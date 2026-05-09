@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   UserCog, Search, Plus, Download, Upload, MoreHorizontal,
@@ -70,11 +70,21 @@ export function UsersPage() {
   const [institutionFilter, setInstitutionFilter] = useState('tous')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [users, setUsers] = useState<UserRow[]>(FAKE_USERS)
+  const [newUser, setNewUser] = useState({ firstName: '', lastName: '', email: '', role: '', institution: '' })
+  const [successToast, setSuccessToast] = useState('')
+
+  useEffect(() => {
+    if (successToast) {
+      const timer = setTimeout(() => setSuccessToast(''), 4000)
+      return () => clearTimeout(timer)
+    }
+  }, [successToast])
 
   const institutions = [...new Set(FAKE_USERS.map(u => u.institution))]
   const roles = [...new Set(FAKE_USERS.map(u => u.role))]
 
-  const filtered = FAKE_USERS.filter(u => {
+  const filtered = users.filter(u => {
     const matchSearch = u.name.toLowerCase().includes(search.toLowerCase()) ||
       u.email.toLowerCase().includes(search.toLowerCase())
     const matchRole = roleFilter === 'tous' || u.role === roleFilter
@@ -168,11 +178,11 @@ export function UsersPage() {
               </Select>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="gap-1">
+              <Button variant="outline" size="sm" className="gap-1" onClick={() => setSuccessToast('Export CSV en cours...')}>
                 <Download className="h-3.5 w-3.5" />
                 Export
               </Button>
-              <Button variant="outline" size="sm" className="gap-1">
+              <Button variant="outline" size="sm" className="gap-1" onClick={() => setSuccessToast('Import en cours...')}>
                 <Upload className="h-3.5 w-3.5" />
                 Import
               </Button>
@@ -192,21 +202,21 @@ export function UsersPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Prénom</Label>
-                        <Input placeholder="Prénom" />
+                        <Input placeholder="Prénom" value={newUser.firstName} onChange={e => setNewUser(prev => ({ ...prev, firstName: e.target.value }))} />
                       </div>
                       <div className="space-y-2">
                         <Label>Nom</Label>
-                        <Input placeholder="Nom de famille" />
+                        <Input placeholder="Nom de famille" value={newUser.lastName} onChange={e => setNewUser(prev => ({ ...prev, lastName: e.target.value }))} />
                       </div>
                     </div>
                     <div className="space-y-2">
                       <Label>Email</Label>
-                      <Input type="email" placeholder="prenom.nom@institution.gov.gn" />
+                      <Input type="email" placeholder="prenom.nom@institution.gov.gn" value={newUser.email} onChange={e => setNewUser(prev => ({ ...prev, email: e.target.value }))} />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Rôle</Label>
-                        <Select>
+                        <Select value={newUser.role} onValueChange={v => setNewUser(prev => ({ ...prev, role: v }))}>
                           <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                           <SelectContent>
                             {roles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
@@ -215,7 +225,7 @@ export function UsersPage() {
                       </div>
                       <div className="space-y-2">
                         <Label>Institution</Label>
-                        <Select>
+                        <Select value={newUser.institution} onValueChange={v => setNewUser(prev => ({ ...prev, institution: v }))}>
                           <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                           <SelectContent>
                             {institutions.map(inst => <SelectItem key={inst} value={inst}>{inst}</SelectItem>)}
@@ -226,8 +236,24 @@ export function UsersPage() {
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
-                    <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90" onClick={() => setDialogOpen(false)}>
-                      Créer l\'utilisateur
+                    <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90" onClick={() => {
+                      const newId = String(Date.now())
+                      const fullName = `${newUser.firstName} ${newUser.lastName}`.trim()
+                      const created: UserRow = {
+                        id: newId,
+                        name: fullName || 'Nouvel utilisateur',
+                        email: newUser.email || 'email@gov.gn',
+                        role: newUser.role || 'Agent',
+                        institution: newUser.institution || 'Non assigné',
+                        status: 'actif',
+                        lastLogin: new Date().toISOString().slice(0, 16).replace('T', ' '),
+                      }
+                      setUsers(prev => [created, ...prev])
+                      setNewUser({ firstName: '', lastName: '', email: '', role: '', institution: '' })
+                      setDialogOpen(false)
+                      setSuccessToast(`Utilisateur ${fullName || 'Nouvel utilisateur'} créé avec succès`)
+                    }}>
+                      Créer l&apos;utilisateur
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -346,8 +372,22 @@ export function UsersPage() {
       </Card>
 
       <div className="text-sm text-muted-foreground text-center">
-        {filtered.length} utilisateur(s) affiché(s) sur {FAKE_USERS.length}
+        {filtered.length} utilisateur(s) affiché(s) sur {users.length}
       </div>
+
+      <AnimatePresence>
+        {successToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-emerald-600 text-white px-4 py-3 rounded-xl shadow-lg"
+          >
+            <CheckCircle2 className="h-5 w-5" />
+            <span className="text-sm font-medium">{successToast}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

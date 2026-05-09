@@ -48,18 +48,22 @@ const STATUS_MAP = {
 }
 
 export function SignaturesPage() {
+  const [signatures, setSignatures] = useState<SignatureRequest[]>(FAKE_SIGNATURES)
   const [activeTab, setActiveTab] = useState('en_attente')
   const [selectedSig, setSelectedSig] = useState<SignatureRequest | null>(null)
   const [signDialogOpen, setSignDialogOpen] = useState(false)
+  const [verifyResult, setVerifyResult] = useState<SignatureRequest | null>(null)
+  const [verifyDialogOpen, setVerifyDialogOpen] = useState(false)
+  const [successToast, setSuccessToast] = useState('')
 
-  const filtered = FAKE_SIGNATURES.filter(s => {
+  const filtered = signatures.filter(s => {
     if (activeTab === 'en_attente') return s.status === 'en_attente'
     if (activeTab === 'signees') return s.status === 'signée'
     return true
   })
 
-  const totalSignees = FAKE_SIGNATURES.filter(s => s.status === 'signée').length
-  const totalEnAttente = FAKE_SIGNATURES.filter(s => s.status === 'en_attente').length
+  const totalSignees = signatures.filter(s => s.status === 'signée').length
+  const totalEnAttente = signatures.filter(s => s.status === 'en_attente').length
   const tauxConformite = 98.5
 
   const stats = [
@@ -101,7 +105,7 @@ export function SignaturesPage() {
             Signées ({totalSignees})
           </TabsTrigger>
           <TabsTrigger value="toutes">
-            Toutes ({FAKE_SIGNATURES.length})
+            Toutes ({signatures.length})
           </TabsTrigger>
         </TabsList>
       </Tabs>
@@ -185,7 +189,10 @@ export function SignaturesPage() {
                           <PenTool className="h-3 w-3" />
                           Signer
                         </Button>
-                        <Button size="sm" variant="outline" className="flex-1 text-red-600 hover:text-red-700 gap-1 h-8 text-xs">
+                        <Button size="sm" variant="outline" className="flex-1 text-red-600 hover:text-red-700 gap-1 h-8 text-xs" onClick={() => {
+                          setSignatures(prev => prev.map(s => s.id === sig.id ? { ...s, status: 'rejetée' as const } : s))
+                          setSuccessToast('Signature rejetée')
+                        }}>
                           <XCircle className="h-3 w-3" />
                           Rejeter
                         </Button>
@@ -193,9 +200,12 @@ export function SignaturesPage() {
                     )}
 
                     {sig.status === 'signée' && (
-                      <Button size="sm" variant="outline" className="w-full gap-1 h-8 text-xs">
+                      <Button size="sm" variant="outline" className="w-full gap-1 h-8 text-xs" onClick={() => {
+                        setVerifyResult(sig)
+                        setVerifyDialogOpen(true)
+                      }}>
                         <Eye className="h-3 w-3" />
-                        Vérifier l\'intégrité
+                        Vérifier l&apos;intégrité
                       </Button>
                     )}
                   </CardContent>
@@ -260,13 +270,99 @@ export function SignaturesPage() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setSignDialogOpen(false)}>Annuler</Button>
-            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2" onClick={() => setSignDialogOpen(false)}>
+            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2" onClick={() => {
+              if (selectedSig) {
+                const now = new Date()
+                setSignatures(prev => prev.map(s => s.id === selectedSig.id ? {
+                  ...s,
+                  status: 'signée' as const,
+                  hash: Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
+                  certificate: 'CN=Certigna/C=GN',
+                  timestamp: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')} GMT`,
+                } : s))
+              }
+              setSignDialogOpen(false)
+              setSuccessToast('Document signé avec succès')
+            }}>
               <PenTool className="h-4 w-4" />
               Confirmer la signature
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Verify Integrity Dialog */}
+      <Dialog open={verifyDialogOpen} onOpenChange={setVerifyDialogOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+              Vérification d&apos;intégrité
+            </DialogTitle>
+            <DialogDescription>Résultat de la vérification du document</DialogDescription>
+          </DialogHeader>
+          {verifyResult && (
+            <div className="space-y-4 py-4">
+              <div className="p-4 rounded-lg bg-muted/50">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-brand dark:text-primary" />
+                  <span className="font-medium text-sm">{verifyResult.documentName}</span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 p-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/10">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">Hash vérifié</p>
+                    <p className="text-xs text-muted-foreground font-mono">{verifyResult.hash}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 p-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/10">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">Certificat valide</p>
+                    <p className="text-xs text-muted-foreground font-mono">{verifyResult.certificate}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 p-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/10">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">Horodatage vérifié</p>
+                    <p className="text-xs text-muted-foreground font-mono">{verifyResult.timestamp}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/10 flex items-center gap-2">
+                <FileCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Intégrité vérifiée - Document conforme</p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setVerifyDialogOpen(false)}>Fermer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Success Toast */}
+      <AnimatePresence>
+        {successToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-lg bg-emerald-600 text-white shadow-lg"
+            onAnimationComplete={() => {
+              setTimeout(() => setSuccessToast(''), 4000)
+            }}
+          >
+            <CheckCircle2 className="h-5 w-5" />
+            <span className="text-sm font-medium">{successToast}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

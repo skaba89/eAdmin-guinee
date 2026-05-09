@@ -92,8 +92,35 @@ export function CourriersPage() {
   const [search, setSearch] = useState('')
   const [priorityFilter, setPriorityFilter] = useState<string>('tous')
   const [showFilters, setShowFilters] = useState(false)
+  const [newCourrierDialog, setNewCourrierDialog] = useState(false)
+  const [courriers, setCourriers] = useState(COURRIERS)
+  const [newCourrier, setNewCourrier] = useState({ objet: '', expediteur: '', priority: 'NORMAL' as CourrierPriority, circuit: '' })
+  const [successToast, setSuccessToast] = useState('')
 
-  const filtered = COURRIERS.filter(c => {
+  const createCourrier = () => {
+    if (!newCourrier.objet || !newCourrier.expediteur) return
+    const id = String(courriers.length + 1)
+    const ref = `CR-2026-${8722 + courriers.length}`
+    const created: Courrier = {
+      id,
+      reference: ref,
+      objet: newCourrier.objet,
+      expediteur: newCourrier.expediteur,
+      priority: newCourrier.priority,
+      circuit: newCourrier.circuit || 'Rédaction → Visa SG → Ministre',
+      statut: 'En attente',
+      sla: '48h restantes',
+      slaHours: 48,
+      date: new Date().toISOString().slice(0, 10),
+    }
+    setCourriers(prev => [created, ...prev])
+    setNewCourrier({ objet: '', expediteur: '', priority: 'NORMAL', circuit: '' })
+    setNewCourrierDialog(false)
+    setSuccessToast(`Courrier ${ref} créé avec succès`)
+    setTimeout(() => setSuccessToast(''), 4000)
+  }
+
+  const filtered = courriers.filter(c => {
     const matchTab = activeTab === 'tous' ||
       (activeTab === 'presidentiels' && c.expediteur.includes('Présidence')) ||
       (activeTab === 'primature' && c.expediteur.includes('Primature')) ||
@@ -238,7 +265,7 @@ export function CourriersPage() {
               Filtres
               <ChevronDown className={`h-3 w-3 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
             </Button>
-            <Button size="sm" className="gap-2 bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90">
+            <Button size="sm" className="gap-2 bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90" onClick={() => setNewCourrierDialog(true)}>
               <Plus className="h-4 w-4" />
               Nouveau courrier
             </Button>
@@ -277,6 +304,81 @@ export function CourriersPage() {
           </AnimatePresence>
         </CardContent>
       </Card>
+
+      {/* Success Toast */}
+      <AnimatePresence>
+        {successToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-white text-sm font-medium shadow-lg"
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            {successToast}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* New Courrier Dialog */}
+      <Dialog open={newCourrierDialog} onOpenChange={setNewCourrierDialog}>
+        <DialogContent className="sm:max-w-[550px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5 text-brand dark:text-primary" />
+              Nouveau courrier officiel
+            </DialogTitle>
+            <DialogDescription>Créer un nouveau courrier interministériel</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Objet du courrier</Label>
+              <Input
+                placeholder="Ex: Note du Cabinet du Premier Ministre — ..."
+                value={newCourrier.objet}
+                onChange={e => setNewCourrier(prev => ({ ...prev, objet: e.target.value }))}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Expéditeur</Label>
+                <Input
+                  placeholder="Ex: Primature, MEF, MATD..."
+                  value={newCourrier.expediteur}
+                  onChange={e => setNewCourrier(prev => ({ ...prev, expediteur: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Priorité</Label>
+                <Select value={newCourrier.priority} onValueChange={(v) => setNewCourrier(prev => ({ ...prev, priority: v as CourrierPriority }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NORMAL">NORMAL</SelectItem>
+                    <SelectItem value="IMPORTANT">IMPORTANT</SelectItem>
+                    <SelectItem value="URGENT">URGENT</SelectItem>
+                    <SelectItem value="CONFIDENTIEL">CONFIDENTIEL</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Circuit de validation (optionnel)</Label>
+              <Input
+                placeholder="Ex: SG → Cabinet PM → Conseil des Ministres"
+                value={newCourrier.circuit}
+                onChange={e => setNewCourrier(prev => ({ ...prev, circuit: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewCourrierDialog(false)}>Annuler</Button>
+            <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={createCourrier} disabled={!newCourrier.objet || !newCourrier.expediteur}>
+              <Send className="h-4 w-4" />
+              Créer le courrier
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Courriers Table */}
       <Card>
@@ -370,7 +472,7 @@ export function CourriersPage() {
             </Table>
           </div>
           <div className="flex items-center justify-between p-4 border-t">
-            <span className="text-xs text-muted-foreground">{filtered.length} courrier(s) affiché(s) sur {COURRIERS.length}</span>
+            <span className="text-xs text-muted-foreground">{filtered.length} courrier(s) affiché(s) sur {courriers.length}</span>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" disabled className="text-xs">Précédent</Button>
               <Button variant="outline" size="sm" className="text-xs bg-brand text-white dark:bg-primary">1</Button>

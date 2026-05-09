@@ -15,6 +15,10 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { BRAND } from '@/lib/constants'
 
 type WorkflowStepStatus = 'completed' | 'current' | 'pending' | 'rejected'
@@ -163,7 +167,63 @@ const TYPE_BADGE_COLORS: Record<string, string> = {
 }
 
 export function WorkflowPage() {
+  const [workflows, setWorkflows] = useState<Workflow[]>(WORKFLOWS)
   const [selectedWorkflow, setSelectedWorkflow] = useState<Workflow | null>(null)
+  const [commentDialogOpen, setCommentDialogOpen] = useState(false)
+  const [commentText, setCommentText] = useState('')
+  const [successToast, setSuccessToast] = useState('')
+
+  const handleAdvance = () => {
+    if (!selectedWorkflow) return
+    const currentStepIndex = selectedWorkflow.steps.findIndex(s => s.status === 'current')
+    if (currentStepIndex === -1) return
+
+    const today = new Date().toISOString().split('T')[0]
+    const updatedWorkflows = workflows.map(wf => {
+      if (wf.id !== selectedWorkflow.id) return wf
+      const newSteps = wf.steps.map((step, i) => {
+        if (i === currentStepIndex) {
+          return { ...step, status: 'completed' as WorkflowStepStatus, date: today, action: `Étape validée le ${today}` }
+        }
+        if (i === currentStepIndex + 1 && step.status === 'pending') {
+          return { ...step, status: 'current' as WorkflowStepStatus }
+        }
+        return step
+      })
+      const completedCount = newSteps.filter(s => s.status === 'completed').length
+      const newProgress = Math.round((completedCount / wf.totalSteps) * 100)
+      const allCompleted = newSteps.every(s => s.status === 'completed')
+      return { ...wf, steps: newSteps, progress: newProgress, status: allCompleted ? 'Validé' as WorkflowStatus : wf.status }
+    })
+
+    setWorkflows(updatedWorkflows)
+    const updated = updatedWorkflows.find(wf => wf.id === selectedWorkflow.id)
+    if (updated) setSelectedWorkflow(updated)
+    setSuccessToast('Procédure avancée avec succès')
+    setTimeout(() => setSuccessToast(''), 4000)
+  }
+
+  const handleAddComment = () => {
+    if (!selectedWorkflow || !commentText.trim()) return
+
+    const now = new Date()
+    const dateStr = `${now.toISOString().split('T')[0]} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+    const updatedWorkflows = workflows.map(wf => {
+      if (wf.id !== selectedWorkflow.id) return wf
+      return {
+        ...wf,
+        comments: [...wf.comments, { author: 'Utilisateur actuel', title: 'Agent', text: commentText.trim(), date: dateStr }],
+      }
+    })
+
+    setWorkflows(updatedWorkflows)
+    const updated = updatedWorkflows.find(wf => wf.id === selectedWorkflow.id)
+    if (updated) setSelectedWorkflow(updated)
+    setCommentText('')
+    setCommentDialogOpen(false)
+    setSuccessToast('Commentaire publié avec succès')
+    setTimeout(() => setSuccessToast(''), 4000)
+  }
 
   const stats = [
     { label: 'Procédures actives', value: '234', icon: GitBranch, color: 'text-brand dark:text-primary', bg: 'bg-brand/5 dark:bg-primary/10' },
@@ -215,7 +275,7 @@ export function WorkflowPage() {
         {/* Workflow Cards */}
         <div className="lg:col-span-2 space-y-4">
           <AnimatePresence mode="popLayout">
-            {WORKFLOWS.map((wf, i) => {
+            {workflows.map((wf, i) => {
               const sConfig = STATUS_CONFIG[wf.status]
               const StatusIcon = sConfig.icon
               const TypeIcon = TYPE_ICONS[wf.type] || GitBranch
@@ -420,11 +480,11 @@ export function WorkflowPage() {
 
                   {/* Actions */}
                   <div className="flex gap-2">
-                    <Button size="sm" className="flex-1 bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-1">
+                    <Button size="sm" className="flex-1 bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-1" onClick={handleAdvance} disabled={!selectedWorkflow.steps.some(s => s.status === 'current')}>
                       <Play className="h-3.5 w-3.5" />
                       Avancer
                     </Button>
-                    <Button size="sm" variant="outline" className="flex-1 gap-1">
+                    <Button size="sm" variant="outline" className="flex-1 gap-1" onClick={() => setCommentDialogOpen(true)}>
                       <MessageSquare className="h-3.5 w-3.5" />
                       Commenter
                     </Button>
@@ -443,6 +503,54 @@ export function WorkflowPage() {
           )}
         </div>
       </div>
+      {/* Comment Dialog */}
+      <Dialog open={commentDialogOpen} onOpenChange={setCommentDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ajouter un commentaire officiel</DialogTitle>
+            <DialogDescription>
+              Publiez un commentaire dans le registre officiel de cette procédure.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="comment-author">Auteur</Label>
+              <Input id="comment-author" value="Utilisateur actuel" disabled />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="comment-text">Commentaire</Label>
+              <Textarea
+                id="comment-text"
+                placeholder="Rédigez votre commentaire officiel..."
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCommentDialogOpen(false)}>Annuler</Button>
+            <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90" onClick={handleAddComment} disabled={!commentText.trim()}>
+              Publier le commentaire
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Success Toast */}
+      <AnimatePresence>
+        {successToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-white text-sm font-medium shadow-lg"
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            {successToast}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Settings, Shield, Bell, Puzzle, Palette,
   Lock, Clock, Key, Globe, Sun, Moon,
@@ -32,6 +32,7 @@ export function SettingsPage() {
     sms_urgent: true, sms_courrier: false,
     whatsapp_courrier: true, whatsapp_workflow: false,
   })
+  const [successToast, setSuccessToast] = useState('')
 
   const integrations = [
     { name: 'API eAdministration', status: 'connected', description: 'API principale de la plateforme', lastSync: 'Il y a 5 min' },
@@ -131,7 +132,7 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2">
+                <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={() => { setSuccessToast('Paramètres généraux enregistrés avec succès'); setTimeout(() => setSuccessToast(''), 4000) }}>
                   <Save className="h-4 w-4" />
                   Enregistrer
                 </Button>
@@ -226,7 +227,7 @@ export function SettingsPage() {
                   </ul>
                 </div>
 
-                <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2">
+                <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={() => { setSuccessToast('Paramètres de sécurité enregistrés avec succès'); setTimeout(() => setSuccessToast(''), 4000) }}>
                   <Save className="h-4 w-4" />
                   Enregistrer
                 </Button>
@@ -324,7 +325,7 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2">
+                <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={() => { setSuccessToast('Préférences de notification enregistrées avec succès'); setTimeout(() => setSuccessToast(''), 4000) }}>
                   <Save className="h-4 w-4" />
                   Enregistrer les préférences
                 </Button>
@@ -447,7 +448,7 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2">
+                <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={() => { setSuccessToast('Préférences d\'apparence enregistrées avec succès'); setTimeout(() => setSuccessToast(''), 4000) }}>
                   <Save className="h-4 w-4" />
                   Enregistrer
                 </Button>
@@ -456,6 +457,21 @@ export function SettingsPage() {
           </motion.div>
         </TabsContent>
       </Tabs>
+
+      {/* Success Toast */}
+      <AnimatePresence>
+        {successToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-white text-sm font-medium shadow-lg"
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            {successToast}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

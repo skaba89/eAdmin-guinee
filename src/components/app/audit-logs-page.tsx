@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   ScrollText, Search, Download, Filter, Clock, User,
-  Activity, Globe, ChevronDown, RefreshCw, AlertTriangle
+  Activity, Globe, ChevronDown, RefreshCw, AlertTriangle, CheckCircle2
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -64,8 +64,10 @@ export function AuditLogsPage() {
   const [actionFilter, setActionFilter] = useState('Tous')
   const [resourceFilter, setResourceFilter] = useState('Tous')
   const [isLive, setIsLive] = useState(true)
+  const [successToast, setSuccessToast] = useState('')
+  const [logs, setLogs] = useState(FAKE_LOGS)
 
-  const filtered = FAKE_LOGS.filter(log => {
+  const filtered = logs.filter(log => {
     const matchSearch = log.user.toLowerCase().includes(search.toLowerCase()) ||
       log.resource.toLowerCase().includes(search.toLowerCase()) ||
       log.details.toLowerCase().includes(search.toLowerCase())
@@ -75,10 +77,10 @@ export function AuditLogsPage() {
   })
 
   const actionCounts = {
-    CREATE: FAKE_LOGS.filter(l => l.action === 'CREATE').length,
-    UPDATE: FAKE_LOGS.filter(l => l.action === 'UPDATE').length,
-    DELETE: FAKE_LOGS.filter(l => l.action === 'DELETE').length,
-    LOGIN: FAKE_LOGS.filter(l => l.action === 'LOGIN').length,
+    CREATE: logs.filter(l => l.action === 'CREATE').length,
+    UPDATE: logs.filter(l => l.action === 'UPDATE').length,
+    DELETE: logs.filter(l => l.action === 'DELETE').length,
+    LOGIN: logs.filter(l => l.action === 'LOGIN').length,
   }
 
   return (
@@ -86,7 +88,7 @@ export function AuditLogsPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Total événements', value: FAKE_LOGS.length, icon: ScrollText, color: 'text-brand dark:text-primary', bg: 'bg-brand/5 dark:bg-primary/10' },
+          { label: 'Total événements', value: logs.length, icon: ScrollText, color: 'text-brand dark:text-primary', bg: 'bg-brand/5 dark:bg-primary/10' },
           { label: 'Créations', value: actionCounts.CREATE, icon: Activity, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
           { label: 'Modifications', value: actionCounts.UPDATE, icon: Activity, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-900/20' },
           { label: 'Suppressions', value: actionCounts.DELETE, icon: Activity, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/20' },
@@ -141,7 +143,7 @@ export function AuditLogsPage() {
               <Input type="date" className="w-[150px]" placeholder="Date fin" />
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="gap-1.5">
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => { setSuccessToast('Export CSV en cours de génération...'); setTimeout(() => setSuccessToast(''), 4000) }}>
                 <Download className="h-3.5 w-3.5" />
                 Export CSV
               </Button>
@@ -164,7 +166,21 @@ export function AuditLogsPage() {
                 Dernière activité: Il y a 5 minutes
               </span>
             </div>
-            <Button variant="ghost" size="sm" className="gap-1.5">
+            <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => {
+              const newLog: AuditLog = {
+                id: String(logs.length + 1),
+                timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+                user: 'Système',
+                action: 'CREATE',
+                resource: 'Actualisation manuelle des logs',
+                resourceType: 'système',
+                ipAddress: '10.0.0.1',
+                details: 'Actualisation du journal d\'audit',
+              }
+              setLogs(prev => [newLog, ...prev])
+              setSuccessToast('Journal actualisé avec succès')
+              setTimeout(() => setSuccessToast(''), 4000)
+            }}>
               <RefreshCw className="h-3.5 w-3.5" />
               Actualiser
             </Button>
@@ -242,8 +258,23 @@ export function AuditLogsPage() {
       </Card>
 
       <div className="text-sm text-muted-foreground text-center">
-        {filtered.length} entrée(s) affichée(s) sur {FAKE_LOGS.length}
+        {filtered.length} entrée(s) affichée(s) sur {logs.length}
       </div>
+
+      {/* Success Toast */}
+      <AnimatePresence>
+        {successToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-white text-sm font-medium shadow-lg"
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            {successToast}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

@@ -49,6 +49,7 @@ import {
   Legend,
 } from 'recharts'
 import { DEMO_KPI, MONTHLY_DATA, DEMO_STATS } from '@/lib/constants'
+import { useAppStore } from '@/store/app-store'
 
 const CHART_COLORS = ['#0B2E58', '#3B7DD8', '#C8A45C', '#10B981', '#EF4444', '#8B5CF6']
 
@@ -138,12 +139,7 @@ const activityColors: Record<string, string> = {
 }
 
 // ─── QUICK ACTIONS ───────────────────────────────────────────────────────────
-const quickActions = [
-  { label: 'Nouveau courrier officiel', icon: Mail, color: 'bg-[#0B2E58] hover:bg-[#0B2E58]/90 text-white' },
-  { label: 'Upload document réglementaire', icon: Upload, color: 'bg-[#3B7DD8] hover:bg-[#3B7DD8]/90 text-white' },
-  { label: 'Procédure administrative', icon: GitBranch, color: 'bg-[#C8A45C] hover:bg-[#C8A45C]/90 text-white' },
-  { label: 'Service citoyen', icon: UserCheck, color: 'bg-emerald-600 hover:bg-emerald-600/90 text-white' },
-]
+// (actions now defined inside the component so they can use navigate)
 
 // ─── HEATMAP DATA ────────────────────────────────────────────────────────────
 const heatmapData = (() => {
@@ -185,6 +181,15 @@ const tooltipStyle = {
 }
 
 export default function DashboardPage() {
+  const navigate = useAppStore((s) => s.navigate)
+
+  const quickActions = [
+    { label: 'Nouveau courrier officiel', icon: Mail, color: 'bg-[#0B2E58] hover:bg-[#0B2E58]/90 text-white', onClick: () => navigate('courriers') },
+    { label: 'Upload document réglementaire', icon: Upload, color: 'bg-[#3B7DD8] hover:bg-[#3B7DD8]/90 text-white', onClick: () => navigate('ged') },
+    { label: 'Procédure administrative', icon: GitBranch, color: 'bg-[#C8A45C] hover:bg-[#C8A45C]/90 text-white', onClick: () => navigate('workflow') },
+    { label: 'Service citoyen', icon: UserCheck, color: 'bg-emerald-600 hover:bg-emerald-600/90 text-white', onClick: () => navigate('citizen-portal') },
+  ]
+
   return (
     <motion.div
       variants={containerVariants}
@@ -519,6 +524,7 @@ export default function DashboardPage() {
                 <Button
                   key={action.label}
                   className={`${action.color} h-auto flex-col gap-2 rounded-xl py-4 text-xs font-semibold shadow-sm transition-all hover:scale-[1.02]`}
+                  onClick={action.onClick}
                 >
                   <action.icon className="size-5" />
                   {action.label}

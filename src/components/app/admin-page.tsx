@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Shield, Server, Database, HardDrive, Activity,
   Cpu, Wifi, Key, ToggleLeft, ToggleRight,
@@ -9,6 +9,9 @@ import {
   Building2, Globe, Settings, BarChart3, Copy,
   Eye, EyeOff, Plus, Trash2
 } from 'lucide-react'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
+} from '@/components/ui/dialog'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -48,7 +51,17 @@ const API_KEYS = [
 export function AdminPage() {
   const [modules, setModules] = useState(MODULES)
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({})
-  const [apiKeys] = useState(API_KEYS)
+  const [apiKeys, setApiKeys] = useState(API_KEYS)
+  const [newKeyDialog, setNewKeyDialog] = useState(false)
+  const [newKeyName, setNewKeyName] = useState('')
+  const [successToast, setSuccessToast] = useState('')
+
+  useEffect(() => {
+    if (successToast) {
+      const timer = setTimeout(() => setSuccessToast(''), 4000)
+      return () => clearTimeout(timer)
+    }
+  }, [successToast])
 
   const toggleModule = (id: string) => {
     setModules(prev => prev.map(m => m.id === id ? { ...m, active: !m.active } : m))
@@ -221,7 +234,7 @@ export function AdminPage() {
                 <CardTitle className="text-base">Gestion des clés API</CardTitle>
                 <CardDescription>Gérez les clés d\'accès à l\'API eAdministration</CardDescription>
               </div>
-              <Button size="sm" className="gap-2 bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90">
+              <Button size="sm" className="gap-2 bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90" onClick={() => { setNewKeyDialog(true); setNewKeyName('') }}>
                 <Plus className="h-4 w-4" />
                 Nouvelle clé
               </Button>
@@ -291,12 +304,63 @@ export function AdminPage() {
                 <Input defaultValue="Conakry, Kaloum" />
               </div>
             </div>
-            <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90">
+            <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90" onClick={() => setSuccessToast('Paramètres enregistrés avec succès')}>
               Enregistrer les modifications
             </Button>
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* New API Key Dialog */}
+      <Dialog open={newKeyDialog} onOpenChange={setNewKeyDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Générer une nouvelle clé API</DialogTitle>
+            <DialogDescription>Entrez un nom pour identifier cette clé</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Nom de la clé</Label>
+              <Input placeholder="Ex: Production API, Partenaire UNDP..." value={newKeyName} onChange={e => setNewKeyName(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewKeyDialog(false)}>Annuler</Button>
+            <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90" onClick={() => {
+              const chars = 'abcdef0123456789'
+              const randomKey = Array.from({ length: 16 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+              const newKey = {
+                id: String(Date.now()),
+                name: newKeyName || 'Nouvelle clé',
+                key: `eadmin_gen_${randomKey}`,
+                created: new Date().toISOString().slice(0, 10),
+                lastUsed: new Date().toISOString().slice(0, 10),
+                status: 'active' as const,
+              }
+              setApiKeys(prev => [newKey, ...prev])
+              setNewKeyName('')
+              setNewKeyDialog(false)
+              setSuccessToast(`Clé API "${newKey.name}" générée avec succès`)
+            }}>
+              Générer la clé
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AnimatePresence>
+        {successToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-emerald-600 text-white px-4 py-3 rounded-xl shadow-lg"
+          >
+            <CheckCircle2 className="h-5 w-5" />
+            <span className="text-sm font-medium">{successToast}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

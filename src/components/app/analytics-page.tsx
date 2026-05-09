@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { useState, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Download,
   FileSpreadsheet,
@@ -11,6 +11,7 @@ import {
   TrendingUp,
   BarChart3,
   Target,
+  CheckCircle2,
 } from 'lucide-react'
 import {
   Card,
@@ -118,6 +119,14 @@ const itemVariants = {
 
 export default function AnalyticsPage() {
   const [selectedPeriod, setSelectedPeriod] = useState<string>('30d')
+  const [successToast, setSuccessToast] = useState('')
+
+  useEffect(() => {
+    if (successToast) {
+      const timer = setTimeout(() => setSuccessToast(''), 4000)
+      return () => clearTimeout(timer)
+    }
+  }, [successToast])
 
   return (
     <motion.div
@@ -137,11 +146,11 @@ export default function AnalyticsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5 text-xs">
+          <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => setSuccessToast('Rapport PDF en cours de génération...')}>
             <Download className="size-3.5" />
             Export PDF
           </Button>
-          <Button variant="outline" size="sm" className="gap-1.5 text-xs">
+          <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => setSuccessToast('Export Excel en cours de génération...')}>
             <FileSpreadsheet className="size-3.5" />
             Export Excel
           </Button>
@@ -470,16 +479,30 @@ export default function AnalyticsPage() {
           <p className="text-xs text-muted-foreground">Téléchargez les rapports dans le format de votre choix</p>
         </div>
         <div className="flex gap-2">
-          <Button className="gap-1.5 bg-[#0B2E58] text-white hover:bg-[#0B2E58]/90">
+          <Button className="gap-1.5 bg-[#0B2E58] text-white hover:bg-[#0B2E58]/90" onClick={() => setSuccessToast('Rapport PDF en cours de génération...')}>
             <Download className="size-3.5" />
             Export PDF
           </Button>
-          <Button variant="outline" className="gap-1.5">
+          <Button variant="outline" className="gap-1.5" onClick={() => setSuccessToast('Export Excel en cours de génération...')}>
             <FileSpreadsheet className="size-3.5" />
             Export Excel
           </Button>
         </div>
       </motion.div>
+
+      <AnimatePresence>
+        {successToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-emerald-600 text-white px-4 py-3 rounded-xl shadow-lg"
+          >
+            <CheckCircle2 className="h-5 w-5" />
+            <span className="text-sm font-medium">{successToast}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   )
 }

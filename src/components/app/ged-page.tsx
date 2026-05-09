@@ -21,6 +21,8 @@ import { Separator } from '@/components/ui/separator'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
 import { BRAND } from '@/lib/constants'
 
 type DocClassification = 'PUBLIC' | 'DIFFUSION LIMITÉE' | 'CONFIDENTIEL' | 'SECRET'
@@ -102,8 +104,34 @@ export function GedPage() {
   const [classificationFilter, setClassificationFilter] = useState<string>('tous')
   const [institutionFilter, setInstitutionFilter] = useState<string>('tous')
   const [showFilters, setShowFilters] = useState(false)
+  const [uploadDialog, setUploadDialog] = useState(false)
+  const [documents, setDocuments] = useState(DOCUMENTS)
+  const [newDoc, setNewDoc] = useState({ objet: '', type: 'Note de service' as DocType, institution: '', classification: 'PUBLIC' as DocClassification })
+  const [successToast, setSuccessToast] = useState('')
 
-  const filteredDocs = DOCUMENTS.filter(doc => {
+  const uploadDocument = () => {
+    if (!newDoc.objet || !newDoc.institution) return
+    const id = String(documents.length + 1)
+    const ref = `NS/2026/${134 + documents.length}/NEW/SG`
+    const created: Document = {
+      id,
+      reference: ref,
+      objet: newDoc.objet,
+      type: newDoc.type,
+      institution: newDoc.institution,
+      taille: '256 KB',
+      classification: newDoc.classification,
+      statut: 'En cours',
+      date: new Date().toISOString().slice(0, 10),
+    }
+    setDocuments(prev => [created, ...prev])
+    setNewDoc({ objet: '', type: 'Note de service', institution: '', classification: 'PUBLIC' })
+    setUploadDialog(false)
+    setSuccessToast(`Document ${ref} importé avec succès`)
+    setTimeout(() => setSuccessToast(''), 4000)
+  }
+
+  const filteredDocs = documents.filter(doc => {
     const matchSearch = doc.objet.toLowerCase().includes(search.toLowerCase()) ||
       doc.reference.toLowerCase().includes(search.toLowerCase()) ||
       doc.institution.toLowerCase().includes(search.toLowerCase())
@@ -218,7 +246,7 @@ export function GedPage() {
                 Filtres avancés
                 <ChevronDown className={`h-3 w-3 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
               </Button>
-              <Button size="sm" className="gap-2 bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90">
+              <Button size="sm" className="gap-2 bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90" onClick={() => setUploadDialog(true)}>
                 <Upload className="h-4 w-4" />
                 Importer un document
               </Button>
@@ -385,7 +413,7 @@ export function GedPage() {
                 </Table>
               </div>
               <div className="flex items-center justify-between p-4 border-t">
-                <span className="text-xs text-muted-foreground">{filteredDocs.length} document(s) affiché(s) sur {DOCUMENTS.length}</span>
+                <span className="text-xs text-muted-foreground">{filteredDocs.length} document(s) affiché(s) sur {documents.length}</span>
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm" disabled className="text-xs">Précédent</Button>
                   <Button variant="outline" size="sm" className="text-xs bg-brand text-white dark:bg-primary">1</Button>
@@ -432,7 +460,7 @@ export function GedPage() {
               <Separator className="my-2" />
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold">Total</span>
-                <span className="text-sm font-bold text-brand dark:text-primary">{DOCUMENTS.length}</span>
+                <span className="text-xs font-bold text-brand dark:text-primary">{documents.length}</span>
               </div>
             </CardContent>
           </Card>
@@ -446,7 +474,7 @@ export function GedPage() {
             </CardHeader>
             <CardContent className="space-y-2">
               {(['PUBLIC', 'DIFFUSION LIMITÉE', 'CONFIDENTIEL', 'SECRET'] as DocClassification[]).map(cls => {
-                const count = DOCUMENTS.filter(d => d.classification === cls).length
+                const count = documents.filter(d => d.classification === cls).length
                 const config = CLASSIFICATION_CONFIG[cls]
                 return (
                   <div key={cls} className="flex items-center justify-between p-2 rounded-lg bg-muted/30">
@@ -462,6 +490,87 @@ export function GedPage() {
           </Card>
         </div>
       </div>
+
+      {/* Success Toast */}
+      <AnimatePresence>
+        {successToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-white text-sm font-medium shadow-lg"
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            {successToast}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Upload Document Dialog */}
+      <Dialog open={uploadDialog} onOpenChange={setUploadDialog}>
+        <DialogContent className="sm:max-w-[550px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5 text-brand dark:text-primary" />
+              Importer un document réglementaire
+            </DialogTitle>
+            <DialogDescription>Ajouter un nouveau document officiel à la GED</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Objet du document</Label>
+              <Input
+                placeholder="Ex: Décret n°D/2026/... portant organisation..."
+                value={newDoc.objet}
+                onChange={e => setNewDoc(prev => ({ ...prev, objet: e.target.value }))}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Type de document</Label>
+                <Select value={newDoc.type} onValueChange={(v) => setNewDoc(prev => ({ ...prev, type: v as DocType }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Décret">Décret</SelectItem>
+                    <SelectItem value="Arrêté">Arrêté</SelectItem>
+                    <SelectItem value="Circulaire">Circulaire</SelectItem>
+                    <SelectItem value="Note de service">Note de service</SelectItem>
+                    <SelectItem value="Rapport">Rapport</SelectItem>
+                    <SelectItem value="Ordonnance">Ordonnance</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Classification</Label>
+                <Select value={newDoc.classification} onValueChange={(v) => setNewDoc(prev => ({ ...prev, classification: v as DocClassification }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PUBLIC">PUBLIC</SelectItem>
+                    <SelectItem value="DIFFUSION LIMITÉE">DIFFUSION LIMITÉE</SelectItem>
+                    <SelectItem value="CONFIDENTIEL">CONFIDENTIEL</SelectItem>
+                    <SelectItem value="SECRET">SECRET</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Institution</Label>
+              <Input
+                placeholder="Ex: Ministère des Finances, Présidence..."
+                value={newDoc.institution}
+                onChange={e => setNewDoc(prev => ({ ...prev, institution: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUploadDialog(false)}>Annuler</Button>
+            <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={uploadDocument} disabled={!newDoc.objet || !newDoc.institution}>
+              <Upload className="h-4 w-4" />
+              Importer le document
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Users, FileText, Clock, CheckCircle2, Upload, Search,
@@ -20,6 +20,9 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Separator } from '@/components/ui/separator'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
+} from '@/components/ui/dialog'
 
 // ─── GUINEA BRAND COLORS ─────────────────────────────────────────────────────
 const GUINEA_RED = '#CE1126'
@@ -247,6 +250,16 @@ export function CitizenPortalPage() {
   const [trackingNumber, setTrackingNumber] = useState('')
   const [trackedDossier, setTrackedDossier] = useState<Dossier | null>(null)
   const [notifPrefs, setNotifPrefs] = useState({ whatsapp: true, sms: false, email: true, ussd: false })
+  const [serviceDialogOpen, setServiceDialogOpen] = useState(false)
+  const [selectedService, setSelectedService] = useState<ServiceItem | null>(null)
+  const [successToast, setSuccessToast] = useState('')
+
+  useEffect(() => {
+    if (successToast) {
+      const timer = setTimeout(() => setSuccessToast(''), 4000)
+      return () => clearTimeout(timer)
+    }
+  }, [successToast])
 
   const handleTrack = () => {
     const found = DOSSIERS.find(d => d.number === trackingNumber || d.number.includes(trackingNumber))
@@ -372,7 +385,7 @@ export function CitizenPortalPage() {
                             </span>
                             <span className="font-semibold text-[#0B2E58] dark:text-[#3B7DD8]">{service.price}</span>
                           </div>
-                          <Button size="sm" className={`w-full gap-1 text-xs h-8 ${category.color} hover:opacity-90 text-white border-0`}>
+                          <Button size="sm" className={`w-full gap-1 text-xs h-8 ${category.color} hover:opacity-90 text-white border-0`} onClick={() => { setSelectedService(service); setServiceDialogOpen(true) }}>
                             Demander
                             <ChevronRight className="h-3 w-3" />
                           </Button>
@@ -566,7 +579,7 @@ export function CitizenPortalPage() {
                 ))}
               </div>
 
-              <Button className="bg-[#0B2E58] hover:bg-[#0B2E58]/90 dark:bg-[#3B7DD8] dark:hover:bg-[#3B7DD8]/90 text-white">
+              <Button className="bg-[#0B2E58] hover:bg-[#0B2E58]/90 dark:bg-[#3B7DD8] dark:hover:bg-[#3B7DD8]/90 text-white" onClick={() => setSuccessToast('Préférences de notification enregistrées')}>
                 Enregistrer les préférences
               </Button>
             </CardContent>
@@ -703,6 +716,45 @@ export function CitizenPortalPage() {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Service Request Dialog */}
+      <Dialog open={serviceDialogOpen} onOpenChange={setServiceDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>{selectedService?.name}</DialogTitle>
+            <DialogDescription>{selectedService?.description}</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              Votre demande de {selectedService?.name} sera traitée dans un délai de {selectedService?.delay}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setServiceDialogOpen(false)}>Annuler</Button>
+            <Button className="bg-[#0B2E58] hover:bg-[#0B2E58]/90 dark:bg-[#3B7DD8] dark:hover:bg-[#3B7DD8]/90 text-white" onClick={() => {
+              const ref = `GN-2026-${String(Math.floor(100000 + Math.random() * 900000))}`
+              setServiceDialogOpen(false)
+              setSuccessToast(`Demande de ${selectedService?.name} soumise avec succès - Référence: ${ref}`)
+            }}>
+              Confirmer la demande
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AnimatePresence>
+        {successToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 50 }}
+            className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-emerald-600 text-white px-4 py-3 rounded-xl shadow-lg"
+          >
+            <CheckCircle2 className="h-5 w-5" />
+            <span className="text-sm font-medium">{successToast}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   )
 }
