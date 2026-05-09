@@ -7,13 +7,14 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, FileText, Mail, GitBranch, PenTool,
   BarChart3, Users, Shield, UserCog, Settings, Bell,
-  ScrollText, LogOut, ChevronLeft, ChevronRight, Sparkles
+  ScrollText, LogOut, ChevronLeft, ChevronRight, Sparkles,
+  ClipboardCheck
 } from 'lucide-react'
 
 const ICON_MAP: Record<string, React.ElementType> = {
   LayoutDashboard, FileText, Mail, GitBranch, PenTool,
   BarChart3, Users, Shield, UserCog, Settings, Bell,
-  ScrollText, Sparkles,
+  ScrollText, Sparkles, ClipboardCheck,
 }
 
 export function AppSidebar() {
