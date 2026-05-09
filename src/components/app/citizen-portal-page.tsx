@@ -169,7 +169,7 @@ const itemVariants = {
 export function CitizenPortalPage() {
   const navigate = useAppStore((s) => s.navigate)
   const { requests, addRequest, getRequestByReference } = useCitizenRequestsStore()
-  const [activeTab, setActiveTab] = useState('services')
+  const [activeTab, setActiveTab] = useState('mes-demandes')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [successToast, setSuccessToast] = useState('')
