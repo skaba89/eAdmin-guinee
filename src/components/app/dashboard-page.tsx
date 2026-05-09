@@ -187,7 +187,9 @@ export default function DashboardPage() {
     { label: 'Nouveau courrier officiel', icon: Mail, color: 'bg-[#0B2E58] hover:bg-[#0B2E58]/90 text-white', onClick: () => navigate('courriers') },
     { label: 'Upload document réglementaire', icon: Upload, color: 'bg-[#3B7DD8] hover:bg-[#3B7DD8]/90 text-white', onClick: () => navigate('ged') },
     { label: 'Procédure administrative', icon: GitBranch, color: 'bg-[#C8A45C] hover:bg-[#C8A45C]/90 text-white', onClick: () => navigate('workflow') },
-    { label: 'Service citoyen', icon: UserCheck, color: 'bg-emerald-600 hover:bg-emerald-600/90 text-white', onClick: () => navigate('citizen-portal') },
+    { label: 'Demandes citoyennes', icon: UserCheck, color: 'bg-emerald-600 hover:bg-emerald-600/90 text-white', onClick: () => navigate('service-requests') },
+    { label: 'Portail Citoyen', icon: UserCheck, color: 'bg-purple-600 hover:bg-purple-600/90 text-white', onClick: () => navigate('citizen-portal') },
+    { label: 'Signatures électroniques', icon: PenTool, color: 'bg-rose-600 hover:bg-rose-600/90 text-white', onClick: () => navigate('signatures') },
   ]
 
   return (
@@ -519,7 +521,7 @@ export default function DashboardPage() {
               </CardTitle>
               <CardDescription className="text-xs">Raccourcis pour les tâches fréquentes</CardDescription>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 gap-3">
+            <CardContent className="grid grid-cols-3 gap-3">
               {quickActions.map((action) => (
                 <Button
                   key={action.label}

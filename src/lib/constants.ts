@@ -58,6 +58,7 @@ export const NAV_ITEMS = {
     { label: 'Blog', page: 'blog' as const },
     { label: 'FAQ', page: 'faq' as const },
     { label: 'Contact', page: 'contact' as const },
+    { label: 'Guinée Services', page: 'public-citizen-portal' as const },
   ],
   auth: [
     { label: 'Connexion', page: 'login' as const },
@@ -71,6 +72,7 @@ export const NAV_ITEMS = {
     { label: 'Signatures', page: 'signatures' as const, icon: 'PenTool' },
     { label: 'Analytics', page: 'analytics' as const, icon: 'BarChart3' },
     { label: 'Portail Citoyen', page: 'citizen-portal' as const, icon: 'Users' },
+    { label: 'Demandes Citoyennes', page: 'service-requests' as const, icon: 'ClipboardCheck' },
   ],
   admin: [
     { label: 'Administration', page: 'admin' as const, icon: 'Shield' },

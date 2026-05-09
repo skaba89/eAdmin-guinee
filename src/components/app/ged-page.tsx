@@ -7,7 +7,7 @@ import {
   Archive, Download, Eye, Trash2, Plus, ChevronDown, Tag,
   Lock, Shield, Brain, Building2, Calendar, X, FolderOpen,
   CheckCircle2, Clock, AlertCircle, BookOpen, FileSignature,
-  ScrollText, BarChart3, MapPin, Library
+  ScrollText, BarChart3, MapPin, Library, Mail, GitBranch, PenTool, UserCheck
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -24,6 +24,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { BRAND } from '@/lib/constants'
+import { useAppStore } from '@/store/app-store'
 
 type DocClassification = 'PUBLIC' | 'DIFFUSION LIMITÉE' | 'CONFIDENTIEL' | 'SECRET'
 type DocStatus = 'Signé' | 'En vigueur' | 'En cours' | 'Publié' | 'Diffusée' | 'Classé'
@@ -108,6 +109,7 @@ export function GedPage() {
   const [documents, setDocuments] = useState(DOCUMENTS)
   const [newDoc, setNewDoc] = useState({ objet: '', type: 'Note de service' as DocType, institution: '', classification: 'PUBLIC' as DocClassification })
   const [successToast, setSuccessToast] = useState('')
+  const navigate = useAppStore((s) => s.navigate)
 
   const uploadDocument = () => {
     if (!newDoc.objet || !newDoc.institution) return
@@ -199,6 +201,35 @@ export function GedPage() {
           </motion.div>
         ))}
       </div>
+
+      {/* Quick Actions */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        <Card className="shadow-sm border-[#C8A45C]/20 dark:border-[#D4B878]/20 bg-gradient-to-r from-[#0B2E58]/[0.02] to-[#C8A45C]/[0.02] dark:from-[#3B7DD8]/[0.05] dark:to-[#D4B878]/[0.03]">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">Actions rapides</CardTitle>
+            <CardDescription className="text-xs">Raccourcis vers les modules liés</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { label: 'Nouveau courrier', icon: Mail, color: 'bg-[#0B2E58] hover:bg-[#0B2E58]/90 text-white', onClick: () => navigate('courriers') },
+                { label: 'Lancer un workflow', icon: GitBranch, color: 'bg-[#C8A45C] hover:bg-[#C8A45C]/90 text-[#0B2E58]', onClick: () => navigate('workflow') },
+                { label: 'Demander signature', icon: PenTool, color: 'bg-emerald-600 hover:bg-emerald-600/90 text-white', onClick: () => navigate('signatures') },
+                { label: 'Demandes citoyennes', icon: UserCheck, color: 'bg-[#3B7DD8] hover:bg-[#3B7DD8]/90 text-white', onClick: () => navigate('service-requests') },
+              ].map(action => (
+                <Button key={action.label} className={`${action.color} h-auto flex-col gap-2 rounded-xl py-4 text-xs font-semibold shadow-sm transition-all hover:scale-[1.02]`} onClick={action.onClick}>
+                  <action.icon className="size-5" />
+                  {action.label}
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
 
       {/* Document Type Tabs */}
       <Card>

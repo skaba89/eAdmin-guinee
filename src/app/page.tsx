@@ -30,6 +30,8 @@ const SettingsPage = dynamic(() => import('@/components/app/settings-page').then
 const NotificationsPage = dynamic(() => import('@/components/app/notifications-page').then(m => ({ default: m.NotificationsPage })), { ssr: false })
 const AuditLogsPage = dynamic(() => import('@/components/app/audit-logs-page').then(m => ({ default: m.AuditLogsPage })), { ssr: false })
 const PublicNav = dynamic(() => import('@/components/landing/public-nav').then(m => ({ default: m.PublicNav })), { ssr: false })
+const PublicCitizenPortal = dynamic(() => import('@/components/landing/public-citizen-portal').then(m => ({ default: m.PublicCitizenPortal })), { ssr: false })
+const ServiceRequestsPage = dynamic(() => import('@/components/app/service-requests-page').then(m => ({ default: m.ServiceRequestsPage })), { ssr: false })
 
 const publicPages: Record<string, React.ComponentType> = {
   landing: LandingPage,
@@ -41,6 +43,7 @@ const publicPages: Record<string, React.ComponentType> = {
   blog: BlogPage,
   faq: FAQPage,
   demo: DemoPage,
+  'public-citizen-portal': PublicCitizenPortal,
 }
 
 const authPages: Record<string, React.ComponentType> = {
@@ -61,6 +64,7 @@ const appPages: Record<string, React.ComponentType> = {
   settings: SettingsPage,
   notifications: NotificationsPage,
   'audit-logs': AuditLogsPage,
+  'service-requests': ServiceRequestsPage,
 }
 
 export default function Home() {

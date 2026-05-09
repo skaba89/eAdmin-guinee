@@ -26,6 +26,8 @@ export type AppPage =
   | 'notifications'
   | 'audit-logs'
   | 'citizen-portal'
+  | 'service-requests'
+  | 'public-citizen-portal'
 
 interface UserInfo {
   name: string

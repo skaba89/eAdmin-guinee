@@ -48,6 +48,7 @@ import {
   Legend,
 } from 'recharts'
 import { MONTHLY_DATA } from '@/lib/constants'
+import { useAppStore } from '@/store/app-store'
 
 const CHART_COLORS = ['#0B2E58', '#3B7DD8', '#C8A45C', '#10B981', '#EF4444']
 
@@ -118,6 +119,7 @@ const itemVariants = {
 }
 
 export default function AnalyticsPage() {
+  const navigate = useAppStore((s) => s.navigate)
   const [selectedPeriod, setSelectedPeriod] = useState<string>('30d')
   const [successToast, setSuccessToast] = useState('')
 
@@ -155,6 +157,33 @@ export default function AnalyticsPage() {
             Export Excel
           </Button>
         </div>
+      </motion.div>
+
+      {/* Quick Actions */}
+      <motion.div variants={itemVariants}>
+        <Card className="shadow-sm border-[#C8A45C]/20 dark:border-[#D4B878]/20 bg-gradient-to-r from-[#0B2E58]/[0.02] to-[#C8A45C]/[0.02] dark:from-[#3B7DD8]/[0.05] dark:to-[#D4B878]/[0.03]">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-sm font-semibold text-[#0B2E58] dark:text-white">Actions rapides</p>
+                <p className="text-xs text-muted-foreground">Raccourcis vers les modules liés</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { label: 'Tableau de bord', icon: BarChart3, color: 'bg-[#0B2E58] hover:bg-[#0B2E58]/90 text-white', onClick: () => navigate('dashboard') },
+                { label: 'Demandes citoyennes', icon: CheckCircle2, color: 'bg-emerald-600 hover:bg-emerald-600/90 text-white', onClick: () => navigate('service-requests') },
+                { label: 'Courriers', icon: Mail, color: 'bg-[#3B7DD8] hover:bg-[#3B7DD8]/90 text-white', onClick: () => navigate('courriers') },
+                { label: 'Documents GED', icon: FileSpreadsheet, color: 'bg-[#C8A45C] hover:bg-[#C8A45C]/90 text-[#0B2E58]', onClick: () => navigate('ged') },
+              ].map(action => (
+                <Button key={action.label} className={`${action.color} h-auto flex-col gap-2 rounded-xl py-3 text-xs font-semibold shadow-sm transition-all hover:scale-[1.02]`} onClick={action.onClick}>
+                  <action.icon className="size-5" />
+                  {action.label}
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </motion.div>
 
       {/* Period Selector */}

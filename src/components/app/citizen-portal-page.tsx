@@ -23,6 +23,8 @@ import { Separator } from '@/components/ui/separator'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
 } from '@/components/ui/dialog'
+import { useAppStore } from '@/store/app-store'
+import { useCitizenRequestsStore } from '@/store/citizen-requests-store'
 
 // ─── GUINEA BRAND COLORS ─────────────────────────────────────────────────────
 const GUINEA_RED = '#CE1126'
@@ -246,6 +248,8 @@ const itemVariants = {
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 export function CitizenPortalPage() {
+  const navigate = useAppStore((s) => s.navigate)
+  const citizenRequests = useCitizenRequestsStore((s) => s.requests)
   const [activeTab, setActiveTab] = useState('services')
   const [trackingNumber, setTrackingNumber] = useState('')
   const [trackedDossier, setTrackedDossier] = useState<Dossier | null>(null)
@@ -300,6 +304,33 @@ export function CitizenPortalPage() {
               <Globe className="size-3" />
               Service Public Numérique
             </Badge>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          QUICK ACTIONS
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <motion.div variants={itemVariants}>
+        <Card className="shadow-sm border-[#C8A45C]/20 dark:border-[#D4B878]/20 bg-gradient-to-r from-[#0B2E58]/[0.02] to-[#C8A45C]/[0.02] dark:from-[#3B7DD8]/[0.05] dark:to-[#D4B878]/[0.03]">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">Actions rapides</CardTitle>
+            <CardDescription className="text-xs">Raccourcis vers les modules liés</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { label: 'Demandes citoyennes', icon: CheckCircle2, color: 'bg-[#0B2E58] hover:bg-[#0B2E58]/90 text-white', onClick: () => navigate('service-requests') },
+                { label: 'Courriers', icon: Mail, color: 'bg-[#3B7DD8] hover:bg-[#3B7DD8]/90 text-white', onClick: () => navigate('courriers') },
+                { label: 'Documents GED', icon: FileText, color: 'bg-[#C8A45C] hover:bg-[#C8A45C]/90 text-[#0B2E58]', onClick: () => navigate('ged') },
+                { label: 'Signatures', icon: Stamp, color: 'bg-emerald-600 hover:bg-emerald-600/90 text-white', onClick: () => navigate('signatures') },
+              ].map(action => (
+                <Button key={action.label} className={`${action.color} h-auto flex-col gap-2 rounded-xl py-3 text-xs font-semibold shadow-sm transition-all hover:scale-[1.02]`} onClick={action.onClick}>
+                  <action.icon className="size-5" />
+                  {action.label}
+                </Button>
+              ))}
+            </div>
           </CardContent>
         </Card>
       </motion.div>
