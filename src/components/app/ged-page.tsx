@@ -3,379 +3,464 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Search, Upload, Filter, Grid3X3, List, MoreHorizontal,
-  FileText, File, FileCheck, Archive, Share2, Download,
-  Eye, Trash2, Plus, ChevronDown, Tag, FolderOpen,
-  Clock, CheckCircle2, AlertCircle, X
+  Search, Upload, Filter, MoreHorizontal, FileText, FileCheck,
+  Archive, Download, Eye, Trash2, Plus, ChevronDown, Tag,
+  Lock, Shield, Brain, Building2, Calendar, X, FolderOpen,
+  CheckCircle2, Clock, AlertCircle, BookOpen, FileSignature,
+  ScrollText, BarChart3, MapPin, Library
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
+import { Progress } from '@/components/ui/progress'
+import { Separator } from '@/components/ui/separator'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { DEMO_STATS } from '@/lib/constants'
+import { BRAND } from '@/lib/constants'
 
-const FAKE_DOCUMENTS = [
-  { id: '1', nom: 'Arrêté n°2024-001/AIT', type: 'Arrêté', taille: '2.4 MB', modifie: '2024-12-15', auteur: 'Mamadou Baldé', statut: 'Actif', tags: ['RGPD', 'Officiel'] },
-  { id: '2', nom: 'Décret n°D/2024/089/PRG', type: 'Décret', taille: '3.1 MB', modifie: '2024-12-14', auteur: 'Aissatou Diallo', statut: 'Actif', tags: ['Présidence'] },
-  { id: '3', nom: 'Circulaire n°C/2024/045/MAT', type: 'Circulaire', taille: '1.2 MB', modifie: '2024-12-13', auteur: 'Ibrahima Sow', statut: 'Partagé', tags: ['MAT', 'Interne'] },
-  { id: '4', nom: 'Note de service n°NS/2024/112', type: 'Note de service', taille: '890 KB', modifie: '2024-12-12', auteur: 'Fatoumata Camara', statut: 'Actif', tags: ['RH'] },
-  { id: '5', nom: 'Rapport annuel 2024 - DGE', type: 'Rapport', taille: '8.7 MB', modifie: '2024-12-11', auteur: 'Sékou Touré', statut: 'Archivé', tags: ['DGE', 'Annuel'] },
-  { id: '6', nom: 'Convention de partenariat UNDP', type: 'Convention', taille: '4.5 MB', modifie: '2024-12-10', auteur: 'Mariama Condé', statut: 'Actif', tags: ['International', 'Partenariat'] },
-  { id: '7', nom: 'Budget prévisionnel 2025', type: 'Budget', taille: '5.2 MB', modifie: '2024-12-09', auteur: 'Abdoulaye Bah', statut: 'Partagé', tags: ['Finance', 'Budget'] },
-  { id: '8', nom: 'Procès-verbal CS-2024-089', type: 'Procès-verbal', taille: '1.8 MB', modifie: '2024-12-08', auteur: 'Kadiatou Sylla', statut: 'Actif', tags: ['CS', 'Réunion'] },
-  { id: '9', nom: 'Ordonnance n°O/2024/023/PRG', type: 'Ordonnance', taille: '2.1 MB', modifie: '2024-12-07', auteur: 'Alpha Condé', statut: 'Archivé', tags: ['Présidence', 'Loi'] },
-  { id: '10', nom: 'Plan stratégique 2024-2028', type: 'Plan', taille: '12.4 MB', modifie: '2024-12-06', auteur: 'Djenabou Diallo', statut: 'Actif', tags: ['Stratégie', 'National'] },
-  { id: '11', nom: 'Marché public n°MP/2024/567', type: 'Marché', taille: '6.3 MB', modifie: '2024-12-05', auteur: 'Moussa Keïta', statut: 'Partagé', tags: ['Marché', 'MP'] },
-  { id: '12', nom: 'Délibération CD-2024-034', type: 'Délibération', taille: '1.5 MB', modifie: '2024-12-04', auteur: 'Aminata Touré', statut: 'Actif', tags: ['CD', 'Conseil'] },
+type DocClassification = 'PUBLIC' | 'DIFFUSION LIMITÉE' | 'CONFIDENTIEL' | 'SECRET'
+type DocStatus = 'Signé' | 'En vigueur' | 'En cours' | 'Publié' | 'Diffusée' | 'Classé'
+type DocType = 'Décret' | 'Arrêté' | 'Circulaire' | 'Note de service' | 'Rapport' | 'Ordonnance'
+
+interface Document {
+  id: string
+  reference: string
+  objet: string
+  type: DocType
+  institution: string
+  taille: string
+  classification: DocClassification
+  statut: DocStatus
+  date: string
+}
+
+const DOCUMENTS: Document[] = [
+  { id: '1', reference: 'D/2026/012/PRG/SGG', objet: 'Décret n°D/2026/012/PRG/SGG portant organisation du Ministère des Finances', type: 'Décret', institution: "Ministère de l'Économie et des Finances", taille: '2.4 MB', classification: 'PUBLIC', statut: 'Signé', date: '2026-01-15' },
+  { id: '2', reference: 'A/2026/045/MEF/CAB', objet: 'Arrêté n°A/2026/045/MEF/CAB fixant les modalités d\'exécution du budget 2026', type: 'Arrêté', institution: "Ministère de l'Économie et des Finances", taille: '1.8 MB', classification: 'PUBLIC', statut: 'En vigueur', date: '2026-01-20' },
+  { id: '3', reference: 'C/2026/003/PM/CAB', objet: 'Circulaire n°C/2026/003/PM/CAB relative à la généralisation de l\'administration électronique', type: 'Circulaire', institution: 'Primature', taille: '890 KB', classification: 'PUBLIC', statut: 'Diffusée', date: '2026-02-01' },
+  { id: '4', reference: 'NS/2026/089/MATD/SG', objet: 'Note de service n°NS/2026/089/MATD/SG relative à l\'organisation des élections locales', type: 'Note de service', institution: 'MATD', taille: '456 KB', classification: 'DIFFUSION LIMITÉE', statut: 'En cours', date: '2026-02-10' },
+  { id: '5', reference: 'R/2025/CC/ANN', objet: 'Rapport annuel 2025 — Cour des Comptes', type: 'Rapport', institution: 'Cour des Comptes', taille: '12.4 MB', classification: 'CONFIDENTIEL', statut: 'Classé', date: '2026-03-01' },
+  { id: '6', reference: 'D/2026/008/PRG/SGG', objet: 'Décret n°D/2026/008/PRG/SGG portant nomination des gouverneurs de région', type: 'Décret', institution: 'Présidence', taille: '1.2 MB', classification: 'PUBLIC', statut: 'Signé', date: '2026-01-25' },
+  { id: '7', reference: 'A/2026/112/MPTEN/CAB', objet: 'Arrêté n°A/2026/112/MPTEN/CAB portant attribution de fréquences radioélectriques', type: 'Arrêté', institution: 'MPTEN', taille: '678 KB', classification: 'PUBLIC', statut: 'Publié', date: '2026-02-15' },
+  { id: '8', reference: 'C/2026/007/MEF/CAB', objet: 'Circulaire n°C/2026/007/MEF/CAB sur les marchés publics 2026', type: 'Circulaire', institution: 'MEF', taille: '1.5 MB', classification: 'DIFFUSION LIMITÉE', statut: 'Diffusée', date: '2026-02-20' },
+  { id: '9', reference: 'D/2026/015/PRG/SGG', objet: 'Décret n°D/2026/015/PRG/SGG portant création de l\'Agence Nationale du Numérique', type: 'Décret', institution: 'Présidence', taille: '2.1 MB', classification: 'PUBLIC', statut: 'En vigueur', date: '2026-03-05' },
+  { id: '10', reference: 'NS/2026/134/MS/CAB', objet: 'Note de service n°NS/2026/134/MS/CAB — Campagne de vaccination COVID-19', type: 'Note de service', institution: 'Ministère de la Santé', taille: '320 KB', classification: 'PUBLIC', statut: 'En cours', date: '2026-03-10' },
+  { id: '11', reference: 'A/2026/078/MJ/CAB', objet: 'Arrêté n°A/2026/078/MJ/CAB portant organisation des tribunaux', type: 'Arrêté', institution: 'Ministère de la Justice', taille: '1.9 MB', classification: 'PUBLIC', statut: 'Signé', date: '2026-03-12' },
+  { id: '12', reference: 'R/2025/PND/T3', objet: 'Rapport de suivi PND — 3e trimestre 2025', type: 'Rapport', institution: 'Ministère du Plan', taille: '8.7 MB', classification: 'DIFFUSION LIMITÉE', statut: 'Diffusée', date: '2026-01-30' },
+  { id: '13', reference: 'C/2026/001/MFP/CAB', objet: 'Circulaire n°C/2026/001/MFP/CAB sur la réforme de la fonction publique', type: 'Circulaire', institution: 'MFP', taille: '950 KB', classification: 'PUBLIC', statut: 'En vigueur', date: '2026-01-08' },
+  { id: '14', reference: 'D/2025/198/PRG/SGG', objet: 'Décret n°D/2025/198/PRG/SGG portant budget général de l\'État 2026', type: 'Décret', institution: 'Présidence', taille: '15.3 MB', classification: 'CONFIDENTIEL', statut: 'Signé', date: '2025-12-20' },
+  { id: '15', reference: 'O/2026/003/PRG', objet: 'Ordonnance n°O/2026/003/PRG portant mesure d\'urgence économique', type: 'Ordonnance', institution: 'Présidence', taille: '3.2 MB', classification: 'DIFFUSION LIMITÉE', statut: 'En vigueur', date: '2026-02-28' },
 ]
 
-const DOC_TYPES = ['Tous', 'Arrêté', 'Décret', 'Circulaire', 'Note de service', 'Rapport', 'Convention', 'Budget', 'Procès-verbal', 'Ordonnance', 'Plan', 'Marché', 'Délibération']
-const DOC_STATUSES = ['Tous', 'Actif', 'Archivé', 'Partagé']
+const TYPE_TABS = [
+  { value: 'tous', label: 'Tous' },
+  { value: 'Décret', label: 'Décrets présidentiels' },
+  { value: 'Arrêté', label: 'Arrêtés ministériels' },
+  { value: 'Circulaire', label: 'Circulaires' },
+  { value: 'Note de service', label: 'Notes de service' },
+  { value: 'Rapport', label: 'Rapports officiels' },
+  { value: 'confidentiel', label: 'Documents confidentiels', icon: Shield },
+]
+
+const CLASSIFICATION_CONFIG: Record<DocClassification, { color: string; icon: React.ElementType }> = {
+  'PUBLIC': { color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', icon: BookOpen },
+  'DIFFUSION LIMITÉE': { color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: AlertCircle },
+  'CONFIDENTIEL': { color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', icon: Lock },
+  'SECRET': { color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400', icon: Shield },
+}
+
+const STATUS_CONFIG: Record<DocStatus, { color: string; icon: React.ElementType }> = {
+  'Signé': { color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', icon: FileSignature },
+  'En vigueur': { color: 'bg-brand/10 text-brand dark:bg-primary/20 dark:text-primary', icon: CheckCircle2 },
+  'En cours': { color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400', icon: Clock },
+  'Publié': { color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400', icon: FileCheck },
+  'Diffusée': { color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400', icon: Archive },
+  'Classé': { color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400', icon: Lock },
+}
+
+const INSTITUTION_COUNTS = [
+  { name: 'Présidence', count: 4, color: 'bg-brand dark:bg-primary' },
+  { name: 'MEF', count: 3, color: 'bg-gold' },
+  { name: 'Primature', count: 1, color: 'bg-emerald-500' },
+  { name: 'MATD', count: 1, color: 'bg-sky-500' },
+  { name: 'Cour des Comptes', count: 1, color: 'bg-red-500' },
+  { name: 'MPTEN', count: 1, color: 'bg-violet-500' },
+  { name: 'Ministère de la Santé', count: 1, color: 'bg-teal-500' },
+  { name: 'Ministère de la Justice', count: 1, color: 'bg-orange-500' },
+  { name: 'Ministère du Plan', count: 1, color: 'bg-pink-500' },
+  { name: 'MFP', count: 1, color: 'bg-cyan-500' },
+]
 
 export function GedPage() {
   const [search, setSearch] = useState('')
-  const [typeFilter, setTypeFilter] = useState('Tous')
-  const [statusFilter, setStatusFilter] = useState('Tous')
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
-  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [activeTab, setActiveTab] = useState('tous')
+  const [classificationFilter, setClassificationFilter] = useState<string>('tous')
+  const [institutionFilter, setInstitutionFilter] = useState<string>('tous')
   const [showFilters, setShowFilters] = useState(false)
 
-  const filteredDocs = FAKE_DOCUMENTS.filter(doc => {
-    const matchSearch = doc.nom.toLowerCase().includes(search.toLowerCase()) ||
-      doc.auteur.toLowerCase().includes(search.toLowerCase())
-    const matchType = typeFilter === 'Tous' || doc.type === typeFilter
-    const matchStatus = statusFilter === 'Tous' || doc.statut === statusFilter
-    return matchSearch && matchType && matchStatus
+  const filteredDocs = DOCUMENTS.filter(doc => {
+    const matchSearch = doc.objet.toLowerCase().includes(search.toLowerCase()) ||
+      doc.reference.toLowerCase().includes(search.toLowerCase()) ||
+      doc.institution.toLowerCase().includes(search.toLowerCase())
+    const matchTab = activeTab === 'tous' ||
+      (activeTab === 'confidentiel' && (doc.classification === 'CONFIDENTIEL' || doc.classification === 'SECRET')) ||
+      (activeTab !== 'confidentiel' && doc.type === activeTab)
+    const matchClassification = classificationFilter === 'tous' || doc.classification === classificationFilter
+    const matchInstitution = institutionFilter === 'tous' || doc.institution === institutionFilter
+    return matchSearch && matchTab && matchClassification && matchInstitution
   })
 
-  const toggleSelect = (id: string) => {
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
-  }
-
-  const toggleAll = () => {
-    if (selectedIds.length === filteredDocs.length) {
-      setSelectedIds([])
-    } else {
-      setSelectedIds(filteredDocs.map(d => d.id))
-    }
-  }
-
-  const getStatusIcon = (statut: string) => {
-    switch (statut) {
-      case 'Actif': return <CheckCircle2 className="h-3.5 w-3.5" />
-      case 'Archivé': return <Archive className="h-3.5 w-3.5" />
-      case 'Partagé': return <Share2 className="h-3.5 w-3.5" />
-      default: return <File className="h-3.5 w-3.5" />
-    }
-  }
-
-  const getStatusColor = (statut: string) => {
-    switch (statut) {
-      case 'Actif': return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-      case 'Archivé': return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-      case 'Partagé': return 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400'
-      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
-    }
-  }
+  const uniqueInstitutions = [...new Set(DOCUMENTS.map(d => d.institution))]
 
   const stats = [
-    { label: 'Total documents', value: DEMO_STATS.documents.total.toLocaleString('fr-FR'), icon: FileText, color: 'text-brand dark:text-primary' },
-    { label: 'Actifs', value: DEMO_STATS.documents.actifs.toLocaleString('fr-FR'), icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400' },
-    { label: 'Archivés', value: DEMO_STATS.documents.archives.toLocaleString('fr-FR'), icon: Archive, color: 'text-amber-600 dark:text-amber-400' },
-    { label: 'Partagés', value: DEMO_STATS.documents.partages.toLocaleString('fr-FR'), icon: Share2, color: 'text-sky-600 dark:text-sky-400' },
+    { label: 'Documents officiels', value: '87 450', icon: FileText, color: 'text-brand dark:text-primary', bg: 'bg-brand/5 dark:bg-primary/10' },
+    { label: 'Décrets & arrêtés', value: '4 230', icon: ScrollText, color: 'text-gold dark:text-gold', bg: 'bg-gold/5 dark:bg-gold/10' },
+    { label: 'Circulaires & notes', value: '12 870', icon: BookOpen, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-900/20' },
+    { label: 'Documents confidentiels', value: '1 340', icon: Lock, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/20' },
+    { label: 'En cours de traitement', value: '2 150', icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+    { label: 'Taux de numérisation', value: '78.3%', icon: BarChart3, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20', isProgress: true, progressValue: 78.3 },
   ]
 
   return (
     <div className="space-y-6">
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-1"
+      >
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-brand/10 dark:bg-primary/20">
+            <Library className="h-6 w-6 text-brand dark:text-primary" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-brand dark:text-primary">Gestion Électronique des Documents Officiels</h2>
+            <p className="text-sm text-muted-foreground">Archivage souverain de la documentation de l&apos;État — Conformément au Code administratif</p>
+          </div>
+        </div>
+      </motion.div>
+
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {stats.map((stat, i) => (
           <motion.div
             key={stat.label}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.08 }}
+            transition={{ delay: i * 0.06 }}
           >
             <Card className="glass-card hover:shadow-lg transition-shadow">
-              <CardContent className="flex items-center gap-4">
-                <div className={`p-3 rounded-xl bg-brand/5 dark:bg-primary/10 ${stat.color}`}>
-                  <stat.icon className="h-6 w-6" />
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className={`p-2 rounded-lg ${stat.bg} ${stat.color}`}>
+                    <stat.icon className="h-4 w-4" />
+                  </div>
+                  <span className="text-xs text-muted-foreground leading-tight">{stat.label}</span>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">{stat.label}</p>
-                  <p className="text-2xl font-bold">{stat.value}</p>
-                </div>
+                <p className="text-xl font-bold">{stat.value}</p>
+                {stat.isProgress && (
+                  <Progress value={stat.progressValue} className="h-1.5 mt-2" />
+                )}
               </CardContent>
             </Card>
           </motion.div>
         ))}
       </div>
 
-      {/* Toolbar */}
+      {/* Document Type Tabs */}
       <Card>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-            {/* Search */}
-            <div className="relative flex-1 w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Rechercher par nom, auteur..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="pl-10"
-              />
+        <CardContent className="p-4">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+              <TabsList className="flex-wrap h-auto gap-1 bg-muted/50 p-1">
+                {TYPE_TABS.map(tab => (
+                  <TabsTrigger key={tab.value} value={tab.value} className="gap-1.5 text-xs data-[state=active]:bg-brand data-[state=active]:text-white dark:data-[state=active]:bg-primary">
+                    {tab.icon && <tab.icon className="h-3 w-3" />}
+                    {tab.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" className="gap-1.5 border-gold/30 text-gold hover:bg-gold/5">
+                  <Brain className="h-3.5 w-3.5" />
+                  Classification automatique par IA
+                </Button>
+                <Button variant="outline" size="sm" className="gap-1.5 border-brand/30 text-brand hover:bg-brand/5 dark:border-primary/30 dark:text-primary dark:hover:bg-primary/5">
+                  <Archive className="h-3.5 w-3.5" />
+                  Export vers les Archives Nationales
+                </Button>
+              </div>
             </div>
 
-            {/* Filter toggle */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowFilters(!showFilters)}
-              className="gap-2"
-            >
-              <Filter className="h-4 w-4" />
-              Filtres
-              <ChevronDown className={`h-3 w-3 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
-            </Button>
-
-            {/* View toggle */}
-            <div className="flex border rounded-lg overflow-hidden">
+            {/* Search & Filters */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <div className="relative flex-1 w-full">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Rechercher par référence, objet, institution..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
               <Button
-                variant={viewMode === 'list' ? 'default' : 'ghost'}
+                variant="outline"
                 size="sm"
-                onClick={() => setViewMode('list')}
-                className="rounded-none"
+                onClick={() => setShowFilters(!showFilters)}
+                className="gap-2"
               >
-                <List className="h-4 w-4" />
+                <Filter className="h-4 w-4" />
+                Filtres avancés
+                <ChevronDown className={`h-3 w-3 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
               </Button>
-              <Button
-                variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('grid')}
-                className="rounded-none"
-              >
-                <Grid3X3 className="h-4 w-4" />
+              <Button size="sm" className="gap-2 bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90">
+                <Upload className="h-4 w-4" />
+                Importer un document
               </Button>
             </div>
 
-            {/* Upload */}
-            <Button className="gap-2 bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90">
-              <Upload className="h-4 w-4" />
-              Importer
-            </Button>
-          </div>
+            <AnimatePresence>
+              {showFilters && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="flex flex-wrap gap-3 pt-3 mt-3 border-t">
+                    <Select value={classificationFilter} onValueChange={setClassificationFilter}>
+                      <SelectTrigger className="w-[200px]">
+                        <Shield className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                        <SelectValue placeholder="Classification" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="tous">Toutes classifications</SelectItem>
+                        <SelectItem value="PUBLIC">PUBLIC</SelectItem>
+                        <SelectItem value="DIFFUSION LIMITÉE">DIFFUSION LIMITÉE</SelectItem>
+                        <SelectItem value="CONFIDENTIEL">CONFIDENTIEL</SelectItem>
+                        <SelectItem value="SECRET">SECRET</SelectItem>
+                      </SelectContent>
+                    </Select>
 
-          {/* Filter bar */}
-          <AnimatePresence>
-            {showFilters && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="flex flex-wrap gap-3 pt-2 border-t">
-                  <Select value={typeFilter} onValueChange={setTypeFilter}>
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Type de document" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DOC_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                    <Select value={institutionFilter} onValueChange={setInstitutionFilter}>
+                      <SelectTrigger className="w-[220px]">
+                        <Building2 className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                        <SelectValue placeholder="Institution" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="tous">Toutes les institutions</SelectItem>
+                        {uniqueInstitutions.map(inst => (
+                          <SelectItem key={inst} value={inst}>{inst}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
 
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-[150px]">
-                      <SelectValue placeholder="Statut" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DOC_STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                    <Select>
+                      <SelectTrigger className="w-[160px]">
+                        <MapPin className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                        <SelectValue placeholder="Région" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="toutes">Toutes les régions</SelectItem>
+                        <SelectItem value="conakry">Conakry</SelectItem>
+                        <SelectItem value="kindia">Kindia</SelectItem>
+                        <SelectItem value="kankan">Kankan</SelectItem>
+                        <SelectItem value="nzérékoré">Nzérékoré</SelectItem>
+                        <SelectItem value="labé">Labé</SelectItem>
+                        <SelectItem value="faranah">Faranah</SelectItem>
+                        <SelectItem value="boké">Boké</SelectItem>
+                        <SelectItem value="mamou">Mamou</SelectItem>
+                      </SelectContent>
+                    </Select>
 
-                  <Input type="date" className="w-[160px]" placeholder="Date début" />
-                  <Input type="date" className="w-[160px]" placeholder="Date fin" />
+                    <Input type="date" className="w-[160px]" placeholder="Date début" />
+                    <Input type="date" className="w-[160px]" placeholder="Date fin" />
 
-                  {(typeFilter !== 'Tous' || statusFilter !== 'Tous') && (
-                    <Button variant="ghost" size="sm" onClick={() => { setTypeFilter('Tous'); setStatusFilter('Tous') }}>
-                      <X className="h-3 w-3 mr-1" />
-                      Réinitialiser
-                    </Button>
-                  )}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Bulk actions */}
-          {selectedIds.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex items-center gap-3 pt-2 border-t"
-            >
-              <span className="text-sm text-muted-foreground">{selectedIds.length} sélectionné(s)</span>
-              <Button variant="outline" size="sm" className="gap-1">
-                <Download className="h-3.5 w-3.5" />
-                Télécharger
-              </Button>
-              <Button variant="outline" size="sm" className="gap-1">
-                <Share2 className="h-3.5 w-3.5" />
-                Partager
-              </Button>
-              <Button variant="outline" size="sm" className="gap-1 text-red-600 hover:text-red-700">
-                <Trash2 className="h-3.5 w-3.5" />
-                Supprimer
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])}>
-                Tout désélectionner
-              </Button>
-            </motion.div>
-          )}
+                    {(classificationFilter !== 'tous' || institutionFilter !== 'tous') && (
+                      <Button variant="ghost" size="sm" onClick={() => { setClassificationFilter('tous'); setInstitutionFilter('tous') }}>
+                        <X className="h-3 w-3 mr-1" />
+                        Réinitialiser
+                      </Button>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </Tabs>
         </CardContent>
       </Card>
 
-      {/* Documents Table / Grid */}
-      {viewMode === 'list' ? (
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10">
-                    <Checkbox
-                      checked={selectedIds.length === filteredDocs.length && filteredDocs.length > 0}
-                      onCheckedChange={toggleAll}
-                    />
-                  </TableHead>
-                  <TableHead>Nom</TableHead>
-                  <TableHead className="hidden md:table-cell">Type</TableHead>
-                  <TableHead className="hidden lg:table-cell">Taille</TableHead>
-                  <TableHead className="hidden md:table-cell">Modifié</TableHead>
-                  <TableHead className="hidden lg:table-cell">Auteur</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead className="hidden xl:table-cell">Tags</TableHead>
-                  <TableHead className="w-10">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredDocs.map((doc, i) => (
-                  <motion.tr
-                    key={doc.id}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.03 }}
-                    className="hover:bg-muted/50 transition-colors"
-                  >
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedIds.includes(doc.id)}
-                        onCheckedChange={() => toggleSelect(doc.id)}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-brand dark:text-primary shrink-0" />
-                        <span className="font-medium text-sm">{doc.nom}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <Badge variant="outline" className="text-xs">{doc.type}</Badge>
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">{doc.taille}</TableCell>
-                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground">{doc.modifie}</TableCell>
-                    <TableCell className="hidden lg:table-cell text-sm">{doc.auteur}</TableCell>
-                    <TableCell>
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(doc.statut)}`}>
-                        {getStatusIcon(doc.statut)}
-                        {doc.statut}
-                      </span>
-                    </TableCell>
-                    <TableCell className="hidden xl:table-cell">
-                      <div className="flex gap-1 flex-wrap">
-                        {doc.tags.map(tag => (
-                          <span key={tag} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-muted text-muted-foreground">
-                            <Tag className="h-2.5 w-2.5" />
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem className="gap-2"><Eye className="h-4 w-4" /> Voir</DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2"><Download className="h-4 w-4" /> Télécharger</DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2"><Share2 className="h-4 w-4" /> Partager</DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2 text-red-600"><Trash2 className="h-4 w-4" /> Supprimer</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </motion.tr>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredDocs.map((doc, i) => (
-            <motion.div
-              key={doc.id}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: i * 0.04 }}
-            >
-              <Card className="glass-card hover:shadow-lg transition-all cursor-pointer group">
-                <CardHeader className="pb-2">
-                  <div className="flex items-start justify-between">
-                    <div className="p-2 rounded-lg bg-brand/5 dark:bg-primary/10">
-                      <FileText className="h-6 w-6 text-brand dark:text-primary" />
-                    </div>
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${getStatusColor(doc.statut)}`}>
-                      {getStatusIcon(doc.statut)}
-                      {doc.statut}
-                    </span>
-                  </div>
-                  <CardTitle className="text-sm mt-2 line-clamp-2 group-hover:text-brand dark:group-hover:text-primary transition-colors">
-                    {doc.nom}
-                  </CardTitle>
-                  <CardDescription className="text-xs">{doc.type} • {doc.taille}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{doc.auteur}</span>
-                    <span>{doc.modifie}</span>
-                  </div>
-                  <div className="flex gap-1 mt-3 flex-wrap">
-                    {doc.tags.map(tag => (
-                      <span key={tag} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] bg-muted text-muted-foreground">
-                        <Tag className="h-2.5 w-2.5" />
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
+      {/* Main Content: Table + Sidebar */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Documents Table */}
+        <div className="lg:col-span-3">
+          <Card>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/30">
+                      <TableHead className="text-xs font-semibold">Référence</TableHead>
+                      <TableHead className="text-xs font-semibold min-w-[300px]">Objet</TableHead>
+                      <TableHead className="text-xs font-semibold">Type</TableHead>
+                      <TableHead className="text-xs font-semibold hidden lg:table-cell">Institution</TableHead>
+                      <TableHead className="text-xs font-semibold hidden md:table-cell">Taille</TableHead>
+                      <TableHead className="text-xs font-semibold">Classification</TableHead>
+                      <TableHead className="text-xs font-semibold">Statut</TableHead>
+                      <TableHead className="text-xs font-semibold w-10">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredDocs.map((doc, i) => {
+                      const classConfig = CLASSIFICATION_CONFIG[doc.classification]
+                      const statusConfig = STATUS_CONFIG[doc.statut]
+                      const ClassIcon = classConfig.icon
+                      const StatusIcon = statusConfig.icon
+                      return (
+                        <motion.tr
+                          key={doc.id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: i * 0.02 }}
+                          className="hover:bg-muted/50 transition-colors group"
+                        >
+                          <TableCell>
+                            <span className="font-mono text-xs font-medium text-brand dark:text-primary">{doc.reference}</span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-start gap-2">
+                              <FileText className="h-4 w-4 text-brand dark:text-primary shrink-0 mt-0.5" />
+                              <span className="text-sm leading-tight line-clamp-2">{doc.objet}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-[10px] font-medium">{doc.type}</Badge>
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            <div className="flex items-center gap-1.5">
+                              <Building2 className="h-3 w-3 text-muted-foreground shrink-0" />
+                              <span className="text-xs text-muted-foreground truncate max-w-[150px]">{doc.institution}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell">
+                            <span className="text-xs text-muted-foreground">{doc.taille}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${classConfig.color}`}>
+                              <ClassIcon className="h-3 w-3" />
+                              {doc.classification}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${statusConfig.color}`}>
+                              <StatusIcon className="h-3 w-3" />
+                              {doc.statut}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem className="gap-2"><Eye className="h-4 w-4" /> Consulter</DropdownMenuItem>
+                                <DropdownMenuItem className="gap-2"><Download className="h-4 w-4" /> Télécharger</DropdownMenuItem>
+                                <DropdownMenuItem className="gap-2"><Archive className="h-4 w-4" /> Archiver</DropdownMenuItem>
+                                <DropdownMenuItem className="gap-2"><Tag className="h-4 w-4" /> Reclassifier</DropdownMenuItem>
+                                <DropdownMenuItem className="gap-2 text-red-600"><Trash2 className="h-4 w-4" /> Supprimer</DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </motion.tr>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="flex items-center justify-between p-4 border-t">
+                <span className="text-xs text-muted-foreground">{filteredDocs.length} document(s) affiché(s) sur {DOCUMENTS.length}</span>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" disabled className="text-xs">Précédent</Button>
+                  <Button variant="outline" size="sm" className="text-xs bg-brand text-white dark:bg-primary">1</Button>
+                  <Button variant="outline" size="sm" className="text-xs">2</Button>
+                  <Button variant="outline" size="sm" className="text-xs">3</Button>
+                  <Button variant="outline" size="sm" className="text-xs">Suivant</Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      )}
 
-      {/* Results count */}
-      <div className="text-sm text-muted-foreground text-center">
-        {filteredDocs.length} document(s) trouvé(s) sur {FAKE_DOCUMENTS.length}
+        {/* Sidebar: Document count by institution */}
+        <div className="lg:col-span-1">
+          <Card className="glass-card sticky top-24">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-brand dark:text-primary" />
+                Documents par institution
+              </CardTitle>
+              <CardDescription className="text-xs">Répartition des documents officiels</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {INSTITUTION_COUNTS.map(inst => {
+                const maxCount = Math.max(...INSTITUTION_COUNTS.map(i => i.count))
+                const pct = (inst.count / maxCount) * 100
+                return (
+                  <div key={inst.name} className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium truncate max-w-[160px]">{inst.name}</span>
+                      <span className="text-xs font-bold text-brand dark:text-primary">{inst.count}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${pct}%` }}
+                        transition={{ delay: 0.3, duration: 0.6 }}
+                        className={`h-full rounded-full ${inst.color}`}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+              <Separator className="my-2" />
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold">Total</span>
+                <span className="text-sm font-bold text-brand dark:text-primary">{DOCUMENTS.length}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="glass-card mt-4">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Shield className="h-4 w-4 text-gold" />
+                Classification
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {(['PUBLIC', 'DIFFUSION LIMITÉE', 'CONFIDENTIEL', 'SECRET'] as DocClassification[]).map(cls => {
+                const count = DOCUMENTS.filter(d => d.classification === cls).length
+                const config = CLASSIFICATION_CONFIG[cls]
+                return (
+                  <div key={cls} className="flex items-center justify-between p-2 rounded-lg bg-muted/30">
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${config.color} px-2 py-0.5 rounded-full`}>
+                      <config.icon className="h-3 w-3" />
+                      {cls}
+                    </span>
+                    <span className="text-xs font-bold">{count}</span>
+                  </div>
+                )
+              })}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   )

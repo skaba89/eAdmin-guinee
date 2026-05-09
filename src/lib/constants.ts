@@ -2,6 +2,8 @@ export const BRAND = {
   name: 'eAdministration Suite',
   fullName: 'eAdministration Suite Guinea',
   company: 'DataSphere Innovation',
+  republic: 'République de Guinée',
+  motto: 'Travail - Justice - Solidarité',
   tagline: 'La plateforme GovTech de nouvelle génération pour la Guinée et l\'Afrique',
   description: 'Digitalisation administrative intégrée pour ministères, institutions publiques, universités et entreprises',
   colors: {
@@ -14,7 +16,36 @@ export const BRAND = {
     grayLight: '#F8F9FA',
     gray: '#6B7280',
     dark: '#111827',
+    guineaRed: '#CE1126',
+    guineaYellow: '#FCD116',
+    guineaGreen: '#009460',
   },
+  governmentStructure: [
+    'Présidence de la République',
+    'Primature (Office of the Prime Minister)',
+    'Ministère de l\'Administration Territoriale et de la Décentralisation',
+    'Ministère de l\'Économie et des Finances',
+    'Ministère de l\'Éducation Nationale et de l\'Alphabétisation',
+    'Ministère de l\'Enseignement Supérieur, de la Recherche Scientifique et de l\'Innovation',
+    'Ministère de la Santé et de l\'Hygiène Publique',
+    'Ministère de la Justice, Gardien des Sceaux',
+    'Ministère de la Défense Nationale',
+    'Ministère de la Sécurité et de la Protection Civile',
+    'Ministère des Transports',
+    'Ministère de l\'Agriculture et de l\'Élevage',
+    'Ministère des Mines et de la Géologie',
+    'Ministère du Plan et de la Coopération Internationale',
+    'Ministère de la Fonction Publique et de la Réforme de l\'État',
+    'Ministère des Postes, Télécommunications et de l\'Économie Numérique',
+    'Ministère de l\'Environnement, des Eaux et Forêts',
+    'Ministère des Travaux Publics',
+    'Ministère du Commerce, de l\'Industrie et des PME',
+    'Cour des Comptes',
+    'Assemblée Nationale',
+    'Conseil Économique et Social',
+    'Agence Nationale de l\'Inclusion Numérique (ANIN)',
+    'Autorité de Régulation des Communications Électroniques et des Postes (ARCEP)',
+  ] as const,
 } as const
 
 export const NAV_ITEMS = {
@@ -51,19 +82,23 @@ export const NAV_ITEMS = {
 } as const
 
 export const DEMO_STATS = {
-  courriers: { total: 2847, entrants: 1523, sortants: 1324, enAttente: 187 },
-  documents: { total: 12450, archives: 8320, actifs: 4130, partages: 892 },
-  workflows: { actifs: 45, completes: 312, enCours: 89, enAttente: 23 },
-  users: { total: 156, actifs: 134, admin: 12, invite: 10 },
+  courriers: { total: 14250, entrants: 8730, sortants: 5520, enAttente: 412, urgents: 87 },
+  documents: { total: 87450, archives: 62300, actifs: 25150, partages: 4892, confidentiels: 1340 },
+  workflows: { actifs: 234, completes: 1876, enCours: 412, enAttente: 89 },
+  users: { total: 2847, actifs: 2312, admin: 156, invite: 379 },
+  institutions: { total: 24, connectees: 18, enDeploiement: 6 },
+  citoyens: { inscrits: 124500, demandes: 8730, satisfait: 94 },
 }
 
 export const DEMO_KPI = [
-  { label: 'Courriers traités', value: '2 847', change: '+12.5%', trend: 'up' as const },
-  { label: 'Documents archivés', value: '12 450', change: '+8.3%', trend: 'up' as const },
-  { label: 'Workflows actifs', value: '45', change: '+3.2%', trend: 'up' as const },
-  { label: 'Délai moyen (jours)', value: '2.4', change: '-15.2%', trend: 'down' as const },
-  { label: 'Taux de conformité', value: '98.7%', change: '+1.2%', trend: 'up' as const },
-  { label: 'Satisfaction citoyen', value: '4.8/5', change: '+0.3', trend: 'up' as const },
+  { label: 'Courriers interministériels traités', value: '14 250', change: '+18.3%', trend: 'up' as const },
+  { label: 'Documents officiels archivés', value: '87 450', change: '+22.1%', trend: 'up' as const },
+  { label: 'Procédures administratives numérisées', value: '234', change: '+45.2%', trend: 'up' as const },
+  { label: 'Délai moyen de traitement', value: '1.8 jours', change: '-32.5%', trend: 'down' as const },
+  { label: 'Taux de conformité réglementaire', value: '99.2%', change: '+2.1%', trend: 'up' as const },
+  { label: 'Satisfaction citoyenne', value: '4.7/5', change: '+0.4', trend: 'up' as const },
+  { label: 'Institutions connectées', value: '18/24', change: '+3', trend: 'up' as const },
+  { label: 'Demandes citoyennes traitées', value: '8 730', change: '+28.7%', trend: 'up' as const },
 ]
 
 export const MONTHLY_DATA = [
@@ -80,3 +115,128 @@ export const MONTHLY_DATA = [
   { month: 'Nov', courriers: 489, documents: 1567, workflows: 58 },
   { month: 'Déc', courriers: 467, documents: 1478, workflows: 53 },
 ]
+
+export const GUINEA_ADMIN_STRUCTURE = {
+  regions: [
+    { name: 'Conakry', capital: 'Conakry' },
+    { name: 'Kindia', capital: 'Kindia' },
+    { name: 'Boké', capital: 'Boké' },
+    { name: 'Labé', capital: 'Labé' },
+    { name: 'Mamou', capital: 'Mamou' },
+    { name: 'Faranah', capital: 'Faranah' },
+    { name: 'Kankan', capital: 'Kankan' },
+    { name: 'N\'Zérékoré', capital: 'N\'Zérékoré' },
+  ],
+  totalRegions: 8,
+  totalPrefectures: 33,
+  totalSubPrefectures: 341,
+  totalCommunes: 38,
+  conakryCommunes: ['Kaloum', 'Dixinn', 'Matam', 'Matoto', 'Ratoma'],
+} as const
+
+export const LEGAL_REFERENCES = [
+  {
+    id: 'LOI-2016-018',
+    reference: 'Loi n°L/2016/018/AN',
+    title: 'Protection des données personnelles',
+    description: 'Loi relative à la protection des données à caractère personnel en République de Guinée',
+    status: 'conforme' as const,
+  },
+  {
+    id: 'ORD-011-PRG-87',
+    reference: 'Ordonnance n°011/PRG/87',
+    title: 'Organisation de l\'administration territoriale',
+    description: 'Ordonnance portant organisation de l\'administration territoriale de la République',
+    status: 'conforme' as const,
+  },
+  {
+    id: 'DECRET-2022-SGG',
+    reference: 'Décret n°D/2022/PRG/SGG',
+    title: 'Signature électronique',
+    description: 'Décret portant réglementation de la signature électronique à valeur juridique',
+    status: 'conforme' as const,
+  },
+  {
+    id: 'LOI-2019-011',
+    reference: 'Loi n°L/2019/011/AN',
+    title: 'Transactions électroniques',
+    description: 'Loi sur les transactions électroniques et le commerce numérique',
+    status: 'conforme' as const,
+  },
+  {
+    id: 'DECRET-2018-ANIN',
+    reference: 'Décret n°D/2018/PRG/SGG',
+    title: 'Création de l\'ANIN',
+    description: 'Décret portant création de l\'Agence Nationale de l\'Inclusion Numérique',
+    status: 'conforme' as const,
+  },
+  {
+    id: 'CODE-ADMIN',
+    reference: 'Code administratif',
+    title: 'Code administratif de la République de Guinée',
+    description: 'Recueil des textes régissant l\'administration publique guinéenne',
+    status: 'conforme' as const,
+  },
+  {
+    id: 'CIRC-001-PM',
+    reference: 'Circulaire n°001/PM/CAB',
+    title: 'Généralisation de l\'administration électronique',
+    description: 'Circulaire portant généralisation de l\'administration électronique dans les ministères et institutions',
+    status: 'en-application' as const,
+  },
+] as const
+
+export const PND_INDICATORS = {
+  axe1: {
+    title: 'Gouvernance démocratique',
+    indicators: [
+      'Taux de transparence des procédures administratives',
+      'Indice de e-gouvernement',
+      'Nombre de services administratifs dématérialisés',
+      'Taux de conformité réglementaire',
+    ],
+  },
+  axe2: {
+    title: 'Transformation structurelle de l\'économie',
+    indicators: [
+      'Nombre de procédures de marchés publics numérisées',
+      'Délai moyen de traitement des dossiers économiques',
+      'Volume des transactions électroniques interministérielles',
+    ],
+  },
+  axe3: {
+    title: 'Développement du capital humain',
+    indicators: [
+      'Taux de formation des agents publics au numérique',
+      'Nombre de services citoyens en ligne',
+      'Indice de satisfaction des usagers',
+    ],
+  },
+  axe4: {
+    title: 'Gestion durable de l\'environnement',
+    indicators: [
+      'Réduction de la consommation papier',
+      'Nombre d\'archives dématérialisées',
+      'Empreinte carbone numérique de l\'administration',
+    ],
+  },
+} as const
+
+export const CITIZEN_SERVICES = [
+  { id: 'acte-naissance', name: 'Extrait d\'acte de naissance', category: 'État civil', delay: '3 jours' },
+  { id: 'certificat-nationalite', name: 'Certificat de nationalité', category: 'Nationalité', delay: '5 jours' },
+  { id: 'casier-judiciaire', name: 'Casier judiciaire', category: 'Justice', delay: '2 jours' },
+  { id: 'acte-mariage', name: 'Extrait d\'acte de mariage', category: 'État civil', delay: '3 jours' },
+  { id: 'acte-deces', name: 'Extrait d\'acte de décès', category: 'État civil', delay: '2 jours' },
+  { id: 'permis-construire', name: 'Permis de construire', category: 'Urbanisme', delay: '15 jours' },
+  { id: 'certificat-residence', name: 'Certificat de résidence', category: 'État civil', delay: '1 jour' },
+  { id: 'attestation-prise-en-charge', name: 'Attestation de prise en charge', category: 'Social', delay: '2 jours' },
+  { id: 'carte-identite', name: 'Carte d\'identité nationale', category: 'Identification', delay: '7 jours' },
+  { id: 'passeport-biometrique', name: 'Passeport biométrique', category: 'Identification', delay: '10 jours' },
+  { id: 'permis-conduire', name: 'Permis de conduire', category: 'Transport', delay: '5 jours' },
+  { id: 'certificat-non-poursuite', name: 'Certificat de non-poursuite', category: 'Justice', delay: '3 jours' },
+  { id: 'attestation-scolarite', name: 'Attestation de scolarité', category: 'Éducation', delay: '2 jours' },
+  { id: 'diplome-releve', name: 'Diplôme et relevé de notes', category: 'Éducation', delay: '5 jours' },
+  { id: 'certificat-vaccination', name: 'Certificat de vaccination', category: 'Santé', delay: '1 jour' },
+  { id: 'enregistrement-entreprise', name: 'Enregistrement entreprise (APIP)', category: 'Économie', delay: '3 jours' },
+] as const

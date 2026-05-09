@@ -27,19 +27,22 @@ export type AppPage =
   | 'audit-logs'
   | 'citizen-portal'
 
+interface UserInfo {
+  name: string
+  email: string
+  role: string
+  institution: string
+  fonction: string
+  avatar?: string
+}
+
 interface AppState {
   currentPage: AppPage
   isAuth: boolean
   theme: 'light' | 'dark'
   sidebarOpen: boolean
   sidebarCollapsed: boolean
-  user: {
-    name: string
-    email: string
-    role: string
-    institution: string
-    avatar?: string
-  } | null
+  user: UserInfo | null
   navigate: (page: AppPage) => void
   setAuth: (auth: boolean) => void
   toggleTheme: () => void
@@ -72,10 +75,11 @@ export const useAppStore = create<AppState>((set) => ({
       isAuth: true,
       currentPage: 'dashboard',
       user: {
-        name: 'Amadou Diallo',
+        name: 'Sékou Condé',
         email: email,
-        role: 'Directeur Général',
-        institution: "Ministère de l'Administration Territoriale",
+        role: 'Secrétaire Général',
+        institution: "Ministère de l'Administration Territoriale et de la Décentralisation",
+        fonction: 'Directeur de la Modernisation Administrative',
       }
     })
   },

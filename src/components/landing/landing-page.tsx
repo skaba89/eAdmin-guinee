@@ -4,12 +4,14 @@ import { useEffect, useRef, useState } from 'react'
 import { motion, useInView } from 'framer-motion'
 import {
   Sparkles, FileText, Mail, GitBranch, PenTool, BarChart3,
-  ArrowRight, CheckCircle2, Building2, GraduationCap, Landmark,
-  Shield, Search, Lock, Cloud, Code2, Bell, ScrollText, Key,
-  Users, Zap, Globe, ChevronRight, Star, Phone, MapPin
+  ArrowRight, CheckCircle2, Building2, Landmark,
+  Shield, Search, Lock, Cloud, Code2, Bell, ScrollText,
+  Users, Zap, Globe, ChevronRight, Star, Phone, MapPin,
+  Server, Database, FileCheck, Scale, BookOpen, Award,
+  Fingerprint, Eye, Cpu, Flag
 } from 'lucide-react'
 import { useAppStore } from '@/store/app-store'
-import { BRAND, DEMO_STATS } from '@/lib/constants'
+import { BRAND, DEMO_STATS, LEGAL_REFERENCES } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -68,65 +70,158 @@ function CounterAnimation({ target, suffix = '' }: { target: number; suffix?: st
 
 /* ─── Data ────────────────────────────────────────────── */
 const modules = [
-  { icon: FileText, title: 'GED', desc: 'Gestion Électronique des Documents', detail: 'Classement, archivage et recherche intelligente de tous vos documents administratifs.' },
-  { icon: Mail, title: 'Courriers Numériques', desc: 'Courriers entrants et sortants', detail: 'Traçabilité complète de vos courriers avec horodatage et circuits de validation.' },
-  { icon: GitBranch, title: 'Workflows Administratifs', desc: 'Automatisation des processus', detail: 'Concevez et déployez des workflows sur mesure pour chaque procédure administrative.' },
-  { icon: PenTool, title: 'Signatures Électroniques', desc: 'Signature numérique certifiée', detail: 'Signez et validez vos documents en toute sécurité avec une valeur juridique reconnue.' },
-  { icon: BarChart3, title: 'Dashboard Décisionnel', desc: 'Tableaux de bord & KPIs', detail: 'Visualisez vos indicateurs clés en temps réel pour une prise de décision éclairée.' },
-  { icon: Sparkles, title: 'IA & Automatisation', desc: 'Intelligence artificielle intégrée', detail: 'OCR intelligent, classification automatique et suggestions alimentées par l\'IA.' },
+  {
+    icon: FileText,
+    title: 'GED',
+    desc: 'Gestion Électronique des Documents',
+    detail: 'Archivage des décrets, arrêtés, circulaires et notes de service conformément au Code administratif de la République de Guinée.',
+  },
+  {
+    icon: Mail,
+    title: 'Courriers Numériques',
+    desc: 'Courriers entrants et sortants',
+    detail: 'Circuit du visa obligatoire : Service → Direction → Secrétariat Général → Cabinet du Ministre. Traçabilité complète avec horodatage certifié.',
+  },
+  {
+    icon: GitBranch,
+    title: 'Workflows Administratifs',
+    desc: 'Automatisation des processus',
+    detail: 'Procédures réglementaires : approbation budgétaire, marchés publics, recrutement fonction publique. Conformité au Code des marchés publics.',
+  },
+  {
+    icon: PenTool,
+    title: 'Signatures Électroniques',
+    desc: 'Signature numérique certifiée',
+    detail: 'Conforme au Décret n°D/2022/PRG/SGG sur la signature électronique à valeur juridique. Certification et non-répudiation garanties.',
+  },
+  {
+    icon: BarChart3,
+    title: 'Dashboard Décisionnel',
+    desc: 'Tableaux de bord & KPIs',
+    detail: 'Indicateurs du Plan National de Développement (PND) et suivi des performances interministérielles en temps réel.',
+  },
+  {
+    icon: Sparkles,
+    title: 'IA & Automatisation',
+    desc: 'Intelligence artificielle intégrée',
+    detail: 'Classification automatique des courriers conformément à la nomenclature administrative guinéenne. OCR intelligent et routing automatique.',
+  },
 ]
 
 const features = [
-  { icon: Search, title: 'OCR Intelligent', desc: 'Reconnaissance optique de caractères pour numériser vos documents papier.' },
-  { icon: Search, title: 'Recherche Avancée', desc: 'Moteur de recherche plein texte avec filtres et facettes.' },
-  { icon: GitBranch, title: 'Versioning', desc: 'Historique complet des modifications avec restauration.' },
-  { icon: Shield, title: 'Permissions RBAC', desc: 'Contrôle d\'accès granulaire basé sur les rôles.' },
-  { icon: Building2, title: 'Multi-tenant', desc: 'Architecture multi-organisations sécurisée.' },
-  { icon: Cloud, title: 'Cloud-ready', desc: 'Déploiement cloud hybride ou on-premise.' },
-  { icon: Code2, title: 'API Ouverte', desc: 'API REST complète pour intégrations tierces.' },
-  { icon: Bell, title: 'Notifications Temps Réel', desc: 'Alertes instantanées push, email et SMS.' },
-  { icon: ScrollText, title: 'Audit Logs', desc: 'Traçabilité complète de toutes les actions.' },
-  { icon: Lock, title: 'Chiffrement', desc: 'Chiffrement de bout en bout des données sensibles.' },
+  { icon: Search, title: 'OCR Intelligent', desc: 'Reconnaissance optique de caractères pour numériser les documents administratifs papier.' },
+  { icon: Search, title: 'Recherche Avancée', desc: 'Moteur de recherche plein texte avec filtres et facettes pour les archives nationales.' },
+  { icon: GitBranch, title: 'Versioning', desc: 'Historique complet des modifications avec restauration des documents réglementaires.' },
+  { icon: Shield, title: 'Permissions RBAC', desc: 'Contrôle d\'accès granulaire basé sur les rôles conformément à la hiérarchie administrative.' },
+  { icon: Building2, title: 'Multi-institutions', desc: 'Architecture multi-tenant sécurisée pour les 24 institutions de l\'État.' },
+  { icon: Cloud, title: 'Souveraineté Cloud', desc: 'Hébergement sur le territoire national en conformité avec la Loi L/2016/018/AN.' },
+  { icon: Code2, title: 'API Interopérable', desc: 'API REST complète pour l\'interconnexion des systèmes d\'information ministériels.' },
+  { icon: Bell, title: 'Notifications Temps Réel', desc: 'Alertes instantanées push, email et SMS pour les agents publics et les citoyens.' },
+  { icon: ScrollText, title: 'Audit & Traçabilité', desc: 'Traçabilité complète de toutes les actions, conforme aux exigences de la Cour des Comptes.' },
+  { icon: Lock, title: 'Chiffrement AES-256', desc: 'Chiffrement de bout en bout des données sensibles de l\'administration publique.' },
 ]
 
 const stats = [
-  { value: 150, suffix: '+', label: 'Institutions' },
-  { value: 50000, suffix: '+', label: 'Documents traités' },
-  { value: 98, suffix: '.7%', label: 'Disponibilité' },
-  { value: 24, suffix: '/7', label: 'Support' },
+  { value: 18, suffix: '/24', label: 'Institutions connectées', icon: Building2 },
+  { value: 87450, suffix: '', label: 'Documents officiels archivés', icon: FileText },
+  { value: 124500, suffix: '', label: 'Citoyens inscrits', icon: Users },
+  { value: 99, suffix: '.2%', label: 'Conformité réglementaire', icon: Shield },
 ]
 
 const steps = [
-  { num: '01', title: 'Inscription', desc: 'Créez votre compte institutionnel en quelques minutes.', icon: Users },
-  { num: '02', title: 'Configuration', desc: 'Paramétrez vos workflows, rôles et structures administratives.', icon: Zap },
-  { num: '03', title: 'Migration', desc: 'Importez vos documents existants avec l\'aide de nos experts.', icon: Globe },
-  { num: '04', title: 'Production', desc: 'Démarrez votre administration numérique avec un accompagnement continu.', icon: CheckCircle2 },
+  {
+    num: '01',
+    title: 'Déploiement ministériel',
+    desc: 'Installation de la plateforme au sein du ministère avec configuration de l\'arbre organisationnel et des habilitations conformes à la hiérarchie administrative.',
+    icon: Building2,
+  },
+  {
+    num: '02',
+    title: 'Paramétrage réglementaire',
+    desc: 'Configuration des circuits de validation, nomenclature des courriers et procédures conformes au Code administratif et aux circulaires en vigueur.',
+    icon: Scale,
+  },
+  {
+    num: '03',
+    title: 'Migration des archives',
+    desc: 'Numérisation et importation des archives papier avec OCR intelligent, indexation selon la nomenclature administrative guinéenne.',
+    icon: Globe,
+  },
+  {
+    num: '04',
+    title: 'Mise en production souveraine',
+    desc: 'Déploiement en production sur l\'infrastructure nationale avec formation des agents et accompagnement continu par l\'ANIN.',
+    icon: CheckCircle2,
+  },
 ]
 
 const testimonials = [
   {
-    name: 'M. Mamadou Bailo Bah',
+    name: 'M. Alpha Oumar Diallo',
     role: 'Secrétaire Général',
-    org: 'Ministère des Finances',
-    text: 'eAdmin Suite a transformé notre gestion des courriers. Nous avons réduit les délais de traitement de 60% en moins de 6 mois. La plateforme est intuitive et nos agents l\'ont adoptée rapidement.',
+    org: 'Ministère de l\'Économie et des Finances',
+    text: 'La plateforme eAdministration Suite a transformé la gestion interministérielle de nos courriers. Nous avons réduit les délais de traitement de 60% en moins de 6 mois. La conformité au Décret sur la signature électronique est un atout majeur pour notre ministère.',
   },
   {
-    name: 'Mme Aissatou Diallo',
-    role: 'Directrice des Systèmes d\'Information',
-    org: 'Université Gamal Abdel Nasser',
-    text: 'La flexibilité des workflows et la qualité du support technique font d\'eAdmin Suite un partenaire de confiance. Notre université a digitalisé plus de 15 000 dossiers étudiant en un an.',
+    name: 'Mme Mariama Baldé',
+    role: 'Directrice de la Modernisation Administrative',
+    org: 'Primature',
+    text: 'Conformément à la Circulaire n°001/PM/CAB, nous avons déployé la plateforme dans 18 institutions. La souplesse des workflows et la traçabilité complète répondent aux exigences de la Cour des Comptes et du Code administratif.',
   },
   {
-    name: 'Dr. Ibrahima Sory Sylla',
-    role: 'Directeur Général',
-    org: 'Agence Nationale de l\'Inclusion Numérique',
-    text: 'L\'architecture multi-tenant nous permet de servir chaque ministère avec sa propre configuration tout en maintenant une gouvernance centralisée. C\'est exactement ce dont nous avions besoin.',
+    name: 'Dr. Mamadou Saliou Bah',
+    role: 'Président',
+    org: 'Autorité de Régulation des Communications Électroniques et des Postes (ARCEP)',
+    text: 'L\'architecture souveraine de la plateforme, avec son hébergement national et son chiffrement AES-256, est conforme à la Loi L/2016/018/AN sur la protection des données. C\'est un modèle pour l\'administration numérique en Afrique de l\'Ouest.',
+  },
+  {
+    name: 'M. Ibrahima Tounkara',
+    role: 'Gouverneur',
+    org: 'Région Administrative de Conakry',
+    text: 'Le déploiement dans les 5 communes de Conakry a permis de traiter plus de 8 700 demandes citoyennes avec un taux de satisfaction de 94%. La décentralisation numérique est désormais une réalité pour les citoyens guinéens.',
   },
 ]
 
-const institutions = [
-  'Ministère des Finances', 'Ministère de l\'Éducation', 'Ministère de la Santé',
-  'Université de Conakry', 'Assemblée Nationale', 'Cour Suprême',
+const institutionNames = [
+  'Présidence de la République',
+  'Primature',
+  'Min. Administration Territoriale',
+  'Min. Économie et Finances',
+  'Min. Éducation Nationale',
+  'Min. Santé et Hygiène Publique',
+  'Min. Justice, Gardien des Sceaux',
+  'Min. Défense Nationale',
+  'Min. Mines et Géologie',
+  'Assemblée Nationale',
+  'Cour des Comptes',
+  'ANIN',
+  'ARCEP',
+  'Conseil Économique et Social',
+  'Min. Agriculture et Élevage',
+  'Min. Plan et Coopération',
+]
+
+const sovereigntyCards = [
+  {
+    icon: Server,
+    title: 'Data Center Conakry',
+    desc: 'Infrastructure d\'hébergement souveraine située à Conakry, garantissant la disponibilité et l\'intégrité des données de l\'État.',
+  },
+  {
+    icon: Shield,
+    title: 'Conformité Loi L/2016/018',
+    desc: 'Protection des données à caractère personnel conformément à la loi guinéenne. Aucun transfert de données hors du territoire national.',
+  },
+  {
+    icon: Fingerprint,
+    title: 'Chiffrement AES-256',
+    desc: 'Chiffrement de bout en bout des données sensibles de l\'administration publique avec les standards les plus élevés.',
+  },
+  {
+    icon: Eye,
+    title: 'Audit de sécurité ANSSI',
+    desc: 'Audits réguliers de sécurité par les autorités nationales compétentes pour garantir la résilience du système d\'information.',
+  },
 ]
 
 /* ─── Component ────────────────────────────────────────── */
@@ -151,46 +246,64 @@ export function LandingPage() {
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#3B7DD8]/20 rounded-full blur-[120px] animate-pulse-soft" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-[#C8A45C]/10 rounded-full blur-[150px]" />
 
+        {/* Guinea tricolor accent line */}
+        <div className="absolute top-0 left-0 right-0 h-1 flex">
+          <div className="flex-1 bg-[#CE1126]" />
+          <div className="flex-1 bg-[#FCD116]" />
+          <div className="flex-1 bg-[#009460]" />
+        </div>
+
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-32 text-center">
           <motion.div
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
           >
+            {/* Republic emblem */}
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="mb-4"
+            >
+              <p className="text-[#C8A45C] text-sm sm:text-base font-semibold tracking-wider uppercase">
+                🇬🇳 République de Guinée — Travail · Justice · Solidarité
+              </p>
+            </motion.div>
+
             <Badge className="mb-6 bg-[#C8A45C]/20 text-[#C8A45C] border-[#C8A45C]/30 hover:bg-[#C8A45C]/30">
-              <Sparkles className="h-3.5 w-3.5 mr-1" />
-              Plateforme GovTech N°1 en Guinée
+              <Landmark className="h-3.5 w-3.5 mr-1" />
+              Plateforme Nationale de eAdministration — République de Guinée
             </Badge>
 
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white leading-tight tracking-tight">
-              La plateforme{' '}
-              <span className="text-[#C8A45C]">GovTech</span> de
-              <br className="hidden sm:block" /> nouvelle génération pour
-              <br className="hidden sm:block" /> la{' '}
-              <span className="text-[#C8A45C]">Guinée</span> et l&apos;Afrique
+              L&apos;administration numérique
+              <br className="hidden sm:block" /> de la{' '}
+              <span className="text-[#C8A45C]">République de Guinée</span>
             </h1>
 
             <p className="mt-6 text-lg sm:text-xl text-white/70 max-w-3xl mx-auto leading-relaxed">
-              Digitalisez votre administration avec une plateforme intégrée de GED,
-              courriers numériques, workflows automatisés et signatures électroniques.
+              Conformément à la Circulaire n°001/PM/CAB, la plateforme eAdministration Suite assure
+              la digitalisation de l&apos;ensemble des procédures administratives pour les 24 institutions
+              de l&apos;État guinéen et les 8 régions administratives.
             </p>
 
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
               <Button
                 size="lg"
-                onClick={() => navigate('demo')}
+                onClick={() => navigate('login')}
                 className="h-12 px-8 text-base bg-[#C8A45C] hover:bg-[#C8A45C]/90 text-[#0B2E58] font-semibold"
               >
-                Demander une démo
+                Accéder à la plateforme
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
               <Button
                 size="lg"
                 variant="outline"
-                onClick={() => navigate('solutions')}
+                onClick={() => navigate('citizen-portal')}
                 className="h-12 px-8 text-base border-white/20 text-white hover:bg-white/10"
               >
-                Découvrir la plateforme
+                Portail Citoyen
               </Button>
             </div>
           </motion.div>
@@ -203,9 +316,9 @@ export function LandingPage() {
             className="mt-16 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto"
           >
             {[
-              { label: 'Courriers traités', value: DEMO_STATS.courriers.total.toLocaleString('fr-FR'), icon: Mail },
-              { label: 'Documents archivés', value: DEMO_STATS.documents.total.toLocaleString('fr-FR'), icon: FileText },
-              { label: 'Workflows actifs', value: DEMO_STATS.workflows.actifs.toString(), icon: GitBranch },
+              { label: 'Institutions connectées', value: `${DEMO_STATS.institutions.connectees}/${DEMO_STATS.institutions.total}`, icon: Building2 },
+              { label: 'Courriers interministériels', value: DEMO_STATS.courriers.total.toLocaleString('fr-FR'), icon: Mail },
+              { label: 'Citoyens inscrits', value: DEMO_STATS.citoyens.inscrits.toLocaleString('fr-FR'), icon: Users },
             ].map((stat) => (
               <div
                 key={stat.label}
@@ -223,26 +336,29 @@ export function LandingPage() {
         <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
       </section>
 
-      {/* ─── TRUSTED BY ────────────────────────────────────── */}
+      {/* ─── INSTITUTIONS DE LA RÉPUBLIQUE ────────────────── */}
       <AnimatedSection className="py-20 bg-background">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div variants={fadeUp} className="text-center mb-12">
             <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-              Ils nous font confiance
+              Institutions de la République
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Les institutions de l&apos;État guinéen engagées dans la transformation numérique
             </p>
           </motion.div>
           <motion.div
             variants={stagger}
-            className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6"
+            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4"
           >
-            {institutions.map((name) => (
+            {institutionNames.map((name) => (
               <motion.div
                 key={name}
                 variants={fadeUp}
                 className="glass-card rounded-xl p-4 text-center hover:shadow-md transition-shadow"
               >
-                <Building2 className="h-8 w-8 text-[#0B2E58]/40 dark:text-primary/40 mx-auto mb-2" />
-                <p className="text-xs font-medium text-muted-foreground">{name}</p>
+                <Building2 className="h-7 w-7 text-[#0B2E58]/40 dark:text-primary/40 mx-auto mb-2" />
+                <p className="text-xs font-medium text-muted-foreground leading-tight">{name}</p>
               </motion.div>
             ))}
           </motion.div>
@@ -257,11 +373,11 @@ export function LandingPage() {
               Modules
             </Badge>
             <h2 className="text-3xl sm:text-4xl font-bold text-foreground">
-              Une suite complète pour votre{' '}
-              <span className="gradient-text">administration numérique</span>
+              Une suite complète pour{' '}
+              <span className="gradient-text">l&apos;administration numérique</span>
             </h2>
             <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-              Six modules intégrés qui couvrent l&apos;ensemble de vos besoins en gestion administrative digitale.
+              Six modules intégrés conformes aux exigences réglementaires de la République de Guinée.
             </p>
           </motion.div>
 
@@ -296,7 +412,7 @@ export function LandingPage() {
               <span className="gradient-text">de pointe</span>
             </h2>
             <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-              Chaque fonctionnalité est conçue pour répondre aux exigences des administrations modernes.
+              Chaque fonctionnalité est conçue pour répondre aux exigences de l&apos;administration publique guinéenne.
             </p>
           </motion.div>
 
@@ -314,6 +430,104 @@ export function LandingPage() {
         </div>
       </AnimatedSection>
 
+      {/* ─── GOVERNANCE ────────────────────────────────────── */}
+      <AnimatedSection className="py-24 bg-muted/30">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <motion.div variants={fadeUp} className="text-center mb-16">
+            <Badge variant="outline" className="mb-4 border-[#C8A45C]/50 text-[#C8A45C]">
+              <Scale className="h-3.5 w-3.5 mr-1" />
+              Gouvernance
+            </Badge>
+            <h2 className="text-3xl sm:text-4xl font-bold text-foreground">
+              Conformité et{' '}
+              <span className="gradient-text">Gouvernance Numérique</span>
+            </h2>
+            <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
+              La plateforme est conforme à l&apos;ensemble du cadre juridique et réglementaire de la République de Guinée.
+            </p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {LEGAL_REFERENCES.map((ref) => (
+              <motion.div key={ref.id} variants={fadeUp}>
+                <Card className="glass-card hover:shadow-lg transition-all duration-300 h-full border-transparent hover:border-[#C8A45C]/30">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#0B2E58]/10 dark:bg-primary/10">
+                        <BookOpen className="h-5 w-5 text-[#0B2E58] dark:text-primary" />
+                      </div>
+                      <Badge
+                        className={cn(
+                          'text-xs',
+                          ref.status === 'conforme'
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800'
+                            : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800'
+                        )}
+                      >
+                        {ref.status === 'conforme' ? 'Conforme' : 'En application'}
+                      </Badge>
+                    </div>
+                    <p className="text-xs font-mono text-[#C8A45C] mb-1">{ref.reference}</p>
+                    <h3 className="text-sm font-semibold text-foreground mb-2">{ref.title}</h3>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{ref.description}</p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Data sovereignty banner */}
+          <motion.div variants={fadeUp} className="mt-10">
+            <div className="rounded-xl bg-gradient-to-r from-[#0B2E58] to-[#134A8E] p-6 text-center">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <Database className="h-5 w-5 text-[#C8A45C]" />
+                <span className="text-[#C8A45C] font-semibold text-sm uppercase tracking-wider">
+                  Souveraineté des données
+                </span>
+              </div>
+              <p className="text-white/80 text-sm">
+                Hébergement des données sur le territoire national — Conformément à la Loi n°L/2016/018/AN sur la protection des données personnelles
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      </AnimatedSection>
+
+      {/* ─── NATIONAL SOVEREIGNTY ──────────────────────────── */}
+      <AnimatedSection className="py-24 bg-background">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <motion.div variants={fadeUp} className="text-center mb-16">
+            <Badge variant="outline" className="mb-4 border-[#0B2E58]/30 dark:border-primary/30 text-[#0B2E58] dark:text-primary">
+              <Flag className="h-3.5 w-3.5 mr-1" />
+              Souveraineté
+            </Badge>
+            <h2 className="text-3xl sm:text-4xl font-bold text-foreground">
+              Souveraineté numérique et{' '}
+              <span className="gradient-text">hébergement national</span>
+            </h2>
+            <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
+              L&apos;infrastructure de la plateforme est entièrement hébergée sur le territoire national, garantissant la souveraineté des données de l&apos;État guinéen.
+            </p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {sovereigntyCards.map((card) => (
+              <motion.div key={card.title} variants={fadeUp}>
+                <Card className="glass-card hover:shadow-lg transition-all duration-300 group h-full border-transparent hover:border-[#C8A45C]/30">
+                  <CardContent className="p-6 text-center">
+                    <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#0B2E58]/10 dark:bg-primary/10 group-hover:bg-[#0B2E58] dark:group-hover:bg-primary transition-colors">
+                      <card.icon className="h-7 w-7 text-[#0B2E58] dark:text-primary group-hover:text-[#C8A45C] transition-colors" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-foreground mb-2">{card.title}</h3>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{card.desc}</p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </AnimatedSection>
+
       {/* ─── STATISTICS ────────────────────────────────────── */}
       <section className="py-24 bg-[#0B2E58] dark:bg-primary relative overflow-hidden">
         <div className="absolute inset-0 opacity-[0.03]" style={{
@@ -321,14 +535,24 @@ export function LandingPage() {
         }} />
         <div className="absolute top-0 right-0 w-96 h-96 bg-[#C8A45C]/10 rounded-full blur-[120px]" />
 
+        {/* Guinea tricolor accent at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 h-1 flex">
+          <div className="flex-1 bg-[#CE1126]" />
+          <div className="flex-1 bg-[#FCD116]" />
+          <div className="flex-1 bg-[#009460]" />
+        </div>
+
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <AnimatedSection>
             <motion.div variants={fadeUp} className="text-center mb-16">
+              <p className="text-[#C8A45C] text-sm font-semibold tracking-wider uppercase mb-2">
+                🇬🇳 République de Guinée
+              </p>
               <h2 className="text-3xl sm:text-4xl font-bold text-white">
-                Des résultats qui parlent
+                Des résultats au service de l&apos;État
               </h2>
               <p className="mt-4 text-lg text-white/60 max-w-2xl mx-auto">
-                Notre plateforme accompagne les institutions guinéennes dans leur transformation digitale.
+                La plateforme eAdministration Suite accompagne la transformation numérique de l&apos;administration publique guinéenne.
               </p>
             </motion.div>
 
@@ -339,6 +563,7 @@ export function LandingPage() {
                   variants={fadeUp}
                   className="text-center"
                 >
+                  <stat.icon className="h-6 w-6 text-[#C8A45C]/60 mx-auto mb-3" />
                   <div className="text-4xl sm:text-5xl font-bold text-[#C8A45C]">
                     <CounterAnimation target={stat.value} suffix={stat.suffix} />
                   </div>
@@ -361,7 +586,7 @@ export function LandingPage() {
               Comment ça <span className="gradient-text">fonctionne</span>
             </h2>
             <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-              Démarrez votre transformation digitale en 4 étapes simples.
+              Déploiement de la plateforme dans les institutions de l&apos;État en 4 étapes réglementaires.
             </p>
           </motion.div>
 
@@ -399,11 +624,11 @@ export function LandingPage() {
               Témoignages
             </Badge>
             <h2 className="text-3xl sm:text-4xl font-bold text-foreground">
-              Ce que disent nos <span className="gradient-text">clients</span>
+              Les retours des <span className="gradient-text">institutions de l&apos;État</span>
             </h2>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {testimonials.map((t) => (
               <motion.div key={t.name} variants={fadeUp}>
                 <Card className="glass-card h-full border-transparent hover:shadow-lg transition-shadow">
@@ -422,7 +647,8 @@ export function LandingPage() {
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-foreground">{t.name}</p>
-                        <p className="text-xs text-muted-foreground">{t.role} — {t.org}</p>
+                        <p className="text-xs text-[#C8A45C] font-medium">{t.role}</p>
+                        <p className="text-xs text-muted-foreground">{t.org}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -441,29 +667,40 @@ export function LandingPage() {
         }} />
         <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-[#C8A45C]/15 rounded-full blur-[100px]" />
 
+        {/* Guinea tricolor accent */}
+        <div className="absolute top-0 left-0 right-0 h-1 flex">
+          <div className="flex-1 bg-[#CE1126]" />
+          <div className="flex-1 bg-[#FCD116]" />
+          <div className="flex-1 bg-[#009460]" />
+        </div>
+
         <div className="relative z-10 mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 text-center">
+          <p className="text-[#C8A45C] text-sm font-semibold tracking-wider uppercase mb-4">
+            🇬🇳 République de Guinée
+          </p>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight">
-            Prêt à digitaliser votre <span className="text-[#C8A45C]">administration</span> ?
+            Rejoignez la transformation numérique de{' '}
+            <span className="text-[#C8A45C]">l&apos;administration guinéenne</span>
           </h2>
           <p className="mt-6 text-lg text-white/70 max-w-2xl mx-auto">
-            Rejoignez les institutions qui ont déjà transformé leurs processus avec eAdmin Suite.
+            Conformément à la Circulaire n°001/PM/CAB, toutes les institutions de l&apos;État sont appelées à adopter la plateforme eAdministration Suite.
           </p>
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button
               size="lg"
-              onClick={() => navigate('demo')}
+              onClick={() => navigate('login')}
               className="h-12 px-8 text-base bg-[#C8A45C] hover:bg-[#C8A45C]/90 text-[#0B2E58] font-semibold"
             >
-              Demander une démo
+              Accéder à la plateforme
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
             <Button
               size="lg"
               variant="outline"
-              onClick={() => navigate('contact')}
+              onClick={() => navigate('citizen-portal')}
               className="h-12 px-8 text-base border-white/20 text-white hover:bg-white/10"
             >
-              Nous contacter
+              Portail Citoyen
             </Button>
           </div>
         </div>
@@ -471,11 +708,32 @@ export function LandingPage() {
 
       {/* ─── FOOTER ────────────────────────────────────────── */}
       <footer className="bg-[#071D3A] dark:bg-background border-t border-border pt-16 pb-8">
+        {/* Guinea tricolor at top */}
+        <div className="flex h-1 mb-8">
+          <div className="flex-1 bg-[#CE1126]" />
+          <div className="flex-1 bg-[#FCD116]" />
+          <div className="flex-1 bg-[#009460]" />
+        </div>
+
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          {/* Republic header */}
+          <div className="text-center mb-12">
+            <p className="text-[#C8A45C] text-lg font-semibold tracking-wide">
+              République de Guinée — Travail · Justice · Solidarité
+            </p>
+            <p className="text-white/50 text-sm mt-1">
+              Site officiel du Gouvernement guinéen
+            </p>
+            <p className="text-white/30 text-xs mt-1 flex items-center justify-center gap-1">
+              <Database className="h-3 w-3" />
+              Hébergé en souveraineté numérique sur le territoire national
+            </p>
+          </div>
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
-            {/* Produit */}
+            {/* Plateforme */}
             <div>
-              <h3 className="text-sm font-semibold text-white dark:text-foreground mb-4">Produit</h3>
+              <h3 className="text-sm font-semibold text-white dark:text-foreground mb-4">Plateforme</h3>
               <ul className="space-y-2">
                 {[
                   { label: 'GED', page: 'solutions' as const },
@@ -483,7 +741,7 @@ export function LandingPage() {
                   { label: 'Workflows', page: 'solutions' as const },
                   { label: 'Signatures', page: 'solutions' as const },
                   { label: 'Analytics', page: 'solutions' as const },
-                  { label: 'Tarifs', page: 'pricing' as const },
+                  { label: 'Portail Citoyen', page: 'citizen-portal' as const },
                 ].map((item) => (
                   <li key={item.label}>
                     <button
@@ -496,16 +754,17 @@ export function LandingPage() {
                 ))}
               </ul>
             </div>
-            {/* Entreprise */}
+            {/* Institutions */}
             <div>
-              <h3 className="text-sm font-semibold text-white dark:text-foreground mb-4">Entreprise</h3>
+              <h3 className="text-sm font-semibold text-white dark:text-foreground mb-4">Institutions</h3>
               <ul className="space-y-2">
                 {[
-                  { label: 'À propos', page: 'about' as const },
-                  { label: 'Services', page: 'services' as const },
-                  { label: 'Carrières', page: 'about' as const },
-                  { label: 'Blog', page: 'blog' as const },
-                  { label: 'Contact', page: 'contact' as const },
+                  { label: 'Présidence', page: 'about' as const },
+                  { label: 'Primature', page: 'about' as const },
+                  { label: 'Ministères', page: 'about' as const },
+                  { label: 'Assemblée Nationale', page: 'about' as const },
+                  { label: 'ANIN', page: 'about' as const },
+                  { label: 'ARCEP', page: 'about' as const },
                 ].map((item) => (
                   <li key={item.label}>
                     <button
@@ -524,10 +783,10 @@ export function LandingPage() {
               <ul className="space-y-2">
                 {[
                   { label: 'Documentation', page: 'faq' as const },
-                  { label: 'API Reference', page: 'faq' as const },
-                  { label: 'Guides', page: 'faq' as const },
+                  { label: 'API Interopérabilité', page: 'faq' as const },
+                  { label: 'Guides ministériels', page: 'faq' as const },
                   { label: 'FAQ', page: 'faq' as const },
-                  { label: 'Communauté', page: 'blog' as const },
+                  { label: 'Formation agents', page: 'services' as const },
                 ].map((item) => (
                   <li key={item.label}>
                     <button
@@ -542,14 +801,14 @@ export function LandingPage() {
             </div>
             {/* Légal */}
             <div>
-              <h3 className="text-sm font-semibold text-white dark:text-foreground mb-4">Légal</h3>
+              <h3 className="text-sm font-semibold text-white dark:text-foreground mb-4">Cadre juridique</h3>
               <ul className="space-y-2">
                 {[
                   'Mentions légales',
-                  'Politique de confidentialité',
-                  'CGU',
-                  'Sécurité',
-                  'RGPD',
+                  'Données personnelles (Loi L/2016/018/AN)',
+                  'Conditions générales',
+                  'Accessibilité',
+                  'Décret signature électronique',
                 ].map((item) => (
                   <li key={item}>
                     <span className="text-sm text-white/60 dark:text-muted-foreground hover:text-[#C8A45C] transition-colors cursor-pointer">
@@ -562,29 +821,31 @@ export function LandingPage() {
           </div>
 
           <div className="border-t border-white/10 dark:border-border pt-8">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex flex-col items-center gap-4">
               <div className="flex items-center gap-2">
                 <div className="h-8 w-8 rounded-lg bg-[#0B2E58] dark:bg-primary flex items-center justify-center">
                   <Sparkles className="h-4 w-4 text-[#C8A45C]" />
                 </div>
                 <span className="text-sm font-semibold text-white dark:text-foreground">
-                  eAdmin Suite
-                </span>
-                <span className="text-xs text-white/40 dark:text-muted-foreground">
-                  par {BRAND.company}
+                  eAdministration Suite
                 </span>
               </div>
-              <div className="flex items-center gap-4">
-                <span className="text-xs text-white/40 dark:text-muted-foreground flex items-center gap-1">
-                  <MapPin className="h-3 w-3" /> Conakry, Guinée
+              <div className="flex flex-col sm:flex-row items-center gap-4 text-xs text-white/40 dark:text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-3 w-3" /> Conakry, République de Guinée
                 </span>
-                <span className="text-xs text-white/40 dark:text-muted-foreground flex items-center gap-1">
+                <span className="flex items-center gap-1">
                   <Phone className="h-3 w-3" /> +224 622 00 00 00
                 </span>
               </div>
-              <p className="text-xs text-white/40 dark:text-muted-foreground">
-                © {new Date().getFullYear()} {BRAND.company}. Tous droits réservés.
-              </p>
+              <div className="text-center">
+                <p className="text-xs text-white/40 dark:text-muted-foreground">
+                  © 2026 République de Guinée — Ministère des Postes, Télécommunications et de l&apos;Économie Numérique
+                </p>
+                <p className="text-xs text-white/30 dark:text-muted-foreground/60 mt-1">
+                  Conçu et développé par {BRAND.company} pour la République de Guinée
+                </p>
+              </div>
             </div>
           </div>
         </div>

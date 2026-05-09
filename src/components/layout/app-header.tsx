@@ -13,9 +13,9 @@ import { Badge } from '@/components/ui/badge'
 
 const PAGE_TITLES: Record<string, string> = {
   dashboard: 'Tableau de bord',
-  ged: 'Gestion Électronique des Documents',
-  courriers: 'Gestion du Courrier',
-  workflow: 'Workflows Administratifs',
+  ged: 'GED — Documents Officiels',
+  courriers: 'Courrier Officiel Interministériel',
+  workflow: 'Procédures Administratives Réglementaires',
   signatures: 'Signatures Électroniques',
   analytics: 'Analytics & Décisionnel',
   admin: 'Administration',
