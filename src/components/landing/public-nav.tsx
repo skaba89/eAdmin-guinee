@@ -45,7 +45,7 @@ export function PublicNav() {
             className="flex items-center gap-2 group"
           >
             <div className="relative flex h-9 w-9 items-center justify-center rounded-lg overflow-hidden bg-[#0B2E58] dark:bg-primary">
-              <img src="/logo.svg" alt="Guinée" className="h-9 w-9" />
+              <img src="/logo-128.png" alt="Armories de la République de Guinée" className="h-9 w-9 object-contain" />
             </div>
             <div className="flex flex-col">
               <span className="text-base font-bold leading-tight text-[#0B2E58] dark:text-foreground">

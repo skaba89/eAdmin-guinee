@@ -824,7 +824,7 @@ export function LandingPage() {
             <div className="flex flex-col items-center gap-4">
               <div className="flex items-center gap-2">
                 <div className="h-8 w-8 rounded-lg bg-[#0B2E58] dark:bg-primary flex items-center justify-center overflow-hidden">
-                  <img src="/logo.svg" alt="Guinée" className="h-8 w-8" />
+                  <img src="/logo-128.png" alt="Armories de la République de Guinée" className="h-8 w-8 object-contain" />
                 </div>
                 <span className="text-sm font-semibold text-white dark:text-foreground">
                   eAdministration Suite

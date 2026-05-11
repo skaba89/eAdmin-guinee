@@ -29,6 +29,11 @@ export const metadata: Metadata = {
     ],
   },
   manifest: "/site.webmanifest",
+  openGraph: {
+    title: "eAdministration Suite — République de Guinée",
+    description: "Plateforme GovTech pour la digitalisation de l'administration publique guinéenne",
+    images: ["/android-chrome-512x512.png"],
+  },
 };
 
 export default function RootLayout({

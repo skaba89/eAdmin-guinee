@@ -101,9 +101,9 @@ export function LoginPage() {
               {/* Glow ring around logo */}
               <div className="absolute inset-0 rounded-full blur-xl opacity-30" style={{ backgroundColor: GUINEA_YELLOW }} />
               <img
-                src="/logo.svg"
-                alt="eAdministration Guinea"
-                className="w-28 h-28 relative z-10 drop-shadow-2xl"
+                src="/logo-256.png"
+                alt="Armories de la République de Guinée"
+                className="w-28 h-28 relative z-10 drop-shadow-2xl object-contain"
               />
             </div>
           </motion.div>
@@ -197,7 +197,7 @@ export function LoginPage() {
         <div className="lg:hidden mb-6 mt-8 flex flex-col items-center gap-3">
           <div className="relative">
             <div className="absolute inset-0 rounded-full blur-lg opacity-20" style={{ backgroundColor: GUINEA_YELLOW }} />
-            <img src="/logo.svg" alt="eAdministration Guinea" className="w-16 h-16 relative z-10" />
+            <img src="/logo-128.png" alt="Armories de la République de Guinée" className="w-16 h-16 relative z-10 object-contain" />
           </div>
           <div className="text-center">
             <h1 className="text-xl font-bold text-[#0B2E58] dark:text-white">eAdministration Suite</h1>

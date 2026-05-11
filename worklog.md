@@ -194,3 +194,23 @@ Stage Summary:
 - 80+ cas de test détaillés avec étapes et résultats attendus
 - Matrice de couverture services x rôles
 - Checklist de validation finale
+
+---
+Task ID: 1
+Agent: Main Agent
+Task: Replace all "Z" branding with official Guinea coat of arms (logo + favicon)
+
+Work Log:
+- Downloaded official Guinea coat of arms SVG from Wikimedia Commons (137KB)
+- Converted SVG to PNG favicons using cairosvg: favicon-16x16.png, favicon-32x32.png, favicon.ico, apple-touch-icon.png, android-chrome-192x192.png, android-chrome-512x512.png
+- Created optimized logo PNGs: logo-128.png (sidebar/nav), logo-256.png (login page)
+- Updated logo.svg with official coat of arms
+- Updated all 4 components using logo: app-sidebar.tsx, public-nav.tsx, login-page.tsx, landing-page.tsx
+- Updated layout.tsx with OpenGraph metadata
+- Verified build compiles successfully
+
+Stage Summary:
+- All "Z" branding replaced with official Guinea coat of arms
+- Favicon shows the official Guinean emblem instead of "Z"
+- All logo references now use PNG versions for performance
+- Official SVG kept as guinea-coat-of-arms-official.svg and logo.svg

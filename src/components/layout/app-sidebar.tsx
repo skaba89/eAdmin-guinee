@@ -177,7 +177,7 @@ export function AppSidebar() {
       {/* Logo — République de Guinée */}
       <div className="flex items-center gap-3 px-4 h-16 border-b border-border shrink-0">
         <div className="h-9 w-9 rounded-xl overflow-hidden flex items-center justify-center shrink-0 shadow-lg shadow-brand/30">
-          <img src="/logo.svg" alt="Guinée" className="h-9 w-9" />
+          <img src="/logo-128.png" alt="Armories de la République de Guinée" className="h-9 w-9 object-contain" />
         </div>
         <AnimatePresence mode="wait">
           {!sidebarCollapsed && (
