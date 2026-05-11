@@ -1,26 +1,140 @@
 'use client'
 
-import { useAppStore, type AppPage } from '@/store/app-store'
-import { NAV_ITEMS } from '@/lib/constants'
+import { useAppStore, ROLE_LABELS, ROLE_COLORS, type AppPage, type UserRole } from '@/store/app-store'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, FileText, Mail, GitBranch, PenTool,
   BarChart3, Users, Shield, UserCog, Settings, Bell,
   ScrollText, LogOut, ChevronLeft, ChevronRight, Sparkles,
-  ClipboardCheck
+  ClipboardCheck, Building2, Database, Fingerprint,
+  Home, Briefcase, BookOpen,
 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+
+// ─── NAV ITEM DEFINITION ─────────────────────────────────────────────────────
+interface NavItem {
+  page: AppPage
+  label: string
+  icon: string
+}
+
+// ─── ROLE-BASED NAVIGATION ───────────────────────────────────────────────────
+const ROLE_NAV: Record<UserRole, { main: NavItem[]; admin?: NavItem[] }> = {
+  citizen: {
+    main: [
+      { page: 'citizen-portal', label: 'Mon Portail', icon: 'Home' },
+      { page: 'service-requests', label: 'Mes demandes', icon: 'ClipboardCheck' },
+      { page: 'public-citizen-portal', label: 'Services publics', icon: 'Briefcase' },
+      { page: 'ai-assistant', label: 'Assistant IA', icon: 'Sparkles' },
+      { page: 'settings', label: 'Paramètres', icon: 'Settings' },
+    ],
+  },
+  mairie: {
+    main: [
+      { page: 'mairie-dashboard', label: 'Tableau de bord', icon: 'LayoutDashboard' },
+      { page: 'service-requests', label: 'Demandes citoyennes', icon: 'ClipboardCheck' },
+      { page: 'ged', label: 'GED', icon: 'FileText' },
+      { page: 'courriers', label: 'Courriers', icon: 'Mail' },
+      { page: 'ai-assistant', label: 'Assistant IA', icon: 'Sparkles' },
+      { page: 'settings', label: 'Paramètres', icon: 'Settings' },
+    ],
+  },
+  admin_general: {
+    main: [
+      { page: 'dashboard', label: 'Tableau de bord', icon: 'LayoutDashboard' },
+      { page: 'service-requests', label: 'Demandes citoyennes', icon: 'ClipboardCheck' },
+      { page: 'ged', label: 'Documents (GED)', icon: 'FileText' },
+      { page: 'courriers', label: 'Courriers', icon: 'Mail' },
+      { page: 'workflow', label: 'Workflows', icon: 'GitBranch' },
+      { page: 'signatures', label: 'Signatures', icon: 'PenTool' },
+      { page: 'analytics', label: 'Analytics', icon: 'BarChart3' },
+      { page: 'citizen-portal', label: 'Portail Citoyen', icon: 'Users' },
+      { page: 'ai-assistant', label: 'Assistant IA', icon: 'Sparkles' },
+    ],
+    admin: [
+      { page: 'admin', label: 'Administration', icon: 'Shield' },
+      { page: 'users', label: 'Utilisateurs', icon: 'UserCog' },
+      { page: 'notifications', label: 'Notifications', icon: 'Bell' },
+      { page: 'audit-logs', label: 'Audit Logs', icon: 'ScrollText' },
+      { page: 'settings', label: 'Paramètres', icon: 'Settings' },
+    ],
+  },
+  agence: {
+    main: [
+      { page: 'agence-dashboard', label: 'Tableau de bord', icon: 'LayoutDashboard' },
+      { page: 'service-requests', label: 'Demandes citoyennes', icon: 'ClipboardCheck' },
+      { page: 'ged', label: 'GED', icon: 'FileText' },
+      { page: 'ai-assistant', label: 'Assistant IA', icon: 'Sparkles' },
+      { page: 'settings', label: 'Paramètres', icon: 'Settings' },
+    ],
+  },
+  ministere: {
+    main: [
+      { page: 'dashboard', label: 'Tableau de bord', icon: 'LayoutDashboard' },
+      { page: 'ged', label: 'GED', icon: 'FileText' },
+      { page: 'courriers', label: 'Courriers', icon: 'Mail' },
+      { page: 'workflow', label: 'Workflows', icon: 'GitBranch' },
+      { page: 'signatures', label: 'Signatures', icon: 'PenTool' },
+      { page: 'ai-assistant', label: 'Assistant IA', icon: 'Sparkles' },
+      { page: 'settings', label: 'Paramètres', icon: 'Settings' },
+    ],
+  },
+  super_admin: {
+    main: [
+      { page: 'dashboard', label: 'Tableau de bord', icon: 'LayoutDashboard' },
+      { page: 'service-requests', label: 'Demandes citoyennes', icon: 'ClipboardCheck' },
+      { page: 'ged', label: 'Documents (GED)', icon: 'FileText' },
+      { page: 'courriers', label: 'Courriers', icon: 'Mail' },
+      { page: 'workflow', label: 'Workflows', icon: 'GitBranch' },
+      { page: 'signatures', label: 'Signatures', icon: 'PenTool' },
+      { page: 'analytics', label: 'Analytics', icon: 'BarChart3' },
+      { page: 'citizen-portal', label: 'Portail Citoyen', icon: 'Users' },
+      { page: 'mairie-dashboard', label: 'Espace Mairie', icon: 'Building2' },
+      { page: 'agence-dashboard', label: 'Espace Agence', icon: 'Fingerprint' },
+      { page: 'ai-assistant', label: 'Assistant IA', icon: 'Sparkles' },
+    ],
+    admin: [
+      { page: 'admin', label: 'Administration', icon: 'Shield' },
+      { page: 'users', label: 'Utilisateurs', icon: 'UserCog' },
+      { page: 'notifications', label: 'Notifications', icon: 'Bell' },
+      { page: 'audit-logs', label: 'Audit Logs', icon: 'ScrollText' },
+      { page: 'settings', label: 'Paramètres', icon: 'Settings' },
+    ],
+  },
+}
+
+// Role-specific extra nav items
+const ROLE_EXTRA_NAV: Partial<Record<UserRole, NavItem[]>> = {
+  mairie: [
+    { page: 'birth-certificate-db', label: 'Base État Civil', icon: 'BookOpen' },
+  ],
+  admin_general: [
+    { page: 'birth-certificate-db', label: 'Base État Civil', icon: 'BookOpen' },
+  ],
+  ministere: [
+    { page: 'birth-certificate-db', label: 'Base État Civil', icon: 'BookOpen' },
+  ],
+  super_admin: [
+    { page: 'birth-certificate-db', label: 'Base État Civil', icon: 'BookOpen' },
+  ],
+}
 
 const ICON_MAP: Record<string, React.ElementType> = {
   LayoutDashboard, FileText, Mail, GitBranch, PenTool,
   BarChart3, Users, Shield, UserCog, Settings, Bell,
-  ScrollText, Sparkles, ClipboardCheck,
+  ScrollText, Sparkles, ClipboardCheck, Building2, Database,
+  Fingerprint, Home, Briefcase, BookOpen,
 }
 
 export function AppSidebar() {
   const { currentPage, navigate, sidebarCollapsed, toggleSidebarCollapse, logout, user } = useAppStore()
 
-  const navItem = (page: AppPage, label: string, icon?: string, section?: string) => {
+  const userRole = (user?.role || 'citizen') as UserRole
+  const navConfig = ROLE_NAV[userRole] || ROLE_NAV.citizen
+  const extraNav = ROLE_EXTRA_NAV[userRole] || []
+
+  const navItem = (page: AppPage, label: string, icon?: string) => {
     const IconComponent = icon ? ICON_MAP[icon] : null
     const isActive = currentPage === page
     return (
@@ -88,19 +202,33 @@ export function AppSidebar() {
             <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 px-3 mb-2">Modules</p>
           )}
           <div className="space-y-1">
-            {NAV_ITEMS.app.map((item) => navItem(item.page, item.label, item.icon))}
+            {navConfig.main.map((item) => navItem(item.page, item.label, item.icon))}
           </div>
         </div>
 
-        {/* Admin */}
-        <div>
-          {!sidebarCollapsed && (
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 px-3 mb-2">Administration</p>
-          )}
-          <div className="space-y-1">
-            {NAV_ITEMS.admin.map((item) => navItem(item.page, item.label, item.icon))}
+        {/* Extra nav items (e.g., Birth certificate database for mairie/admin) */}
+        {extraNav.length > 0 && (
+          <div>
+            {!sidebarCollapsed && (
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 px-3 mb-2">Accès rapide</p>
+            )}
+            <div className="space-y-1">
+              {extraNav.map((item) => navItem(item.page, item.label, item.icon))}
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Admin section */}
+        {navConfig.admin && navConfig.admin.length > 0 && (
+          <div>
+            {!sidebarCollapsed && (
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 px-3 mb-2">Administration</p>
+            )}
+            <div className="space-y-1">
+              {navConfig.admin.map((item) => navItem(item.page, item.label, item.icon))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* User */}
@@ -120,11 +248,37 @@ export function AppSidebar() {
                 className="flex-1 min-w-0 overflow-hidden"
               >
                 <p className="text-xs font-medium truncate">{user?.name || 'Utilisateur'}</p>
-                <p className="text-[10px] text-muted-foreground truncate">{user?.role || 'Admin'}</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className={`inline-flex items-center px-1.5 py-0 rounded text-[9px] font-semibold leading-relaxed ${ROLE_COLORS[userRole]}`}>
+                    {ROLE_LABELS[userRole]}
+                  </span>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
+
+        {/* Logout button */}
+        {!sidebarCollapsed && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={logout}
+            className="w-full mt-2 justify-start gap-2 text-muted-foreground hover:text-red-500 h-8 text-xs"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            Déconnexion
+          </Button>
+        )}
+        {sidebarCollapsed && (
+          <button
+            onClick={logout}
+            className="w-full mt-2 flex items-center justify-center p-2 rounded-lg text-muted-foreground hover:text-red-500 transition-colors"
+            title="Déconnexion"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {/* Collapse toggle */}

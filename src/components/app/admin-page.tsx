@@ -12,6 +12,10 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
 } from '@/components/ui/dialog'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+} from '@/components/ui/alert-dialog'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -20,6 +24,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Progress } from '@/components/ui/progress'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 interface Module {
   id: string
@@ -41,7 +46,16 @@ const MODULES: Module[] = [
   { id: 'api', name: 'API Gateway', description: 'Gestion des APIs et intégrations', active: false, icon: Settings },
 ]
 
-const API_KEYS = [
+interface ApiKey {
+  id: string
+  name: string
+  key: string
+  created: string
+  lastUsed: string
+  status: 'active' | 'revoked'
+}
+
+const INITIAL_API_KEYS: ApiKey[] = [
   { id: '1', name: 'Production API', key: 'eadmin_prod_a7f3b2c9d1e4f5a6', created: '2024-01-15', lastUsed: '2024-12-15', status: 'active' },
   { id: '2', name: 'Staging API', key: 'eadmin_stg_d4e5f6a7b8c9d0e1', created: '2024-06-01', lastUsed: '2024-12-14', status: 'active' },
   { id: '3', name: 'Partner - UNDP', key: 'eadmin_ext_f2a3b4c5d6e7f8a9', created: '2024-03-20', lastUsed: '2024-11-30', status: 'active' },
@@ -51,10 +65,27 @@ const API_KEYS = [
 export function AdminPage() {
   const [modules, setModules] = useState(MODULES)
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({})
-  const [apiKeys, setApiKeys] = useState(API_KEYS)
+  const [apiKeys, setApiKeys] = useState(INITIAL_API_KEYS)
   const [newKeyDialog, setNewKeyDialog] = useState(false)
   const [newKeyName, setNewKeyName] = useState('')
   const [successToast, setSuccessToast] = useState('')
+
+  // Delete confirmation dialog
+  const [deleteKeyDialog, setDeleteKeyDialog] = useState(false)
+  const [deleteKeyId, setDeleteKeyId] = useState<string | null>(null)
+
+  // Institution settings
+  const [institutionSettings, setInstitutionSettings] = useState({
+    name: "Ministère de l'Administration Territoriale",
+    sigle: 'MAT',
+    tutelle: 'Primature',
+    localisation: 'Conakry, Kaloum',
+  })
+
+  const showToast = (message: string) => {
+    setSuccessToast(message)
+    setTimeout(() => setSuccessToast(''), 4000)
+  }
 
   useEffect(() => {
     if (successToast) {
@@ -65,6 +96,53 @@ export function AdminPage() {
 
   const toggleModule = (id: string) => {
     setModules(prev => prev.map(m => m.id === id ? { ...m, active: !m.active } : m))
+  }
+
+  const copyApiKey = async (keyValue: string) => {
+    try {
+      await navigator.clipboard.writeText(keyValue)
+      showToast('Clé API copiée dans le presse-papiers')
+    } catch {
+      // Fallback for environments where clipboard API is not available
+      const textArea = document.createElement('textarea')
+      textArea.value = keyValue
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+      showToast('Clé API copiée dans le presse-papiers')
+    }
+  }
+
+  const handleDeleteKeyOpen = (keyId: string) => {
+    setDeleteKeyId(keyId)
+    setDeleteKeyDialog(true)
+  }
+
+  const handleDeleteKeyConfirm = () => {
+    if (!deleteKeyId) return
+    const keyToDelete = apiKeys.find(k => k.id === deleteKeyId)
+    setApiKeys(prev => prev.filter(k => k.id !== deleteKeyId))
+    setDeleteKeyDialog(false)
+    setDeleteKeyId(null)
+    showToast(`Clé API "${keyToDelete?.name || ''}" supprimée avec succès`)
+  }
+
+  const toggleKeyStatus = (keyId: string) => {
+    setApiKeys(prev => prev.map(k => {
+      if (k.id !== keyId) return k
+      const newStatus = k.status === 'active' ? 'revoked' : 'active'
+      return { ...k, status: newStatus }
+    }))
+    const keyToToggle = apiKeys.find(k => k.id === keyId)
+    if (keyToToggle) {
+      const newStatus = keyToToggle.status === 'active' ? 'révoquée' : 'activée'
+      showToast(`Clé API "${keyToToggle.name}" ${newStatus}`)
+    }
+  }
+
+  const handleSaveInstitution = () => {
+    showToast('Paramètres sauvegardés avec succès')
   }
 
   const healthIndicators = [
@@ -232,7 +310,7 @@ export function AdminPage() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-base">Gestion des clés API</CardTitle>
-                <CardDescription>Gérez les clés d\'accès à l\'API eAdministration</CardDescription>
+                <CardDescription>Gérez les clés d&apos;accès à l&apos;API eAdministration</CardDescription>
               </div>
               <Button size="sm" className="gap-2 bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90" onClick={() => { setNewKeyDialog(true); setNewKeyName('') }}>
                 <Plus className="h-4 w-4" />
@@ -248,7 +326,7 @@ export function AdminPage() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium">{key.name}</p>
-                      <Badge variant={key.status === 'active' ? 'default' : 'destructive'} className="text-[10px]">
+                      <Badge variant={key.status === 'active' ? 'default' : 'destructive'} className="text-[10px] cursor-pointer" onClick={() => toggleKeyStatus(key.id)}>
                         {key.status === 'active' ? 'Active' : 'Révoquée'}
                       </Badge>
                     </div>
@@ -256,10 +334,10 @@ export function AdminPage() {
                       <code className="text-xs font-mono text-muted-foreground">
                         {showKeys[key.id] ? key.key : '••••••••••••••••••••'}
                       </code>
-                      <button onClick={() => setShowKeys(prev => ({ ...prev, [key.id]: !prev[key.id] }))}>
-                        {showKeys[key.id] ? <EyeOff className="h-3 w-3 text-muted-foreground" /> : <Eye className="h-3 w-3 text-muted-foreground" />}
+                      <button onClick={() => setShowKeys(prev => ({ ...prev, [key.id]: !prev[key.id] }))} className="text-muted-foreground hover:text-foreground transition-colors">
+                        {showKeys[key.id] ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
                       </button>
-                      <button className="text-muted-foreground hover:text-foreground">
+                      <button onClick={() => copyApiKey(key.key)} className="text-muted-foreground hover:text-foreground transition-colors" title="Copier la clé">
                         <Copy className="h-3 w-3" />
                       </button>
                     </div>
@@ -268,12 +346,22 @@ export function AdminPage() {
                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
                   <span>Créée: {key.created}</span>
                   <span>Dernière utilisation: {key.lastUsed}</span>
-                  <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 h-7 w-7 p-0">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 h-7 w-7 p-0"
+                    onClick={() => handleDeleteKeyOpen(key.id)}
+                  >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               </div>
             ))}
+            {apiKeys.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                Aucune clé API configurée. Créez-en une pour commencer.
+              </div>
+            )}
           </CardContent>
         </Card>
       </motion.div>
@@ -282,29 +370,41 @@ export function AdminPage() {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}>
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Paramètres de l\'institution</CardTitle>
+            <CardTitle className="text-base">Paramètres de l&apos;institution</CardTitle>
             <CardDescription>Configuration générale de votre institution</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Nom de l\'institution</Label>
-                <Input defaultValue="Ministère de l'Administration Territoriale" />
+                <Label>Nom de l&apos;institution</Label>
+                <Input
+                  value={institutionSettings.name}
+                  onChange={e => setInstitutionSettings(prev => ({ ...prev, name: e.target.value }))}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Sigle</Label>
-                <Input defaultValue="MAT" />
+                <Input
+                  value={institutionSettings.sigle}
+                  onChange={e => setInstitutionSettings(prev => ({ ...prev, sigle: e.target.value }))}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Tutelle</Label>
-                <Input defaultValue="Primature" />
+                <Input
+                  value={institutionSettings.tutelle}
+                  onChange={e => setInstitutionSettings(prev => ({ ...prev, tutelle: e.target.value }))}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Localisation</Label>
-                <Input defaultValue="Conakry, Kaloum" />
+                <Input
+                  value={institutionSettings.localisation}
+                  onChange={e => setInstitutionSettings(prev => ({ ...prev, localisation: e.target.value }))}
+                />
               </div>
             </div>
-            <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90" onClick={() => setSuccessToast('Paramètres enregistrés avec succès')}>
+            <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90" onClick={handleSaveInstitution}>
               Enregistrer les modifications
             </Button>
           </CardContent>
@@ -329,24 +429,45 @@ export function AdminPage() {
             <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90" onClick={() => {
               const chars = 'abcdef0123456789'
               const randomKey = Array.from({ length: 16 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
-              const newKey = {
+              const newKey: ApiKey = {
                 id: String(Date.now()),
                 name: newKeyName || 'Nouvelle clé',
                 key: `eadmin_gen_${randomKey}`,
                 created: new Date().toISOString().slice(0, 10),
                 lastUsed: new Date().toISOString().slice(0, 10),
-                status: 'active' as const,
+                status: 'active',
               }
               setApiKeys(prev => [newKey, ...prev])
               setNewKeyName('')
               setNewKeyDialog(false)
-              setSuccessToast(`Clé API "${newKey.name}" générée avec succès`)
+              showToast(`Clé API "${newKey.name}" générée avec succès`)
             }}>
               Générer la clé
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete API Key Confirmation Dialog */}
+      <AlertDialog open={deleteKeyDialog} onOpenChange={setDeleteKeyDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-red-600" />
+              Supprimer la clé API
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer cette clé API ? Cette action est irréversible et toute application utilisant cette clé perdra son accès.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction className="bg-red-600 hover:bg-red-700 text-white" onClick={handleDeleteKeyConfirm}>
+              Supprimer définitivement
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AnimatePresence>
         {successToast && (

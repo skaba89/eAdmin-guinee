@@ -32,6 +32,11 @@ const AuditLogsPage = dynamic(() => import('@/components/app/audit-logs-page').t
 const PublicNav = dynamic(() => import('@/components/landing/public-nav').then(m => ({ default: m.PublicNav })), { ssr: false })
 const PublicCitizenPortal = dynamic(() => import('@/components/landing/public-citizen-portal').then(m => ({ default: m.PublicCitizenPortal })), { ssr: false })
 const ServiceRequestsPage = dynamic(() => import('@/components/app/service-requests-page').then(m => ({ default: m.ServiceRequestsPage })), { ssr: false })
+const MairieDashboardPage = dynamic(() => import('@/components/app/mairie-dashboard-page').then(m => ({ default: m.MairieDashboardPage })), { ssr: false })
+const AgenceDashboardPage = dynamic(() => import('@/components/app/agence-dashboard-page').then(m => ({ default: m.AgenceDashboardPage })), { ssr: false })
+const BirthCertificateDbPage = dynamic(() => import('@/components/app/birth-certificate-db-page').then(m => ({ default: m.BirthCertificateDbPage })), { ssr: false })
+const AiAssistantPage = dynamic(() => import('@/components/app/ai-assistant-page').then(m => ({ default: m.AiAssistantPage })), { ssr: false })
+const AiChatbotWidget = dynamic(() => import('@/components/app/ai-chatbot-widget').then(m => ({ default: m.AiChatbotWidget })), { ssr: false })
 
 const publicPages: Record<string, React.ComponentType> = {
   landing: LandingPage,
@@ -65,10 +70,14 @@ const appPages: Record<string, React.ComponentType> = {
   notifications: NotificationsPage,
   'audit-logs': AuditLogsPage,
   'service-requests': ServiceRequestsPage,
+  'mairie-dashboard': MairieDashboardPage,
+  'agence-dashboard': AgenceDashboardPage,
+  'birth-certificate-db': BirthCertificateDbPage,
+  'ai-assistant': AiAssistantPage,
 }
 
 export default function Home() {
-  const { currentPage, isAuth } = useAppStore()
+  const { currentPage, isAuth, user } = useAppStore()
 
   // Auth pages (login, register, etc.)
   if (!isAuth && currentPage in authPages) {
@@ -78,6 +87,7 @@ export default function Home() {
 
   // Authenticated app pages
   if (isAuth) {
+    // Determine the default page based on role
     const AppComponent = appPages[currentPage] || DashboardPage
     return (
       <div className="min-h-screen flex bg-background">
@@ -88,6 +98,7 @@ export default function Home() {
             <AppComponent />
           </main>
         </div>
+        <AiChatbotWidget />
       </div>
     )
   }

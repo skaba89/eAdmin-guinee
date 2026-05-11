@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ScrollText, Search, Download, Filter, Clock, User,
@@ -59,13 +59,102 @@ const ACTION_CONFIG: Record<string, { label: string; color: string; bgColor: str
 const RESOURCE_TYPES = ['Tous', 'auth', 'courriers', 'workflows', 'ged', 'admin', 'citoyen', 'système']
 const ACTION_TYPES = ['Tous', 'CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT', 'EXPORT', 'APPROVE', 'REJECT']
 
+// Random data generators for live mode
+const LIVE_USERS = ['Amadou Diallo', 'Aissatou Baldé', 'Ibrahima Sow', 'Fatoumata Camara', 'Alpha Condé', 'Mariama Condé', 'Kadiatou Sylla', 'Mamadou Keïta']
+const LIVE_ACTIONS: AuditLog['action'][] = ['CREATE', 'UPDATE', 'APPROVE', 'LOGIN', 'EXPORT']
+const LIVE_RESOURCES = ['Courrier CE-2024-', 'Workflow WF-2024-', 'Arrêté n°2024-', 'Dossier DOSS-2024-', 'Rapport R-2024-']
+const LIVE_RESOURCE_TYPES = ['courriers', 'workflows', 'ged', 'citoyen', 'auth']
+const LIVE_DETAILS: Record<string, string[]> = {
+  CREATE: ['Nouveau courrier entrant créé', 'Nouveau document GED créé', 'Nouvelle demande citoyenne enregistrée', 'Nouveau workflow initié'],
+  UPDATE: ['Mise à jour des métadonnées', 'Modification du statut', 'Transition d\'étape validée', 'Correction apportée'],
+  APPROVE: ['Approbation DRH', 'Validation direction générale', 'Visa conforme', 'Autorisation accordée'],
+  LOGIN: ['Connexion réussie depuis Conakry', 'Connexion depuis Kindia', 'Reconnexion automatique', 'Connexion mobile'],
+  EXPORT: ['Export PDF du rapport', 'Export CSV des données', 'Export du journal', 'Génération du bordereau'],
+}
+const LIVE_IPS = ['196.125.43.21', '196.125.43.22', '196.125.43.25', '196.125.43.30', '10.0.0.1']
+
+function exportCSV(data: AuditLog[], filename: string) {
+  if (!data.length) return
+  const headers = ['Horodatage', 'Utilisateur', 'Action', 'Ressource', 'Type', 'Adresse IP', 'Détails']
+  const csv = [
+    headers.join(','),
+    ...data.map(row =>
+      [row.timestamp, row.user, row.action, row.resource, row.resourceType, row.ipAddress, row.details]
+        .map(v => `"${v}"`)
+        .join(',')
+    ),
+  ].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export function AuditLogsPage() {
   const [search, setSearch] = useState('')
   const [actionFilter, setActionFilter] = useState('Tous')
   const [resourceFilter, setResourceFilter] = useState('Tous')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [isLive, setIsLive] = useState(true)
   const [successToast, setSuccessToast] = useState('')
   const [logs, setLogs] = useState(FAKE_LOGS)
+  const [lastActivity, setLastActivity] = useState('Il y a 5 minutes')
+  const liveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const logIdCounter = useRef(FAKE_LOGS.length)
+
+  // Live mode: add fake entries every 5 seconds
+  useEffect(() => {
+    if (isLive) {
+      liveIntervalRef.current = setInterval(() => {
+        const action = LIVE_ACTIONS[Math.floor(Math.random() * LIVE_ACTIONS.length)]
+        const user = LIVE_USERS[Math.floor(Math.random() * LIVE_USERS.length)]
+        const resourcePrefix = LIVE_RESOURCES[Math.floor(Math.random() * LIVE_RESOURCES.length)]
+        const resourceType = LIVE_RESOURCE_TYPES[Math.floor(Math.random() * LIVE_RESOURCE_TYPES.length)]
+        const details = LIVE_DETAILS[action][Math.floor(Math.random() * LIVE_DETAILS[action].length)]
+        const ip = LIVE_IPS[Math.floor(Math.random() * LIVE_IPS.length)]
+
+        logIdCounter.current += 1
+        const newLog: AuditLog = {
+          id: String(logIdCounter.current),
+          timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+          user,
+          action,
+          resource: `${resourcePrefix}${Math.floor(Math.random() * 2000) + 1000}`,
+          resourceType,
+          ipAddress: ip,
+          details,
+        }
+        setLogs(prev => [newLog, ...prev])
+        setLastActivity('À l\'instant')
+      }, 5000)
+    } else {
+      if (liveIntervalRef.current) {
+        clearInterval(liveIntervalRef.current)
+        liveIntervalRef.current = null
+      }
+    }
+    return () => {
+      if (liveIntervalRef.current) {
+        clearInterval(liveIntervalRef.current)
+      }
+    }
+  }, [isLive])
+
+  // Update "last activity" text periodically
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setLastActivity(prev => {
+        if (prev === 'À l\'instant') return 'Il y a quelques secondes'
+        if (prev === 'Il y a quelques secondes') return 'Il y a 1 minute'
+        return prev
+      })
+    }, 10000)
+    return () => clearInterval(timer)
+  }, [])
 
   const filtered = logs.filter(log => {
     const matchSearch = log.user.toLowerCase().includes(search.toLowerCase()) ||
@@ -73,7 +162,11 @@ export function AuditLogsPage() {
       log.details.toLowerCase().includes(search.toLowerCase())
     const matchAction = actionFilter === 'Tous' || log.action === actionFilter
     const matchResource = resourceFilter === 'Tous' || log.resourceType === resourceFilter
-    return matchSearch && matchAction && matchResource
+    // Date filtering
+    const logDate = log.timestamp.slice(0, 10) // YYYY-MM-DD
+    const matchDateFrom = !dateFrom || logDate >= dateFrom
+    const matchDateTo = !dateTo || logDate <= dateTo
+    return matchSearch && matchAction && matchResource && matchDateFrom && matchDateTo
   })
 
   const actionCounts = {
@@ -82,6 +175,15 @@ export function AuditLogsPage() {
     DELETE: logs.filter(l => l.action === 'DELETE').length,
     LOGIN: logs.filter(l => l.action === 'LOGIN').length,
   }
+
+  const handleExportCSV = useCallback(() => {
+    setSuccessToast('Export CSV en cours de génération...')
+    setTimeout(() => {
+      exportCSV(filtered, `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`)
+      setSuccessToast('Export CSV téléchargé avec succès !')
+      setTimeout(() => setSuccessToast(''), 4000)
+    }, 600)
+  }, [filtered])
 
   return (
     <div className="space-y-6">
@@ -139,11 +241,11 @@ export function AuditLogsPage() {
                   {RESOURCE_TYPES.map(r => <SelectItem key={r} value={r}>{r === 'Tous' ? 'Toutes les ressources' : r}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <Input type="date" className="w-[150px]" placeholder="Date début" />
-              <Input type="date" className="w-[150px]" placeholder="Date fin" />
+              <Input type="date" className="w-[150px]" placeholder="Date début" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+              <Input type="date" className="w-[150px]" placeholder="Date fin" value={dateTo} onChange={e => setDateTo(e.target.value)} />
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => { setSuccessToast('Export CSV en cours de génération...'); setTimeout(() => setSuccessToast(''), 4000) }}>
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={handleExportCSV}>
                 <Download className="h-3.5 w-3.5" />
                 Export CSV
               </Button>
@@ -163,21 +265,24 @@ export function AuditLogsPage() {
                 {isLive ? 'Temps réel' : 'En pause'}
               </button>
               <span className="text-xs text-muted-foreground">
-                Dernière activité: Il y a 5 minutes
+                Dernière activité: {lastActivity}
               </span>
             </div>
             <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => {
+              const action = LIVE_ACTIONS[Math.floor(Math.random() * LIVE_ACTIONS.length)]
+              logIdCounter.current += 1
               const newLog: AuditLog = {
-                id: String(logs.length + 1),
+                id: String(logIdCounter.current),
                 timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
-                user: 'Système',
-                action: 'CREATE',
-                resource: 'Actualisation manuelle des logs',
+                user: 'Utilisateur actuel',
+                action,
+                resource: 'Actualisation manuelle',
                 resourceType: 'système',
-                ipAddress: '10.0.0.1',
+                ipAddress: '196.125.43.1',
                 details: 'Actualisation du journal d\'audit',
               }
               setLogs(prev => [newLog, ...prev])
+              setLastActivity('À l\'instant')
               setSuccessToast('Journal actualisé avec succès')
               setTimeout(() => setSuccessToast(''), 4000)
             }}>
@@ -210,7 +315,7 @@ export function AuditLogsPage() {
                     key={log.id}
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.02 }}
+                    transition={{ delay: Math.min(i * 0.02, 0.3) }}
                     className="hover:bg-muted/50 transition-colors"
                   >
                     <TableCell>

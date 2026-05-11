@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Download,
@@ -12,6 +12,7 @@ import {
   BarChart3,
   Target,
   CheckCircle2,
+  Loader2,
 } from 'lucide-react'
 import {
   Card,
@@ -47,7 +48,6 @@ import {
   CartesianGrid,
   Legend,
 } from 'recharts'
-import { MONTHLY_DATA } from '@/lib/constants'
 import { useAppStore } from '@/store/app-store'
 
 const CHART_COLORS = ['#0B2E58', '#3B7DD8', '#C8A45C', '#10B981', '#EF4444']
@@ -59,31 +59,149 @@ const periods = [
   { label: '1 an', value: '1y' },
 ] as const
 
-const summaryCards = [
-  { label: 'Total courriers', value: '2 847', change: '+12.5%', trend: 'up' as const, icon: Mail },
-  { label: 'Délai moyen', value: '2.4 j', change: '-15.2%', trend: 'down' as const, icon: Clock },
-  { label: 'Taux conformité', value: '98.7%', change: '+1.2%', trend: 'up' as const, icon: ShieldCheck },
-  { label: 'Score performance', value: '94.2', change: '+3.8', trend: 'up' as const, icon: TrendingUp },
-]
+// Period-dependent summary data
+const periodSummaryData: Record<string, { label: string; value: string; change: string; trend: 'up' | 'down' }[][]> = {
+  '7d': [
+    [
+      { label: 'Total courriers', value: '647', change: '+5.2%', trend: 'up' as const },
+      { label: 'Délai moyen', value: '1.9 j', change: '-8.1%', trend: 'down' as const },
+      { label: 'Taux conformité', value: '99.1%', change: '+0.4%', trend: 'up' as const },
+      { label: 'Score performance', value: '96.8', change: '+1.2', trend: 'up' as const },
+    ],
+  ],
+  '30d': [
+    [
+      { label: 'Total courriers', value: '2 847', change: '+12.5%', trend: 'up' as const },
+      { label: 'Délai moyen', value: '2.4 j', change: '-15.2%', trend: 'down' as const },
+      { label: 'Taux conformité', value: '98.7%', change: '+1.2%', trend: 'up' as const },
+      { label: 'Score performance', value: '94.2', change: '+3.8', trend: 'up' as const },
+    ],
+  ],
+  '90d': [
+    [
+      { label: 'Total courriers', value: '8 234', change: '+18.7%', trend: 'up' as const },
+      { label: 'Délai moyen', value: '2.8 j', change: '-22.3%', trend: 'down' as const },
+      { label: 'Taux conformité', value: '97.9%', change: '+2.5%', trend: 'up' as const },
+      { label: 'Score performance', value: '91.5', change: '+5.1', trend: 'up' as const },
+    ],
+  ],
+  '1y': [
+    [
+      { label: 'Total courriers', value: '34 560', change: '+24.1%', trend: 'up' as const },
+      { label: 'Délai moyen', value: '3.1 j', change: '-35.8%', trend: 'down' as const },
+      { label: 'Taux conformité', value: '96.4%', change: '+4.8%', trend: 'up' as const },
+      { label: 'Score performance', value: '88.7', change: '+9.3', trend: 'up' as const },
+    ],
+  ],
+}
 
-// Service volume data for stacked bar chart
-const serviceData = [
-  { service: 'Cabinet', courriers: 45, documents: 120, workflows: 18 },
-  { service: 'Ressources Humaines', courriers: 38, documents: 95, workflows: 22 },
-  { service: 'Finance', courriers: 52, documents: 140, workflows: 15 },
-  { service: 'Technique', courriers: 30, documents: 85, workflows: 28 },
-  { service: 'Juridique', courriers: 25, documents: 70, workflows: 12 },
-  { service: 'Communication', courriers: 18, documents: 55, workflows: 8 },
-]
+// Period-dependent monthly chart data
+const periodChartData: Record<string, { month: string; courriers: number; documents: number; workflows: number }[]> = {
+  '7d': [
+    { month: 'Lun', courriers: 45, documents: 120, workflows: 8 },
+    { month: 'Mar', courriers: 52, documents: 145, workflows: 12 },
+    { month: 'Mer', courriers: 38, documents: 98, workflows: 6 },
+    { month: 'Jeu', courriers: 61, documents: 167, workflows: 15 },
+    { month: 'Ven', courriers: 55, documents: 134, workflows: 11 },
+    { month: 'Sam', courriers: 12, documents: 23, workflows: 2 },
+    { month: 'Dim', courriers: 8, documents: 15, workflows: 1 },
+  ],
+  '30d': [
+    { month: 'S1', courriers: 245, documents: 890, workflows: 34 },
+    { month: 'S2', courriers: 312, documents: 1023, workflows: 41 },
+    { month: 'S3', courriers: 287, documents: 945, workflows: 38 },
+    { month: 'S4', courriers: 356, documents: 1134, workflows: 45 },
+  ],
+  '90d': [
+    { month: 'Oct', courriers: 456, documents: 1423, workflows: 55 },
+    { month: 'Nov', courriers: 489, documents: 1567, workflows: 58 },
+    { month: 'Déc', courriers: 467, documents: 1478, workflows: 53 },
+  ],
+  '1y': [
+    { month: 'Jan', courriers: 245, documents: 890, workflows: 34 },
+    { month: 'Fév', courriers: 312, documents: 1023, workflows: 41 },
+    { month: 'Mar', courriers: 287, documents: 945, workflows: 38 },
+    { month: 'Avr', courriers: 356, documents: 1134, workflows: 45 },
+    { month: 'Mai', courriers: 398, documents: 1256, workflows: 52 },
+    { month: 'Jun', courriers: 421, documents: 1345, workflows: 48 },
+    { month: 'Jul', courriers: 378, documents: 1198, workflows: 43 },
+    { month: 'Aoû', courriers: 334, documents: 1067, workflows: 39 },
+    { month: 'Sep', courriers: 412, documents: 1289, workflows: 51 },
+    { month: 'Oct', courriers: 456, documents: 1423, workflows: 55 },
+    { month: 'Nov', courriers: 489, documents: 1567, workflows: 58 },
+    { month: 'Déc', courriers: 467, documents: 1478, workflows: 53 },
+  ],
+}
 
-// Radar data
-const radarData = [
-  { dimension: 'Réactivité', score: 85 },
-  { dimension: 'Conformité', score: 92 },
-  { dimension: 'Efficacité', score: 78 },
-  { dimension: 'Innovation', score: 65 },
-  { dimension: 'Satisfaction', score: 88 },
-]
+// Period-dependent service data
+const periodServiceData: Record<string, { service: string; courriers: number; documents: number; workflows: number }[]> = {
+  '7d': [
+    { service: 'Cabinet', courriers: 12, documents: 34, workflows: 5 },
+    { service: 'Ressources Humaines', courriers: 9, documents: 28, workflows: 7 },
+    { service: 'Finance', courriers: 15, documents: 42, workflows: 4 },
+    { service: 'Technique', courriers: 8, documents: 22, workflows: 9 },
+    { service: 'Juridique', courriers: 6, documents: 18, workflows: 3 },
+    { service: 'Communication', courriers: 4, documents: 12, workflows: 2 },
+  ],
+  '30d': [
+    { service: 'Cabinet', courriers: 45, documents: 120, workflows: 18 },
+    { service: 'Ressources Humaines', courriers: 38, documents: 95, workflows: 22 },
+    { service: 'Finance', courriers: 52, documents: 140, workflows: 15 },
+    { service: 'Technique', courriers: 30, documents: 85, workflows: 28 },
+    { service: 'Juridique', courriers: 25, documents: 70, workflows: 12 },
+    { service: 'Communication', courriers: 18, documents: 55, workflows: 8 },
+  ],
+  '90d': [
+    { service: 'Cabinet', courriers: 128, documents: 356, workflows: 52 },
+    { service: 'Ressources Humaines', courriers: 105, documents: 287, workflows: 64 },
+    { service: 'Finance', courriers: 148, documents: 412, workflows: 43 },
+    { service: 'Technique', courriers: 89, documents: 245, workflows: 78 },
+    { service: 'Juridique', courriers: 72, documents: 198, workflows: 35 },
+    { service: 'Communication', courriers: 48, documents: 156, workflows: 22 },
+  ],
+  '1y': [
+    { service: 'Cabinet', courriers: 456, documents: 1340, workflows: 195 },
+    { service: 'Ressources Humaines', courriers: 378, documents: 1089, workflows: 242 },
+    { service: 'Finance', courriers: 520, documents: 1567, workflows: 167 },
+    { service: 'Technique', courriers: 312, documents: 923, workflows: 298 },
+    { service: 'Juridique', courriers: 245, documents: 756, workflows: 128 },
+    { service: 'Communication', courriers: 198, documents: 534, workflows: 87 },
+  ],
+}
+
+// Radar data per period
+const periodRadarData: Record<string, { dimension: string; score: number }[]> = {
+  '7d': [
+    { dimension: 'Réactivité', score: 92 },
+    { dimension: 'Conformité', score: 99 },
+    { dimension: 'Efficacité', score: 85 },
+    { dimension: 'Innovation', score: 72 },
+    { dimension: 'Satisfaction', score: 94 },
+  ],
+  '30d': [
+    { dimension: 'Réactivité', score: 85 },
+    { dimension: 'Conformité', score: 92 },
+    { dimension: 'Efficacité', score: 78 },
+    { dimension: 'Innovation', score: 65 },
+    { dimension: 'Satisfaction', score: 88 },
+  ],
+  '90d': [
+    { dimension: 'Réactivité', score: 78 },
+    { dimension: 'Conformité', score: 88 },
+    { dimension: 'Efficacité', score: 72 },
+    { dimension: 'Innovation', score: 58 },
+    { dimension: 'Satisfaction', score: 82 },
+  ],
+  '1y': [
+    { dimension: 'Réactivité', score: 70 },
+    { dimension: 'Conformité', score: 82 },
+    { dimension: 'Efficacité', score: 65 },
+    { dimension: 'Innovation', score: 50 },
+    { dimension: 'Satisfaction', score: 75 },
+  ],
+}
+
+const summaryIcons = [Mail, Clock, ShieldCheck, TrendingUp]
 
 // Top services ranking
 const topServices = [
@@ -118,10 +236,84 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' as const } },
 }
 
+function exportCSV(data: Record<string, string | number>[], filename: string) {
+  if (!data.length) return
+  const headers = Object.keys(data[0])
+  const csv = [headers.join(','), ...data.map(row => headers.map(h => `"${row[h] ?? ''}"`).join(','))].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function exportPDFReport(period: string, summary: { label: string; value: string; change: string }[], chartData: { month: string; courriers: number; documents: number; workflows: number }[], serviceDataRows: { service: string; courriers: number; documents: number; workflows: number }[]) {
+  const periodLabel = periods.find(p => p.value === period)?.label || period
+  const lines = [
+    '═══════════════════════════════════════════════════════════',
+    '  eAdministration Suite Guinea — Rapport Analytics',
+    '═══════════════════════════════════════════════════════════',
+    '',
+    `  Période : ${periodLabel}`,
+    `  Généré le : ${new Date().toLocaleString('fr-FR')}`,
+    '',
+    '───────────────────────────────────────────────────────────',
+    '  INDICATEURS CLÉS',
+    '───────────────────────────────────────────────────────────',
+    '',
+    ...summary.map(s => `  ${s.label.padEnd(25)} ${s.value.padStart(12)}  (${s.change})`),
+    '',
+    '───────────────────────────────────────────────────────────',
+    '  TENDANCES',
+    '───────────────────────────────────────────────────────────',
+    '',
+    '  ' + ['Période', 'Courriers', 'Documents', 'Workflows'].map(h => h.padEnd(14)).join(''),
+    '  ' + '─'.repeat(56),
+    ...chartData.map(r => '  ' + [r.month, String(r.courriers), String(r.documents), String(r.workflows)].map(v => v.padEnd(14)).join('')),
+    '',
+    '───────────────────────────────────────────────────────────',
+    '  VOLUME PAR SERVICE',
+    '───────────────────────────────────────────────────────────',
+    '',
+    '  ' + ['Service', 'Courriers', 'Documents', 'Workflows'].map(h => h.padEnd(20)).join(''),
+    '  ' + '─'.repeat(80),
+    ...serviceDataRows.map(r => '  ' + [r.service, String(r.courriers), String(r.documents), String(r.workflows)].map(v => v.padEnd(20)).join('')),
+    '',
+    '───────────────────────────────────────────────────────────',
+    '  CONFORMITÉ SLA',
+    '───────────────────────────────────────────────────────────',
+    '',
+    '  ' + ['Type', 'Total', 'Dans délai', 'Hors délai', 'Taux'].map(h => h.padEnd(18)).join(''),
+    '  ' + '─'.repeat(90),
+    ...slaData.map(r => '  ' + [r.type, String(r.total), String(r.dansDelai), String(r.horsDelai), r.taux].map(v => v.padEnd(18)).join('')),
+    '',
+    '═══════════════════════════════════════════════════════════',
+    '  Fin du rapport — eAdministration Suite Guinea',
+    '═══════════════════════════════════════════════════════════',
+  ]
+  const content = lines.join('\n')
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `rapport-analytics-${period}-${new Date().toISOString().slice(0, 10)}.txt`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export default function AnalyticsPage() {
   const navigate = useAppStore((s) => s.navigate)
   const [selectedPeriod, setSelectedPeriod] = useState<string>('30d')
   const [successToast, setSuccessToast] = useState('')
+  const [exportingPdf, setExportingPdf] = useState(false)
+  const [exportingCsv, setExportingCsv] = useState(false)
+
+  const currentSummary = periodSummaryData[selectedPeriod]?.[0] || periodSummaryData['30d'][0]
+  const currentChartData = periodChartData[selectedPeriod] || periodChartData['30d']
+  const currentServiceData = periodServiceData[selectedPeriod] || periodServiceData['30d']
+  const currentRadarData = periodRadarData[selectedPeriod] || periodRadarData['30d']
 
   useEffect(() => {
     if (successToast) {
@@ -129,6 +321,32 @@ export default function AnalyticsPage() {
       return () => clearTimeout(timer)
     }
   }, [successToast])
+
+  const handleExportPDF = useCallback(async () => {
+    setExportingPdf(true)
+    setSuccessToast('Rapport PDF en cours de génération...')
+    // Simulate a brief delay for UX
+    await new Promise(r => setTimeout(r, 1200))
+    exportPDFReport(selectedPeriod, currentSummary, currentChartData, currentServiceData)
+    setSuccessToast('Rapport PDF téléchargé avec succès !')
+    setExportingPdf(false)
+  }, [selectedPeriod, currentSummary, currentChartData, currentServiceData])
+
+  const handleExportCSV = useCallback(async () => {
+    setExportingCsv(true)
+    setSuccessToast('Export CSV en cours de génération...')
+    await new Promise(r => setTimeout(r, 800))
+    // Combine all data into one CSV export
+    const allData = currentChartData.map(row => ({
+      Période: row.month,
+      Courriers: row.courriers,
+      Documents: row.documents,
+      Workflows: row.workflows,
+    }))
+    exportCSV(allData, `analytics-${selectedPeriod}-${new Date().toISOString().slice(0, 10)}.csv`)
+    setSuccessToast('Export CSV téléchargé avec succès !')
+    setExportingCsv(false)
+  }, [selectedPeriod, currentChartData])
 
   return (
     <motion.div
@@ -148,12 +366,12 @@ export default function AnalyticsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => setSuccessToast('Rapport PDF en cours de génération...')}>
-            <Download className="size-3.5" />
+          <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={handleExportPDF} disabled={exportingPdf}>
+            {exportingPdf ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
             Export PDF
           </Button>
-          <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => setSuccessToast('Export Excel en cours de génération...')}>
-            <FileSpreadsheet className="size-3.5" />
+          <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={handleExportCSV} disabled={exportingCsv}>
+            {exportingCsv ? <Loader2 className="size-3.5 animate-spin" /> : <FileSpreadsheet className="size-3.5" />}
             Export Excel
           </Button>
         </div>
@@ -207,8 +425,8 @@ export default function AnalyticsPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
-        {summaryCards.map((card) => {
-          const Icon = card.icon
+        {currentSummary.map((card, idx) => {
+          const Icon = summaryIcons[idx]
           const isPositive = card.trend === 'up'
           return (
             <motion.div key={card.label} variants={itemVariants}>
@@ -242,12 +460,12 @@ export default function AnalyticsPage() {
         })}
       </div>
 
-      {/* Main Chart: Tendances sur 12 mois */}
+      {/* Main Chart: Tendances */}
       <motion.div variants={itemVariants}>
         <Card className="shadow-md">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
-              Tendances sur 12 mois
+              Tendances — {periods.find(p => p.value === selectedPeriod)?.label || '30 jours'}
             </CardTitle>
             <CardDescription className="text-xs">
               Évolution comparée des courriers, documents et workflows
@@ -255,7 +473,7 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={MONTHLY_DATA} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+              <LineChart data={currentChartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} className="text-muted-foreground" />
                 <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" />
@@ -313,7 +531,7 @@ export default function AnalyticsPage() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={serviceData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                <BarChart data={currentServiceData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                   <XAxis
                     dataKey="service"
@@ -353,7 +571,7 @@ export default function AnalyticsPage() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="70%">
+                <RadarChart data={currentRadarData} cx="50%" cy="50%" outerRadius="70%">
                   <PolarGrid className="stroke-border" />
                   <PolarAngleAxis dataKey="dimension" tick={{ fontSize: 11 }} className="text-muted-foreground" />
                   <PolarRadiusAxis tick={{ fontSize: 10 }} domain={[0, 100]} />
@@ -508,12 +726,12 @@ export default function AnalyticsPage() {
           <p className="text-xs text-muted-foreground">Téléchargez les rapports dans le format de votre choix</p>
         </div>
         <div className="flex gap-2">
-          <Button className="gap-1.5 bg-[#0B2E58] text-white hover:bg-[#0B2E58]/90" onClick={() => setSuccessToast('Rapport PDF en cours de génération...')}>
-            <Download className="size-3.5" />
+          <Button className="gap-1.5 bg-[#0B2E58] text-white hover:bg-[#0B2E58]/90" onClick={handleExportPDF} disabled={exportingPdf}>
+            {exportingPdf ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
             Export PDF
           </Button>
-          <Button variant="outline" className="gap-1.5" onClick={() => setSuccessToast('Export Excel en cours de génération...')}>
-            <FileSpreadsheet className="size-3.5" />
+          <Button variant="outline" className="gap-1.5" onClick={handleExportCSV} disabled={exportingCsv}>
+            {exportingCsv ? <Loader2 className="size-3.5 animate-spin" /> : <FileSpreadsheet className="size-3.5" />}
             Export Excel
           </Button>
         </div>

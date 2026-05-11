@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   UserCog, Search, Plus, Download, Upload, MoreHorizontal,
   Shield, Eye, Pencil, Trash2, UserPlus, CheckCircle2,
-  XCircle, Clock, Filter, Users
+  XCircle, Clock, Filter, Users, KeyRound
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -15,12 +15,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Separator } from '@/components/ui/separator'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription
 } from '@/components/ui/dialog'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+} from '@/components/ui/alert-dialog'
 import { Label } from '@/components/ui/label'
 import { DEMO_STATS } from '@/lib/constants'
 
@@ -74,6 +79,36 @@ export function UsersPage() {
   const [newUser, setNewUser] = useState({ firstName: '', lastName: '', email: '', role: '', institution: '' })
   const [successToast, setSuccessToast] = useState('')
 
+  // Profile dialog
+  const [profileDialog, setProfileDialog] = useState(false)
+  const [profileUser, setProfileUser] = useState<UserRow | null>(null)
+
+  // Edit dialog
+  const [editDialog, setEditDialog] = useState(false)
+  const [editUser, setEditUser] = useState<UserRow | null>(null)
+  const [editForm, setEditForm] = useState({ name: '', email: '', role: '', institution: '' })
+
+  // Reset password confirmation
+  const [resetPasswordDialog, setResetPasswordDialog] = useState(false)
+  const [resetPasswordUser, setResetPasswordUser] = useState<UserRow | null>(null)
+
+  // Delete user confirmation
+  const [deleteUserDialog, setDeleteUserDialog] = useState(false)
+  const [deleteUserId, setDeleteUserId] = useState<string | null>(null)
+  const [deleteUserName, setDeleteUserName] = useState('')
+
+  // Bulk delete confirmation
+  const [bulkDeleteDialog, setBulkDeleteDialog] = useState(false)
+
+  // Bulk change role dialog
+  const [bulkRoleDialog, setBulkRoleDialog] = useState(false)
+  const [bulkRole, setBulkRole] = useState('')
+
+  const showToast = (message: string) => {
+    setSuccessToast(message)
+    setTimeout(() => setSuccessToast(''), 4000)
+  }
+
   useEffect(() => {
     if (successToast) {
       const timer = setTimeout(() => setSuccessToast(''), 4000)
@@ -103,6 +138,94 @@ export function UsersPage() {
     } else {
       setSelectedIds(filtered.map(u => u.id))
     }
+  }
+
+  // === User dropdown handlers ===
+  const handleViewProfile = (user: UserRow) => {
+    setProfileUser(user)
+    setProfileDialog(true)
+  }
+
+  const handleEditOpen = (user: UserRow) => {
+    setEditUser(user)
+    setEditForm({ name: user.name, email: user.email, role: user.role, institution: user.institution })
+    setEditDialog(true)
+  }
+
+  const handleEditSave = () => {
+    if (!editUser) return
+    setUsers(prev => prev.map(u =>
+      u.id === editUser.id
+        ? { ...u, name: editForm.name, email: editForm.email, role: editForm.role, institution: editForm.institution }
+        : u
+    ))
+    setEditDialog(false)
+    showToast(`Utilisateur ${editForm.name} modifié avec succès`)
+  }
+
+  const handleResetPasswordOpen = (user: UserRow) => {
+    setResetPasswordUser(user)
+    setResetPasswordDialog(true)
+  }
+
+  const handleResetPasswordConfirm = () => {
+    if (!resetPasswordUser) return
+    setResetPasswordDialog(false)
+    showToast(`Mot de passe réinitialisé pour ${resetPasswordUser.name}`)
+  }
+
+  const handleDeleteUserOpen = (user: UserRow) => {
+    setDeleteUserId(user.id)
+    setDeleteUserName(user.name)
+    setDeleteUserDialog(true)
+  }
+
+  const handleDeleteUserConfirm = () => {
+    if (!deleteUserId) return
+    setUsers(prev => prev.filter(u => u.id !== deleteUserId))
+    setSelectedIds(prev => prev.filter(id => id !== deleteUserId))
+    setDeleteUserDialog(false)
+    showToast(`Utilisateur ${deleteUserName} supprimé`)
+  }
+
+  // === Bulk action handlers ===
+  const handleBulkDeactivate = () => {
+    setUsers(prev => prev.map(u =>
+      selectedIds.includes(u.id) ? { ...u, status: 'inactif' as const } : u
+    ))
+    showToast(`${selectedIds.length} utilisateur(s) désactivé(s)`)
+    setSelectedIds([])
+  }
+
+  const handleBulkRoleConfirm = () => {
+    if (!bulkRole) return
+    setUsers(prev => prev.map(u =>
+      selectedIds.includes(u.id) ? { ...u, role: bulkRole } : u
+    ))
+    showToast(`Rôle "${bulkRole}" appliqué à ${selectedIds.length} utilisateur(s)`)
+    setBulkRoleDialog(false)
+    setBulkRole('')
+    setSelectedIds([])
+  }
+
+  const handleBulkDeleteOpen = () => {
+    setBulkDeleteDialog(true)
+  }
+
+  const handleBulkDeleteConfirm = () => {
+    setUsers(prev => prev.filter(u => !selectedIds.includes(u.id)))
+    showToast(`${selectedIds.length} utilisateur(s) supprimé(s)`)
+    setSelectedIds([])
+    setBulkDeleteDialog(false)
+  }
+
+  // === Export/Import handlers ===
+  const handleExport = () => {
+    showToast('Export des utilisateurs en CSV en cours...')
+  }
+
+  const handleImport = () => {
+    showToast('Import en cours de traitement...')
   }
 
   const stats = [
@@ -178,11 +301,11 @@ export function UsersPage() {
               </Select>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="gap-1" onClick={() => setSuccessToast('Export CSV en cours...')}>
+              <Button variant="outline" size="sm" className="gap-1" onClick={handleExport}>
                 <Download className="h-3.5 w-3.5" />
                 Export
               </Button>
-              <Button variant="outline" size="sm" className="gap-1" onClick={() => setSuccessToast('Import en cours...')}>
+              <Button variant="outline" size="sm" className="gap-1" onClick={handleImport}>
                 <Upload className="h-3.5 w-3.5" />
                 Import
               </Button>
@@ -251,7 +374,7 @@ export function UsersPage() {
                       setUsers(prev => [created, ...prev])
                       setNewUser({ firstName: '', lastName: '', email: '', role: '', institution: '' })
                       setDialogOpen(false)
-                      setSuccessToast(`Utilisateur ${fullName || 'Nouvel utilisateur'} créé avec succès`)
+                      showToast(`Utilisateur ${fullName || 'Nouvel utilisateur'} créé avec succès`)
                     }}>
                       Créer l&apos;utilisateur
                     </Button>
@@ -269,9 +392,18 @@ export function UsersPage() {
               className="flex items-center gap-3 pt-2 border-t"
             >
               <span className="text-sm text-muted-foreground">{selectedIds.length} sélectionné(s)</span>
-              <Button variant="outline" size="sm" className="gap-1">Désactiver</Button>
-              <Button variant="outline" size="sm" className="gap-1">Changer le rôle</Button>
-              <Button variant="outline" size="sm" className="gap-1 text-red-600">Supprimer</Button>
+              <Button variant="outline" size="sm" className="gap-1" onClick={handleBulkDeactivate}>
+                <XCircle className="h-3.5 w-3.5" />
+                Désactiver
+              </Button>
+              <Button variant="outline" size="sm" className="gap-1" onClick={() => { setBulkRole(''); setBulkRoleDialog(true) }}>
+                <Shield className="h-3.5 w-3.5" />
+                Changer le rôle
+              </Button>
+              <Button variant="outline" size="sm" className="gap-1 text-red-600" onClick={handleBulkDeleteOpen}>
+                <Trash2 className="h-3.5 w-3.5" />
+                Supprimer
+              </Button>
               <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])}>Tout désélectionner</Button>
             </motion.div>
           )}
@@ -300,7 +432,7 @@ export function UsersPage() {
             </TableHeader>
             <TableBody>
               {filtered.map((user, i) => {
-                const rConfig = ROLE_CONFIG[user.role]
+                const rConfig = ROLE_CONFIG[user.role] || ROLE_CONFIG.Agent
                 const sConfig = STATUS_CONFIG[user.status]
                 const RoleIcon = rConfig.icon
                 const StatusIcon = sConfig.icon
@@ -356,10 +488,18 @@ export function UsersPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem className="gap-2"><Eye className="h-4 w-4" /> Voir le profil</DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2"><Pencil className="h-4 w-4" /> Modifier</DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2">Réinitialiser le mot de passe</DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2 text-red-600"><Trash2 className="h-4 w-4" /> Supprimer</DropdownMenuItem>
+                          <DropdownMenuItem className="gap-2" onClick={() => handleViewProfile(user)}>
+                            <Eye className="h-4 w-4" /> Voir le profil
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="gap-2" onClick={() => handleEditOpen(user)}>
+                            <Pencil className="h-4 w-4" /> Modifier
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="gap-2" onClick={() => handleResetPasswordOpen(user)}>
+                            <KeyRound className="h-4 w-4" /> Réinitialiser le mot de passe
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="gap-2 text-red-600 focus:text-red-600" onClick={() => handleDeleteUserOpen(user)}>
+                            <Trash2 className="h-4 w-4" /> Supprimer
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -374,6 +514,226 @@ export function UsersPage() {
       <div className="text-sm text-muted-foreground text-center">
         {filtered.length} utilisateur(s) affiché(s) sur {users.length}
       </div>
+
+      {/* ===== DIALOGS ===== */}
+
+      {/* View Profile Dialog */}
+      <Dialog open={profileDialog} onOpenChange={setProfileDialog}>
+        <DialogContent className="sm:max-w-[525px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5 text-brand dark:text-primary" />
+              Profil utilisateur
+            </DialogTitle>
+            <DialogDescription>Détails du compte utilisateur</DialogDescription>
+          </DialogHeader>
+          {profileUser && (
+            <div className="grid gap-4 py-4">
+              <div className="flex items-center gap-4">
+                <Avatar className="h-16 w-16">
+                  <AvatarFallback className="bg-brand/10 text-brand dark:bg-primary/20 dark:text-primary text-xl">
+                    {profileUser.name.split(' ').map(n => n[0]).join('')}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="text-lg font-semibold">{profileUser.name}</p>
+                  <p className="text-sm text-muted-foreground">{profileUser.email}</p>
+                </div>
+              </div>
+              <Separator />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <span className="text-xs text-muted-foreground font-medium">Rôle</span>
+                  <div>
+                    {(() => {
+                      const rc = ROLE_CONFIG[profileUser.role] || ROLE_CONFIG.Agent
+                      const RIcon = rc.icon
+                      return (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${rc.color}`}>
+                          <RIcon className="h-3 w-3" />
+                          {profileUser.role}
+                        </span>
+                      )
+                    })()}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-xs text-muted-foreground font-medium">Statut</span>
+                  <div>
+                    {(() => {
+                      const sc = STATUS_CONFIG[profileUser.status]
+                      const SIcon = sc.icon
+                      return (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${sc.color}`}>
+                          <SIcon className="h-3 w-3" />
+                          {sc.label}
+                        </span>
+                      )
+                    })()}
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs text-muted-foreground font-medium">Institution</span>
+                <p className="text-sm">{profileUser.institution}</p>
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs text-muted-foreground font-medium">Dernière connexion</span>
+                <p className="text-sm">{profileUser.lastLogin}</p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setProfileDialog(false)}>Fermer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit User Dialog */}
+      <Dialog open={editDialog} onOpenChange={setEditDialog}>
+        <DialogContent className="sm:max-w-[525px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-brand dark:text-primary" />
+              Modifier l&apos;utilisateur
+            </DialogTitle>
+            <DialogDescription>Modifier les informations du compte</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Nom complet</Label>
+              <Input value={editForm.name} onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input type="email" value={editForm.email} onChange={e => setEditForm(prev => ({ ...prev, email: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Rôle</Label>
+                <Select value={editForm.role} onValueChange={v => setEditForm(prev => ({ ...prev, role: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {roles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Institution</Label>
+                <Select value={editForm.institution} onValueChange={v => setEditForm(prev => ({ ...prev, institution: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {institutions.map(inst => <SelectItem key={inst} value={inst}>{inst}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialog(false)}>Annuler</Button>
+            <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90" onClick={handleEditSave}>
+              Enregistrer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Password Confirmation */}
+      <AlertDialog open={resetPasswordDialog} onOpenChange={setResetPasswordDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5 text-amber-600" />
+              Réinitialiser le mot de passe
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {resetPasswordUser && `Voulez-vous réinitialiser le mot de passe de ${resetPasswordUser.name} ? Un nouveau mot de passe temporaire sera généré et envoyé par email.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction className="bg-amber-600 hover:bg-amber-700 text-white" onClick={handleResetPasswordConfirm}>
+              Réinitialiser
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Single User Confirmation */}
+      <AlertDialog open={deleteUserDialog} onOpenChange={setDeleteUserDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-red-600" />
+              Supprimer l&apos;utilisateur
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer l&apos;utilisateur {deleteUserName} ? Cette action est irréversible et toutes les données associées seront perdues.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction className="bg-red-600 hover:bg-red-700 text-white" onClick={handleDeleteUserConfirm}>
+              Supprimer définitivement
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Confirmation */}
+      <AlertDialog open={bulkDeleteDialog} onOpenChange={setBulkDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-red-600" />
+              Supprimer les utilisateurs sélectionnés
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer {selectedIds.length} utilisateur(s) ? Cette action est irréversible et toutes les données associées seront perdues.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction className="bg-red-600 hover:bg-red-700 text-white" onClick={handleBulkDeleteConfirm}>
+              Supprimer {selectedIds.length} utilisateur(s)
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Change Role Dialog */}
+      <Dialog open={bulkRoleDialog} onOpenChange={setBulkRoleDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-brand dark:text-primary" />
+              Changer le rôle
+            </DialogTitle>
+            <DialogDescription>
+              Appliquer un nouveau rôle aux {selectedIds.length} utilisateur(s) sélectionné(s)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Nouveau rôle</Label>
+              <Select value={bulkRole} onValueChange={setBulkRole}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner un rôle" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkRoleDialog(false)}>Annuler</Button>
+            <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90" onClick={handleBulkRoleConfirm} disabled={!bulkRole}>
+              Appliquer le rôle
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AnimatePresence>
         {successToast && (

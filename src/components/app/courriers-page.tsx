@@ -7,7 +7,7 @@ import {
   AlertTriangle, Eye, MoreHorizontal, ChevronDown, X,
   Building2, Timer, Shield, CheckCircle2, ArrowRight,
   Stamp, FileCheck, Route, Gauge, CircleDot, ArrowUpDown,
-  FileText, GitBranch, PenTool, UserCheck
+  FileText, GitBranch, PenTool, UserCheck, Archive, ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -22,13 +22,17 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+} from '@/components/ui/alert-dialog'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { BRAND } from '@/lib/constants'
 import { useAppStore } from '@/store/app-store'
 
 type CourrierPriority = 'URGENT' | 'IMPORTANT' | 'NORMAL' | 'CONFIDENTIEL'
-type CourrierStatus = 'En attente de visa SG' | 'En cours de validation' | 'Diffusée' | 'Transmis au Ministre' | 'En attente visa SG' | 'Visa obtenu' | 'En cours' | 'Traité' | 'En attente' | 'Diffusé' | 'En commission'
+type CourrierStatus = 'En attente de visa SG' | 'En cours de validation' | 'Diffusée' | 'Transmis au Ministre' | 'En attente visa SG' | 'Visa obtenu' | 'Visé' | 'En cours' | 'Traité' | 'Archivé' | 'En attente' | 'Diffusé' | 'En commission'
 type CourrierTab = 'tous' | 'presidentiels' | 'primature' | 'interministeriels' | 'emanations' | 'urgents'
 
 interface Courrier {
@@ -42,6 +46,7 @@ interface Courrier {
   sla: string
   slaHours?: number
   date: string
+  notes?: string[]
 }
 
 const COURRIERS: Courrier[] = [
@@ -59,6 +64,21 @@ const COURRIERS: Courrier[] = [
   { id: '12', reference: 'CR-2026-8710', objet: 'Invitation — Conseil interministériel du 15 mai 2026', expediteur: 'Primature', priority: 'URGENT', circuit: 'SG → Cabinet PM → Tous les Ministères', statut: 'Diffusée', sla: '', date: '2026-05-01' },
 ]
 
+const DESTINATION_SERVICES = [
+  'Secrétariat Général (SG)',
+  'Cabinet du Premier Ministre',
+  'Direction Financière',
+  'Direction des Ressources Humaines',
+  'Direction Juridique',
+  'Direction de l\'Urbanisme',
+  'Direction de la Coopération',
+  'Ministère des Finances (MEF)',
+  'Ministère de la Justice (MJ)',
+  'Ministère de la Santé (MS)',
+  'Ministère de l\'Éducation (MEN)',
+  'Présidence de la République',
+]
+
 const PRIORITY_CONFIG: Record<CourrierPriority, { color: string; icon: React.ElementType }> = {
   URGENT: { color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800', icon: AlertTriangle },
   IMPORTANT: { color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-800', icon: AlertTriangle },
@@ -73,8 +93,10 @@ const STATUS_COLORS: Record<string, string> = {
   'Transmis au Ministre': 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
   'En attente visa SG': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
   'Visa obtenu': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+  'Visé': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
   'En cours': 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400',
   'Traité': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+  'Archivé': 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400',
   'En attente': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
   'Diffusé': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
   'En commission': 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
@@ -89,6 +111,8 @@ const TAB_CONFIG: { value: CourrierTab; label: string; icon?: React.ElementType 
   { value: 'urgents', label: 'Urgents', icon: AlertTriangle },
 ]
 
+const ITEMS_PER_PAGE = 10
+
 export function CourriersPage() {
   const [activeTab, setActiveTab] = useState<CourrierTab>('tous')
   const [search, setSearch] = useState('')
@@ -99,6 +123,28 @@ export function CourriersPage() {
   const [newCourrier, setNewCourrier] = useState({ objet: '', expediteur: '', priority: 'NORMAL' as CourrierPriority, circuit: '' })
   const [successToast, setSuccessToast] = useState('')
   const navigate = useAppStore((s) => s.navigate)
+
+  // Detail dialog
+  const [detailDialog, setDetailDialog] = useState(false)
+  const [detailCourrier, setDetailCourrier] = useState<Courrier | null>(null)
+
+  // Transfer dialog
+  const [transferDialog, setTransferDialog] = useState(false)
+  const [transferCourrier, setTransferCourrier] = useState<Courrier | null>(null)
+  const [transferDestination, setTransferDestination] = useState('')
+  const [transferNote, setTransferNote] = useState('')
+
+  // Archive confirmation
+  const [archiveDialog, setArchiveDialog] = useState(false)
+  const [archiveCourrier, setArchiveCourrier] = useState<Courrier | null>(null)
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1)
+
+  const showToast = (message: string) => {
+    setSuccessToast(message)
+    setTimeout(() => setSuccessToast(''), 4000)
+  }
 
   const createCourrier = () => {
     if (!newCourrier.objet || !newCourrier.expediteur) return
@@ -119,8 +165,70 @@ export function CourriersPage() {
     setCourriers(prev => [created, ...prev])
     setNewCourrier({ objet: '', expediteur: '', priority: 'NORMAL', circuit: '' })
     setNewCourrierDialog(false)
-    setSuccessToast(`Courrier ${ref} créé avec succès`)
-    setTimeout(() => setSuccessToast(''), 4000)
+    setCurrentPage(1)
+    showToast(`Courrier ${ref} créé avec succès`)
+  }
+
+  const handleConsulter = (courrier: Courrier) => {
+    setDetailCourrier(courrier)
+    setDetailDialog(true)
+  }
+
+  const handleViser = (courrier: Courrier) => {
+    setCourriers(prev => prev.map(c =>
+      c.id === courrier.id
+        ? { ...c, statut: 'Visé' as CourrierStatus, sla: '', notes: [...(c.notes || []), `[${new Date().toLocaleString('fr-FR')}] Visa accordé — Statut changé en « Visé »`] }
+        : c
+    ))
+    showToast(`Courrier ${courrier.reference} visé avec succès`)
+  }
+
+  const handleTransferOpen = (courrier: Courrier) => {
+    setTransferCourrier(courrier)
+    setTransferDestination('')
+    setTransferNote('')
+    setTransferDialog(true)
+  }
+
+  const handleTransferConfirm = () => {
+    if (!transferCourrier || !transferDestination) return
+    setCourriers(prev => prev.map(c =>
+      c.id === transferCourrier.id
+        ? {
+            ...c,
+            statut: 'Transmis au Ministre' as CourrierStatus,
+            circuit: `${c.circuit} → ${transferDestination}`,
+            notes: [...(c.notes || []), `[${new Date().toLocaleString('fr-FR')}] Transféré vers ${transferDestination}${transferNote ? ` — Note: ${transferNote}` : ''}`],
+          }
+        : c
+    ))
+    setTransferDialog(false)
+    showToast(`Courrier ${transferCourrier.reference} transféré vers ${transferDestination}`)
+  }
+
+  const handleTraiter = (courrier: Courrier) => {
+    setCourriers(prev => prev.map(c =>
+      c.id === courrier.id
+        ? { ...c, statut: 'Traité' as CourrierStatus, sla: '', notes: [...(c.notes || []), `[${new Date().toLocaleString('fr-FR')}] Courrier traité`] }
+        : c
+    ))
+    showToast(`Courrier ${courrier.reference} marqué comme traité`)
+  }
+
+  const handleArchiveOpen = (courrier: Courrier) => {
+    setArchiveCourrier(courrier)
+    setArchiveDialog(true)
+  }
+
+  const handleArchiveConfirm = () => {
+    if (!archiveCourrier) return
+    setCourriers(prev => prev.map(c =>
+      c.id === archiveCourrier.id
+        ? { ...c, statut: 'Archivé' as CourrierStatus, sla: '', notes: [...(c.notes || []), `[${new Date().toLocaleString('fr-FR')}] Courrier archivé`] }
+        : c
+    ))
+    setArchiveDialog(false)
+    showToast(`Courrier ${archiveCourrier.reference} archivé avec succès`)
   }
 
   const filtered = courriers.filter(c => {
@@ -136,6 +244,13 @@ export function CourriersPage() {
     const matchPriority = priorityFilter === 'tous' || c.priority === priorityFilter
     return matchTab && matchSearch && matchPriority
   })
+
+  // Pagination logic
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
+  const paginatedFiltered = filtered.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  )
 
   const statCards = [
     { label: 'Courriers officiels', value: '14 250', icon: Mail, color: 'text-brand dark:text-primary', bg: 'bg-brand/5 dark:bg-primary/10' },
@@ -264,7 +379,7 @@ export function CourriersPage() {
       <Card>
         <CardContent className="p-4 space-y-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as CourrierTab)}>
+            <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as CourrierTab); setCurrentPage(1) }}>
               <TabsList className="flex-wrap h-auto gap-1 bg-muted/50 p-1">
                 {TAB_CONFIG.map(tab => (
                   <TabsTrigger key={tab.value} value={tab.value} className="gap-1.5 text-xs data-[state=active]:bg-brand data-[state=active]:text-white dark:data-[state=active]:bg-primary">
@@ -283,7 +398,7 @@ export function CourriersPage() {
               <Input
                 placeholder="Rechercher par référence, objet, expéditeur..."
                 value={search}
-                onChange={e => setSearch(e.target.value)}
+                onChange={e => { setSearch(e.target.value); setCurrentPage(1) }}
                 className="pl-10"
               />
             </div>
@@ -312,7 +427,7 @@ export function CourriersPage() {
                 className="overflow-hidden"
               >
                 <div className="flex flex-wrap gap-3 pt-3 border-t">
-                  <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                  <Select value={priorityFilter} onValueChange={(v) => { setPriorityFilter(v); setCurrentPage(1) }}>
                     <SelectTrigger className="w-[160px]">
                       <SelectValue placeholder="Priorité" />
                     </SelectTrigger>
@@ -325,7 +440,7 @@ export function CourriersPage() {
                     </SelectContent>
                   </Select>
                   {priorityFilter !== 'tous' && (
-                    <Button variant="ghost" size="sm" onClick={() => setPriorityFilter('tous')}>
+                    <Button variant="ghost" size="sm" onClick={() => { setPriorityFilter('tous'); setCurrentPage(1) }}>
                       <X className="h-3 w-3 mr-1" />
                       Réinitialiser
                     </Button>
@@ -412,6 +527,178 @@ export function CourriersPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Courrier Detail Dialog */}
+      <Dialog open={detailDialog} onOpenChange={setDetailDialog}>
+        <DialogContent className="sm:max-w-[650px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5 text-brand dark:text-primary" />
+              Détails du courrier
+            </DialogTitle>
+            <DialogDescription>Informations complètes du courrier officiel</DialogDescription>
+          </DialogHeader>
+          {detailCourrier && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <span className="text-xs text-muted-foreground font-medium">Référence</span>
+                  <p className="text-sm font-mono font-medium text-brand dark:text-primary">{detailCourrier.reference}</p>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-xs text-muted-foreground font-medium">Date</span>
+                  <p className="text-sm">{detailCourrier.date}</p>
+                </div>
+              </div>
+              <Separator />
+              <div className="space-y-1">
+                <span className="text-xs text-muted-foreground font-medium">Objet</span>
+                <p className="text-sm font-medium">{detailCourrier.objet}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <span className="text-xs text-muted-foreground font-medium">Expéditeur</span>
+                  <div className="flex items-center gap-1.5">
+                    <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                    <p className="text-sm">{detailCourrier.expediteur}</p>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-xs text-muted-foreground font-medium">Priorité</span>
+                  <div>
+                    {(() => {
+                      const pConfig = PRIORITY_CONFIG[detailCourrier.priority]
+                      const PIcon = pConfig.icon
+                      return (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${pConfig.color}`}>
+                          <PIcon className="h-3 w-3" />
+                          {detailCourrier.priority}
+                        </span>
+                      )
+                    })()}
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs text-muted-foreground font-medium">Circuit de validation</span>
+                <div className="flex items-center gap-1.5">
+                  <Route className="h-3.5 w-3.5 text-muted-foreground" />
+                  <p className="text-sm">{detailCourrier.circuit}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <span className="text-xs text-muted-foreground font-medium">Statut</span>
+                  <div>
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[detailCourrier.statut] || 'bg-gray-100 text-gray-700'}`}>
+                      {detailCourrier.statut}
+                    </span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-xs text-muted-foreground font-medium">SLA</span>
+                  <p className="text-sm">
+                    {detailCourrier.sla ? (
+                      <span className={`inline-flex items-center gap-1 font-medium ${getSlaColor(detailCourrier.sla, detailCourrier.priority)}`}>
+                        <Timer className="h-3.5 w-3.5" />
+                        {detailCourrier.sla}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+              {detailCourrier.notes && detailCourrier.notes.length > 0 && (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <span className="text-xs text-muted-foreground font-medium">Historique de traitement</span>
+                    <div className="max-h-40 overflow-y-auto space-y-1.5">
+                      {detailCourrier.notes.map((note, idx) => (
+                        <div key={idx} className="flex items-start gap-2 text-xs p-2 rounded-lg bg-muted/50">
+                          <CircleDot className="h-3 w-3 mt-0.5 text-brand dark:text-primary shrink-0" />
+                          <span>{note}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetailDialog(false)}>Fermer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Transfer Dialog */}
+      <Dialog open={transferDialog} onOpenChange={setTransferDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowRight className="h-5 w-5 text-brand dark:text-primary" />
+              Transférer le courrier
+            </DialogTitle>
+            <DialogDescription>
+              {transferCourrier && `Transférer ${transferCourrier.reference} — ${transferCourrier.objet.slice(0, 60)}...`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Service de destination</Label>
+              <Select value={transferDestination} onValueChange={setTransferDestination}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner le service destinataire" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DESTINATION_SERVICES.map(service => (
+                    <SelectItem key={service} value={service}>{service}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Note de transfert (optionnel)</Label>
+              <Textarea
+                placeholder="Ajoutez une note explicative pour le transfert..."
+                value={transferNote}
+                onChange={e => setTransferNote(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTransferDialog(false)}>Annuler</Button>
+            <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={handleTransferConfirm} disabled={!transferDestination}>
+              <ArrowRight className="h-4 w-4" />
+              Confirmer le transfert
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Archive Confirmation Dialog */}
+      <AlertDialog open={archiveDialog} onOpenChange={setArchiveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Archive className="h-5 w-5 text-amber-600" />
+              Archiver le courrier
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {archiveCourrier && `Voulez-vous archiver le courrier ${archiveCourrier.reference} ? Cette action indiquera que le courrier a été traité et archivé.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction className="bg-amber-600 hover:bg-amber-700 text-white" onClick={handleArchiveConfirm}>
+              Confirmer l&apos;archivage
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Courriers Table */}
       <Card>
         <CardContent className="p-0">
@@ -430,7 +717,7 @@ export function CourriersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((c, i) => {
+                {paginatedFiltered.map((c, i) => {
                   const pConfig = PRIORITY_CONFIG[c.priority]
                   const PriorityIcon = pConfig.icon
                   const statusColor = STATUS_COLORS[c.statut] || 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
@@ -489,11 +776,21 @@ export function CourriersPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem className="gap-2"><Eye className="h-4 w-4" /> Consulter</DropdownMenuItem>
-                            <DropdownMenuItem className="gap-2"><Stamp className="h-4 w-4" /> Viser</DropdownMenuItem>
-                            <DropdownMenuItem className="gap-2"><ArrowRight className="h-4 w-4" /> Transférer</DropdownMenuItem>
-                            <DropdownMenuItem className="gap-2"><FileCheck className="h-4 w-4" /> Traiter</DropdownMenuItem>
-                            <DropdownMenuItem className="gap-2"><CheckCircle2 className="h-4 w-4" /> Archiver</DropdownMenuItem>
+                            <DropdownMenuItem className="gap-2" onClick={() => handleConsulter(c)}>
+                              <Eye className="h-4 w-4" /> Consulter
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="gap-2" onClick={() => handleViser(c)} disabled={c.statut === 'Visé' || c.statut === 'Traité' || c.statut === 'Archivé'}>
+                              <Stamp className="h-4 w-4" /> Viser
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="gap-2" onClick={() => handleTransferOpen(c)} disabled={c.statut === 'Traité' || c.statut === 'Archivé'}>
+                              <ArrowRight className="h-4 w-4" /> Transférer
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="gap-2" onClick={() => handleTraiter(c)} disabled={c.statut === 'Traité' || c.statut === 'Archivé'}>
+                              <FileCheck className="h-4 w-4" /> Traiter
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="gap-2" onClick={() => handleArchiveOpen(c)} disabled={c.statut === 'Archivé'}>
+                              <CheckCircle2 className="h-4 w-4" /> Archiver
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -504,11 +801,41 @@ export function CourriersPage() {
             </Table>
           </div>
           <div className="flex items-center justify-between p-4 border-t">
-            <span className="text-xs text-muted-foreground">{filtered.length} courrier(s) affiché(s) sur {courriers.length}</span>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" disabled className="text-xs">Précédent</Button>
-              <Button variant="outline" size="sm" className="text-xs bg-brand text-white dark:bg-primary">1</Button>
-              <Button variant="outline" size="sm" className="text-xs">Suivant</Button>
+            <span className="text-xs text-muted-foreground">
+              {filtered.length} courrier(s) affiché(s) sur {courriers.length} — Page {currentPage} sur {totalPages}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs h-8"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(p => p - 1)}
+              >
+                <ChevronLeft className="h-3.5 w-3.5 mr-1" />
+                Précédent
+              </Button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                <Button
+                  key={page}
+                  variant="outline"
+                  size="sm"
+                  className={`text-xs h-8 w-8 p-0 ${page === currentPage ? 'bg-brand text-white dark:bg-primary' : ''}`}
+                  onClick={() => setCurrentPage(page)}
+                >
+                  {page}
+                </Button>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs h-8"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(p => p + 1)}
+              >
+                Suivant
+                <ChevronRight className="h-3.5 w-3.5 ml-1" />
+              </Button>
             </div>
           </div>
         </CardContent>

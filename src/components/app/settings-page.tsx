@@ -1,13 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Settings, Shield, Bell, Puzzle, Palette,
   Lock, Clock, Key, Globe, Sun, Moon,
   Monitor, Save, CheckCircle2, AlertTriangle,
   Wifi, Mail, MessageSquare, Smartphone,
-  Building2, Phone, MapPin, Upload
+  Building2, Phone, MapPin, Upload, Loader2
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -18,14 +18,35 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose,
+} from '@/components/ui/dialog'
+import { useAppStore } from '@/store/app-store'
+
+interface IntegrationConfig {
+  apiUrl: string
+  apiKey: string
+  syncInterval: string
+  enabled: boolean
+}
+
+const integrations = [
+  { name: 'API eAdministration', status: 'connected', description: 'API principale de la plateforme', lastSync: 'Il y a 5 min', defaults: { apiUrl: 'https://api.eadmin.gn/v2', apiKey: '••••••••••••', syncInterval: '5', enabled: true } },
+  { name: 'Active Directory / LDAP', status: 'connected', description: 'Authentification centralisée', lastSync: 'Il y a 1h', defaults: { apiUrl: 'ldap://ad.mat.gov.gn:389', apiKey: '••••••••••••', syncInterval: '30', enabled: true } },
+  { name: 'Service SMS (Orange)', status: 'connected', description: 'Envoi de notifications SMS', lastSync: 'Il y a 30 min', defaults: { apiUrl: 'https://api.orange.com/sms/v1', apiKey: '••••••••••••', syncInterval: '15', enabled: true } },
+  { name: 'WhatsApp Business API', status: 'error', description: 'Notifications WhatsApp', lastSync: 'Échec il y a 2h', defaults: { apiUrl: 'https://graph.facebook.com/v18.0', apiKey: '', syncInterval: '15', enabled: false } },
+  { name: 'Système de signature (Certigna)', status: 'connected', description: 'Signature électronique certifiée', lastSync: 'Il y a 15 min', defaults: { apiUrl: 'https://sign.certigna.gn/api', apiKey: '••••••••••••', syncInterval: '10', enabled: true } },
+  { name: 'Base de données NIN', status: 'disconnected', description: 'Vérification d\'identité nationale', lastSync: 'Jamais connecté', defaults: { apiUrl: '', apiKey: '', syncInterval: '60', enabled: false } },
+]
 
 export function SettingsPage() {
+  const { theme: appTheme, toggleTheme } = useAppStore()
   const [mfaEnabled, setMfaEnabled] = useState(true)
   const [sessionTimeout, setSessionTimeout] = useState('30')
   const [passwordMinLength, setPasswordMinLength] = useState('12')
   const [twoFactorAuth, setTwoFactorAuth] = useState(true)
   const [ipWhitelist, setIpWhitelist] = useState(false)
-  const [theme, setTheme] = useState('system')
+  const [theme, setTheme] = useState(appTheme === 'dark' ? 'dark' : appTheme === 'light' ? 'light' : 'system')
   const [language, setLanguage] = useState('fr')
   const [notifSettings, setNotifSettings] = useState({
     email_courrier: true, email_workflow: true, email_signature: true,
@@ -33,15 +54,25 @@ export function SettingsPage() {
     whatsapp_courrier: true, whatsapp_workflow: false,
   })
   const [successToast, setSuccessToast] = useState('')
+  const [savingGeneral, setSavingGeneral] = useState(false)
+  const [savingSecurity, setSavingSecurity] = useState(false)
+  const [savingNotifications, setSavingNotifications] = useState(false)
+  const [savingAppearance, setSavingAppearance] = useState(false)
 
-  const integrations = [
-    { name: 'API eAdministration', status: 'connected', description: 'API principale de la plateforme', lastSync: 'Il y a 5 min' },
-    { name: 'Active Directory / LDAP', status: 'connected', description: 'Authentification centralisée', lastSync: 'Il y a 1h' },
-    { name: 'Service SMS (Orange)', status: 'connected', description: 'Envoi de notifications SMS', lastSync: 'Il y a 30 min' },
-    { name: 'WhatsApp Business API', status: 'error', description: 'Notifications WhatsApp', lastSync: 'Échec il y a 2h' },
-    { name: 'Système de signature (Certigna)', status: 'connected', description: 'Signature électronique certifiée', lastSync: 'Il y a 15 min' },
-    { name: 'Base de données NIN', status: 'disconnected', description: 'Vérification d\'identité nationale', lastSync: 'Jamais connecté' },
-  ]
+  // Logo upload
+  const logoInputRef = useRef<HTMLInputElement>(null)
+  const [logoPreview, setLogoPreview] = useState<string | null>(null)
+
+  // Integration dialog
+  const [integrationDialogOpen, setIntegrationDialogOpen] = useState(false)
+  const [selectedIntegration, setSelectedIntegration] = useState<string | null>(null)
+  const [integrationConfigs, setIntegrationConfigs] = useState<IntegrationConfig>({
+    apiUrl: '',
+    apiKey: '',
+    syncInterval: '15',
+    enabled: true,
+  })
+  const [savingIntegration, setSavingIntegration] = useState(false)
 
   const getIntStatus = (status: string) => {
     switch (status) {
@@ -50,6 +81,95 @@ export function SettingsPage() {
       case 'disconnected': return { label: 'Non connecté', color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400', icon: Wifi }
       default: return { label: 'Inconnu', color: 'bg-gray-100 text-gray-600', icon: Wifi }
     }
+  }
+
+  const handleThemeChange = (newTheme: string) => {
+    setTheme(newTheme)
+    // Apply theme to the app
+    if (newTheme === 'system') {
+      const prefersDark = typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
+      if (prefersDark && appTheme !== 'dark') {
+        toggleTheme()
+      } else if (!prefersDark && appTheme !== 'light') {
+        toggleTheme()
+      }
+    } else if (newTheme === 'dark' && appTheme !== 'dark') {
+      toggleTheme()
+    } else if (newTheme === 'light' && appTheme !== 'light') {
+      toggleTheme()
+    }
+  }
+
+  const handleLogoUpload = () => {
+    logoInputRef.current?.click()
+  }
+
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+      setSuccessToast('Logo mis à jour avec succès')
+      setTimeout(() => setSuccessToast(''), 4000)
+    }
+  }
+
+  const handleOpenIntegration = (intName: string) => {
+    const int = integrations.find(i => i.name === intName)
+    if (int) {
+      setSelectedIntegration(int.name)
+      setIntegrationConfigs({
+        apiUrl: int.defaults.apiUrl,
+        apiKey: int.defaults.apiKey,
+        syncInterval: int.defaults.syncInterval,
+        enabled: int.defaults.enabled,
+      })
+      setIntegrationDialogOpen(true)
+    }
+  }
+
+  const handleSaveIntegration = async () => {
+    setSavingIntegration(true)
+    await new Promise(r => setTimeout(r, 1200))
+    setSavingIntegration(false)
+    setIntegrationDialogOpen(false)
+    setSuccessToast(`Configuration de ${selectedIntegration} enregistrée avec succès`)
+    setTimeout(() => setSuccessToast(''), 4000)
+  }
+
+  const handleSaveGeneral = async () => {
+    setSavingGeneral(true)
+    await new Promise(r => setTimeout(r, 1000))
+    setSavingGeneral(false)
+    setSuccessToast('Paramètres généraux enregistrés avec succès')
+    setTimeout(() => setSuccessToast(''), 4000)
+  }
+
+  const handleSaveSecurity = async () => {
+    setSavingSecurity(true)
+    await new Promise(r => setTimeout(r, 1000))
+    setSavingSecurity(false)
+    setSuccessToast('Paramètres de sécurité enregistrés avec succès')
+    setTimeout(() => setSuccessToast(''), 4000)
+  }
+
+  const handleSaveNotifications = async () => {
+    setSavingNotifications(true)
+    await new Promise(r => setTimeout(r, 1000))
+    setSavingNotifications(false)
+    setSuccessToast('Préférences de notification enregistrées avec succès')
+    setTimeout(() => setSuccessToast(''), 4000)
+  }
+
+  const handleSaveAppearance = async () => {
+    setSavingAppearance(true)
+    await new Promise(r => setTimeout(r, 1000))
+    setSavingAppearance(false)
+    setSuccessToast('Préférences d\'apparence enregistrées avec succès')
+    setTimeout(() => setSuccessToast(''), 4000)
   }
 
   return (
@@ -83,13 +203,13 @@ export function SettingsPage() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Informations de l\'institution</CardTitle>
+                <CardTitle className="text-base">Informations de l&apos;institution</CardTitle>
                 <CardDescription>Configuration générale de votre organisation</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" /> Nom de l\'institution</Label>
+                    <Label className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" /> Nom de l&apos;institution</Label>
                     <Input defaultValue="Ministère de l'Administration Territoriale" />
                   </div>
                   <div className="space-y-2">
@@ -117,13 +237,24 @@ export function SettingsPage() {
                 <Separator />
 
                 <div className="space-y-2">
-                  <Label>Logo de l\'institution</Label>
+                  <Label>Logo de l&apos;institution</Label>
                   <div className="flex items-center gap-4">
-                    <div className="h-16 w-16 rounded-xl bg-brand/10 dark:bg-primary/10 flex items-center justify-center border-2 border-dashed border-brand/20 dark:border-primary/20">
-                      <Building2 className="h-8 w-8 text-brand/40 dark:text-primary/40" />
+                    <div className="h-16 w-16 rounded-xl bg-brand/10 dark:bg-primary/10 flex items-center justify-center border-2 border-dashed border-brand/20 dark:border-primary/20 overflow-hidden">
+                      {logoPreview ? (
+                        <img src={logoPreview} alt="Logo" className="h-full w-full object-cover rounded-xl" />
+                      ) : (
+                        <Building2 className="h-8 w-8 text-brand/40 dark:text-primary/40" />
+                      )}
                     </div>
                     <div>
-                      <Button variant="outline" size="sm" className="gap-1.5">
+                      <input
+                        ref={logoInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/svg+xml"
+                        className="hidden"
+                        onChange={handleLogoFileChange}
+                      />
+                      <Button variant="outline" size="sm" className="gap-1.5" onClick={handleLogoUpload}>
                         <Upload className="h-3.5 w-3.5" />
                         Changer le logo
                       </Button>
@@ -132,9 +263,9 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={() => { setSuccessToast('Paramètres généraux enregistrés avec succès'); setTimeout(() => setSuccessToast(''), 4000) }}>
-                  <Save className="h-4 w-4" />
-                  Enregistrer
+                <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={handleSaveGeneral} disabled={savingGeneral}>
+                  {savingGeneral ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  {savingGeneral ? 'Enregistrement...' : 'Enregistrer'}
                 </Button>
               </CardContent>
             </Card>
@@ -166,7 +297,7 @@ export function SettingsPage() {
                     <Key className="h-5 w-5 text-brand dark:text-primary" />
                     <div>
                       <p className="text-sm font-medium">Double authentification obligatoire</p>
-                      <p className="text-xs text-muted-foreground">Codes de récupération générés à l\'inscription</p>
+                      <p className="text-xs text-muted-foreground">Codes de récupération générés à l&apos;inscription</p>
                     </div>
                   </div>
                   <Switch checked={twoFactorAuth} onCheckedChange={setTwoFactorAuth} />
@@ -176,8 +307,8 @@ export function SettingsPage() {
                   <div className="flex items-center gap-3">
                     <Globe className="h-5 w-5 text-brand dark:text-primary" />
                     <div>
-                      <p className="text-sm font-medium">Liste blanche d\'adresses IP</p>
-                      <p className="text-xs text-muted-foreground">Restreindre l\'accès à certaines plages d\'IP</p>
+                      <p className="text-sm font-medium">Liste blanche d&apos;adresses IP</p>
+                      <p className="text-xs text-muted-foreground">Restreindre l&apos;accès à certaines plages d&apos;IP</p>
                     </div>
                   </div>
                   <Switch checked={ipWhitelist} onCheckedChange={setIpWhitelist} />
@@ -189,7 +320,7 @@ export function SettingsPage() {
                   <div className="space-y-2">
                     <Label className="flex items-center gap-1.5">
                       <Clock className="h-3.5 w-3.5" />
-                      Délai d\'expiration de session
+                      Délai d&apos;expiration de session
                     </Label>
                     <Select value={sessionTimeout} onValueChange={setSessionTimeout}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
@@ -227,9 +358,9 @@ export function SettingsPage() {
                   </ul>
                 </div>
 
-                <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={() => { setSuccessToast('Paramètres de sécurité enregistrés avec succès'); setTimeout(() => setSuccessToast(''), 4000) }}>
-                  <Save className="h-4 w-4" />
-                  Enregistrer
+                <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={handleSaveSecurity} disabled={savingSecurity}>
+                  {savingSecurity ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  {savingSecurity ? 'Enregistrement...' : 'Enregistrer'}
                 </Button>
               </CardContent>
             </Card>
@@ -325,9 +456,9 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={() => { setSuccessToast('Préférences de notification enregistrées avec succès'); setTimeout(() => setSuccessToast(''), 4000) }}>
-                  <Save className="h-4 w-4" />
-                  Enregistrer les préférences
+                <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={handleSaveNotifications} disabled={savingNotifications}>
+                  {savingNotifications ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  {savingNotifications ? 'Enregistrement...' : 'Enregistrer les préférences'}
                 </Button>
               </CardContent>
             </Card>
@@ -363,7 +494,7 @@ export function SettingsPage() {
                           <StatusIcon className="h-3 w-3" />
                           {config.label}
                         </span>
-                        <Button variant="outline" size="sm" className="h-7 text-xs">
+                        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleOpenIntegration(int.name)}>
                           {int.status === 'connected' ? 'Configurer' : 'Connecter'}
                         </Button>
                       </div>
@@ -381,7 +512,7 @@ export function SettingsPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Apparence & langue</CardTitle>
-                <CardDescription>Personnalisez l\'interface de la plateforme</CardDescription>
+                <CardDescription>Personnalisez l&apos;interface de la plateforme</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-3">
@@ -394,7 +525,7 @@ export function SettingsPage() {
                     ].map(t => (
                       <button
                         key={t.value}
-                        onClick={() => setTheme(t.value)}
+                        onClick={() => handleThemeChange(t.value)}
                         className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
                           theme === t.value ? 'border-brand dark:border-primary bg-brand/5 dark:bg-primary/5' : 'border-border hover:border-brand/30 dark:hover:border-primary/30'
                         }`}
@@ -409,17 +540,17 @@ export function SettingsPage() {
                 <Separator />
 
                 <div className="space-y-2">
-                  <Label>Langue de l\'interface</Label>
+                  <Label>Langue de l&apos;interface</Label>
                   <Select value={language} onValueChange={setLanguage}>
                     <SelectTrigger className="w-[240px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="fr">🇫🇷 Français</SelectItem>
-                      <SelectItem value="en">🇬🇧 English</SelectItem>
-                      <SelectItem value="ff">🇬🇳 Pular</SelectItem>
-                      <SelectItem value="man">🇬🇳 Maninka</SelectItem>
-                      <SelectItem value="sus">🇬🇳 Soussou</SelectItem>
+                      <SelectItem value="fr">Français</SelectItem>
+                      <SelectItem value="en">English</SelectItem>
+                      <SelectItem value="ff">Pular</SelectItem>
+                      <SelectItem value="man">Maninka</SelectItem>
+                      <SelectItem value="sus">Soussou</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -448,15 +579,78 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={() => { setSuccessToast('Préférences d\'apparence enregistrées avec succès'); setTimeout(() => setSuccessToast(''), 4000) }}>
-                  <Save className="h-4 w-4" />
-                  Enregistrer
+                <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={handleSaveAppearance} disabled={savingAppearance}>
+                  {savingAppearance ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  {savingAppearance ? 'Enregistrement...' : 'Enregistrer'}
                 </Button>
               </CardContent>
             </Card>
           </motion.div>
         </TabsContent>
       </Tabs>
+
+      {/* Integration Configuration Dialog */}
+      <Dialog open={integrationDialogOpen} onOpenChange={setIntegrationDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{selectedIntegration}</DialogTitle>
+            <DialogDescription>
+              Configurez les paramètres de connexion pour cette intégration
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>URL de l&apos;API</Label>
+              <Input
+                placeholder="https://api.example.com/v1"
+                value={integrationConfigs.apiUrl}
+                onChange={e => setIntegrationConfigs(prev => ({ ...prev, apiUrl: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Clé API / Token</Label>
+              <Input
+                type="password"
+                placeholder="Entrez la clé API"
+                value={integrationConfigs.apiKey}
+                onChange={e => setIntegrationConfigs(prev => ({ ...prev, apiKey: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Intervalle de synchronisation</Label>
+              <Select value={integrationConfigs.syncInterval} onValueChange={v => setIntegrationConfigs(prev => ({ ...prev, syncInterval: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5">5 minutes</SelectItem>
+                  <SelectItem value="10">10 minutes</SelectItem>
+                  <SelectItem value="15">15 minutes</SelectItem>
+                  <SelectItem value="30">30 minutes</SelectItem>
+                  <SelectItem value="60">1 heure</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg border">
+              <div>
+                <p className="text-sm font-medium">Activer l&apos;intégration</p>
+                <p className="text-xs text-muted-foreground">Activez ou désactivez cette connexion</p>
+              </div>
+              <Switch
+                checked={integrationConfigs.enabled}
+                onCheckedChange={v => setIntegrationConfigs(prev => ({ ...prev, enabled: v }))}
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <DialogClose asChild>
+              <Button variant="outline">Annuler</Button>
+            </DialogClose>
+            <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={handleSaveIntegration} disabled={savingIntegration}>
+              {savingIntegration ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {savingIntegration ? 'Enregistrement...' : 'Enregistrer'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Success Toast */}
       <AnimatePresence>

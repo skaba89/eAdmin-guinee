@@ -1,13 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Search, Upload, Filter, MoreHorizontal, FileText, FileCheck,
   Archive, Download, Eye, Trash2, Plus, ChevronDown, Tag,
   Lock, Shield, Brain, Building2, Calendar, X, FolderOpen,
   CheckCircle2, Clock, AlertCircle, BookOpen, FileSignature,
-  ScrollText, BarChart3, MapPin, Library, Mail, GitBranch, PenTool, UserCheck
+  ScrollText, BarChart3, MapPin, Library, Mail, GitBranch, PenTool, UserCheck,
+  ChevronLeft, ChevronRight, AlertTriangle
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -19,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Progress } from '@/components/ui/progress'
 import { Separator } from '@/components/ui/separator'
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
@@ -99,17 +100,47 @@ const INSTITUTION_COUNTS = [
   { name: 'MFP', count: 1, color: 'bg-cyan-500' },
 ]
 
+const REGIONS = [
+  { value: 'toutes', label: 'Toutes les régions' },
+  { value: 'conakry', label: 'Conakry' },
+  { value: 'kindia', label: 'Kindia' },
+  { value: 'kankan', label: 'Kankan' },
+  { value: 'nzerekore', label: 'Nzérékoré' },
+  { value: 'labe', label: 'Labé' },
+  { value: 'faranah', label: 'Faranah' },
+  { value: 'boke', label: 'Boké' },
+  { value: 'mamou', label: 'Mamou' },
+]
+
+const PAGE_SIZE = 10
+
 export function GedPage() {
   const [search, setSearch] = useState('')
   const [activeTab, setActiveTab] = useState('tous')
   const [classificationFilter, setClassificationFilter] = useState<string>('tous')
   const [institutionFilter, setInstitutionFilter] = useState<string>('tous')
+  const [regionFilter, setRegionFilter] = useState<string>('toutes')
+  const [dateFrom, setDateFrom] = useState<string>('')
+  const [dateTo, setDateTo] = useState<string>('')
   const [showFilters, setShowFilters] = useState(false)
   const [uploadDialog, setUploadDialog] = useState(false)
   const [documents, setDocuments] = useState(DOCUMENTS)
   const [newDoc, setNewDoc] = useState({ objet: '', type: 'Note de service' as DocType, institution: '', classification: 'PUBLIC' as DocClassification })
   const [successToast, setSuccessToast] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
   const navigate = useAppStore((s) => s.navigate)
+
+  // Dialog states
+  const [viewDoc, setViewDoc] = useState<Document | null>(null)
+  const [reclassifyDoc, setReclassifyDoc] = useState<Document | null>(null)
+  const [reclassifyValue, setReclassifyValue] = useState<DocClassification>('PUBLIC')
+  const [deleteDoc, setDeleteDoc] = useState<Document | null>(null)
+  const [exportDialog, setExportDialog] = useState(false)
+
+  const showToast = (msg: string) => {
+    setSuccessToast(msg)
+    setTimeout(() => setSuccessToast(''), 4000)
+  }
 
   const uploadDocument = () => {
     if (!newDoc.objet || !newDoc.institution) return
@@ -129,21 +160,133 @@ export function GedPage() {
     setDocuments(prev => [created, ...prev])
     setNewDoc({ objet: '', type: 'Note de service', institution: '', classification: 'PUBLIC' })
     setUploadDialog(false)
-    setSuccessToast(`Document ${ref} importé avec succès`)
-    setTimeout(() => setSuccessToast(''), 4000)
+    showToast(`Document ${ref} importé avec succès`)
   }
 
-  const filteredDocs = documents.filter(doc => {
-    const matchSearch = doc.objet.toLowerCase().includes(search.toLowerCase()) ||
-      doc.reference.toLowerCase().includes(search.toLowerCase()) ||
-      doc.institution.toLowerCase().includes(search.toLowerCase())
-    const matchTab = activeTab === 'tous' ||
-      (activeTab === 'confidentiel' && (doc.classification === 'CONFIDENTIEL' || doc.classification === 'SECRET')) ||
-      (activeTab !== 'confidentiel' && doc.type === activeTab)
-    const matchClassification = classificationFilter === 'tous' || doc.classification === classificationFilter
-    const matchInstitution = institutionFilter === 'tous' || doc.institution === institutionFilter
-    return matchSearch && matchTab && matchClassification && matchInstitution
-  })
+  // Filtered documents with all filters applied
+  const filteredDocs = useMemo(() => {
+    return documents.filter(doc => {
+      const matchSearch = doc.objet.toLowerCase().includes(search.toLowerCase()) ||
+        doc.reference.toLowerCase().includes(search.toLowerCase()) ||
+        doc.institution.toLowerCase().includes(search.toLowerCase())
+      const matchTab = activeTab === 'tous' ||
+        (activeTab === 'confidentiel' && (doc.classification === 'CONFIDENTIEL' || doc.classification === 'SECRET')) ||
+        (activeTab !== 'confidentiel' && doc.type === activeTab)
+      const matchClassification = classificationFilter === 'tous' || doc.classification === classificationFilter
+      const matchInstitution = institutionFilter === 'tous' || doc.institution === institutionFilter
+      const matchDateFrom = !dateFrom || doc.date >= dateFrom
+      const matchDateTo = !dateTo || doc.date <= dateTo
+      return matchSearch && matchTab && matchClassification && matchInstitution && matchDateFrom && matchDateTo
+    })
+  }, [documents, search, activeTab, classificationFilter, institutionFilter, dateFrom, dateTo])
+
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(filteredDocs.length / PAGE_SIZE))
+  const paginatedDocs = filteredDocs.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  // Reset to page 1 when filters change
+  const handleFilterChange = (setter: (v: string) => void) => (value: string) => {
+    setter(value)
+    setCurrentPage(1)
+  }
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value)
+    setCurrentPage(1)
+  }
+
+  // Dropdown actions
+  const handleConsulter = (doc: Document) => {
+    setViewDoc(doc)
+  }
+
+  const handleTelecharger = (doc: Document) => {
+    showToast(`Téléchargement de ${doc.reference} en cours...`)
+    // Simulate download by creating a blob
+    setTimeout(() => {
+      const content = `RÉPUBLIQUE DE GUINÉE\nTravail - Justice - Solidarité\n\n${doc.objet}\n\nRéférence: ${doc.reference}\nType: ${doc.type}\nInstitution: ${doc.institution}\nClassification: ${doc.classification}\nStatut: ${doc.statut}\nDate: ${doc.date}\n\n--- Contenu du document ---\n\n${doc.objet}\n\nConformément aux dispositions légales en vigueur en République de Guinée, le présent document est émis pour application par les services concernés.\n\nFait à Conakry, le ${doc.date}`
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${doc.reference.replace(/\//g, '-')}.txt`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    }, 800)
+  }
+
+  const handleArchiver = (doc: Document) => {
+    setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, statut: 'Classé' as DocStatus } : d))
+    showToast(`Document ${doc.reference} archivé avec succès`)
+  }
+
+  const handleReclassifier = (doc: Document) => {
+    setReclassifyDoc(doc)
+    setReclassifyValue(doc.classification)
+  }
+
+  const confirmReclassify = () => {
+    if (!reclassifyDoc) return
+    setDocuments(prev => prev.map(d => d.id === reclassifyDoc.id ? { ...d, classification: reclassifyValue } : d))
+    showToast(`Document ${reclassifyDoc.reference} reclassifié en ${reclassifyValue}`)
+    setReclassifyDoc(null)
+  }
+
+  const handleSupprimer = (doc: Document) => {
+    setDeleteDoc(doc)
+  }
+
+  const confirmDelete = () => {
+    if (!deleteDoc) return
+    setDocuments(prev => prev.filter(d => d.id !== deleteDoc.id))
+    showToast(`Document ${deleteDoc.reference} supprimé`)
+    setDeleteDoc(null)
+  }
+
+  // AI Classification
+  const handleAiClassification = () => {
+    const classifications: DocClassification[] = ['PUBLIC', 'DIFFUSION LIMITÉE', 'CONFIDENTIEL', 'SECRET']
+    const nonPublicDocs = documents.filter(d => d.classification === 'PUBLIC' || d.classification === 'DIFFUSION LIMITÉE')
+    const count = Math.min(Math.floor(Math.random() * 3) + 1, nonPublicDocs.length)
+    const indicesToReclassify = new Set<number>()
+    while (indicesToReclassify.size < count) {
+      indicesToReclassify.add(Math.floor(Math.random() * nonPublicDocs.length))
+    }
+    const idsToReclassify = new Set(Array.from(indicesToReclassify).map(i => nonPublicDocs[i].id))
+    setDocuments(prev => prev.map(d => {
+      if (idsToReclassify.has(d.id)) {
+        const newClass = classifications[Math.floor(Math.random() * classifications.length)]
+        return { ...d, classification: newClass }
+      }
+      return d
+    }))
+    showToast(`${count} documents reclassifiés par l'IA`)
+  }
+
+  // Export to National Archives
+  const handleExport = () => {
+    setExportDialog(true)
+  }
+
+  const confirmExport = () => {
+    const count = filteredDocs.length
+    showToast(`${count} documents exportés vers les Archives Nationales`)
+    setExportDialog(false)
+  }
+
+  // Reset filters
+  const resetFilters = () => {
+    setClassificationFilter('tous')
+    setInstitutionFilter('tous')
+    setRegionFilter('toutes')
+    setDateFrom('')
+    setDateTo('')
+    setCurrentPage(1)
+  }
+
+  const hasActiveFilters = classificationFilter !== 'tous' || institutionFilter !== 'tous' || regionFilter !== 'toutes' || dateFrom !== '' || dateTo !== ''
 
   const uniqueInstitutions = [...new Set(DOCUMENTS.map(d => d.institution))]
 
@@ -155,6 +298,15 @@ export function GedPage() {
     { label: 'En cours de traitement', value: '2 150', icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
     { label: 'Taux de numérisation', value: '78.3%', icon: BarChart3, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20', isProgress: true, progressValue: 78.3 },
   ]
+
+  // Generate page numbers for pagination
+  const getPageNumbers = () => {
+    const pages: number[] = []
+    for (let i = 1; i <= totalPages; i++) {
+      pages.push(i)
+    }
+    return pages
+  }
 
   return (
     <div className="space-y-6">
@@ -234,7 +386,7 @@ export function GedPage() {
       {/* Document Type Tabs */}
       <Card>
         <CardContent className="p-4">
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setCurrentPage(1) }}>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
               <TabsList className="flex-wrap h-auto gap-1 bg-muted/50 p-1">
                 {TYPE_TABS.map(tab => (
@@ -245,11 +397,11 @@ export function GedPage() {
                 ))}
               </TabsList>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="gap-1.5 border-gold/30 text-gold hover:bg-gold/5">
+                <Button variant="outline" size="sm" className="gap-1.5 border-gold/30 text-gold hover:bg-gold/5" onClick={handleAiClassification}>
                   <Brain className="h-3.5 w-3.5" />
                   Classification automatique par IA
                 </Button>
-                <Button variant="outline" size="sm" className="gap-1.5 border-brand/30 text-brand hover:bg-brand/5 dark:border-primary/30 dark:text-primary dark:hover:bg-primary/5">
+                <Button variant="outline" size="sm" className="gap-1.5 border-brand/30 text-brand hover:bg-brand/5 dark:border-primary/30 dark:text-primary dark:hover:bg-primary/5" onClick={handleExport}>
                   <Archive className="h-3.5 w-3.5" />
                   Export vers les Archives Nationales
                 </Button>
@@ -263,7 +415,7 @@ export function GedPage() {
                 <Input
                   placeholder="Rechercher par référence, objet, institution..."
                   value={search}
-                  onChange={e => setSearch(e.target.value)}
+                  onChange={e => handleSearchChange(e.target.value)}
                   className="pl-10"
                 />
               </div>
@@ -292,7 +444,7 @@ export function GedPage() {
                   className="overflow-hidden"
                 >
                   <div className="flex flex-wrap gap-3 pt-3 mt-3 border-t">
-                    <Select value={classificationFilter} onValueChange={setClassificationFilter}>
+                    <Select value={classificationFilter} onValueChange={handleFilterChange(setClassificationFilter)}>
                       <SelectTrigger className="w-[200px]">
                         <Shield className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
                         <SelectValue placeholder="Classification" />
@@ -306,7 +458,7 @@ export function GedPage() {
                       </SelectContent>
                     </Select>
 
-                    <Select value={institutionFilter} onValueChange={setInstitutionFilter}>
+                    <Select value={institutionFilter} onValueChange={handleFilterChange(setInstitutionFilter)}>
                       <SelectTrigger className="w-[220px]">
                         <Building2 className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
                         <SelectValue placeholder="Institution" />
@@ -319,29 +471,23 @@ export function GedPage() {
                       </SelectContent>
                     </Select>
 
-                    <Select>
+                    <Select value={regionFilter} onValueChange={handleFilterChange(setRegionFilter)}>
                       <SelectTrigger className="w-[160px]">
                         <MapPin className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
                         <SelectValue placeholder="Région" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="toutes">Toutes les régions</SelectItem>
-                        <SelectItem value="conakry">Conakry</SelectItem>
-                        <SelectItem value="kindia">Kindia</SelectItem>
-                        <SelectItem value="kankan">Kankan</SelectItem>
-                        <SelectItem value="nzérékoré">Nzérékoré</SelectItem>
-                        <SelectItem value="labé">Labé</SelectItem>
-                        <SelectItem value="faranah">Faranah</SelectItem>
-                        <SelectItem value="boké">Boké</SelectItem>
-                        <SelectItem value="mamou">Mamou</SelectItem>
+                        {REGIONS.map(r => (
+                          <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
 
-                    <Input type="date" className="w-[160px]" placeholder="Date début" />
-                    <Input type="date" className="w-[160px]" placeholder="Date fin" />
+                    <Input type="date" className="w-[160px]" placeholder="Date début" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setCurrentPage(1) }} />
+                    <Input type="date" className="w-[160px]" placeholder="Date fin" value={dateTo} onChange={e => { setDateTo(e.target.value); setCurrentPage(1) }} />
 
-                    {(classificationFilter !== 'tous' || institutionFilter !== 'tous') && (
-                      <Button variant="ghost" size="sm" onClick={() => { setClassificationFilter('tous'); setInstitutionFilter('tous') }}>
+                    {hasActiveFilters && (
+                      <Button variant="ghost" size="sm" onClick={resetFilters}>
                         <X className="h-3 w-3 mr-1" />
                         Réinitialiser
                       </Button>
@@ -375,82 +521,131 @@ export function GedPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredDocs.map((doc, i) => {
-                      const classConfig = CLASSIFICATION_CONFIG[doc.classification]
-                      const statusConfig = STATUS_CONFIG[doc.statut]
-                      const ClassIcon = classConfig.icon
-                      const StatusIcon = statusConfig.icon
-                      return (
-                        <motion.tr
-                          key={doc.id}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: i * 0.02 }}
-                          className="hover:bg-muted/50 transition-colors group"
-                        >
-                          <TableCell>
-                            <span className="font-mono text-xs font-medium text-brand dark:text-primary">{doc.reference}</span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-start gap-2">
-                              <FileText className="h-4 w-4 text-brand dark:text-primary shrink-0 mt-0.5" />
-                              <span className="text-sm leading-tight line-clamp-2">{doc.objet}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="text-[10px] font-medium">{doc.type}</Badge>
-                          </TableCell>
-                          <TableCell className="hidden lg:table-cell">
-                            <div className="flex items-center gap-1.5">
-                              <Building2 className="h-3 w-3 text-muted-foreground shrink-0" />
-                              <span className="text-xs text-muted-foreground truncate max-w-[150px]">{doc.institution}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="hidden md:table-cell">
-                            <span className="text-xs text-muted-foreground">{doc.taille}</span>
-                          </TableCell>
-                          <TableCell>
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${classConfig.color}`}>
-                              <ClassIcon className="h-3 w-3" />
-                              {doc.classification}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${statusConfig.color}`}>
-                              <StatusIcon className="h-3 w-3" />
-                              {doc.statut}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem className="gap-2"><Eye className="h-4 w-4" /> Consulter</DropdownMenuItem>
-                                <DropdownMenuItem className="gap-2"><Download className="h-4 w-4" /> Télécharger</DropdownMenuItem>
-                                <DropdownMenuItem className="gap-2"><Archive className="h-4 w-4" /> Archiver</DropdownMenuItem>
-                                <DropdownMenuItem className="gap-2"><Tag className="h-4 w-4" /> Reclassifier</DropdownMenuItem>
-                                <DropdownMenuItem className="gap-2 text-red-600"><Trash2 className="h-4 w-4" /> Supprimer</DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </motion.tr>
-                      )
-                    })}
+                    {paginatedDocs.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                          <FolderOpen className="h-10 w-10 mx-auto mb-2 opacity-40" />
+                          <p className="text-sm">Aucun document trouvé</p>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      paginatedDocs.map((doc, i) => {
+                        const classConfig = CLASSIFICATION_CONFIG[doc.classification]
+                        const statusConfig = STATUS_CONFIG[doc.statut]
+                        const ClassIcon = classConfig.icon
+                        const StatusIcon = statusConfig.icon
+                        return (
+                          <motion.tr
+                            key={doc.id}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: i * 0.02 }}
+                            className="hover:bg-muted/50 transition-colors group"
+                          >
+                            <TableCell>
+                              <span className="font-mono text-xs font-medium text-brand dark:text-primary">{doc.reference}</span>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-start gap-2">
+                                <FileText className="h-4 w-4 text-brand dark:text-primary shrink-0 mt-0.5" />
+                                <span className="text-sm leading-tight line-clamp-2">{doc.objet}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-[10px] font-medium">{doc.type}</Badge>
+                            </TableCell>
+                            <TableCell className="hidden lg:table-cell">
+                              <div className="flex items-center gap-1.5">
+                                <Building2 className="h-3 w-3 text-muted-foreground shrink-0" />
+                                <span className="text-xs text-muted-foreground truncate max-w-[150px]">{doc.institution}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell">
+                              <span className="text-xs text-muted-foreground">{doc.taille}</span>
+                            </TableCell>
+                            <TableCell>
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${classConfig.color}`}>
+                                <ClassIcon className="h-3 w-3" />
+                                {doc.classification}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${statusConfig.color}`}>
+                                <StatusIcon className="h-3 w-3" />
+                                {doc.statut}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem className="gap-2" onClick={() => handleConsulter(doc)}>
+                                    <Eye className="h-4 w-4" /> Consulter
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem className="gap-2" onClick={() => handleTelecharger(doc)}>
+                                    <Download className="h-4 w-4" /> Télécharger
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem className="gap-2" onClick={() => handleArchiver(doc)}>
+                                    <Archive className="h-4 w-4" /> Archiver
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem className="gap-2" onClick={() => handleReclassifier(doc)}>
+                                    <Tag className="h-4 w-4" /> Reclassifier
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem className="gap-2 text-red-600" onClick={() => handleSupprimer(doc)}>
+                                    <Trash2 className="h-4 w-4" /> Supprimer
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </motion.tr>
+                        )
+                      })
+                    )}
                   </TableBody>
                 </Table>
               </div>
               <div className="flex items-center justify-between p-4 border-t">
-                <span className="text-xs text-muted-foreground">{filteredDocs.length} document(s) affiché(s) sur {documents.length}</span>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" disabled className="text-xs">Précédent</Button>
-                  <Button variant="outline" size="sm" className="text-xs bg-brand text-white dark:bg-primary">1</Button>
-                  <Button variant="outline" size="sm" className="text-xs">2</Button>
-                  <Button variant="outline" size="sm" className="text-xs">3</Button>
-                  <Button variant="outline" size="sm" className="text-xs">Suivant</Button>
+                <span className="text-xs text-muted-foreground">
+                  {filteredDocs.length} document(s) affiché(s) sur {documents.length}
+                  {totalPages > 1 && ` — Page ${currentPage} sur ${totalPages}`}
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs gap-1"
+                    disabled={currentPage <= 1}
+                    onClick={() => setCurrentPage(p => p - 1)}
+                  >
+                    <ChevronLeft className="h-3 w-3" />
+                    Précédent
+                  </Button>
+                  {getPageNumbers().map(page => (
+                    <Button
+                      key={page}
+                      variant="outline"
+                      size="sm"
+                      className={`text-xs ${page === currentPage ? 'bg-brand text-white dark:bg-primary' : ''}`}
+                      onClick={() => setCurrentPage(page)}
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs gap-1"
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setCurrentPage(p => p + 1)}
+                  >
+                    Suivant
+                    <ChevronRight className="h-3 w-3" />
+                  </Button>
                 </div>
               </div>
             </CardContent>
@@ -598,6 +793,226 @@ export function GedPage() {
             <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={uploadDocument} disabled={!newDoc.objet || !newDoc.institution}>
               <Upload className="h-4 w-4" />
               Importer le document
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Document Consultation Dialog */}
+      <Dialog open={!!viewDoc} onOpenChange={(open) => { if (!open) setViewDoc(null) }}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5 text-brand dark:text-primary" />
+              Consultation du document
+            </DialogTitle>
+            <DialogDescription>Détails et aperçu du document officiel</DialogDescription>
+          </DialogHeader>
+          {viewDoc && (
+            <div className="space-y-4">
+              {/* Document metadata */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Référence</Label>
+                  <p className="text-sm font-mono font-semibold text-brand dark:text-primary">{viewDoc.reference}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Type</Label>
+                  <Badge variant="outline" className="text-xs font-medium">{viewDoc.type}</Badge>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Institution</Label>
+                  <p className="text-sm">{viewDoc.institution}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Classification</Label>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${CLASSIFICATION_CONFIG[viewDoc.classification].color}`}>
+                    {(() => { const Ic = CLASSIFICATION_CONFIG[viewDoc.classification].icon; return <Ic className="h-3 w-3" /> })()}
+                    {viewDoc.classification}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Statut</Label>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_CONFIG[viewDoc.statut].color}`}>
+                    {(() => { const Ic = STATUS_CONFIG[viewDoc.statut].icon; return <Ic className="h-3 w-3" /> })()}
+                    {viewDoc.statut}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Date</Label>
+                  <p className="text-sm">{viewDoc.date}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Taille</Label>
+                  <p className="text-sm">{viewDoc.taille}</p>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Simulated document preview */}
+              <div className="border rounded-lg p-6 bg-white dark:bg-gray-900 shadow-inner">
+                {/* Republic of Guinea header */}
+                <div className="text-center space-y-1 mb-6">
+                  <div className="flex items-center justify-center gap-3 mb-2">
+                    <div className="w-8 h-5 bg-[#CE1126] rounded-sm" />
+                    <div className="w-8 h-5 bg-[#FCD116] rounded-sm" />
+                    <div className="w-8 h-5 bg-[#009460] rounded-sm" />
+                  </div>
+                  <p className="text-xs font-semibold tracking-widest uppercase text-muted-foreground">République de Guinée</p>
+                  <p className="text-[10px] text-muted-foreground">Travail — Justice — Solidarité</p>
+                  <Separator className="my-2" />
+                </div>
+
+                {/* Document content */}
+                <div className="space-y-4 text-sm leading-relaxed">
+                  <div className="text-center">
+                    <p className="font-bold text-base">{viewDoc.type} n°{viewDoc.reference}</p>
+                  </div>
+                  <p className="text-justify first-letter:text-3xl first-letter:font-bold first-letter:float-left first-letter:mr-1 first-letter:mt-1">
+                    {viewDoc.objet}
+                  </p>
+                  <p className="text-justify text-muted-foreground">
+                    Conformément aux dispositions constitutionnelles et aux textes réglementaires en vigueur en République de Guinée, le présent document est émis pour pleine et entière application par l&apos;institution susvisée et tous les services concernés.
+                  </p>
+                  <p className="text-justify text-muted-foreground">
+                    Les mesures prévues par le présent {viewDoc.type.toLowerCase()} entrent en vigueur à compter de la date de sa signature. Tous les ministères, institutions et organismes concernés sont tenus de veiller à sa stricte application dans les meilleurs délais.
+                  </p>
+                </div>
+
+                {/* Signature area */}
+                <div className="mt-8 flex justify-end">
+                  <div className="text-center space-y-1">
+                    <p className="text-xs text-muted-foreground">Fait à Conakry, le {viewDoc.date}</p>
+                    <p className="text-sm font-semibold">{viewDoc.institution}</p>
+                    <div className="w-32 border-b border-dashed border-muted-foreground/30 mx-auto mt-4" />
+                    <p className="text-[10px] text-muted-foreground">Signature & Cachet</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setViewDoc(null)}>Fermer</Button>
+            {viewDoc && (
+              <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={() => { handleTelecharger(viewDoc); setViewDoc(null) }}>
+                <Download className="h-4 w-4" />
+                Télécharger
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reclassify Dialog */}
+      <Dialog open={!!reclassifyDoc} onOpenChange={(open) => { if (!open) setReclassifyDoc(null) }}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Tag className="h-5 w-5 text-gold" />
+              Reclassifier le document
+            </DialogTitle>
+            <DialogDescription>
+              {reclassifyDoc && `Modifier la classification de ${reclassifyDoc.reference}`}
+            </DialogDescription>
+          </DialogHeader>
+          {reclassifyDoc && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Classification actuelle</Label>
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${CLASSIFICATION_CONFIG[reclassifyDoc.classification].color}`}>
+                  {(() => { const Ic = CLASSIFICATION_CONFIG[reclassifyDoc.classification].icon; return <Ic className="h-3 w-3" /> })()}
+                  {reclassifyDoc.classification}
+                </span>
+              </div>
+              <div className="space-y-2">
+                <Label>Nouvelle classification</Label>
+                <Select value={reclassifyValue} onValueChange={(v) => setReclassifyValue(v as DocClassification)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PUBLIC">PUBLIC</SelectItem>
+                    <SelectItem value="DIFFUSION LIMITÉE">DIFFUSION LIMITÉE</SelectItem>
+                    <SelectItem value="CONFIDENTIEL">CONFIDENTIEL</SelectItem>
+                    <SelectItem value="SECRET">SECRET</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReclassifyDoc(null)}>Annuler</Button>
+            <Button className="bg-gold hover:bg-gold/90 text-[#0B2E58] gap-2" onClick={confirmReclassify}>
+              <CheckCircle2 className="h-4 w-4" />
+              Reclassifier
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteDoc} onOpenChange={(open) => { if (!open) setDeleteDoc(null) }}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              Confirmer la suppression
+            </DialogTitle>
+            <DialogDescription>
+              Cette action est irréversible. Le document sera définitivement supprimé de la GED.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteDoc && (
+            <div className="py-4">
+              <div className="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/10 p-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-red-600" />
+                  <span className="font-mono text-sm font-semibold text-red-700 dark:text-red-400">{deleteDoc.reference}</span>
+                </div>
+                <p className="text-sm text-red-700/80 dark:text-red-300/80">{deleteDoc.objet}</p>
+                <p className="text-xs text-red-600/60 dark:text-red-400/60">{deleteDoc.type} — {deleteDoc.institution} — {deleteDoc.date}</p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDoc(null)}>Annuler</Button>
+            <Button variant="destructive" className="gap-2" onClick={confirmDelete}>
+              <Trash2 className="h-4 w-4" />
+              Supprimer définitivement
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Export to National Archives Dialog */}
+      <Dialog open={exportDialog} onOpenChange={setExportDialog}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Archive className="h-5 w-5 text-brand dark:text-primary" />
+              Export vers les Archives Nationales
+            </DialogTitle>
+            <DialogDescription>
+              Confirmez l&apos;export des documents affichés vers les Archives Nationales de la République de Guinée.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="rounded-lg border border-brand/20 dark:border-primary/20 bg-brand/5 dark:bg-primary/5 p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Documents à exporter</span>
+                <span className="text-lg font-bold text-brand dark:text-primary">{filteredDocs.length}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Les {filteredDocs.length} documents actuellement affichés seront transférés aux Archives Nationales conformément au Code administratif.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExportDialog(false)}>Annuler</Button>
+            <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={confirmExport}>
+              <Archive className="h-4 w-4" />
+              Confirmer l&apos;export
             </Button>
           </DialogFooter>
         </DialogContent>
