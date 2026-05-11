@@ -24,7 +24,8 @@ import { Separator } from '@/components/ui/separator'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
 } from '@/components/ui/dialog'
-import { useCitizenRequestsStore, type RequestStatus } from '@/store/citizen-requests-store'
+import { useCitizenRequestsStore, type CitizenRequest, type RequestStatus } from '@/store/citizen-requests-store'
+import { useAppStore } from '@/store/app-store'
 
 const GUINEA_RED = '#CE1126'
 const GUINEA_YELLOW = '#FCD116'
@@ -159,6 +160,7 @@ const itemVariants = {
 
 export function PublicCitizenPortal() {
   const { requests, addRequest, getRequestByReference } = useCitizenRequestsStore()
+  const { isAuth, user, navigate } = useAppStore()
   const [activeTab, setActiveTab] = useState('services')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
@@ -195,14 +197,21 @@ export function PublicCitizenPortal() {
   }, [successToast])
 
   const handleOpenRequestDialog = (service: ServiceItem, category: ServiceCategory) => {
+    // If not authenticated, redirect to login first
+    if (!isAuth) {
+      navigate('login')
+      return
+    }
     setSelectedService(service)
     setSelectedCategoryInfo(category)
+    // Pre-fill from logged-in user info
+    const nameParts = (user?.name || '').split(' ')
     setForm({
-      citizenName: '',
-      citizenFirstName: '',
-      citizenNIN: '',
-      citizenPhone: '',
-      citizenEmail: '',
+      citizenName: nameParts.length > 1 ? nameParts.slice(1).join(' ') : nameParts[0] || '',
+      citizenFirstName: nameParts.length > 1 ? nameParts[0] : '',
+      citizenNIN: user?.nin || '',
+      citizenPhone: user?.phone || '',
+      citizenEmail: user?.email || '',
       citizenAddress: '',
       motif: '',
       deliveryMode: 'guichet',
@@ -459,8 +468,8 @@ export function PublicCitizenPortal() {
                               <FileText className="h-3 w-3" />
                               {service.requiredDocs.length} pièce(s) justificative(s)
                             </div>
-                            <Button size="sm" className={`w-full gap-1 text-xs h-9 ${category.color} hover:opacity-90 text-white border-0`} onClick={() => handleOpenRequestDialog(service, category)}>
-                              Faire une demande
+                            <Button size="sm" className={`w-full gap-1 text-xs h-9 ${isAuth ? category.color : 'bg-[#C8A45C] hover:bg-[#C8A45C]/90 text-[#0B2E58]'} text-white border-0`} onClick={() => handleOpenRequestDialog(service, category)}>
+                              {isAuth ? 'Faire une demande' : 'Se connecter pour demander'}
                               <ChevronRight className="h-3 w-3" />
                             </Button>
                           </CardContent>

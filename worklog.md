@@ -214,3 +214,26 @@ Stage Summary:
 - Favicon shows the official Guinean emblem instead of "Z"
 - All logo references now use PNG versions for performance
 - Official SVG kept as guinea-coat-of-arms-official.svg and logo.svg
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Make the citizen portal fully functional
+
+Work Log:
+- Fixed missing CitizenRequest type import in public-citizen-portal.tsx
+- Added useAppStore import to public citizen portal for auth checking
+- Public portal now redirects to login when unauthenticated user clicks "Faire une demande"
+- Public portal buttons show "Se connecter pour demander" for non-authenticated users
+- Pre-fill request form with logged-in user's personal info (name, NIN, phone, email) in both portals
+- Added user-specific request filtering: "Mes demandes" now shows only the current user's requests (matched by email, NIN, or phone)
+- Updated demo data: 2 demo requests now match citizen account (citoyen@eadmin.gn) so citizen sees their own data
+- Bumped citizen-requests-storage persist version to 3 to force reload of updated demo data
+- All stats in the citizen portal now reflect the user's own requests, not all requests
+
+Stage Summary:
+- Citizen portal is now fully functional end-to-end
+- Authenticated flow: Login → Pre-filled form → Submit request → Track → See updates
+- Public flow: Browse services → Click "Se connecter" → Login → Auto-redirect to citizen portal
+- Agent flow: Service requests page shows all requests, agent can process them
+- Demo citizen account has 2 matching requests visible in "Mes demandes"

@@ -168,6 +168,7 @@ const itemVariants = {
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 export function CitizenPortalPage() {
   const navigate = useAppStore((s) => s.navigate)
+  const user = useAppStore((s) => s.user)
   const { requests, addRequest, getRequestByReference } = useCitizenRequestsStore()
   const [activeTab, setActiveTab] = useState('mes-demandes')
   const [searchQuery, setSearchQuery] = useState('')
@@ -215,12 +216,14 @@ export function CitizenPortalPage() {
   const handleOpenRequestDialog = (service: ServiceItem, category: ServiceCategory) => {
     setSelectedService(service)
     setSelectedCategoryInfo(category)
+    // Pre-fill from logged-in user info
+    const nameParts = (user?.name || '').split(' ')
     setForm({
-      citizenName: '',
-      citizenFirstName: '',
-      citizenNIN: '',
-      citizenPhone: '',
-      citizenEmail: '',
+      citizenName: nameParts.length > 1 ? nameParts.slice(1).join(' ') : nameParts[0] || '',
+      citizenFirstName: nameParts.length > 1 ? nameParts[0] : '',
+      citizenNIN: user?.nin || '',
+      citizenPhone: user?.phone || '',
+      citizenEmail: user?.email || '',
       citizenAddress: '',
       motif: '',
       deliveryMode: 'guichet',
@@ -291,12 +294,21 @@ export function CitizenPortalPage() {
     }))
     .filter(cat => cat.services.length > 0)
 
-  // Stats from actual requests
+  // Filter requests for the current user (by email or NIN match)
+  const myRequests = user
+    ? requests.filter(r =>
+        r.citizenEmail === user.email ||
+        r.citizenNIN === user.nin ||
+        r.citizenPhone === user.phone
+      )
+    : requests
+
+  // Stats from actual user requests
   const myStats = [
-    { label: 'Demandes soumises', value: requests.filter(r => r.status === 'soumise').length, icon: Send, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-900/20' },
-    { label: 'En traitement', value: requests.filter(r => ['en_cours', 'pieces_complementaires'].includes(r.status)).length, icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
-    { label: 'Documents prêts', value: requests.filter(r => r.status === 'prete').length, icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
-    { label: 'Livrées', value: requests.filter(r => r.status === 'livree').length, icon: Download, color: 'text-[#0B2E58] dark:text-[#3B7DD8]', bg: 'bg-[#0B2E58]/5 dark:bg-[#3B7DD8]/10' },
+    { label: 'Demandes soumises', value: myRequests.filter(r => r.status === 'soumise').length, icon: Send, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-900/20' },
+    { label: 'En traitement', value: myRequests.filter(r => ['en_cours', 'pieces_complementaires'].includes(r.status)).length, icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+    { label: 'Documents prêts', value: myRequests.filter(r => r.status === 'prete').length, icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
+    { label: 'Livrées', value: myRequests.filter(r => r.status === 'livree').length, icon: Download, color: 'text-[#0B2E58] dark:text-[#3B7DD8]', bg: 'bg-[#0B2E58]/5 dark:bg-[#3B7DD8]/10' },
   ]
 
   return (
@@ -337,7 +349,7 @@ export function CitizenPortalPage() {
                 </Badge>
                 <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-xs gap-1.5">
                   <CheckCircle2 className="size-3" />
-                  {requests.length} demande(s) en cours
+                  {myRequests.length} demande(s) en cours
                 </Badge>
               </div>
             </div>
@@ -404,7 +416,7 @@ export function CitizenPortalPage() {
           </TabsTrigger>
           <TabsTrigger value="mes-demandes" className="gap-1.5 text-sm data-[state=active]:bg-[#0B2E58] data-[state=active]:text-white">
             <FileText className="size-4" />
-            Mes demandes ({requests.length})
+            Mes demandes ({myRequests.length})
           </TabsTrigger>
           <TabsTrigger value="suivi" className="gap-1.5 text-sm data-[state=active]:bg-[#0B2E58] data-[state=active]:text-white">
             <Search className="size-4" />
@@ -529,7 +541,7 @@ export function CitizenPortalPage() {
         ═════════════════════════════════════════════════════════════════════ */}
         <TabsContent value="mes-demandes">
           <div className="space-y-4 mt-4">
-            {requests.length === 0 ? (
+            {myRequests.length === 0 ? (
               <Card className="glass-card">
                 <CardContent className="flex flex-col items-center justify-center py-16 text-center">
                   <FileText className="size-16 text-muted-foreground/20 mb-4" />
@@ -545,7 +557,7 @@ export function CitizenPortalPage() {
               <>
                 {/* Request cards */}
                 <AnimatePresence mode="popLayout">
-                  {requests.map((req, i) => {
+                  {myRequests.map((req, i) => {
                     const sConfig = STATUS_CONFIG[req.status]
                     const SIcon = sConfig.icon
                     return (
@@ -799,11 +811,11 @@ export function CitizenPortalPage() {
               </AnimatePresence>
 
               {/* Quick access to recent requests */}
-              {requests.length > 0 && (
+              {myRequests.length > 0 && (
                 <div>
                   <h4 className="text-sm font-semibold mb-3">Vos demandes récentes</h4>
                   <div className="space-y-2">
-                    {requests.slice(0, 5).map(req => {
+                    {myRequests.slice(0, 5).map(req => {
                       const sConfig = STATUS_CONFIG[req.status]
                       return (
                         <div

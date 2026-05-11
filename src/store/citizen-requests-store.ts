@@ -95,7 +95,7 @@ const DEMO_REQUESTS: CitizenRequest[] = [
     citizenFirstName: 'Aminata',
     citizenNIN: 'NIN-2019-458723',
     citizenPhone: '+224 622 34 56 78',
-    citizenEmail: 'aminata.diallo@email.com',
+    citizenEmail: 'citoyen@eadmin.gn',
     citizenAddress: 'Conakry, Commune de Kaloum',
     motif: "Demande d'extrait d'acte de naissance pour dossier d'emploi",
     documents: ["Carte d'identité", 'Acte de naissance original ou numéro d\'acte'],
@@ -232,11 +232,11 @@ const DEMO_REQUESTS: CitizenRequest[] = [
     serviceName: 'Certificat de nationalité',
     category: 'État Civil',
     categoryId: 'etat-civil',
-    citizenName: 'Sow',
-    citizenFirstName: 'Abdoulaye',
-    citizenNIN: 'NIN-2015-567890',
-    citizenPhone: '+224 621 98 76 54',
-    citizenEmail: 'abdoulaye.sow@email.com',
+    citizenName: 'Diallo',
+    citizenFirstName: 'Aminata',
+    citizenNIN: 'NIN-2019-458723',
+    citizenPhone: '+224 622 34 56 78',
+    citizenEmail: 'citoyen@eadmin.gn',
     citizenAddress: 'Kankan, Préfecture de Kankan',
     motif: 'Certificat de nationalité pour inscription sur les listes électorales',
     documents: ["Carte d'identité nationale", "Extrait d'acte de naissance", "2 photos d'identité", 'Certificat de résidence'],
@@ -522,9 +522,9 @@ export const useCitizenRequestsStore = create<CitizenRequestsState>()(
     }),
     {
       name: 'citizen-requests-storage',
-      version: 2,
+      version: 3,
       migrate: (persistedState: any, version: number) => {
-        if (version < 2) {
+        if (version < 3) {
           // Force reset to demo data on upgrade
           return { requests: DEMO_REQUESTS }
         }
