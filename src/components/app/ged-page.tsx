@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Search, Upload, Filter, MoreHorizontal, FileText, FileCheck,
@@ -8,7 +8,7 @@ import {
   Lock, Shield, Brain, Building2, Calendar, X, FolderOpen,
   CheckCircle2, Clock, AlertCircle, BookOpen, FileSignature,
   ScrollText, BarChart3, MapPin, Library, Mail, GitBranch, PenTool, UserCheck,
-  ChevronLeft, ChevronRight, AlertTriangle
+  ChevronLeft, ChevronRight, AlertTriangle, FileImage, FileSpreadsheet, FileType, Paperclip
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -41,6 +41,9 @@ interface Document {
   classification: DocClassification
   statut: DocStatus
   date: string
+  fileName?: string
+  fileType?: string
+  fileData?: string
 }
 
 const DOCUMENTS: Document[] = [
@@ -130,6 +133,13 @@ export function GedPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const navigate = useAppStore((s) => s.navigate)
 
+  // File upload state
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [isUploading, setIsUploading] = useState(false)
+  const [dragActive, setDragActive] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   // Dialog states
   const [viewDoc, setViewDoc] = useState<Document | null>(null)
   const [reclassifyDoc, setReclassifyDoc] = useState<Document | null>(null)
@@ -142,25 +152,210 @@ export function GedPage() {
     setTimeout(() => setSuccessToast(''), 4000)
   }
 
+  // File type icon helper
+  const getFileIcon = (fileName: string) => {
+    const ext = fileName.split('.').pop()?.toLowerCase()
+    if (ext === 'pdf') return FileText
+    if (['doc', 'docx'].includes(ext || '')) return FileType
+    if (['xls', 'xlsx'].includes(ext || '')) return FileSpreadsheet
+    if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext || '')) return FileImage
+    return FileText
+  }
+
+  // Format file size
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  // Generate official Republic of Guinea HTML document
+  const generateOfficialDocument = (doc: Document): string => {
+    return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${doc.type} n°${doc.reference} — République de Guinée</title>
+  <style>
+    @page { size: A4; margin: 2cm; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Times New Roman', Georgia, serif; color: #1a1a1a; line-height: 1.6; padding: 2cm; max-width: 21cm; margin: 0 auto; }
+    .tricolor { display: flex; width: 100%; height: 6px; margin-bottom: 20px; }
+    .tricolor-red { flex: 1; background-color: #CE1126; }
+    .tricolor-yellow { flex: 1; background-color: #FCD116; }
+    .tricolor-green { flex: 1; background-color: #009460; }
+    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #0B2E58; padding-bottom: 20px; }
+    .header h1 { font-size: 11pt; letter-spacing: 3px; text-transform: uppercase; color: #0B2E58; margin-bottom: 4px; }
+    .header .motto { font-size: 9pt; color: #666; letter-spacing: 1px; }
+    .header .institution { font-size: 10pt; color: #0B2E58; font-weight: bold; margin-top: 8px; }
+    .doc-title { text-align: center; margin: 30px 0 20px; }
+    .doc-title h2 { font-size: 14pt; color: #0B2E58; text-transform: uppercase; letter-spacing: 1px; }
+    .doc-title .ref { font-size: 11pt; color: #333; margin-top: 4px; }
+    .content { text-align: justify; margin: 20px 0; font-size: 12pt; }
+    .content p { margin-bottom: 12px; text-indent: 1.5cm; }
+    .metadata { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 20px 0; font-size: 10pt; }
+    .metadata .label { color: #666; font-style: italic; }
+    .metadata .value { font-weight: 600; }
+    .signature { margin-top: 60px; text-align: right; }
+    .signature .date { font-size: 10pt; color: #333; }
+    .signature .signataire { font-size: 11pt; font-weight: bold; color: #0B2E58; margin-top: 8px; }
+    .signature .line { width: 200px; border-bottom: 1px dashed #999; margin-top: 40px; margin-left: auto; }
+    .signature .label-sign { font-size: 9pt; color: #666; margin-top: 4px; }
+    .classification { text-align: center; margin-top: 30px; padding: 6px 16px; border: 2px solid #CE1126; display: inline-block; font-size: 10pt; font-weight: bold; color: #CE1126; letter-spacing: 2px; }
+    .footer { margin-top: 40px; border-top: 1px solid #ddd; padding-top: 10px; font-size: 8pt; color: #999; text-align: center; }
+    @media print { body { padding: 0; } .no-print { display: none; } }
+  </style>
+</head>
+<body>
+  <div class="tricolor">
+    <div class="tricolor-red"></div>
+    <div class="tricolor-yellow"></div>
+    <div class="tricolor-green"></div>
+  </div>
+  <div class="header">
+    <h1>République de Guinée</h1>
+    <div class="motto">Travail — Justice — Solidarité</div>
+    <div class="institution">${doc.institution}</div>
+  </div>
+  <div class="doc-title">
+    <h2>${doc.type}</h2>
+    <div class="ref">n°${doc.reference}</div>
+  </div>
+  <div class="content">
+    <p><strong>${doc.objet}</strong></p>
+    <p>Conformément aux dispositions constitutionnelles et aux textes réglementaires en vigueur en République de Guinée, le présent document est émis pour pleine et entière application par l'institution susvisée et tous les services concernés.</p>
+    <p>Les mesures prévues par le présent ${doc.type.toLowerCase()} entrent en vigueur à compter de la date de sa signature. Tous les ministères, institutions et organismes concernés sont tenus de veiller à sa stricte application dans les meilleurs délais.</p>
+    <p>Le présent ${doc.type.toLowerCase()} sera publié au Journal Officiel de la République de Guinée et notifié à toutes les parties prenantes concernées.</p>
+  </div>
+  <div class="metadata">
+    <div><span class="label">Classification :</span> <span class="value">${doc.classification}</span></div>
+    <div><span class="label">Statut :</span> <span class="value">${doc.statut}</span></div>
+    <div><span class="label">Type :</span> <span class="value">${doc.type}</span></div>
+    <div><span class="label">Date :</span> <span class="value">${doc.date}</span></div>
+  </div>
+  <div style="text-align: center;">
+    <div class="classification">${doc.classification}</div>
+  </div>
+  <div class="signature">
+    <div class="date">Fait à Conakry, le ${doc.date}</div>
+    <div class="signataire">${doc.institution}</div>
+    <div class="line"></div>
+    <div class="label-sign">Signature & Cachet officiel</div>
+  </div>
+  <div class="footer">
+    Ce document est généré par le système eAdministration Suite de la République de Guinée — ${doc.reference} — ${new Date().toLocaleDateString('fr-FR')}
+  </div>
+</body>
+</html>`
+  }
+
+  // Handle file selection
+  const handleFileSelect = useCallback((file: File) => {
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
+    ]
+    if (!allowedTypes.includes(file.type) && !file.name.match(/\.(pdf|doc|docx|xls|xlsx|png|jpg|jpeg)$/i)) {
+      showToast('Format de fichier non supporté. Utilisez PDF, DOC, DOCX, XLS, XLSX, PNG ou JPG.')
+      return
+    }
+    setUploadFile(file)
+    setUploadProgress(0)
+  }, [showToast])
+
+  // Drag and drop handlers
+  const handleDrag = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true)
+    } else if (e.type === 'dragleave') {
+      setDragActive(false)
+    }
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragActive(false)
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileSelect(e.dataTransfer.files[0])
+    }
+  }, [handleFileSelect])
+
   const uploadDocument = () => {
     if (!newDoc.objet || !newDoc.institution) return
     const id = String(documents.length + 1)
     const ref = `NS/2026/${134 + documents.length}/NEW/SG`
-    const created: Document = {
-      id,
-      reference: ref,
-      objet: newDoc.objet,
-      type: newDoc.type,
-      institution: newDoc.institution,
-      taille: '256 KB',
-      classification: newDoc.classification,
-      statut: 'En cours',
-      date: new Date().toISOString().slice(0, 10),
+
+    if (uploadFile) {
+      setIsUploading(true)
+      setUploadProgress(0)
+      // Simulate upload progress
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval)
+            return 90
+          }
+          return prev + Math.random() * 20
+        })
+      }, 200)
+
+      const reader = new FileReader()
+      reader.onload = () => {
+        clearInterval(progressInterval)
+        setUploadProgress(100)
+        const base64Data = reader.result as string
+        const created: Document = {
+          id,
+          reference: ref,
+          objet: newDoc.objet,
+          type: newDoc.type,
+          institution: newDoc.institution,
+          taille: formatFileSize(uploadFile.size),
+          classification: newDoc.classification,
+          statut: 'En cours',
+          date: new Date().toISOString().slice(0, 10),
+          fileName: uploadFile.name,
+          fileType: uploadFile.type,
+          fileData: base64Data,
+        }
+        setTimeout(() => {
+          setDocuments(prev => [created, ...prev])
+          setNewDoc({ objet: '', type: 'Note de service', institution: '', classification: 'PUBLIC' })
+          setUploadFile(null)
+          setUploadProgress(0)
+          setIsUploading(false)
+          setUploadDialog(false)
+          showToast(`Document ${ref} importé avec succès (${uploadFile.name})`)
+        }, 400)
+      }
+      reader.readAsDataURL(uploadFile)
+    } else {
+      const created: Document = {
+        id,
+        reference: ref,
+        objet: newDoc.objet,
+        type: newDoc.type,
+        institution: newDoc.institution,
+        taille: '256 KB',
+        classification: newDoc.classification,
+        statut: 'En cours',
+        date: new Date().toISOString().slice(0, 10),
+      }
+      setDocuments(prev => [created, ...prev])
+      setNewDoc({ objet: '', type: 'Note de service', institution: '', classification: 'PUBLIC' })
+      setUploadDialog(false)
+      showToast(`Document ${ref} importé avec succès`)
     }
-    setDocuments(prev => [created, ...prev])
-    setNewDoc({ objet: '', type: 'Note de service', institution: '', classification: 'PUBLIC' })
-    setUploadDialog(false)
-    showToast(`Document ${ref} importé avec succès`)
   }
 
   // Filtered documents with all filters applied
@@ -202,19 +397,30 @@ export function GedPage() {
 
   const handleTelecharger = (doc: Document) => {
     showToast(`Téléchargement de ${doc.reference} en cours...`)
-    // Simulate download by creating a blob
     setTimeout(() => {
-      const content = `RÉPUBLIQUE DE GUINÉE\nTravail - Justice - Solidarité\n\n${doc.objet}\n\nRéférence: ${doc.reference}\nType: ${doc.type}\nInstitution: ${doc.institution}\nClassification: ${doc.classification}\nStatut: ${doc.statut}\nDate: ${doc.date}\n\n--- Contenu du document ---\n\n${doc.objet}\n\nConformément aux dispositions légales en vigueur en République de Guinée, le présent document est émis pour application par les services concernés.\n\nFait à Conakry, le ${doc.date}`
-      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+      const htmlContent = generateOfficialDocument(doc)
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${doc.reference.replace(/\//g, '-')}.txt`
+      a.download = `${doc.reference.replace(/\//g, '-')}.html`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-    }, 800)
+    }, 600)
+  }
+
+  // Download original uploaded file
+  const handleDownloadOriginal = (doc: Document) => {
+    if (!doc.fileData || !doc.fileName) return
+    const a = document.createElement('a')
+    a.href = doc.fileData
+    a.download = doc.fileName
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    showToast(`Fichier original ${doc.fileName} téléchargé`)
   }
 
   const handleArchiver = (doc: Document) => {
@@ -733,8 +939,8 @@ export function GedPage() {
       </AnimatePresence>
 
       {/* Upload Document Dialog */}
-      <Dialog open={uploadDialog} onOpenChange={setUploadDialog}>
-        <DialogContent className="sm:max-w-[550px]">
+      <Dialog open={uploadDialog} onOpenChange={(open) => { setUploadDialog(open); if (!open) { setUploadFile(null); setUploadProgress(0); setIsUploading(false) } }}>
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Upload className="h-5 w-5 text-brand dark:text-primary" />
@@ -743,6 +949,71 @@ export function GedPage() {
             <DialogDescription>Ajouter un nouveau document officiel à la GED</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            {/* Drag & Drop File Upload Zone */}
+            <div className="space-y-2">
+              <Label>Fichier (optionnel)</Label>
+              <div
+                onDragEnter={handleDrag}
+                onDragLeave={handleDrag}
+                onDragOver={handleDrag}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 transition-all cursor-pointer ${
+                  dragActive
+                    ? 'border-brand bg-brand/5 dark:border-primary dark:bg-primary/10'
+                    : uploadFile
+                      ? 'border-emerald-300 bg-emerald-50/50 dark:border-emerald-700 dark:bg-emerald-900/10'
+                      : 'border-muted-foreground/25 hover:border-brand/50 hover:bg-brand/5 dark:hover:border-primary/50 dark:hover:bg-primary/5'
+                }`}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files?.[0]) handleFileSelect(e.target.files[0])
+                  }}
+                />
+                {uploadFile ? (
+                  <div className="flex items-center gap-3 w-full">
+                    <div className="p-2.5 rounded-lg bg-brand/10 dark:bg-primary/20">
+                      {(() => { const FIcon = getFileIcon(uploadFile.name); return <FIcon className="h-6 w-6 text-brand dark:text-primary" /> })()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{uploadFile.name}</p>
+                      <p className="text-xs text-muted-foreground">{formatFileSize(uploadFile.size)} — {uploadFile.type || 'Type inconnu'}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0"
+                      onClick={(e) => { e.stopPropagation(); setUploadFile(null); setUploadProgress(0) }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <Upload className="h-8 w-8 text-muted-foreground/40 mb-2" />
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Glissez-déposez un fichier ici ou <span className="text-brand dark:text-primary underline">parcourir</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground/60 mt-1">PDF, DOC, DOCX, XLS, XLSX, PNG, JPG</p>
+                  </>
+                )}
+              </div>
+              {isUploading && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">Chargement en cours...</span>
+                    <span className="font-medium text-brand dark:text-primary">{Math.round(uploadProgress)}%</span>
+                  </div>
+                  <Progress value={uploadProgress} className="h-1.5" />
+                </div>
+              )}
+            </div>
+
             <div className="space-y-2">
               <Label>Objet du document</Label>
               <Input
@@ -789,10 +1060,10 @@ export function GedPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setUploadDialog(false)}>Annuler</Button>
-            <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={uploadDocument} disabled={!newDoc.objet || !newDoc.institution}>
+            <Button variant="outline" onClick={() => { setUploadDialog(false); setUploadFile(null); setUploadProgress(0) }}>Annuler</Button>
+            <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={uploadDocument} disabled={!newDoc.objet || !newDoc.institution || isUploading}>
               <Upload className="h-4 w-4" />
-              Importer le document
+              {isUploading ? 'Chargement...' : 'Importer le document'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -848,6 +1119,22 @@ export function GedPage() {
                 </div>
               </div>
 
+              {/* Uploaded file info */}
+              {viewDoc.fileName && (
+                <div className="rounded-lg border border-brand/20 dark:border-primary/20 bg-brand/5 dark:bg-primary/5 p-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-brand/10 dark:bg-primary/20">
+                      {(() => { const FIcon = getFileIcon(viewDoc.fileName); return <FIcon className="h-5 w-5 text-brand dark:text-primary" /> })()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{viewDoc.fileName}</p>
+                      <p className="text-xs text-muted-foreground">{viewDoc.fileType} — {viewDoc.taille}</p>
+                    </div>
+                    <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
+                  </div>
+                </div>
+              )}
+
               <Separator />
 
               {/* Simulated document preview */}
@@ -894,10 +1181,16 @@ export function GedPage() {
           )}
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setViewDoc(null)}>Fermer</Button>
+            {viewDoc && viewDoc.fileName && viewDoc.fileData && (
+              <Button variant="outline" className="gap-2 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20" onClick={() => handleDownloadOriginal(viewDoc)}>
+                <Download className="h-4 w-4" />
+                Fichier original
+              </Button>
+            )}
             {viewDoc && (
               <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={() => { handleTelecharger(viewDoc); setViewDoc(null) }}>
                 <Download className="h-4 w-4" />
-                Télécharger
+                Télécharger en PDF
               </Button>
             )}
           </DialogFooter>

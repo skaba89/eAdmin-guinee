@@ -1,13 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Mail, MailOpen, Send, Clock, Plus, Search, Filter,
   AlertTriangle, Eye, MoreHorizontal, ChevronDown, X,
   Building2, Timer, Shield, CheckCircle2, ArrowRight,
   Stamp, FileCheck, Route, Gauge, CircleDot, ArrowUpDown,
-  FileText, GitBranch, PenTool, UserCheck, Archive, ChevronLeft, ChevronRight
+  FileText, GitBranch, PenTool, UserCheck, Archive, ChevronLeft, ChevronRight, Download, Upload, Paperclip, FileImage, FileSpreadsheet, FileType
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -35,6 +35,13 @@ type CourrierPriority = 'URGENT' | 'IMPORTANT' | 'NORMAL' | 'CONFIDENTIEL'
 type CourrierStatus = 'En attente de visa SG' | 'En cours de validation' | 'Diffusée' | 'Transmis au Ministre' | 'En attente visa SG' | 'Visa obtenu' | 'Visé' | 'En cours' | 'Traité' | 'Archivé' | 'En attente' | 'Diffusé' | 'En commission'
 type CourrierTab = 'tous' | 'presidentiels' | 'primature' | 'interministeriels' | 'emanations' | 'urgents'
 
+interface PieceJointe {
+  name: string
+  type: string
+  size: string
+  data: string
+}
+
 interface Courrier {
   id: string
   reference: string
@@ -47,6 +54,7 @@ interface Courrier {
   slaHours?: number
   date: string
   notes?: string[]
+  piecesJointes?: PieceJointe[]
 }
 
 const COURRIERS: Courrier[] = [
@@ -124,6 +132,71 @@ export function CourriersPage() {
   const [successToast, setSuccessToast] = useState('')
   const navigate = useAppStore((s) => s.navigate)
 
+  // File upload state
+  const [courrierFiles, setCourrierFiles] = useState<File[]>([])
+  const [courrierDragActive, setCourrierDragActive] = useState(false)
+  const courrierFileInputRef = useRef<HTMLInputElement>(null)
+
+  // Format file size
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  // Get file icon
+  const getFileIcon = (fileName: string) => {
+    const ext = fileName.split('.').pop()?.toLowerCase()
+    if (ext === 'pdf') return FileText
+    if (['doc', 'docx'].includes(ext || '')) return FileType
+    if (['xls', 'xlsx'].includes(ext || '')) return FileSpreadsheet
+    if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext || '')) return FileImage
+    return FileText
+  }
+
+  // Drag handlers
+  const handleCourrierDrag = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setCourrierDragActive(true)
+    } else if (e.type === 'dragleave') {
+      setCourrierDragActive(false)
+    }
+  }, [])
+
+  const handleCourrierDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setCourrierDragActive(false)
+    if (e.dataTransfer.files) {
+      const newFiles = Array.from(e.dataTransfer.files)
+      setCourrierFiles(prev => [...prev, ...newFiles])
+    }
+  }, [])
+
+  const handleCourrierFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const newFiles = Array.from(e.target.files)
+      setCourrierFiles(prev => [...prev, ...newFiles])
+    }
+  }
+
+  const removeCourrierFile = (index: number) => {
+    setCourrierFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  // Download attached file
+  const handleDownloadPieceJointe = (pj: PieceJointe) => {
+    const a = document.createElement('a')
+    a.href = pj.data
+    a.download = pj.name
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    showToast(`Fichier ${pj.name} téléchargé`)
+  }
+
   // Detail dialog
   const [detailDialog, setDetailDialog] = useState(false)
   const [detailCourrier, setDetailCourrier] = useState<Courrier | null>(null)
@@ -150,23 +223,49 @@ export function CourriersPage() {
     if (!newCourrier.objet || !newCourrier.expediteur) return
     const id = String(courriers.length + 1)
     const ref = `CR-2026-${8722 + courriers.length}`
-    const created: Courrier = {
-      id,
-      reference: ref,
-      objet: newCourrier.objet,
-      expediteur: newCourrier.expediteur,
-      priority: newCourrier.priority,
-      circuit: newCourrier.circuit || 'Rédaction → Visa SG → Ministre',
-      statut: 'En attente',
-      sla: '48h restantes',
-      slaHours: 48,
-      date: new Date().toISOString().slice(0, 10),
+
+    // Process attached files
+    const processFiles = (): Promise<PieceJointe[]> => {
+      if (courrierFiles.length === 0) return Promise.resolve([])
+      return Promise.all(
+        courrierFiles.map(file => {
+          return new Promise<PieceJointe>((resolve) => {
+            const reader = new FileReader()
+            reader.onload = () => {
+              resolve({
+                name: file.name,
+                type: file.type,
+                size: formatFileSize(file.size),
+                data: reader.result as string,
+              })
+            }
+            reader.readAsDataURL(file)
+          })
+        })
+      )
     }
-    setCourriers(prev => [created, ...prev])
-    setNewCourrier({ objet: '', expediteur: '', priority: 'NORMAL', circuit: '' })
-    setNewCourrierDialog(false)
-    setCurrentPage(1)
-    showToast(`Courrier ${ref} créé avec succès`)
+
+    processFiles().then(piecesJointes => {
+      const created: Courrier = {
+        id,
+        reference: ref,
+        objet: newCourrier.objet,
+        expediteur: newCourrier.expediteur,
+        priority: newCourrier.priority,
+        circuit: newCourrier.circuit || 'Rédaction → Visa SG → Ministre',
+        statut: 'En attente',
+        sla: '48h restantes',
+        slaHours: 48,
+        date: new Date().toISOString().slice(0, 10),
+        piecesJointes,
+      }
+      setCourriers(prev => [created, ...prev])
+      setNewCourrier({ objet: '', expediteur: '', priority: 'NORMAL', circuit: '' })
+      setCourrierFiles([])
+      setNewCourrierDialog(false)
+      setCurrentPage(1)
+      showToast(`Courrier ${ref} créé avec succès${piecesJointes.length > 0 ? ` (${piecesJointes.length} pièce(s) jointe(s))` : ''}`)
+    })
   }
 
   const handleConsulter = (courrier: Courrier) => {
@@ -468,8 +567,8 @@ export function CourriersPage() {
       </AnimatePresence>
 
       {/* New Courrier Dialog */}
-      <Dialog open={newCourrierDialog} onOpenChange={setNewCourrierDialog}>
-        <DialogContent className="sm:max-w-[550px]">
+      <Dialog open={newCourrierDialog} onOpenChange={(open) => { setNewCourrierDialog(open); if (!open) setCourrierFiles([]) }}>
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5 text-brand dark:text-primary" />
@@ -516,9 +615,63 @@ export function CourriersPage() {
                 onChange={e => setNewCourrier(prev => ({ ...prev, circuit: e.target.value }))}
               />
             </div>
+
+            {/* File attachment zone */}
+            <div className="space-y-2">
+              <Label>Pièces jointes (optionnel)</Label>
+              <div
+                onDragEnter={handleCourrierDrag}
+                onDragLeave={handleCourrierDrag}
+                onDragOver={handleCourrierDrag}
+                onDrop={handleCourrierDrop}
+                onClick={() => courrierFileInputRef.current?.click()}
+                className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-4 transition-all cursor-pointer ${
+                  courrierDragActive
+                    ? 'border-brand bg-brand/5 dark:border-primary dark:bg-primary/10'
+                    : courrierFiles.length > 0
+                      ? 'border-emerald-300 bg-emerald-50/50 dark:border-emerald-700 dark:bg-emerald-900/10'
+                      : 'border-muted-foreground/25 hover:border-brand/50 hover:bg-brand/5 dark:hover:border-primary/50 dark:hover:bg-primary/5'
+                }`}
+              >
+                <input
+                  ref={courrierFileInputRef}
+                  type="file"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                  multiple
+                  className="hidden"
+                  onChange={handleCourrierFileSelect}
+                />
+                {courrierFiles.length === 0 ? (
+                  <>
+                    <Paperclip className="h-6 w-6 text-muted-foreground/40 mb-1" />
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Ajouter des pièces jointes ou <span className="text-brand dark:text-primary underline">parcourir</span>
+                    </p>
+                    <p className="text-[10px] text-muted-foreground/60 mt-0.5">PDF, DOC, XLS, PNG, JPG</p>
+                  </>
+                ) : (
+                  <div className="w-full space-y-2">
+                    {courrierFiles.map((file, i) => {
+                      const FIcon = getFileIcon(file.name)
+                      return (
+                        <div key={i} className="flex items-center gap-2">
+                          <FIcon className="h-4 w-4 text-brand dark:text-primary shrink-0" />
+                          <span className="text-xs truncate flex-1">{file.name}</span>
+                          <span className="text-[10px] text-muted-foreground">{formatFileSize(file.size)}</span>
+                          <Button variant="ghost" size="icon" className="h-5 w-5 shrink-0" onClick={(e) => { e.stopPropagation(); removeCourrierFile(i) }}>
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )
+                    })}
+                    <p className="text-[10px] text-muted-foreground text-center">Cliquez pour ajouter d&apos;autres fichiers</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setNewCourrierDialog(false)}>Annuler</Button>
+            <Button variant="outline" onClick={() => { setNewCourrierDialog(false); setCourrierFiles([]) }}>Annuler</Button>
             <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={createCourrier} disabled={!newCourrier.objet || !newCourrier.expediteur}>
               <Send className="h-4 w-4" />
               Créer le courrier
@@ -620,6 +773,36 @@ export function CourriersPage() {
                           <span>{note}</span>
                         </div>
                       ))}
+                    </div>
+                  </div>
+                </>
+              )}
+              {/* Attached files */}
+              {detailCourrier.piecesJointes && detailCourrier.piecesJointes.length > 0 && (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <span className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
+                      <Paperclip className="h-3 w-3" />
+                      Pièces jointes ({detailCourrier.piecesJointes.length})
+                    </span>
+                    <div className="space-y-1.5">
+                      {detailCourrier.piecesJointes.map((pj, idx) => {
+                        const FIcon = getFileIcon(pj.name)
+                        return (
+                          <div key={idx} className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 border border-muted-foreground/10">
+                            <FIcon className="h-4 w-4 text-brand dark:text-primary shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-medium truncate">{pj.name}</p>
+                              <p className="text-[10px] text-muted-foreground">{pj.size}</p>
+                            </div>
+                            <Button variant="ghost" size="sm" className="h-6 text-xs gap-1 shrink-0" onClick={() => handleDownloadPieceJointe(pj)}>
+                              <Download className="h-3 w-3" />
+                              Télécharger
+                            </Button>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 </>

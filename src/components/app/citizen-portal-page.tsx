@@ -281,6 +281,101 @@ export function CitizenPortalPage() {
     setDetailDialogOpen(true)
   }
 
+  // Generate official citizen document for download
+  const generateCitizenDocument = (req: CitizenRequest): string => {
+    const citizenFullName = `${req.citizenFirstName} ${req.citizenName}`
+    return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${req.serviceName} — République de Guinée</title>
+  <style>
+    @page { size: A4; margin: 2cm; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Times New Roman', Georgia, serif; color: #1a1a1a; line-height: 1.6; padding: 2cm; max-width: 21cm; margin: 0 auto; }
+    .tricolor { display: flex; width: 100%; height: 6px; margin-bottom: 20px; }
+    .tricolor-red { flex: 1; background-color: #CE1126; }
+    .tricolor-yellow { flex: 1; background-color: #FCD116; }
+    .tricolor-green { flex: 1; background-color: #009460; }
+    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #0B2E58; padding-bottom: 20px; }
+    .header h1 { font-size: 11pt; letter-spacing: 3px; text-transform: uppercase; color: #0B2E58; margin-bottom: 4px; }
+    .header .motto { font-size: 9pt; color: #666; letter-spacing: 1px; }
+    .header .institution { font-size: 10pt; color: #0B2E58; font-weight: bold; margin-top: 8px; }
+    .doc-title { text-align: center; margin: 30px 0 20px; }
+    .doc-title h2 { font-size: 14pt; color: #0B2E58; text-transform: uppercase; letter-spacing: 1px; }
+    .doc-title .ref { font-size: 11pt; color: #333; margin-top: 4px; }
+    .content { text-align: justify; margin: 20px 0; font-size: 12pt; }
+    .content p { margin-bottom: 12px; text-indent: 1.5cm; }
+    .info-box { border: 1px solid #0B2E58; padding: 16px; margin: 20px 0; border-radius: 4px; }
+    .info-box h3 { font-size: 10pt; color: #0B2E58; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; border-bottom: 1px solid #ccc; padding-bottom: 6px; }
+    .info-row { display: flex; margin-bottom: 6px; font-size: 11pt; }
+    .info-row .label { width: 180px; color: #666; font-style: italic; }
+    .info-row .value { font-weight: 600; flex: 1; }
+    .signature { margin-top: 60px; text-align: right; }
+    .signature .date { font-size: 10pt; color: #333; }
+    .signature .signataire { font-size: 11pt; font-weight: bold; color: #0B2E58; margin-top: 8px; }
+    .signature .line { width: 200px; border-bottom: 1px dashed #999; margin-top: 40px; margin-left: auto; }
+    .signature .label-sign { font-size: 9pt; color: #666; margin-top: 4px; }
+    .footer { margin-top: 40px; border-top: 1px solid #ddd; padding-top: 10px; font-size: 8pt; color: #999; text-align: center; }
+    @media print { body { padding: 0; } }
+  </style>
+</head>
+<body>
+  <div class="tricolor">
+    <div class="tricolor-red"></div>
+    <div class="tricolor-yellow"></div>
+    <div class="tricolor-green"></div>
+  </div>
+  <div class="header">
+    <h1>République de Guinée</h1>
+    <div class="motto">Travail — Justice — Solidarité</div>
+    <div class="institution">${req.assignedService}</div>
+  </div>
+  <div class="doc-title">
+    <h2>${req.serviceName}</h2>
+    <div class="ref">Référence : ${req.reference}</div>
+  </div>
+  <div class="info-box">
+    <h3>Informations du demandeur</h3>
+    <div class="info-row"><span class="label">Nom complet :</span><span class="value">${citizenFullName}</span></div>
+    <div class="info-row"><span class="label">NIN :</span><span class="value">${req.citizenNIN}</span></div>
+    <div class="info-row"><span class="label">Téléphone :</span><span class="value">${req.citizenPhone}</span></div>
+    <div class="info-row"><span class="label">Adresse :</span><span class="value">${req.citizenAddress}</span></div>
+    <div class="info-row"><span class="label">Mode de livraison :</span><span class="value">${req.deliveryMode === 'en_ligne' ? 'En ligne' : req.deliveryMode === 'guichet' ? 'Au guichet' : 'Par courrier'}</span></div>
+  </div>
+  <div class="content">
+    <p>Par la présente, il est certifié que le(s) document(s) relatif(s) à la demande sus-référencée a/ont été établi(s) conformément aux dispositions légales et réglementaires en vigueur en République de Guinée.</p>
+    <p>Le présent document est délivré pour faire valoir ce que de droit. Toute falsification ou utilisation frauduleuse expose son auteur aux poursuites prévues par la loi guinéenne.</p>
+  </div>
+  <div class="signature">
+    <div class="date">Fait à Conakry, le ${new Date(req.createdAt).toLocaleDateString('fr-FR')}</div>
+    <div class="signataire">${req.assignedService}</div>
+    <div class="line"></div>
+    <div class="label-sign">Signature & Cachet officiel</div>
+  </div>
+  <div class="footer">
+    Ce document est généré par le système eAdministration Suite de la République de Guinée — ${req.reference} — ${new Date().toLocaleDateString('fr-FR')}
+  </div>
+</body>
+</html>`
+  }
+
+  // Download citizen document
+  const handleDownloadCitizenDocument = (req: CitizenRequest) => {
+    const htmlContent = generateCitizenDocument(req)
+    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${req.reference.replace(/\//g, '-')}-${req.serviceName.replace(/\s+/g, '-').toLowerCase()}.html`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    setSuccessToast(`Document ${req.reference} téléchargé avec succès`)
+  }
+
   // Filter services by search
   const filteredCategories = SERVICE_CATEGORIES
     .filter(cat => selectedCategory === 'all' || cat.id === selectedCategory)
@@ -607,14 +702,20 @@ export function CitizenPortalPage() {
                             {/* Delivery info for ready/delivered */}
                             {(req.status === 'prete' || req.status === 'livree') && (
                               <div className="mt-2 p-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40">
-                                <div className="flex items-center gap-2">
-                                  <CheckCircle2 className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-                                  <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                                    {req.status === 'livree' ? 'Document livré' : 'Document prêt'}
-                                    {req.deliveryMode === 'guichet' && req.deliveryLocation && ` — Retrait au : ${req.deliveryLocation}`}
-                                    {req.deliveryMode === 'en_ligne' && ' — Disponible en ligne'}
-                                    {req.deliveryMode === 'courrier' && ' — Envoyé par courrier'}
-                                  </p>
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <CheckCircle2 className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                                    <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                                      {req.status === 'livree' ? 'Document livré' : 'Document prêt'}
+                                      {req.deliveryMode === 'guichet' && req.deliveryLocation && ` — Retrait au : ${req.deliveryLocation}`}
+                                      {req.deliveryMode === 'en_ligne' && ' — Disponible en ligne'}
+                                      {req.deliveryMode === 'courrier' && ' — Envoyé par courrier'}
+                                    </p>
+                                  </div>
+                                  <Button size="sm" className="gap-1.5 h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" onClick={(e) => { e.stopPropagation(); handleDownloadCitizenDocument(req) }}>
+                                    <Download className="h-3 w-3" />
+                                    Télécharger
+                                  </Button>
                                 </div>
                               </div>
                             )}
@@ -1128,11 +1229,17 @@ export function CitizenPortalPage() {
                 {/* Delivery info */}
                 {(selectedRequest.status === 'prete' || selectedRequest.status === 'livree') && (
                   <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400" />
-                      <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
-                        {selectedRequest.status === 'livree' ? 'Document livré' : 'Document prêt'}
-                      </span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400" />
+                        <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                          {selectedRequest.status === 'livree' ? 'Document livré' : 'Document prêt'}
+                        </span>
+                      </div>
+                      <Button size="sm" className="gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => handleDownloadCitizenDocument(selectedRequest)}>
+                        <Download className="h-3.5 w-3.5" />
+                        Télécharger le document
+                      </Button>
                     </div>
                     {selectedRequest.deliveryMode === 'guichet' && selectedRequest.deliveryLocation && (
                       <p className="text-xs text-muted-foreground mt-1 ml-6">Retrait au : {selectedRequest.deliveryLocation}</p>
