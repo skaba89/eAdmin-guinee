@@ -1,7 +1,7 @@
 export const BRAND = {
   name: 'eAdministration Suite',
   fullName: 'eAdministration Suite Guinea',
-  company: 'DataSphere Innovation',
+  company: 'République de Guinée',
   republic: 'République de Guinée',
   motto: 'Travail - Justice - Solidarité',
   tagline: 'La plateforme GovTech de nouvelle génération pour la Guinée et l\'Afrique',

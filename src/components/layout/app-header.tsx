@@ -103,7 +103,7 @@ export function AppHeader() {
           <h1 className="text-lg font-semibold">
             {PAGE_TITLES[currentPage] || 'eAdministration Suite'}
           </h1>
-          <p className="text-xs text-muted-foreground">{user?.institution || 'DataSphere Innovation'} • {user ? ROLE_LABELS[(user.role || 'citizen') as UserRole] : ''}</p>
+          <p className="text-xs text-muted-foreground">{user?.institution || 'République de Guinée'} • {user ? ROLE_LABELS[(user.role || 'citizen') as UserRole] : ''}</p>
         </div>
       </div>
 

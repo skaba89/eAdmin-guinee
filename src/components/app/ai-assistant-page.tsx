@@ -223,7 +223,7 @@ export function AiAssistantPage() {
             {/* Sidebar Footer */}
             <div className="px-4 py-3 border-t border-border shrink-0">
               <p className="text-[10px] text-muted-foreground text-center">
-                République de Guinée · DataSphere Innovation
+                République de Guinée · eAdministration Suite
               </p>
             </div>
           </motion.aside>

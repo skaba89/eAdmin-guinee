@@ -29,7 +29,7 @@ const team = [
 ]
 
 const milestones = [
-  { year: '2019', title: 'Création', desc: 'DataSphere Innovation est fondée à Conakry avec la vision de digitaliser l\'administration guinéenne.' },
+  { year: '2019', title: 'Création', desc: 'Lancement du programme national de digitalisation administrative par le gouvernement guinéen.' },
   { year: '2020', title: 'Premier MVP', desc: 'Lancement de la première version d\'eAdmin Suite avec les modules GED et Courriers.' },
   { year: '2021', title: 'Premiers clients', desc: 'Signature avec les 3 premiers ministères et traitement des 10 000 premiers documents.' },
   { year: '2022', title: 'Scale-up', desc: 'Lancement des workflows et signatures électroniques. 50+ institutions adoptent la plateforme.' },
@@ -58,7 +58,7 @@ export function AboutPage() {
               Construire l&apos;avenir de l&apos;<span className="gradient-text">administration numérique</span>
             </h1>
             <p className="mt-4 text-lg text-muted-foreground max-w-3xl mx-auto">
-              DataSphere Innovation est une entreprise de technologie guinéenne dédiée à la transformation
+              La Direction Nationale de la Modernisation Administrative est l'organe gouvernemental dédié à la transformation
               digitale des administrations publiques en Afrique.
             </p>
           </motion.div>

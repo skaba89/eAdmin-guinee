@@ -823,8 +823,8 @@ export function LandingPage() {
           <div className="border-t border-white/10 dark:border-border pt-8">
             <div className="flex flex-col items-center gap-4">
               <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-[#0B2E58] dark:bg-primary flex items-center justify-center">
-                  <Sparkles className="h-4 w-4 text-[#C8A45C]" />
+                <div className="h-8 w-8 rounded-lg bg-[#0B2E58] dark:bg-primary flex items-center justify-center overflow-hidden">
+                  <img src="/logo.svg" alt="Guinée" className="h-8 w-8" />
                 </div>
                 <span className="text-sm font-semibold text-white dark:text-foreground">
                   eAdministration Suite

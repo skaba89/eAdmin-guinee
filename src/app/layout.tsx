@@ -14,13 +14,21 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "eAdministration Suite Guinea | DataSphere Innovation",
-  description: "Plateforme GovTech de nouvelle génération pour la digitalisation administrative en Guinée et en Afrique. GED, courriers numériques, workflows, signatures électroniques.",
-  keywords: ["GovTech", "eAdministration", "Guinée", "DataSphere Innovation", "GED", "courriers numériques", "transformation digitale"],
-  authors: [{ name: "DataSphere Innovation" }],
+  title: "eAdministration Suite — République de Guinée",
+  description: "Plateforme GovTech de nouvelle génération pour la digitalisation de l'administration publique de la République de Guinée. GED, courriers numériques, workflows, signatures électroniques.",
+  keywords: ["GovTech", "eAdministration", "Guinée", "République de Guinée", "administration publique", "GED", "courriers numériques", "transformation digitale"],
+  authors: [{ name: "République de Guinée" }],
   icons: {
-    icon: "/logo.svg",
+    icon: [
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon.ico", sizes: "48x48" },
+    ],
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
   },
+  manifest: "/site.webmanifest",
 };
 
 export default function RootLayout({

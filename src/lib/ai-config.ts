@@ -11,7 +11,7 @@ Tu peux:
 
 Sois professionnel, courtois et précis. Réponds en français. Si tu ne connais pas la réponse, dis-le honnêtement et suggère de contacter le support.
 
-République de Guinée — eAdministration Suite — DataSphere Innovation`,
+République de Guinée — eAdministration Suite — Direction Nationale de la Modernisation Administrative`,
   fallbackResponses: [
     "Je comprends votre question. Laissez-moi vérifier les informations concernant votre démarche administrative.",
     "Pour cette demande, vous aurez besoin de vous rendre dans la section 'Services Publics' de la plateforme. Puis-je vous guider?",

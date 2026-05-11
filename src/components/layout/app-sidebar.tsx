@@ -174,10 +174,10 @@ export function AppSidebar() {
       transition={{ duration: 0.2, ease: 'easeInOut' }}
       className="h-screen sticky top-0 flex flex-col border-r border-border bg-sidebar text-sidebar-foreground z-40"
     >
-      {/* Logo */}
+      {/* Logo — République de Guinée */}
       <div className="flex items-center gap-3 px-4 h-16 border-b border-border shrink-0">
-        <div className="h-9 w-9 rounded-xl bg-brand flex items-center justify-center shrink-0 shadow-lg shadow-brand/30">
-          <Sparkles className="h-5 w-5 text-white" />
+        <div className="h-9 w-9 rounded-xl overflow-hidden flex items-center justify-center shrink-0 shadow-lg shadow-brand/30">
+          <img src="/logo.svg" alt="Guinée" className="h-9 w-9" />
         </div>
         <AnimatePresence mode="wait">
           {!sidebarCollapsed && (
@@ -188,7 +188,7 @@ export function AppSidebar() {
               className="overflow-hidden"
             >
               <div className="font-bold text-sm leading-tight text-brand dark:text-primary">eAdmin Suite</div>
-              <div className="text-[10px] text-muted-foreground">DataSphere Innovation</div>
+              <div className="text-[10px] text-muted-foreground">République de Guinée</div>
             </motion.div>
           )}
         </AnimatePresence>
