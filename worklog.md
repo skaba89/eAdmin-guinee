@@ -237,3 +237,34 @@ Stage Summary:
 - Public flow: Browse services → Click "Se connecter" → Login → Auto-redirect to citizen portal
 - Agent flow: Service requests page shows all requests, agent can process them
 - Demo citizen account has 2 matching requests visible in "Mes demandes"
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Add Guinea images to landing page background to promote country's image
+
+Work Log:
+- Generated 6 AI images of Guinea using z-ai-generate CLI:
+  - guinea-hero-conakry.png — Conakry skyline panoramic view
+  - guinea-nimba-mountains.png — Mount Nimba UNESCO landscape
+  - guinea-niger-river.png — Niger River scenic view
+  - guinea-fouta-djallon.png — Fouta Djallon waterfalls
+  - guinea-mosque-conakry.png — Grand Mosque of Conakry
+  - guinea-culture-dance.png — Traditional Guinean cultural dance
+- Updated Hero section: Conakry skyline as background with dark overlay gradient
+- Updated Institutions section: Grand Mosque of Conakry background with semi-transparent overlay
+- Updated Sovereignty section: Fouta Djallon waterfalls background
+- Updated Statistics section: Mount Nimba mountains background with dark overlay
+- Updated How It Works section: Niger River background with semi-transparent overlay
+- Updated Testimonials section: Guinean cultural dance background
+- Updated CTA section: Fouta Djallon waterfalls background with gradient overlay
+- Created new "Découvrez la Guinée" gallery section with 6 image cards showing landmarks and descriptions
+- All image backgrounds have proper z-index layering (background → overlay → content)
+- Build verified successfully
+
+Stage Summary:
+- 6 AI-generated Guinea images saved to /public/
+- 7 sections now have Guinea photo backgrounds with overlays for readability
+- New "Découvrez la Guinée" gallery section with 6 location cards
+- Landing page now prominently promotes Guinea's image, culture, and landscapes
+- Build passes with no errors

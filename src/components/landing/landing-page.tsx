@@ -232,8 +232,13 @@ export function LandingPage() {
     <div className="min-h-screen overflow-hidden">
       {/* ─── HERO ──────────────────────────────────────────── */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        {/* Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0B2E58] via-[#134A8E] to-[#0B2E58]" />
+        {/* Background image - Conakry skyline */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: "url('/guinea-hero-conakry.png')" }}
+        />
+        {/* Dark overlay with national gradient */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0B2E58]/90 via-[#134A8E]/85 to-[#0B2E58]/90" />
         {/* Grid pattern */}
         <div
           className="absolute inset-0 opacity-[0.04]"
@@ -337,8 +342,14 @@ export function LandingPage() {
       </section>
 
       {/* ─── INSTITUTIONS DE LA RÉPUBLIQUE ────────────────── */}
-      <AnimatedSection className="py-20 bg-background">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <AnimatedSection className="py-20 relative overflow-hidden">
+        {/* Background image - Grand Mosque of Conakry */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: "url('/guinea-mosque-conakry.png')" }}
+        />
+        <div className="absolute inset-0 bg-background/92" />
+        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div variants={fadeUp} className="text-center mb-12">
             <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
               Institutions de la République
@@ -362,6 +373,78 @@ export function LandingPage() {
               </motion.div>
             ))}
           </motion.div>
+        </div>
+      </AnimatedSection>
+
+      {/* ─── DÉCOUVREZ LA GUINÉE ───────────────────────────── */}
+      <AnimatedSection className="py-24 bg-background">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <motion.div variants={fadeUp} className="text-center mb-16">
+            <Badge variant="outline" className="mb-4 border-[#CE1126]/40 text-[#CE1126]">
+              <Flag className="h-3.5 w-3.5 mr-1" />
+              Découvrez la Guinée
+            </Badge>
+            <h2 className="text-3xl sm:text-4xl font-bold text-foreground">
+              Une nation d&apos;exception,{' '}
+              <span className="gradient-text">une richesse naturelle</span>
+            </h2>
+            <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
+              De Conakry aux hauts plateaux du Fouta Djallon, du Mont Nimba au fleuve Niger, la Guinée offre des paysages d&apos;une beauté incomparable.
+            </p>
+          </motion.div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[
+              {
+                img: '/guinea-hero-conakry.png',
+                title: 'Conakry, la capitale',
+                desc: 'Métropole dynamique bordée par l\'Atlantique, carrefour économique et culturel de l\'Afrique de l\'Ouest.',
+              },
+              {
+                img: '/guinea-nimba-mountains.png',
+                title: 'Mont Nimba',
+                desc: 'Patrimoine mondial de l\'UNESCO, massif montagneux aux écosystèmes uniques et à la biodiversité exceptionnelle.',
+              },
+              {
+                img: '/guinea-niger-river.png',
+                title: 'Fleuve Niger',
+                desc: 'Prend sa source en Guinée, le fleuve nourrit des millions de personnes à travers l\'Afrique de l\'Ouest.',
+              },
+              {
+                img: '/guinea-fouta-djallon.png',
+                title: 'Fouta Djallon',
+                desc: 'Hauts plateaux aux cascades majestueuses, le « château d\'eau » de l\'Afrique de l\'Ouest.',
+              },
+              {
+                img: '/guinea-mosque-conakry.png',
+                title: 'Grande Mosquée de Conakry',
+                desc: 'L\'un des plus grands édifices religieux d\'Afrique, symbole de la ferveur spirituelle guinéenne.',
+              },
+              {
+                img: '/guinea-culture-dance.png',
+                title: 'Culture et traditions',
+                desc: 'Danses traditionnelles, djembé et griots perpétuent l\'héritage culturel riche et diversifié de la Guinée.',
+              },
+            ].map((item) => (
+              <motion.div key={item.title} variants={fadeUp}>
+                <Card className="overflow-hidden hover:shadow-xl transition-all duration-300 group h-full border-transparent hover:border-[#C8A45C]/30">
+                  <div className="relative h-48 overflow-hidden">
+                    <div
+                      className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110"
+                      style={{ backgroundImage: `url('${item.img}')` }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                    <div className="absolute bottom-3 left-4">
+                      <h3 className="text-white font-semibold text-sm">{item.title}</h3>
+                    </div>
+                  </div>
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
         </div>
       </AnimatedSection>
 
@@ -494,8 +577,14 @@ export function LandingPage() {
       </AnimatedSection>
 
       {/* ─── NATIONAL SOVEREIGNTY ──────────────────────────── */}
-      <AnimatedSection className="py-24 bg-background">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <AnimatedSection className="py-24 relative overflow-hidden">
+        {/* Background image - Fouta Djallon highlands */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: "url('/guinea-fouta-djallon.png')" }}
+        />
+        <div className="absolute inset-0 bg-background/93" />
+        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div variants={fadeUp} className="text-center mb-16">
             <Badge variant="outline" className="mb-4 border-[#0B2E58]/30 dark:border-primary/30 text-[#0B2E58] dark:text-primary">
               <Flag className="h-3.5 w-3.5 mr-1" />
@@ -529,7 +618,13 @@ export function LandingPage() {
       </AnimatedSection>
 
       {/* ─── STATISTICS ────────────────────────────────────── */}
-      <section className="py-24 bg-[#0B2E58] dark:bg-primary relative overflow-hidden">
+      <section className="py-24 relative overflow-hidden">
+        {/* Background image - Mount Nimba */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: "url('/guinea-nimba-mountains.png')" }}
+        />
+        <div className="absolute inset-0 bg-[#0B2E58]/92 dark:bg-primary/92" />
         <div className="absolute inset-0 opacity-[0.03]" style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
         }} />
@@ -576,8 +671,14 @@ export function LandingPage() {
       </section>
 
       {/* ─── HOW IT WORKS ──────────────────────────────────── */}
-      <AnimatedSection className="py-24 bg-background">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <AnimatedSection className="py-24 relative overflow-hidden">
+        {/* Background image - Niger River */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: "url('/guinea-niger-river.png')" }}
+        />
+        <div className="absolute inset-0 bg-background/93" />
+        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div variants={fadeUp} className="text-center mb-16">
             <Badge variant="outline" className="mb-4 border-[#C8A45C]/50 text-[#C8A45C]">
               Processus
@@ -617,8 +718,14 @@ export function LandingPage() {
       </AnimatedSection>
 
       {/* ─── TESTIMONIALS ──────────────────────────────────── */}
-      <AnimatedSection className="py-24 bg-muted/30">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <AnimatedSection className="py-24 relative overflow-hidden">
+        {/* Background image - Guinean culture & dance */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: "url('/guinea-culture-dance.png')" }}
+        />
+        <div className="absolute inset-0 bg-muted/90" />
+        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div variants={fadeUp} className="text-center mb-16">
             <Badge variant="outline" className="mb-4 border-[#0B2E58]/30 dark:border-primary/30 text-[#0B2E58] dark:text-primary">
               Témoignages
@@ -661,7 +768,12 @@ export function LandingPage() {
 
       {/* ─── CTA ───────────────────────────────────────────── */}
       <section className="py-24 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0B2E58] via-[#134A8E] to-[#0B2E58] dark:from-primary dark:via-primary/80 dark:to-primary" />
+        {/* Background image - Fouta Djallon waterfalls */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: "url('/guinea-fouta-djallon.png')" }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0B2E58]/92 via-[#134A8E]/88 to-[#0B2E58]/92 dark:from-primary/92 dark:via-primary/85 dark:to-primary/92" />
         <div className="absolute inset-0 opacity-[0.04]" style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
         }} />
