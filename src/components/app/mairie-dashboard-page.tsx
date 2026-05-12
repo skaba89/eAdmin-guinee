@@ -4,10 +4,11 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Building2, FileText, Clock, CheckCircle2, AlertCircle, Search,
-  Send, Eye, Users, MapPin, Phone, Hash, Calendar, ArrowRight,
-  Plus, ChevronDown, XCircle, Download, Mail, Check, Play,
-  Landmark, Baby, Shield, Heart, Home, Stamp, MessageSquare,
+  Send, MapPin, Phone, Hash, Calendar, ArrowRight,
+  XCircle, Download, Mail, Check, Play,
+  Baby, Shield, Stamp, MessageSquare,
   ClipboardCheck, User, BookOpen, Database,
+  Paperclip, FileCheck, Upload as UploadIcon,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -23,9 +24,10 @@ import { Progress } from '@/components/ui/progress'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
 } from '@/components/ui/dialog'
-import { useAppStore, ROLE_LABELS, ROLE_COLORS } from '@/store/app-store'
+import { useAppStore } from '@/store/app-store'
 import { useCitizenRequestsStore, type CitizenRequest, type RequestStatus } from '@/store/citizen-requests-store'
 import { useBirthCertificateStore, type BirthRecord } from '@/store/birth-certificate-store'
+import { formatFileSize, getFileTypeIcon, downloadUploadedFile, downloadCitizenDocument, createGeneratedDocument, ACCEPTED_FILE_TYPES, processFile } from '@/lib/document-utils'
 
 // ─── STATUS CONFIG ────────────────────────────────────────────────────────────
 const STATUS_CONFIG: Record<RequestStatus, { label: string; color: string; icon: React.ElementType }> = {
@@ -55,7 +57,7 @@ const itemVariants = {
 export function MairieDashboardPage() {
   const navigate = useAppStore((s) => s.navigate)
   const user = useAppStore((s) => s.user)
-  const { requests, updateRequestStatus, addProcessingNote, advanceTimeline, assignRequest, completeRequest } = useCitizenRequestsStore()
+  const { requests, updateRequestStatus, addProcessingNote, advanceTimeline, assignRequest, completeRequest, verifyDocument, setGeneratedDocument, addUploadedDocument } = useCitizenRequestsStore()
 
   // Filter requests for mairie categories (etat-civil and residence)
   const mairieRequests = requests.filter(r => r.categoryId === 'etat-civil' || r.categoryId === 'residence')
@@ -68,6 +70,7 @@ export function MairieDashboardPage() {
   const [deliveryDialogOpen, setDeliveryDialogOpen] = useState(false)
   const [deliveryMode, setDeliveryMode] = useState<'en_ligne' | 'guichet' | 'courrier'>('guichet')
   const [deliveryLocation, setDeliveryLocation] = useState('')
+  const [generateDocDialogOpen, setGenerateDocDialogOpen] = useState(false)
   const [successToast, setSuccessToast] = useState('')
 
   // Birth certificate search
@@ -158,6 +161,40 @@ export function MairieDashboardPage() {
   const refreshSelected = (id: string) => {
     const updated = requests.find(r => r.id === id)
     if (updated) setSelectedRequest(updated)
+  }
+
+  const handleVerifyDocument = (requestId: string, docId: string) => {
+    verifyDocument(requestId, docId)
+    setSuccessToast('Document vérifié avec succès')
+    if (selectedRequest) refreshSelected(selectedRequest.id)
+  }
+
+  const handleGenerateDocument = () => {
+    if (!selectedRequest) return
+    const doc = createGeneratedDocument(selectedRequest, user?.name || selectedRequest.assignedAgent || 'Agent de Mairie')
+    setGeneratedDocument(selectedRequest.id, doc)
+    updateRequestStatus(selectedRequest.id, 'prete', 'Document officiel généré et prêt pour le retrait')
+    advanceTimeline(selectedRequest.id)
+    setGenerateDocDialogOpen(false)
+    setSuccessToast(`Document officiel généré pour ${selectedRequest.reference}`)
+    refreshSelected(selectedRequest.id)
+  }
+
+  const handleDownloadDocument = () => {
+    if (!selectedRequest) return
+    downloadCitizenDocument(selectedRequest, selectedRequest.assignedAgent)
+    setSuccessToast(`Document ${selectedRequest.reference} téléchargé`)
+  }
+
+  const handleAddDocumentToRequest = async (file: File, requestId: string) => {
+    try {
+      const doc = await processFile(file, 'Document complémentaire')
+      addUploadedDocument(requestId, doc)
+      setSuccessToast('Document ajouté avec succès')
+      if (selectedRequest) refreshSelected(selectedRequest.id)
+    } catch (err: any) {
+      setSuccessToast(err.message)
+    }
   }
 
   const handleBirthSearch = () => {
@@ -474,14 +511,59 @@ export function MairieDashboardPage() {
 
                         {/* Required documents */}
                         <div>
-                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Pièces justificatives</h4>
-                          <div className="space-y-1">
-                            {selectedRequest.documents.map((doc, i) => (
-                              <div key={i} className="flex items-center gap-2 text-xs">
-                                <Check className="size-3 text-muted-foreground" />
-                                <span>{doc}</span>
-                              </div>
-                            ))}
+                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
+                            <Paperclip className="size-3.5" />
+                            Pièces justificatives ({selectedRequest.uploadedDocuments.length} / {selectedRequest.documents.length})
+                          </h4>
+                          <div className="space-y-1.5">
+                            {selectedRequest.documents.map((docName, i) => {
+                              const uploaded = selectedRequest.uploadedDocuments.find(d => d.requiredDocName === docName)
+                              return (
+                                <div key={i} className={`flex items-center justify-between p-2 rounded-lg text-xs border ${uploaded ? (uploaded.verified ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-800/40 dark:bg-emerald-900/10' : 'border-amber-200 bg-amber-50/50 dark:border-amber-800/40 dark:bg-amber-900/10') : 'border-dashed border-muted-foreground/30 bg-muted/20'}`}>
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    {uploaded ? (
+                                      <>
+                                        <span className={`text-[8px] font-bold ${getFileTypeIcon(uploaded.type).color}`}>{getFileTypeIcon(uploaded.type).icon}</span>
+                                        <div className="min-w-0">
+                                          <p className="font-medium truncate">{docName}</p>
+                                          <p className="text-[10px] text-muted-foreground">{uploaded.name} ({formatFileSize(uploaded.size)})</p>
+                                        </div>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Paperclip className="size-3 text-muted-foreground" />
+                                        <span className="text-muted-foreground">{docName}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    {uploaded ? (
+                                      <>
+                                        {uploaded.verified ? (
+                                          <Badge className="text-[8px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-0 gap-0.5 px-1.5">
+                                            <FileCheck className="size-2.5" /> Vérifié
+                                          </Badge>
+                                        ) : (
+                                          <Button size="sm" variant="outline" className="h-5 text-[9px] gap-0.5 px-1.5" onClick={() => handleVerifyDocument(selectedRequest.id, uploaded.id)}>
+                                            <Check className="size-2.5" /> Vérifier
+                                          </Button>
+                                        )}
+                                        <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => downloadUploadedFile(uploaded)}>
+                                          <Download className="size-3" />
+                                        </Button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <input type="file" accept={ACCEPTED_FILE_TYPES} className="hidden" id={`mairie-upload-${i}`} onChange={async (e) => { if (e.target.files?.[0]) { await handleAddDocumentToRequest(e.target.files[0], selectedRequest.id); e.target.value = '' } }} />
+                                        <Button size="sm" variant="outline" className="h-5 text-[9px] gap-0.5 px-1.5" onClick={() => document.getElementById(`mairie-upload-${i}`)?.click()}>
+                                          <UploadIcon className="size-2.5" /> Ajouter
+                                        </Button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            })}
                           </div>
                         </div>
 
@@ -551,9 +633,9 @@ export function MairieDashboardPage() {
                             </Button>
                           )}
                           {selectedRequest.status === 'validee' && (
-                            <Button size="sm" className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white gap-1" onClick={() => handleMarkReady(selectedRequest)}>
-                              <CheckCircle2 className="size-3.5" />
-                              Marquer prêt
+                            <Button size="sm" className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white gap-1" onClick={() => setGenerateDocDialogOpen(true)}>
+                              <Stamp className="size-3.5" />
+                              Générer le document
                             </Button>
                           )}
                           {selectedRequest.status === 'prete' && (
@@ -569,6 +651,30 @@ export function MairieDashboardPage() {
                             </Button>
                           )}
                         </div>
+
+                        {/* Generate Official Document */}
+                        {selectedRequest.status === 'validee' && (
+                          <Button size="sm" className="w-full bg-[#C8A45C] hover:bg-[#C8A45C]/90 text-[#0B2E58] gap-2 font-semibold" onClick={() => setGenerateDocDialogOpen(true)}>
+                            <FileText className="size-4" />
+                            Générer le document officiel
+                          </Button>
+                        )}
+
+                        {/* Download Generated Document */}
+                        {(selectedRequest.status === 'prete' || selectedRequest.status === 'livree') && selectedRequest.generatedDocument && (
+                          <div className="space-y-2">
+                            <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800/40">
+                              <div className="flex items-center gap-2">
+                                <FileCheck className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                                <p className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">Document généré le {new Date(selectedRequest.generatedDocument.generatedAt).toLocaleDateString('fr-FR')}</p>
+                              </div>
+                            </div>
+                            <Button size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white gap-2" onClick={handleDownloadDocument}>
+                              <Download className="size-4" />
+                              Télécharger le document
+                            </Button>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   </motion.div>
@@ -804,6 +910,40 @@ export function MairieDashboardPage() {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Generate Document Dialog */}
+      <Dialog open={generateDocDialogOpen} onOpenChange={setGenerateDocDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="size-5 text-[#C8A45C]" />
+              Générer le document officiel
+            </DialogTitle>
+            <DialogDescription>Générez le document officiel pour cette demande</DialogDescription>
+          </DialogHeader>
+          {selectedRequest && (
+            <div className="space-y-4 py-2">
+              <div className="p-3 rounded-lg bg-muted/50 text-sm">
+                <p><strong>Référence :</strong> <span className="font-mono">{selectedRequest.reference}</span></p>
+                <p><strong>Service :</strong> {selectedRequest.serviceName}</p>
+                <p><strong>Citoyen :</strong> {selectedRequest.citizenFirstName} {selectedRequest.citizenName}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/40">
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  En confirmant, le document officiel sera généré et la demande passera au statut "Document prêt".
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGenerateDocDialogOpen(false)}>Annuler</Button>
+            <Button className="bg-[#C8A45C] hover:bg-[#C8A45C]/90 text-[#0B2E58] gap-2 font-semibold" onClick={handleGenerateDocument}>
+              <FileText className="size-4" />
+              Confirmer la génération
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Note Dialog */}
       <Dialog open={noteDialogOpen} onOpenChange={setNoteDialogOpen}>

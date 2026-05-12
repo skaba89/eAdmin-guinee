@@ -10,7 +10,8 @@ import {
   Shield, Baby, Church, Stethoscope, IdCard, Stamp,
   Globe, Smartphone, Hash, Landmark, Award, BookOpen,
   ArrowLeft, Check, AlertCircle, Download, Eye, Send,
-  Plus, ChevronDown, XCircle,
+  Plus, ChevronDown, XCircle, Image as ImageIcon, Trash2, File,
+  Paperclip, FileCheck,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -27,7 +28,8 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
 } from '@/components/ui/dialog'
 import { useAppStore } from '@/store/app-store'
-import { useCitizenRequestsStore, type CitizenRequest, type RequestStatus } from '@/store/citizen-requests-store'
+import { useCitizenRequestsStore, type CitizenRequest, type RequestStatus, type UploadedDocument, type GeneratedDocument } from '@/store/citizen-requests-store'
+import { processFile, formatFileSize, getFileTypeIcon, downloadUploadedFile, downloadCitizenDocument, ACCEPTED_FILE_TYPES, MAX_FILE_SIZE, createGeneratedDocument } from '@/lib/document-utils'
 
 // ─── GUINEA BRAND COLORS ─────────────────────────────────────────────────────
 const GUINEA_RED = '#CE1126'
@@ -206,6 +208,11 @@ export function CitizenPortalPage() {
   // Notification preferences
   const [notifPrefs, setNotifPrefs] = useState({ whatsapp: true, sms: false, email: true, ussd: false })
 
+  // File upload state
+  const [uploadedFiles, setUploadedFiles] = useState<Map<string, UploadedDocument>>(new Map())
+  const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({})
+  const [isUploading, setIsUploading] = useState(false)
+
   useEffect(() => {
     if (successToast) {
       const timer = setTimeout(() => setSuccessToast(''), 4000)
@@ -230,6 +237,7 @@ export function CitizenPortalPage() {
     })
     setFormErrors({})
     setAcceptedTerms(false)
+    setUploadedFiles(new Map())
     setRequestDialogOpen(true)
   }
 
@@ -261,11 +269,14 @@ export function CitizenPortalPage() {
       citizenAddress: form.citizenAddress,
       motif: form.motif || `Demande de ${selectedService.name}`,
       documents: selectedService.requiredDocs,
+      uploadedDocuments: Array.from(uploadedFiles.values()),
       createdAt: new Date().toISOString(),
       deliveryMode: form.deliveryMode,
     })
 
     setRequestDialogOpen(false)
+    setUploadedFiles(new Map())
+    setUploadErrors({})
     setSuccessToast(`Demande soumise avec succès ! Référence : ${newRequest.reference}`)
     setActiveTab('mes-demandes')
   }
@@ -281,99 +292,39 @@ export function CitizenPortalPage() {
     setDetailDialogOpen(true)
   }
 
-  // Generate official citizen document for download
-  const generateCitizenDocument = (req: CitizenRequest): string => {
-    const citizenFullName = `${req.citizenFirstName} ${req.citizenName}`
-    return `<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${req.serviceName} — République de Guinée</title>
-  <style>
-    @page { size: A4; margin: 2cm; }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Times New Roman', Georgia, serif; color: #1a1a1a; line-height: 1.6; padding: 2cm; max-width: 21cm; margin: 0 auto; }
-    .tricolor { display: flex; width: 100%; height: 6px; margin-bottom: 20px; }
-    .tricolor-red { flex: 1; background-color: #CE1126; }
-    .tricolor-yellow { flex: 1; background-color: #FCD116; }
-    .tricolor-green { flex: 1; background-color: #009460; }
-    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #0B2E58; padding-bottom: 20px; }
-    .header h1 { font-size: 11pt; letter-spacing: 3px; text-transform: uppercase; color: #0B2E58; margin-bottom: 4px; }
-    .header .motto { font-size: 9pt; color: #666; letter-spacing: 1px; }
-    .header .institution { font-size: 10pt; color: #0B2E58; font-weight: bold; margin-top: 8px; }
-    .doc-title { text-align: center; margin: 30px 0 20px; }
-    .doc-title h2 { font-size: 14pt; color: #0B2E58; text-transform: uppercase; letter-spacing: 1px; }
-    .doc-title .ref { font-size: 11pt; color: #333; margin-top: 4px; }
-    .content { text-align: justify; margin: 20px 0; font-size: 12pt; }
-    .content p { margin-bottom: 12px; text-indent: 1.5cm; }
-    .info-box { border: 1px solid #0B2E58; padding: 16px; margin: 20px 0; border-radius: 4px; }
-    .info-box h3 { font-size: 10pt; color: #0B2E58; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; border-bottom: 1px solid #ccc; padding-bottom: 6px; }
-    .info-row { display: flex; margin-bottom: 6px; font-size: 11pt; }
-    .info-row .label { width: 180px; color: #666; font-style: italic; }
-    .info-row .value { font-weight: 600; flex: 1; }
-    .signature { margin-top: 60px; text-align: right; }
-    .signature .date { font-size: 10pt; color: #333; }
-    .signature .signataire { font-size: 11pt; font-weight: bold; color: #0B2E58; margin-top: 8px; }
-    .signature .line { width: 200px; border-bottom: 1px dashed #999; margin-top: 40px; margin-left: auto; }
-    .signature .label-sign { font-size: 9pt; color: #666; margin-top: 4px; }
-    .footer { margin-top: 40px; border-top: 1px solid #ddd; padding-top: 10px; font-size: 8pt; color: #999; text-align: center; }
-    @media print { body { padding: 0; } }
-  </style>
-</head>
-<body>
-  <div class="tricolor">
-    <div class="tricolor-red"></div>
-    <div class="tricolor-yellow"></div>
-    <div class="tricolor-green"></div>
-  </div>
-  <div class="header">
-    <h1>République de Guinée</h1>
-    <div class="motto">Travail — Justice — Solidarité</div>
-    <div class="institution">${req.assignedService}</div>
-  </div>
-  <div class="doc-title">
-    <h2>${req.serviceName}</h2>
-    <div class="ref">Référence : ${req.reference}</div>
-  </div>
-  <div class="info-box">
-    <h3>Informations du demandeur</h3>
-    <div class="info-row"><span class="label">Nom complet :</span><span class="value">${citizenFullName}</span></div>
-    <div class="info-row"><span class="label">NIN :</span><span class="value">${req.citizenNIN}</span></div>
-    <div class="info-row"><span class="label">Téléphone :</span><span class="value">${req.citizenPhone}</span></div>
-    <div class="info-row"><span class="label">Adresse :</span><span class="value">${req.citizenAddress}</span></div>
-    <div class="info-row"><span class="label">Mode de livraison :</span><span class="value">${req.deliveryMode === 'en_ligne' ? 'En ligne' : req.deliveryMode === 'guichet' ? 'Au guichet' : 'Par courrier'}</span></div>
-  </div>
-  <div class="content">
-    <p>Par la présente, il est certifié que le(s) document(s) relatif(s) à la demande sus-référencée a/ont été établi(s) conformément aux dispositions légales et réglementaires en vigueur en République de Guinée.</p>
-    <p>Le présent document est délivré pour faire valoir ce que de droit. Toute falsification ou utilisation frauduleuse expose son auteur aux poursuites prévues par la loi guinéenne.</p>
-  </div>
-  <div class="signature">
-    <div class="date">Fait à Conakry, le ${new Date(req.createdAt).toLocaleDateString('fr-FR')}</div>
-    <div class="signataire">${req.assignedService}</div>
-    <div class="line"></div>
-    <div class="label-sign">Signature & Cachet officiel</div>
-  </div>
-  <div class="footer">
-    Ce document est généré par le système eAdministration Suite de la République de Guinée — ${req.reference} — ${new Date().toLocaleDateString('fr-FR')}
-  </div>
-</body>
-</html>`
-  }
-
   // Download citizen document
   const handleDownloadCitizenDocument = (req: CitizenRequest) => {
-    const htmlContent = generateCitizenDocument(req)
-    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${req.reference.replace(/\//g, '-')}-${req.serviceName.replace(/\s+/g, '-').toLowerCase()}.html`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
+    downloadCitizenDocument(req, req.assignedAgent)
     setSuccessToast(`Document ${req.reference} téléchargé avec succès`)
+  }
+
+  // File upload handlers
+  const handleFileUpload = async (file: File, requiredDocName: string) => {
+    try {
+      setIsUploading(true)
+      setUploadErrors(prev => { const n = {...prev}; delete n[requiredDocName]; return n })
+      const doc = await processFile(file, requiredDocName)
+      setUploadedFiles(prev => new Map(prev).set(requiredDocName, doc))
+    } catch (err: any) {
+      setUploadErrors(prev => ({ ...prev, [requiredDocName]: err.message }))
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const handleRemoveFile = (requiredDocName: string) => {
+    setUploadedFiles(prev => {
+      const n = new Map(prev)
+      n.delete(requiredDocName)
+      return n
+    })
+  }
+
+  const handleDrop = async (e: React.DragEvent, requiredDocName: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const file = e.dataTransfer.files[0]
+    if (file) await handleFileUpload(file, requiredDocName)
   }
 
   // Filter services by search
@@ -691,6 +642,26 @@ export function CitizenPortalPage() {
                                 {req.deliveryMode === 'en_ligne' ? 'Livraison en ligne' : req.deliveryMode === 'guichet' ? 'Retrait au guichet' : 'Envoi par courrier'}
                               </div>
                             </div>
+                            {(req.status === 'prete' || req.status === 'livree') && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1 h-7 text-xs mt-2 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+                                onClick={(e) => { e.stopPropagation(); downloadCitizenDocument(req, req.assignedAgent) }}
+                              >
+                                <Download className="size-3" />
+                                Télécharger
+                              </Button>
+                            )}
+                            {req.uploadedDocuments.length > 0 && (
+                              <span className="flex items-center gap-1 text-[10px] text-muted-foreground mt-1">
+                                <Paperclip className="size-3" />
+                                {req.uploadedDocuments.length} document(s) chargé(s)
+                                {req.uploadedDocuments.filter(d => d.verified).length > 0 && (
+                                  <span className="text-emerald-500">({req.uploadedDocuments.filter(d => d.verified).length} vérifié(s))</span>
+                                )}
+                              </span>
+                            )}
                             {/* Progress bar */}
                             <div className="mt-3">
                               <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
@@ -1026,19 +997,6 @@ export function CitizenPortalPage() {
                 </div>
               </div>
 
-              {/* Required docs */}
-              <div>
-                <Label className="text-sm font-medium mb-2 block">Pièces justificatives requises</Label>
-                <div className="grid grid-cols-1 gap-1.5">
-                  {selectedService.requiredDocs.map((doc, i) => (
-                    <div key={i} className="flex items-center gap-2 p-2 rounded-lg border text-xs">
-                      <Checkbox id={`doc-${i}`} />
-                      <label htmlFor={`doc-${i}`} className="text-sm cursor-pointer">{doc}</label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
               <Separator />
 
               {/* Citizen info form */}
@@ -1103,6 +1061,93 @@ export function CitizenPortalPage() {
                   ))}
                 </div>
               </div>
+
+              {/* File Upload Section */}
+              {selectedService && selectedCategoryInfo && (
+                <div className="space-y-3">
+                  <Separator />
+                  <h4 className="text-sm font-semibold flex items-center gap-2">
+                    <Upload className="size-4" />
+                    Pièces justificatives à charger
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    Chargez vos documents justificatifs. Formats acceptés : PDF, DOC, DOCX, JPG, PNG. Taille max : 10 Mo par fichier.
+                  </p>
+                  <div className="space-y-2">
+                    {selectedService.requiredDocs.map((docName) => {
+                      const uploaded = uploadedFiles.get(docName)
+                      const error = uploadErrors[docName]
+                      const typeInfo = uploaded ? getFileTypeIcon(uploaded.type) : null
+                      return (
+                        <div key={docName} className={`p-3 rounded-lg border ${error ? 'border-red-300 bg-red-50/50 dark:border-red-800/40 dark:bg-red-900/10' : uploaded ? 'border-emerald-300 bg-emerald-50/50 dark:border-emerald-800/40 dark:bg-emerald-900/10' : 'border-dashed border-muted-foreground/30'}`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              {uploaded ? (
+                                <>
+                                  <span className={`text-[9px] font-bold ${typeInfo?.color}`}>{typeInfo?.icon}</span>
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-medium truncate">{docName}</p>
+                                    <p className="text-[10px] text-muted-foreground">{uploaded.name} ({formatFileSize(uploaded.size)})</p>
+                                  </div>
+                                  <CheckCircle2 className="size-4 text-emerald-500 shrink-0" />
+                                </>
+                              ) : (
+                                <>
+                                  <Paperclip className="size-3.5 text-muted-foreground shrink-0" />
+                                  <p className="text-xs text-muted-foreground">{docName}</p>
+                                </>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {uploaded ? (
+                                <>
+                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => downloadUploadedFile(uploaded)}>
+                                    <Download className="size-3" />
+                                  </Button>
+                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500 hover:text-red-600" onClick={() => handleRemoveFile(docName)}>
+                                    <Trash2 className="size-3" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <input
+                                    type="file"
+                                    accept={ACCEPTED_FILE_TYPES}
+                                    className="hidden"
+                                    id={`file-upload-${docName.replace(/[^a-zA-Z0-9]/g, '-')}`}
+                                    onChange={async (e) => {
+                                      if (e.target.files?.[0]) {
+                                        await handleFileUpload(e.target.files[0], docName)
+                                        e.target.value = ''
+                                      }
+                                    }}
+                                  />
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-6 text-[10px] gap-1"
+                                    onClick={() => document.getElementById(`file-upload-${docName.replace(/[^a-zA-Z0-9]/g, '-')}`)?.click()}
+                                    disabled={isUploading}
+                                  >
+                                    <Upload className="size-3" />
+                                    Charger
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          {error && <p className="text-[10px] text-red-500 mt-1">{error}</p>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {uploadedFiles.size > 0 && (
+                    <p className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                      {uploadedFiles.size} fichier(s) chargé(s) sur {selectedService.requiredDocs.length} pièce(s) requise(s)
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Terms */}
               <div className="flex items-start gap-3 p-3 rounded-lg border">
@@ -1226,23 +1271,60 @@ export function CitizenPortalPage() {
                   </>
                 )}
 
-                {/* Delivery info */}
-                {(selectedRequest.status === 'prete' || selectedRequest.status === 'livree') && (
-                  <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400" />
-                        <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">
-                          {selectedRequest.status === 'livree' ? 'Document livré' : 'Document prêt'}
-                        </span>
-                      </div>
-                      <Button size="sm" className="gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => handleDownloadCitizenDocument(selectedRequest)}>
-                        <Download className="h-3.5 w-3.5" />
-                        Télécharger le document
-                      </Button>
+                {/* Uploaded Documents Section */}
+                {selectedRequest.uploadedDocuments.length > 0 && (
+                  <div className="space-y-2">
+                    <Separator />
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                      <Paperclip className="size-3.5" />
+                      Documents chargés ({selectedRequest.uploadedDocuments.length})
+                    </h4>
+                    <div className="space-y-1.5">
+                      {selectedRequest.uploadedDocuments.map((doc) => {
+                        const typeInfo = getFileTypeIcon(doc.type)
+                        return (
+                          <div key={doc.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50 border border-muted text-xs">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className={`text-[8px] font-bold ${typeInfo.color}`}>{typeInfo.icon}</span>
+                              <div className="min-w-0">
+                                <p className="font-medium truncate">{doc.requiredDocName}</p>
+                                <p className="text-[10px] text-muted-foreground">{doc.name} ({formatFileSize(doc.size)})</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {doc.verified && <FileCheck className="size-3.5 text-emerald-500" />}
+                              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => downloadUploadedFile(doc)}>
+                                <Download className="size-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
+                  </div>
+                )}
+
+                {/* Download Official Document Button */}
+                {(selectedRequest.status === 'prete' || selectedRequest.status === 'livree') && (
+                  <div className="space-y-2">
+                    <Separator />
+                    <Button
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+                      onClick={() => downloadCitizenDocument(selectedRequest, selectedRequest.assignedAgent)}
+                    >
+                      <Download className="size-4" />
+                      Télécharger le document officiel
+                    </Button>
+                    {selectedRequest.generatedDocument && (
+                      <p className="text-[10px] text-center text-muted-foreground">
+                        Document généré le {new Date(selectedRequest.generatedDocument.generatedAt).toLocaleDateString('fr-FR')} par {selectedRequest.generatedDocument.generatedBy}
+                      </p>
+                    )}
                     {selectedRequest.deliveryMode === 'guichet' && selectedRequest.deliveryLocation && (
-                      <p className="text-xs text-muted-foreground mt-1 ml-6">Retrait au : {selectedRequest.deliveryLocation}</p>
+                      <p className="text-xs text-muted-foreground text-center">Retrait au : {selectedRequest.deliveryLocation}</p>
+                    )}
+                    {selectedRequest.deliveryMode === 'en_ligne' && (
+                      <p className="text-xs text-muted-foreground text-center">Document disponible en ligne dans votre espace personnel</p>
                     )}
                   </div>
                 )}

@@ -117,3 +117,46 @@ Implemented real file upload and download functionality across three pages of th
 1. `src/components/app/ged-page.tsx` — Major changes (interface, upload dialog, download, view dialog)
 2. `src/components/app/citizen-portal-page.tsx` — Download functionality for processed requests
 3. `src/components/app/courriers-page.tsx` — File attachments in new courrier and detail dialogs
+---
+Task ID: 1
+Agent: Main Agent
+Task: Implement document upload/download functionality and make all features functional with testable workflows
+
+Work Log:
+- Analyzed full codebase structure: store, components, utilities
+- Updated citizen-requests-store.ts with UploadedDocument and GeneratedDocument interfaces
+- Added uploadedDocuments[] and generatedDocument? fields to CitizenRequest
+- Added new store actions: addUploadedDocument, removeUploadedDocument, verifyDocument, setGeneratedDocument, resetToDemoData
+- Updated DEMO_REQUESTS with demo uploaded documents and a generated document for demo-006 (livree)
+- Bumped persist version to 4 with migration
+- Created /src/lib/document-utils.ts shared utility module with:
+  - formatFileSize, getFileTypeIcon, processFile, downloadUploadedFile, previewUploadedFile
+  - generateOfficialDocumentHtml (enhanced with watermark, QR placeholder, service-specific content)
+  - downloadGeneratedDocument, downloadCitizenDocument, createGeneratedDocument
+  - ACCEPTED_FILE_TYPES, MAX_FILE_SIZE constants
+- Updated citizen-portal-page.tsx:
+  - Added file upload zone in request form dialog per required document
+  - Added drag-drop support, file validation, error handling
+  - Added download button for prete/livree requests
+  - Added uploaded documents view in detail dialog with verification status
+  - Replaced old inline document generation with shared utilities
+- Updated service-requests-page.tsx:
+  - Added document verification (verify button per uploaded document)
+  - Added file upload for missing documents (agent can add)
+  - Added "Generate Official Document" button for validee status
+  - Added document download for prete/livree status
+  - Added Generate Document Dialog with confirmation
+- Updated mairie-dashboard-page.tsx:
+  - Same document management capabilities as service-requests-page
+  - Document verification, upload, generation, and download
+  - Generate Document Dialog
+- Updated agence-dashboard-page.tsx:
+  - Same document management capabilities with ANIP-specific naming
+  - Generate Document Dialog
+
+Stage Summary:
+- Build verified successfully
+- Full workflow now testable: submit request → upload docs → agent verifies → agent validates → agent generates document → citizen downloads
+- 6 demo accounts cover all roles for testing
+- 8 demo requests cover all statuses including documents
+- All document operations work with real browser FileReader API and file downloads
