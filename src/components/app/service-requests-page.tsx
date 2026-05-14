@@ -603,11 +603,11 @@ export function ServiceRequestsPage() {
                   <div>
                     <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
                       <Paperclip className="size-3.5" />
-                      Pièces justificatives ({selectedRequest.uploadedDocuments.length} chargée{selectedRequest.uploadedDocuments.length > 1 ? 's' : ''} / {selectedRequest.documents.length} requise{selectedRequest.documents.length > 1 ? 's' : ''})
+                      Pièces justificatives ({selectedRequest.uploadedDocuments?.length ?? 0} chargée{(selectedRequest.uploadedDocuments?.length ?? 0) > 1 ? 's' : ''} / {selectedRequest.documents?.length ?? 0} requise{(selectedRequest.documents?.length ?? 0) > 1 ? 's' : ''})
                     </h4>
                     <div className="space-y-1.5">
-                      {selectedRequest.documents.map((docName, i) => {
-                        const uploaded = selectedRequest.uploadedDocuments.find(d => d.requiredDocName === docName)
+                      {(selectedRequest.documents ?? []).map((docName, i) => {
+                        const uploaded = (selectedRequest.uploadedDocuments ?? []).find(d => d.requiredDocName === docName)
                         return (
                           <div key={i} className={`flex items-center justify-between p-2 rounded-lg text-xs border ${uploaded ? (uploaded.verified ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-800/40 dark:bg-emerald-900/10' : 'border-amber-200 bg-amber-50/50 dark:border-amber-800/40 dark:bg-amber-900/10') : 'border-dashed border-muted-foreground/30 bg-muted/20'}`}>
                             <div className="flex items-center gap-2 min-w-0">
@@ -658,11 +658,11 @@ export function ServiceRequestsPage() {
                   </div>
 
                   {/* Uploaded documents */}
-                  {selectedRequest.uploadedDocuments.length > 0 && (
+                  {(selectedRequest.uploadedDocuments?.length ?? 0) > 0 && (
                     <div>
-                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Documents chargés ({selectedRequest.uploadedDocuments.length})</h4>
+                      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Documents chargés ({selectedRequest.uploadedDocuments?.length ?? 0})</h4>
                       <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                        {selectedRequest.uploadedDocuments.map((doc) => (
+                        {(selectedRequest.uploadedDocuments ?? []).map((doc) => (
                           <div key={doc.id} className="flex items-center gap-2 p-2 rounded-lg border text-xs">
                             {getDocIcon(doc.type)}
                             <div className="flex-1 min-w-0">
@@ -1022,7 +1022,7 @@ export function ServiceRequestsPage() {
                 <p><strong>Référence :</strong> <span className="font-mono">{selectedRequest.reference}</span></p>
                 <p><strong>Service :</strong> {selectedRequest.serviceName}</p>
                 <p><strong>Citoyen :</strong> {selectedRequest.citizenFirstName} {selectedRequest.citizenName}</p>
-                <p><strong>Documents vérifiés :</strong> {selectedRequest.uploadedDocuments.filter(d => d.verified).length} / {selectedRequest.documents.length}</p>
+                <p><strong>Documents vérifiés :</strong> {(selectedRequest.uploadedDocuments ?? []).filter(d => d.verified).length} / {selectedRequest.documents?.length ?? 0}</p>
               </div>
               <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/40">
                 <p className="text-xs text-amber-700 dark:text-amber-400">

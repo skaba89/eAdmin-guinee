@@ -666,9 +666,9 @@ export function CitizenPortalPage() {
                             {(req.uploadedDocuments?.length ?? 0) > 0 && (
                               <span className="flex items-center gap-1 text-[10px] text-muted-foreground mt-1">
                                 <Paperclip className="size-3" />
-                                {req.uploadedDocuments.length} document(s) chargé(s)
-                                {req.uploadedDocuments.filter(d => d.verified).length > 0 && (
-                                  <span className="text-emerald-500">({req.uploadedDocuments.filter(d => d.verified).length} vérifié(s))</span>
+                                {req.uploadedDocuments?.length ?? 0} document(s) chargé(s)
+                                {(req.uploadedDocuments ?? []).filter(d => d.verified).length > 0 && (
+                                  <span className="text-emerald-500">({(req.uploadedDocuments ?? []).filter(d => d.verified).length} vérifié(s))</span>
                                 )}
                               </span>
                             )}
@@ -1305,10 +1305,10 @@ export function CitizenPortalPage() {
                     <div className="divider-premium" />
                     <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
                       <Paperclip className="size-3.5 text-[#C8A45C] dark:text-[#D4B878]" />
-                      Documents chargés ({selectedRequest.uploadedDocuments.length})
+                      Documents chargés ({selectedRequest.uploadedDocuments?.length ?? 0})
                     </h4>
                     <div className="space-y-1.5">
-                      {selectedRequest.uploadedDocuments.map((doc) => {
+                      {(selectedRequest.uploadedDocuments ?? []).map((doc) => {
                         const typeInfo = getFileTypeIcon(doc.type)
                         return (
                           <div key={doc.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/30 backdrop-blur-sm border border-[#C8A45C]/10 dark:border-[#D4B878]/5 text-xs">

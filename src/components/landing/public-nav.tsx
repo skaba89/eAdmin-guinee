@@ -45,7 +45,9 @@ export function PublicNav() {
       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
       className={cn(
         'fixed top-0 left-0 right-0 z-50 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] glass-nav-visible',
-        scrolled && 'glass-nav-scrolled'
+        scrolled && 'glass-nav-scrolled',
+        // Always ensure text shadow for readability against any background
+        '[&_span]:drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]'
       )}
     >
       {/* Guinea Tricolor Accent Line */}
@@ -74,10 +76,10 @@ export function PublicNav() {
               <div className="absolute inset-0 rounded-xl ring-1 ring-[#C8A45C]/0 group-hover:ring-[#C8A45C]/40 transition-all duration-300" />
             </div>
             <div className="flex flex-col">
-              <span className="text-[15px] font-bold leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] tracking-tight">
+              <span className="text-[15px] font-bold leading-tight text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.7)] tracking-tight">
                 eAdmin Suite
               </span>
-              <span className="text-[10px] font-semibold leading-tight text-[#FCD116] drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] tracking-wide uppercase">
+              <span className="text-[10px] font-semibold leading-tight text-[#FCD116] drop-shadow-[0_2px_4px_rgba(0,0,0,0.7)] tracking-wide uppercase">
                 République de Guinée
               </span>
             </div>
@@ -92,7 +94,7 @@ export function PublicNav() {
                   key={item.page}
                   onClick={() => handleNavigate(item.page)}
                   className={cn(
-                    'relative px-3.5 py-2 text-sm font-medium rounded-lg transition-all duration-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]',
+                    'relative px-3.5 py-2 text-sm font-medium rounded-lg transition-all duration-300 drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]',
                     isActive
                       ? 'text-white dark:text-[#FCD116]'
                       : 'text-white/80 hover:text-white dark:hover:text-white'
@@ -293,7 +295,7 @@ export function PublicNav() {
                       }}
                       onClick={() => handleNavigate(item.page)}
                       className={cn(
-                        'flex items-center w-full text-left px-4 py-2.5 text-sm font-medium rounded-xl transition-all duration-200',
+                        'flex items-center w-full text-left px-4 py-2.5 text-sm font-medium rounded-xl transition-all duration-200 drop-shadow-[0_1px_3px_rgba(0,0,0,0.4)]',
                         isActive
                           ? 'text-white bg-white/15'
                           : 'text-white/70 hover:text-white hover:bg-white/10'

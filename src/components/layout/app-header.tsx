@@ -177,7 +177,7 @@ export function AppHeader() {
   const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
 
   return (
-    <header className="sticky top-0 z-30 h-16 flex items-center justify-between px-4 sm:px-6 bg-background/70 dark:bg-background/60 backdrop-blur-xl border-b border-border/50">
+    <header className="sticky top-0 z-30 h-16 flex items-center justify-between px-4 sm:px-6 bg-background/90 dark:bg-background/85 backdrop-blur-xl border-b border-border/50">
       {/* Premium bottom border glow */}
       <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-gold/30 to-transparent" />
       <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-brand/10 to-transparent" />

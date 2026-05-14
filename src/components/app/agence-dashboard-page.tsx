@@ -566,11 +566,11 @@ export function AgenceDashboardPage() {
                       <div>
                         <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
                           <Paperclip className="size-3.5 text-[#C8A45C]" />
-                          Pièces justificatives ({selectedRequest.uploadedDocuments.length} / {selectedRequest.documents.length})
+                          Pièces justificatives ({selectedRequest.uploadedDocuments?.length ?? 0} / {selectedRequest.documents?.length ?? 0})
                         </h4>
                         <div className="space-y-1.5">
-                          {selectedRequest.documents.map((docName, i) => {
-                            const uploaded = selectedRequest.uploadedDocuments.find(d => d.requiredDocName === docName)
+                          {(selectedRequest.documents ?? []).map((docName, i) => {
+                            const uploaded = (selectedRequest.uploadedDocuments ?? []).find(d => d.requiredDocName === docName)
                             return (
                               <div key={i} className={`flex items-center justify-between p-2 rounded-lg text-xs border backdrop-blur-sm ${uploaded ? (uploaded.verified ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-800/40 dark:bg-emerald-900/10' : 'border-amber-200 bg-amber-50/50 dark:border-amber-800/40 dark:bg-amber-900/10') : 'border-dashed border-muted-foreground/30 bg-muted/20'}`}>
                                 <div className="flex items-center gap-2 min-w-0">
