@@ -653,7 +653,7 @@ export function CitizenPortalPage() {
                                 Télécharger
                               </Button>
                             )}
-                            {req.uploadedDocuments.length > 0 && (
+                            {(req.uploadedDocuments?.length ?? 0) > 0 && (
                               <span className="flex items-center gap-1 text-[10px] text-muted-foreground mt-1">
                                 <Paperclip className="size-3" />
                                 {req.uploadedDocuments.length} document(s) chargé(s)
@@ -1272,7 +1272,7 @@ export function CitizenPortalPage() {
                 )}
 
                 {/* Uploaded Documents Section */}
-                {selectedRequest.uploadedDocuments.length > 0 && (
+                {(selectedRequest.uploadedDocuments?.length ?? 0) > 0 && (
                   <div className="space-y-2">
                     <Separator />
                     <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
