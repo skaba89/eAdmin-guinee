@@ -379,6 +379,78 @@
   position: relative;
 }
 
+/* Always-visible navigation — dark navy with strong contrast against ANY background */
+.glass-nav-visible {
+  background: rgba(11, 46, 88, 0.82);
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  border-bottom: 1px solid rgba(200, 164, 92, 0.15);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    0 4px 16px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  position: relative;
+}
+
+.glass-nav-visible::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(200, 164, 92, 0.25) 30%,
+    rgba(252, 209, 22, 0.35) 50%,
+    rgba(200, 164, 92, 0.25) 70%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+/* Scrolled state — slightly more opaque */
+.glass-nav-scrolled {
+  background: rgba(7, 30, 58, 0.92);
+  border-bottom-color: rgba(200, 164, 92, 0.2);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.35),
+    0 8px 24px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* Mobile navigation dropdown — solid navy background */
+.glass-nav-mobile {
+  background: rgba(11, 46, 88, 0.95);
+  backdrop-filter: blur(24px) saturate(1.5);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  border: 1px solid rgba(200, 164, 92, 0.2);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 4px 16px rgba(0, 0, 0, 0.25);
+  position: relative;
+}
+
+.glass-nav-mobile::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    rgba(200, 164, 92, 0.3) 0%,
+    transparent 40%,
+    transparent 60%,
+    rgba(200, 164, 92, 0.15) 100%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
 .glass-nav::after {
   content: "";
   position: absolute;

@@ -294,9 +294,9 @@ export function LandingPage() {
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{ backgroundImage: "url('/guinea-hero-conakry.png')" }}
         />
-        {/* Sophisticated mesh gradient overlay */}
-        <div className="absolute inset-0 hero-mesh-gradient/92" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0B2E58]/60 via-transparent to-[#0B2E58]/80" />
+        {/* Sophisticated mesh gradient overlay — dark enough for text contrast */}
+        <div className="absolute inset-0 hero-mesh-gradient/95" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0B2E58]/70 via-[#0B2E58]/30 to-[#0B2E58]/90" />
 
         {/* Animated moving grid lines */}
         <div
@@ -452,7 +452,7 @@ export function LandingPage() {
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{ backgroundImage: "url('/guinea-mosque-conakry.png')" }}
         />
-        <div className="absolute inset-0 bg-background/92" />
+        <div className="absolute inset-0 bg-background/95" />
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div variants={fadeUp} className="text-center mb-12">
             <div className="badge-premium inline-flex mb-3">
@@ -702,7 +702,7 @@ export function LandingPage() {
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{ backgroundImage: "url('/guinea-fouta-djallon.png')" }}
         />
-        <div className="absolute inset-0 bg-background/93" />
+        <div className="absolute inset-0 bg-background/95" />
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div variants={fadeUp} className="text-center mb-16">
             <div className="badge-premium inline-flex mb-4">
@@ -743,7 +743,7 @@ export function LandingPage() {
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{ backgroundImage: "url('/guinea-nimba-mountains.png')" }}
         />
-        <div className="absolute inset-0 bg-[#0B2E58]/92 dark:bg-primary/92" />
+        <div className="absolute inset-0 bg-[#0B2E58]/95 dark:bg-primary/95" />
         {/* Mesh gradient overlay */}
         <div className="absolute inset-0 opacity-30 hero-mesh-gradient" />
         <div className="absolute inset-0 opacity-[0.03]" style={{
@@ -802,7 +802,7 @@ export function LandingPage() {
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{ backgroundImage: "url('/guinea-niger-river.png')" }}
         />
-        <div className="absolute inset-0 bg-background/93" />
+        <div className="absolute inset-0 bg-background/95" />
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div variants={fadeUp} className="text-center mb-16">
             <div className="badge-premium inline-flex mb-4">
@@ -906,8 +906,8 @@ export function LandingPage() {
           style={{ backgroundImage: "url('/guinea-fouta-djallon.png')" }}
         />
         {/* Premium gradient background with mesh effect */}
-        <div className="absolute inset-0 hero-mesh-gradient/92" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0B2E58]/70 via-transparent to-[#0B2E58]/90" />
+        <div className="absolute inset-0 hero-mesh-gradient/95" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0B2E58]/80 via-[#0B2E58]/40 to-[#0B2E58]/95" />
         <div className="absolute inset-0 opacity-[0.04]" style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
         }} />

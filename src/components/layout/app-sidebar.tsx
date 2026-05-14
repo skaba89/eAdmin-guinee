@@ -146,7 +146,7 @@ function SectionLabel({ children, collapsed }: { children: React.ReactNode; coll
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="text-[9px] font-semibold uppercase tracking-[0.2em] text-gold/70 dark:text-gold/60 px-4 mb-2 select-none"
+      className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C8A45C]/80 dark:text-[#D4B878]/70 px-4 mb-2 select-none"
     >
       {children}
     </motion.p>
@@ -182,7 +182,7 @@ function PremiumNavItem({
         collapsed ? 'justify-center px-2 py-2.5 mx-auto' : 'gap-3 px-3 py-2.5',
         isActive
           ? 'text-white dark:text-white'
-          : 'text-white/55 dark:text-white/50 hover:text-white/90 dark:hover:text-white/85'
+          : 'text-white/75 dark:text-white/65 hover:text-white/95 dark:hover:text-white/90'
       )}
     >
       {/* Active background with gradient */}
@@ -221,7 +221,7 @@ function PremiumNavItem({
               'h-[18px] w-[18px] transition-all duration-300',
               isActive
                 ? 'text-[#C8A45C] dark:text-[#D4B878]'
-                : 'text-white/50 dark:text-white/40 group-hover:text-white/80 dark:group-hover:text-white/70'
+                : 'text-white/65 dark:text-white/55 group-hover:text-white/90 dark:group-hover:text-white/80'
             )}
             style={isActive ? { filter: 'drop-shadow(0 0 6px rgba(200,164,92,0.4))' } : undefined}
           />

@@ -163,6 +163,11 @@ export function LoginPage() {
           `,
         }}
       >
+        {/* Background image of Guinea — Conakry */}
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-15"
+          style={{ backgroundImage: "url('/guinea-hero-conakry.png')" }}
+        />
         {/* Decorative tricolor vertical stripes */}
         <div className="absolute left-0 top-0 bottom-0 w-1.5 flex flex-col z-20">
           <div className="flex-1" style={{ backgroundColor: GUINEA_RED }} />

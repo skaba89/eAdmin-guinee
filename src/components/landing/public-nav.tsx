@@ -44,8 +44,8 @@ export function PublicNav() {
       animate={{ y: 0 }}
       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
       className={cn(
-        'fixed top-0 left-0 right-0 z-50 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]',
-        scrolled ? 'glass-nav' : 'bg-transparent'
+        'fixed top-0 left-0 right-0 z-50 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] glass-nav-visible',
+        scrolled && 'glass-nav-scrolled'
       )}
     >
       {/* Guinea Tricolor Accent Line */}
@@ -64,7 +64,7 @@ export function PublicNav() {
             aria-label={`${BRAND.name} — Accueil`}
           >
             {/* Logo container with gold ring on hover */}
-            <div className="relative flex h-10 w-10 items-center justify-center rounded-xl overflow-hidden bg-gradient-to-br from-[#0B2E58] to-[#143D6B] dark:from-[#143D6B] dark:to-[#1A4A80] shadow-md transition-all duration-300 group-hover:shadow-gold group-hover:scale-105">
+            <div className="relative flex h-10 w-10 items-center justify-center rounded-xl overflow-hidden bg-white/15 shadow-md transition-all duration-300 group-hover:shadow-[0_0_16px_rgba(200,164,92,0.3)] group-hover:scale-105 group-hover:bg-white/20">
               <img
                 src="/logo-128.png"
                 alt="Armories de la République de Guinée"
@@ -74,10 +74,10 @@ export function PublicNav() {
               <div className="absolute inset-0 rounded-xl ring-1 ring-[#C8A45C]/0 group-hover:ring-[#C8A45C]/40 transition-all duration-300" />
             </div>
             <div className="flex flex-col">
-              <span className="text-[15px] font-bold leading-tight text-gradient-navy tracking-tight">
+              <span className="text-[15px] font-bold leading-tight text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] tracking-tight">
                 eAdmin Suite
               </span>
-              <span className="text-[10px] font-semibold leading-tight text-gradient-gold tracking-wide uppercase">
+              <span className="text-[10px] font-semibold leading-tight text-[#FCD116] drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)] tracking-wide uppercase">
                 République de Guinée
               </span>
             </div>
@@ -92,17 +92,17 @@ export function PublicNav() {
                   key={item.page}
                   onClick={() => handleNavigate(item.page)}
                   className={cn(
-                    'relative px-3.5 py-2 text-sm font-medium rounded-lg transition-all duration-300',
+                    'relative px-3.5 py-2 text-sm font-medium rounded-lg transition-all duration-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]',
                     isActive
-                      ? 'text-[#0B2E58] dark:text-[#D4B878]'
-                      : 'text-muted-foreground hover:text-[#0B2E58] dark:hover:text-foreground'
+                      ? 'text-white dark:text-[#FCD116]'
+                      : 'text-white/80 hover:text-white dark:hover:text-white'
                   )}
                 >
                   {/* Active indicator pill */}
                   {isActive && (
                     <motion.div
                       layoutId="nav-active-pill"
-                      className="absolute inset-0 rounded-lg bg-[#0B2E58]/[0.06] dark:bg-[#C8A45C]/[0.08]"
+                      className="absolute inset-0 rounded-lg bg-white/15 dark:bg-[#C8A45C]/[0.12]"
                       transition={{ type: 'spring', stiffness: 380, damping: 30 }}
                     />
                   )}
@@ -113,14 +113,14 @@ export function PublicNav() {
                       className={cn(
                         'absolute -bottom-0.5 left-0 h-[2px] rounded-full transition-all duration-300',
                         isActive
-                          ? 'w-full bg-[#C8A45C] dark:bg-[#D4B878]'
-                          : 'w-0 bg-[#C8A45C] group-hover:w-full'
+                          ? 'w-full bg-[#FCD116] dark:bg-[#D4B878]'
+                          : 'w-0 bg-[#FCD116] group-hover:w-full'
                       )}
                     />
                   </span>
                   {/* Hover background */}
                   {!isActive && (
-                    <span className="absolute inset-0 rounded-lg bg-transparent hover:bg-muted/60 transition-colors duration-200" />
+                    <span className="absolute inset-0 rounded-lg bg-transparent hover:bg-white/10 transition-colors duration-200" />
                   )}
                 </button>
               )
@@ -146,7 +146,7 @@ export function PublicNav() {
                     exit={{ rotate: 90, opacity: 0, scale: 0.5 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <Sun className="h-4 w-4 text-[#D4B878]" />
+                    <Sun className="h-4 w-4 text-[#FCD116]" />
                   </motion.div>
                 ) : (
                   <motion.div
@@ -156,7 +156,7 @@ export function PublicNav() {
                     exit={{ rotate: -90, opacity: 0, scale: 0.5 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <Moon className="h-4 w-4 text-[#0B2E58]" />
+                    <Moon className="h-4 w-4 text-white" />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -166,7 +166,7 @@ export function PublicNav() {
             <Button
               variant="outline"
               onClick={() => handleNavigate('login')}
-              className="h-9 px-4 text-sm font-medium rounded-lg border-[#0B2E58]/15 dark:border-[#3B7DD8]/20 hover:border-[#C8A45C]/40 hover:bg-[#C8A45C]/[0.04] hover:text-[#0B2E58] dark:hover:border-[#D4B878]/30 dark:hover:bg-[#D4B878]/[0.06] dark:hover:text-[#D4B878] transition-all duration-300"
+              className="h-9 px-4 text-sm font-medium rounded-lg border-white/30 text-white hover:bg-white/15 hover:border-white/50 hover:text-white bg-white/5 backdrop-blur-sm transition-all duration-300"
             >
               Connexion
             </Button>
@@ -174,7 +174,7 @@ export function PublicNav() {
             {/* Premium CTA — Demander une démo */}
             <button
               onClick={() => handleNavigate('demo')}
-              className="btn-gold flex items-center gap-1.5 h-9 px-5 text-sm"
+              className="btn-gold flex items-center gap-1.5 h-9 px-5 text-sm shadow-lg shadow-[#C8A45C]/30"
             >
               Demander une démo
               <ChevronRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
@@ -199,7 +199,7 @@ export function PublicNav() {
                     exit={{ rotate: 90, opacity: 0 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <Sun className="h-4 w-4 text-[#D4B878]" />
+                    <Sun className="h-4 w-4 text-[#FCD116]" />
                   </motion.div>
                 ) : (
                   <motion.div
@@ -209,7 +209,7 @@ export function PublicNav() {
                     exit={{ rotate: -90, opacity: 0 }}
                     transition={{ duration: 0.2 }}
                   >
-                    <Moon className="h-4 w-4 text-[#0B2E58]" />
+                    <Moon className="h-4 w-4 text-white" />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -218,7 +218,7 @@ export function PublicNav() {
               variant="ghost"
               size="icon"
               onClick={() => setMobileOpen(!mobileOpen)}
-              className="h-9 w-9 rounded-lg"
+              className="h-9 w-9 rounded-lg text-white hover:bg-white/10"
               aria-label={mobileOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
             >
               <AnimatePresence mode="wait" initial={false}>
@@ -269,7 +269,7 @@ export function PublicNav() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -8, scale: 0.98 }}
               transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-              className="lg:hidden glass-premium mx-3 mt-1 rounded-2xl overflow-hidden shadow-premium-lg"
+              className="lg:hidden glass-nav-mobile mx-3 mt-1 rounded-2xl overflow-hidden shadow-premium-lg"
             >
               {/* Guinea tricolor divider inside mobile menu */}
               <div className="h-[2px] w-full flex">
@@ -295,8 +295,8 @@ export function PublicNav() {
                       className={cn(
                         'flex items-center w-full text-left px-4 py-2.5 text-sm font-medium rounded-xl transition-all duration-200',
                         isActive
-                          ? 'text-[#0B2E58] dark:text-[#D4B878] bg-[#0B2E58]/[0.06] dark:bg-[#C8A45C]/[0.08]'
-                          : 'text-muted-foreground hover:text-[#0B2E58] dark:hover:text-foreground hover:bg-muted/50'
+                          ? 'text-white bg-white/15'
+                          : 'text-white/70 hover:text-white hover:bg-white/10'
                       )}
                     >
                       <span className="flex-1">{item.label}</span>
@@ -315,13 +315,13 @@ export function PublicNav() {
                   <Button
                     variant="outline"
                     onClick={() => handleNavigate('login')}
-                    className="w-full h-11 rounded-xl font-medium border-[#0B2E58]/15 dark:border-[#3B7DD8]/20 hover:border-[#C8A45C]/40 transition-all duration-300"
+                    className="w-full h-11 rounded-xl font-medium border-white/30 text-white hover:bg-white/15 hover:border-white/50 bg-white/5 backdrop-blur-sm transition-all duration-300"
                   >
                     Connexion
                   </Button>
                   <button
                     onClick={() => handleNavigate('demo')}
-                    className="btn-gold w-full h-11 flex items-center justify-center gap-2 rounded-xl text-sm"
+                    className="btn-gold w-full h-11 flex items-center justify-center gap-2 rounded-xl text-sm shadow-lg shadow-[#C8A45C]/30"
                   >
                     Demander une démo
                     <ChevronRight className="h-4 w-4" />
