@@ -351,10 +351,10 @@ export function CitizenPortalPage() {
 
   // Stats from actual user requests
   const myStats = [
-    { label: 'Demandes soumises', value: myRequests.filter(r => r.status === 'soumise').length, icon: Send, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-900/20' },
-    { label: 'En traitement', value: myRequests.filter(r => ['en_cours', 'pieces_complementaires'].includes(r.status)).length, icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
-    { label: 'Documents prêts', value: myRequests.filter(r => r.status === 'prete').length, icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
-    { label: 'Livrées', value: myRequests.filter(r => r.status === 'livree').length, icon: Download, color: 'text-[#0B2E58] dark:text-[#3B7DD8]', bg: 'bg-[#0B2E58]/5 dark:bg-[#3B7DD8]/10' },
+    { label: 'Demandes soumises', value: myRequests.filter(r => r.status === 'soumise').length, icon: Send, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-900/20', gradientBg: 'bg-gradient-to-br from-sky-100 to-sky-50 dark:from-sky-900/30 dark:to-sky-800/10' },
+    { label: 'En traitement', value: myRequests.filter(r => ['en_cours', 'pieces_complementaires'].includes(r.status)).length, icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20', gradientBg: 'bg-gradient-to-br from-amber-100 to-amber-50 dark:from-amber-900/30 dark:to-amber-800/10' },
+    { label: 'Documents prêts', value: myRequests.filter(r => r.status === 'prete').length, icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20', gradientBg: 'bg-gradient-to-br from-emerald-100 to-emerald-50 dark:from-emerald-900/30 dark:to-emerald-800/10' },
+    { label: 'Livrées', value: myRequests.filter(r => r.status === 'livree').length, icon: Download, color: 'text-[#0B2E58] dark:text-[#3B7DD8]', bg: 'bg-[#0B2E58]/5 dark:bg-[#3B7DD8]/10', gradientBg: 'bg-gradient-to-br from-[#0B2E58]/10 to-[#3B7DD8]/5 dark:from-[#3B7DD8]/20 dark:to-[#0B2E58]/10' },
   ]
 
   return (
@@ -368,32 +368,40 @@ export function CitizenPortalPage() {
           HEADER — GUINÉE SERVICES PUBLICS
       ═══════════════════════════════════════════════════════════════════════ */}
       <motion.div variants={itemVariants}>
-        <Card className="glass-card overflow-hidden border-[#C8A45C]/20 dark:border-[#D4B878]/20 bg-gradient-to-br from-[#0B2E58] via-[#0B2E58]/95 to-[#134A8E] dark:from-[#0B2E58] dark:via-[#071D3A] dark:to-[#0B2E58]">
+        <Card className="glass-premium overflow-hidden bg-gradient-to-br from-[#0B2E58] via-[#0B2E58]/95 to-[#134A8E] dark:from-[#0B2E58] dark:via-[#071D3A] dark:to-[#0B2E58] border-0">
           <CardContent className="p-6 md:p-8 text-white relative">
-            {/* Guinea tricolor accent */}
-            <div className="flex gap-0 mb-4 -mx-6 md:-mx-8 -mt-6 md:-mt-8">
-              <div className="flex-1 h-1.5" style={{ backgroundColor: GUINEA_RED }} />
-              <div className="flex-1 h-1.5" style={{ backgroundColor: GUINEA_YELLOW }} />
-              <div className="flex-1 h-1.5" style={{ backgroundColor: GUINEA_GREEN }} />
+            {/* Guinea tricolor accent — taller with gradient fade at edges */}
+            <div className="flex gap-0 mb-5 -mx-6 md:-mx-8 -mt-6 md:-mt-8">
+              <div className="flex-1 h-2" style={{ background: `linear-gradient(to right, transparent, ${GUINEA_RED})` }} />
+              <div className="flex-1 h-2" style={{ backgroundColor: GUINEA_RED }} />
+              <div className="flex-1 h-2" style={{ background: `linear-gradient(to right, ${GUINEA_RED}, ${GUINEA_YELLOW})` }} />
+              <div className="flex-1 h-2" style={{ backgroundColor: GUINEA_YELLOW }} />
+              <div className="flex-1 h-2" style={{ background: `linear-gradient(to right, ${GUINEA_YELLOW}, ${GUINEA_GREEN})` }} />
+              <div className="flex-1 h-2" style={{ backgroundColor: GUINEA_GREEN }} />
+              <div className="flex-1 h-2" style={{ background: `linear-gradient(to right, ${GUINEA_GREEN}, transparent)` }} />
             </div>
 
             <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-              <div className="flex size-14 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm shadow-xl border border-white/20">
-                <Landmark className="size-7 text-white" />
+              {/* Icon container with gold ring + glow */}
+              <div className="relative">
+                <div className="flex size-14 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm shadow-xl border-2 border-[#C8A45C]/40 animate-glow-pulse">
+                  <Landmark className="size-7 text-white" />
+                </div>
+                <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-br from-[#C8A45C]/20 to-transparent blur-sm -z-10" />
               </div>
               <div className="flex-1">
-                <p className="text-xs uppercase tracking-widest text-white/60 font-medium">République de Guinée</p>
-                <h2 className="text-2xl font-bold mt-0.5">Guinée Services Publics</h2>
-                <p className="text-sm text-white/70 mt-1 max-w-xl">
+                <p className="text-xs uppercase tracking-[0.2em] text-[#C8A45C]/70 font-medium">République de Guinée</p>
+                <h2 className="text-2xl font-bold mt-0.5 tracking-tight">Guinée Services Publics</h2>
+                <p className="text-sm text-white/60 mt-1 max-w-xl leading-relaxed">
                   Portail officiel des démarches administratives — Soumettez vos demandes, suivez l&apos;avancement et recevez vos documents
                 </p>
               </div>
               <div className="flex flex-col gap-2">
-                <Badge className="bg-[#C8A45C] text-[#0B2E58] hover:bg-[#C8A45C]/90 border-0 font-semibold text-xs gap-1.5 shadow-sm">
+                <Badge className="badge-premium bg-[#C8A45C] text-[#0B2E58] hover:bg-[#C8A45C]/90 border-0 font-semibold text-xs gap-1.5 shadow-gold">
                   <Globe className="size-3" />
                   Service Public Numérique
                 </Badge>
-                <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-xs gap-1.5">
+                <Badge className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs gap-1.5 backdrop-blur-sm">
                   <CheckCircle2 className="size-3" />
                   {myRequests.length} demande(s) en cours
                 </Badge>
@@ -407,20 +415,23 @@ export function CitizenPortalPage() {
           QUICK ACTIONS
       ═══════════════════════════════════════════════════════════════════════ */}
       <motion.div variants={itemVariants}>
-        <Card className="shadow-sm border-[#C8A45C]/20 dark:border-[#D4B878]/20 bg-gradient-to-r from-[#0B2E58]/[0.02] to-[#C8A45C]/[0.02] dark:from-[#3B7DD8]/[0.05] dark:to-[#D4B878]/[0.03]">
+        <Card className="card-interactive border-[#C8A45C]/15 dark:border-[#D4B878]/10 bg-gradient-to-r from-[#0B2E58]/[0.02] to-[#C8A45C]/[0.02] dark:from-[#3B7DD8]/[0.05] dark:to-[#D4B878]/[0.03]">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">Actions rapides</CardTitle>
+            <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white flex items-center gap-2">
+              <span className="text-gradient-gold">⚡</span>
+              Actions rapides
+            </CardTitle>
             <CardDescription className="text-xs">Raccourcis vers les modules liés</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
-                { label: 'Mes demandes', icon: FileText, color: 'bg-[#0B2E58] hover:bg-[#0B2E58]/90 text-white', onClick: () => setActiveTab('mes-demandes') },
-                { label: 'Suivi dossier', icon: Search, color: 'bg-[#3B7DD8] hover:bg-[#3B7DD8]/90 text-white', onClick: () => setActiveTab('suivi') },
-                { label: 'Nouvelle demande', icon: Plus, color: 'bg-[#C8A45C] hover:bg-[#C8A45C]/90 text-[#0B2E58]', onClick: () => setActiveTab('services') },
-                { label: 'Traitement demandes', icon: CheckCircle2, color: 'bg-emerald-600 hover:bg-emerald-600/90 text-white', onClick: () => navigate('service-requests') },
+                { label: 'Mes demandes', icon: FileText, color: 'bg-gradient-to-br from-[#0B2E58] to-[#134A8E] hover:from-[#0B2E58]/90 hover:to-[#134A8E]/90 text-white shadow-navy', onClick: () => setActiveTab('mes-demandes') },
+                { label: 'Suivi dossier', icon: Search, color: 'bg-gradient-to-br from-[#3B7DD8] to-[#2A6BC7] hover:from-[#3B7DD8]/90 hover:to-[#2A6BC7]/90 text-white shadow-navy', onClick: () => setActiveTab('suivi') },
+                { label: 'Nouvelle demande', icon: Plus, color: 'bg-gradient-to-br from-[#C8A45C] to-[#A88A3C] hover:from-[#C8A45C]/90 hover:to-[#A88A3C]/90 text-[#0B2E58] shadow-gold', onClick: () => setActiveTab('services') },
+                { label: 'Traitement demandes', icon: CheckCircle2, color: 'bg-gradient-to-br from-emerald-600 to-emerald-700 hover:from-emerald-600/90 hover:to-emerald-700/90 text-white shadow-sm', onClick: () => navigate('service-requests') },
               ].map(action => (
-                <Button key={action.label} className={`${action.color} h-auto flex-col gap-2 rounded-xl py-3 text-xs font-semibold shadow-sm transition-all hover:scale-[1.02]`} onClick={action.onClick}>
+                <Button key={action.label} className={`${action.color} h-auto flex-col gap-2 rounded-xl py-3.5 text-xs font-semibold transition-all duration-300 hover:scale-[1.03] active:scale-[0.98]`} onClick={action.onClick}>
                   <action.icon className="size-5" />
                   {action.label}
                 </Button>
@@ -436,14 +447,14 @@ export function CitizenPortalPage() {
       <motion.div variants={itemVariants}>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {myStats.map((stat) => (
-            <Card key={stat.label} className="shadow-sm border-[#0B2E58]/5 dark:border-[#3B7DD8]/10">
+            <Card key={stat.label} className="premium-stat group transition-all duration-300 hover:-translate-y-0.5">
               <CardContent className="flex items-center gap-3 p-4">
-                <div className={`p-2.5 rounded-xl ${stat.bg} ${stat.color}`}>
+                <div className={`p-2.5 rounded-xl ${stat.gradientBg} ${stat.color} shadow-sm`}>
                   <stat.icon className="size-5" />
                 </div>
                 <div>
-                  <p className="text-xl font-bold text-[#0B2E58] dark:text-white">{stat.value}</p>
-                  <p className="text-xs text-muted-foreground">{stat.label}</p>
+                  <p className="text-xl font-bold tabular-nums tracking-tight text-[#0B2E58] dark:text-white">{stat.value}</p>
+                  <p className="text-[11px] text-muted-foreground font-medium">{stat.label}</p>
                 </div>
               </CardContent>
             </Card>
@@ -455,20 +466,20 @@ export function CitizenPortalPage() {
           TABS NAVIGATION
       ═══════════════════════════════════════════════════════════════════════ */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="w-full sm:w-auto h-auto flex-wrap gap-1 bg-muted/50 p-1.5">
-          <TabsTrigger value="services" className="gap-1.5 text-sm data-[state=active]:bg-[#0B2E58] data-[state=active]:text-white">
+        <TabsList className="w-full sm:w-auto h-auto flex-wrap gap-1 bg-muted/40 p-1.5 rounded-xl border border-[#C8A45C]/10 dark:border-[#D4B878]/5">
+          <TabsTrigger value="services" className="gap-1.5 text-sm rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0B2E58] data-[state=active]:to-[#134A8E] data-[state=active]:text-white data-[state=active]:shadow-navy dark:data-[state=active]:from-[#3B7DD8] dark:data-[state=active]:to-[#2A6BC7] transition-all duration-300">
             <Globe className="size-4" />
             Services
           </TabsTrigger>
-          <TabsTrigger value="mes-demandes" className="gap-1.5 text-sm data-[state=active]:bg-[#0B2E58] data-[state=active]:text-white">
+          <TabsTrigger value="mes-demandes" className="gap-1.5 text-sm rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0B2E58] data-[state=active]:to-[#134A8E] data-[state=active]:text-white data-[state=active]:shadow-navy dark:data-[state=active]:from-[#3B7DD8] dark:data-[state=active]:to-[#2A6BC7] transition-all duration-300">
             <FileText className="size-4" />
             Mes demandes ({myRequests.length})
           </TabsTrigger>
-          <TabsTrigger value="suivi" className="gap-1.5 text-sm data-[state=active]:bg-[#0B2E58] data-[state=active]:text-white">
+          <TabsTrigger value="suivi" className="gap-1.5 text-sm rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0B2E58] data-[state=active]:to-[#134A8E] data-[state=active]:text-white data-[state=active]:shadow-navy dark:data-[state=active]:from-[#3B7DD8] dark:data-[state=active]:to-[#2A6BC7] transition-all duration-300">
             <Search className="size-4" />
             Suivi
           </TabsTrigger>
-          <TabsTrigger value="notifications" className="gap-1.5 text-sm data-[state=active]:bg-[#0B2E58] data-[state=active]:text-white">
+          <TabsTrigger value="notifications" className="gap-1.5 text-sm rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0B2E58] data-[state=active]:to-[#134A8E] data-[state=active]:text-white data-[state=active]:shadow-navy dark:data-[state=active]:from-[#3B7DD8] dark:data-[state=active]:to-[#2A6BC7] transition-all duration-300">
             <Bell className="size-4" />
             Notifications
           </TabsTrigger>
@@ -487,19 +498,19 @@ export function CitizenPortalPage() {
                   placeholder="Rechercher un service..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 glass-input focus-ring-premium"
                 />
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button variant={selectedCategory === 'all' ? 'default' : 'outline'} size="sm"
                   onClick={() => setSelectedCategory('all')}
-                  className={selectedCategory === 'all' ? 'bg-[#0B2E58] text-white hover:bg-[#0B2E58]/90' : ''}>
+                  className={selectedCategory === 'all' ? 'bg-gradient-to-r from-[#0B2E58] to-[#134A8E] text-white hover:from-[#0B2E58]/90 hover:to-[#134A8E]/90 shadow-navy' : ''}>
                   Tous
                 </Button>
                 {SERVICE_CATEGORIES.map(cat => (
                   <Button key={cat.id} variant={selectedCategory === cat.id ? 'default' : 'outline'} size="sm"
                     onClick={() => setSelectedCategory(cat.id)}
-                    className={selectedCategory === cat.id ? `${cat.color} text-white border-0` : ''}>
+                    className={selectedCategory === cat.id ? `${cat.color} text-white border-0 shadow-sm` : ''}>
                     {cat.name}
                   </Button>
                 ))}
@@ -515,13 +526,13 @@ export function CitizenPortalPage() {
                 animate="visible"
                 transition={{ delay: catIndex * 0.05 }}
               >
-                <div className="flex items-center gap-2 mb-3">
-                  <div className={`h-1.5 w-1.5 rounded-full ${category.color}`} />
+                <div className="flex items-center gap-2 mb-4">
+                  <div className={`h-2 w-2 rounded-full ${category.color}`} />
                   <h3 className={`text-sm font-semibold ${category.textColor}`}>
                     {category.name}
                   </h3>
-                  <div className="flex-1 h-px bg-border" />
-                  <Badge variant="outline" className="text-[10px]">
+                  <div className="divider-premium flex-1" />
+                  <Badge variant="outline" className="badge-premium text-[10px]">
                     {category.services.length} service{category.services.length > 1 ? 's' : ''}
                   </Badge>
                 </div>
@@ -534,13 +545,13 @@ export function CitizenPortalPage() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: i * 0.04 }}
                     >
-                      <Card className={`hover:shadow-lg transition-all cursor-pointer group h-full border ${category.borderColor}`}>
+                      <Card className={`card-interactive group h-full border ${category.borderColor}`}>
                         <CardHeader className="pb-2">
                           <div className="flex items-start justify-between">
-                            <div className={`p-2.5 rounded-xl ${category.iconBgColor}`}>
+                            <div className={`p-2.5 rounded-xl bg-gradient-to-br ${category.bgColor} shadow-sm`}>
                               <service.icon className={`h-5 w-5 ${category.textColor}`} />
                             </div>
-                            <Badge variant="outline" className="text-[10px]">{category.name}</Badge>
+                            <Badge variant="outline" className="badge-premium text-[10px]">{category.name}</Badge>
                           </div>
                           <CardTitle className="text-sm mt-2 group-hover:text-[#0B2E58] dark:group-hover:text-[#3B7DD8] transition-colors leading-tight">
                             {service.name}
@@ -553,14 +564,13 @@ export function CitizenPortalPage() {
                               <Clock className="h-3 w-3" />
                               Délai: {service.delay}
                             </span>
-                            <span className="font-semibold text-[#0B2E58] dark:text-[#3B7DD8]">{service.price}</span>
+                            <span className="font-semibold text-gradient-gold text-xs">{service.price}</span>
                           </div>
                           <div className="text-xs text-muted-foreground mb-3 flex items-center gap-1">
                             <FileText className="h-3 w-3" />
                             {service.requiredDocs.length} pièce(s) justificative(s)
                           </div>
-                          <Button size="sm" className={`w-full gap-1 text-xs h-8 ${category.color} hover:opacity-90 text-white border-0`}
-                            onClick={() => handleOpenRequestDialog(service, category)}>
+                          <Button size="sm" className="btn-gold w-full gap-1 text-xs h-8" onClick={() => handleOpenRequestDialog(service, category)}>
                             Faire une demande
                             <ChevronRight className="h-3 w-3" />
                           </Button>
@@ -588,12 +598,12 @@ export function CitizenPortalPage() {
         <TabsContent value="mes-demandes">
           <div className="space-y-4 mt-4">
             {myRequests.length === 0 ? (
-              <Card className="glass-card">
+              <Card className="glass-premium">
                 <CardContent className="flex flex-col items-center justify-center py-16 text-center">
                   <FileText className="size-16 text-muted-foreground/20 mb-4" />
                   <h3 className="text-lg font-semibold text-muted-foreground mb-1">Aucune demande</h3>
                   <p className="text-sm text-muted-foreground mb-4">Vous n&apos;avez pas encore soumis de demande. Explorez nos services pour commencer.</p>
-                  <Button className="bg-[#0B2E58] hover:bg-[#0B2E58]/90 dark:bg-[#3B7DD8] dark:hover:bg-[#3B7DD8]/90 text-white gap-2" onClick={() => setActiveTab('services')}>
+                  <Button className="btn-premium gap-2" onClick={() => setActiveTab('services')}>
                     <Plus className="size-4" />
                     Nouvelle demande
                   </Button>
@@ -615,19 +625,19 @@ export function CitizenPortalPage() {
                         transition={{ delay: i * 0.03 }}
                         layout
                       >
-                        <Card className="hover:shadow-lg transition-all cursor-pointer" onClick={() => handleViewDetail(req)}>
+                        <Card className="card-interactive" onClick={() => handleViewDetail(req)}>
                           <CardContent className="p-4">
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex items-center gap-3">
-                                <div className={`p-2 rounded-xl ${sConfig.color}`}>
+                                <div className={`p-2 rounded-xl backdrop-blur-sm ${sConfig.color}`}>
                                   <SIcon className="size-4" />
                                 </div>
                                 <div>
                                   <p className="font-semibold text-sm">{req.serviceName}</p>
-                                  <p className="text-xs text-muted-foreground font-mono">{req.reference}</p>
+                                  <p className="text-xs text-muted-foreground font-mono tracking-wide">{req.reference}</p>
                                 </div>
                               </div>
-                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${sConfig.color}`}>
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium backdrop-blur-sm border border-white/10 dark:border-white/5 ${sConfig.color}`}>
                                 {sConfig.label}
                               </span>
                             </div>
@@ -646,7 +656,7 @@ export function CitizenPortalPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="gap-1 h-7 text-xs mt-2 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+                                className="btn-premium gap-1 h-7 text-xs mt-2 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
                                 onClick={(e) => { e.stopPropagation(); downloadCitizenDocument(req, req.assignedAgent) }}
                               >
                                 <Download className="size-3" />
@@ -662,17 +672,22 @@ export function CitizenPortalPage() {
                                 )}
                               </span>
                             )}
-                            {/* Progress bar */}
+                            {/* Progress bar with gradient fill */}
                             <div className="mt-3">
                               <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
                                 <span>Avancement</span>
                                 <span>{req.timeline.filter(s => s.status === 'completed').length}/{req.timeline.length} étapes</span>
                               </div>
-                              <Progress value={(req.timeline.filter(s => s.status === 'completed').length / req.timeline.length) * 100} className="h-1.5" />
+                              <div className="h-1.5 w-full rounded-full bg-muted/50 overflow-hidden">
+                                <div
+                                  className="h-full rounded-full bg-gradient-to-r from-[#0B2E58] via-[#3B7DD8] to-[#C8A45C] dark:from-[#3B7DD8] dark:via-[#5A96E6] dark:to-[#D4B878] transition-all duration-500"
+                                  style={{ width: `${(req.timeline.filter(s => s.status === 'completed').length / req.timeline.length) * 100}%` }}
+                                />
+                              </div>
                             </div>
                             {/* Delivery info for ready/delivered */}
                             {(req.status === 'prete' || req.status === 'livree') && (
-                              <div className="mt-2 p-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40">
+                              <div className="mt-2 p-2 rounded-lg bg-gradient-to-r from-emerald-50 to-emerald-100/50 dark:from-emerald-900/20 dark:to-emerald-800/10 border border-emerald-200 dark:border-emerald-800/40">
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2">
                                     <CheckCircle2 className="size-3.5 text-emerald-600 dark:text-emerald-400" />
@@ -683,7 +698,7 @@ export function CitizenPortalPage() {
                                       {req.deliveryMode === 'courrier' && ' — Envoyé par courrier'}
                                     </p>
                                   </div>
-                                  <Button size="sm" className="gap-1.5 h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white" onClick={(e) => { e.stopPropagation(); handleDownloadCitizenDocument(req) }}>
+                                  <Button size="sm" className="btn-gold gap-1.5 h-7 text-xs" onClick={(e) => { e.stopPropagation(); handleDownloadCitizenDocument(req) }}>
                                     <Download className="h-3 w-3" />
                                     Télécharger
                                   </Button>
@@ -705,10 +720,10 @@ export function CitizenPortalPage() {
             SUIVI DE DOSSIER — TRACKING BY REFERENCE
         ═════════════════════════════════════════════════════════════════════ */}
         <TabsContent value="suivi">
-          <Card className="mt-4">
+          <Card className="card-gradient mt-4">
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
-                <Search className="size-5 text-[#0B2E58] dark:text-[#3B7DD8]" />
+                <Search className="size-5 text-gradient-gold" />
                 Suivi de dossier
               </CardTitle>
               <CardDescription>Entrez votre numéro de référence pour suivre l&apos;avancement de votre démarche</CardDescription>
@@ -721,11 +736,11 @@ export function CitizenPortalPage() {
                     placeholder="Ex: GN-2026-012345"
                     value={trackingNumber}
                     onChange={e => { setTrackingNumber(e.target.value); setTrackingError(false) }}
-                    className="pl-10"
+                    className="pl-10 glass-input focus-ring-premium"
                     onKeyDown={e => e.key === 'Enter' && handleTrack()}
                   />
                 </div>
-                <Button onClick={handleTrack} className="bg-[#0B2E58] hover:bg-[#0B2E58]/90 dark:bg-[#3B7DD8] dark:hover:bg-[#3B7DD8]/90 gap-2 text-white">
+                <Button onClick={handleTrack} className="btn-premium gap-2">
                   <Search className="h-4 w-4" />
                   Rechercher
                 </Button>
@@ -739,23 +754,23 @@ export function CitizenPortalPage() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
                   >
-                    <Card className="border-2 border-[#0B2E58]/10 dark:border-[#3B7DD8]/20">
+                    <Card className="glass-premium border-2 border-[#0B2E58]/10 dark:border-[#3B7DD8]/20">
                       <CardContent className="p-6 space-y-5">
                         <div className="flex items-start justify-between">
                           <div>
                             <h3 className="font-bold text-lg">{trackedRequest.serviceName}</h3>
-                            <p className="text-sm text-muted-foreground font-mono">{trackedRequest.reference}</p>
+                            <p className="text-sm text-muted-foreground font-mono tracking-wide">{trackedRequest.reference}</p>
                             <p className="text-xs text-muted-foreground mt-1">
                               Service compétent : <span className="font-medium">{trackedRequest.assignedService}</span>
                             </p>
                           </div>
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${STATUS_CONFIG[trackedRequest.status].color}`}>
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur-sm border border-white/10 dark:border-white/5 ${STATUS_CONFIG[trackedRequest.status].color}`}>
                             {(() => { const Icon = STATUS_CONFIG[trackedRequest.status].icon; return <Icon className="size-3.5" /> })()}
                             {STATUS_CONFIG[trackedRequest.status].label}
                           </span>
                         </div>
 
-                        <Separator />
+                        <div className="divider-premium" />
 
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                           <div>
@@ -772,20 +787,23 @@ export function CitizenPortalPage() {
                           </div>
                         </div>
 
-                        <Separator />
+                        <div className="divider-premium" />
 
-                        {/* Timeline */}
+                        {/* Timeline with refined step indicators */}
                         <div>
-                          <h4 className="text-sm font-semibold mb-4">Avancement de votre demande</h4>
+                          <h4 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                            <span className="text-gradient-gold">→</span>
+                            Avancement de votre demande
+                          </h4>
                           <div className="relative">
-                            <div className="absolute left-3.5 top-0 bottom-0 w-0.5 bg-muted" />
+                            <div className="absolute left-3.5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-[#0B2E58] via-[#3B7DD8] to-muted dark:from-[#3B7DD8] dark:via-[#5A96E6] dark:to-muted" />
                             <div className="space-y-5">
                               {trackedRequest.timeline.map((step, i) => (
                                 <div key={i} className="flex gap-4 relative">
-                                  <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 z-10 ${
-                                    step.status === 'completed' ? 'bg-emerald-500 text-white' :
-                                    step.status === 'current' ? 'bg-[#0B2E58] text-white dark:bg-[#3B7DD8]' :
-                                    'bg-muted text-muted-foreground'
+                                  <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 z-10 border-2 ${
+                                    step.status === 'completed' ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 border-emerald-400 text-white shadow-sm shadow-emerald-500/20' :
+                                    step.status === 'current' ? 'bg-gradient-to-br from-[#0B2E58] to-[#134A8E] border-[#3B7DD8] text-white dark:from-[#3B7DD8] dark:to-[#2A6BC7] dark:border-[#5A96E6] shadow-sm shadow-[#3B7DD8]/20' :
+                                    'bg-background border-muted-foreground/30 text-muted-foreground'
                                   }`}>
                                     {step.status === 'completed' ? (
                                       <Check className="h-4 w-4" />
@@ -815,17 +833,17 @@ export function CitizenPortalPage() {
                         {/* Notifications from processing */}
                         {trackedRequest.processingNotes.filter(n => n.type === 'notification' || n.type === 'info_complementaire').length > 0 && (
                           <>
-                            <Separator />
+                            <div className="divider-premium" />
                             <div>
                               <h4 className="text-sm font-semibold mb-3">Notifications</h4>
                               <div className="space-y-2">
                                 {trackedRequest.processingNotes
                                   .filter(n => n.type === 'notification' || n.type === 'info_complementaire')
                                   .map((note, i) => (
-                                    <div key={i} className={`p-3 rounded-lg text-sm ${
+                                    <div key={i} className={`p-3 rounded-lg text-sm backdrop-blur-sm ${
                                       note.type === 'info_complementaire'
-                                        ? 'bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800/40'
-                                        : 'bg-muted/50 border border-muted'
+                                        ? 'bg-orange-50/80 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800/40'
+                                        : 'bg-muted/30 border border-muted'
                                     }`}>
                                       <div className="flex items-center gap-2 mb-1">
                                         {note.type === 'info_complementaire' ? (
@@ -846,7 +864,7 @@ export function CitizenPortalPage() {
 
                         {/* Delivery info */}
                         {(trackedRequest.status === 'prete' || trackedRequest.status === 'livree') && (
-                          <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40">
+                          <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/50 dark:from-emerald-900/20 dark:to-emerald-800/10 border border-emerald-200 dark:border-emerald-800/40">
                             <div className="flex items-center gap-3 mb-2">
                               <CheckCircle2 className="size-5 text-emerald-600 dark:text-emerald-400" />
                               <h4 className="font-semibold text-emerald-700 dark:text-emerald-400">
@@ -885,24 +903,27 @@ export function CitizenPortalPage() {
               {/* Quick access to recent requests */}
               {myRequests.length > 0 && (
                 <div>
-                  <h4 className="text-sm font-semibold mb-3">Vos demandes récentes</h4>
+                  <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                    <span className="text-gradient-gold">📋</span>
+                    Vos demandes récentes
+                  </h4>
                   <div className="space-y-2">
                     {myRequests.slice(0, 5).map(req => {
                       const sConfig = STATUS_CONFIG[req.status]
                       return (
                         <div
                           key={req.id}
-                          className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                          className="card-interactive flex items-center justify-between p-3 rounded-lg"
                           onClick={() => { setTrackingNumber(req.reference); setTrackedRequest(req) }}
                         >
                           <div className="flex items-center gap-3">
                             <FileText className="h-4 w-4 text-[#0B2E58] dark:text-[#3B7DD8]" />
                             <div>
                               <p className="text-sm font-medium">{req.serviceName}</p>
-                              <p className="text-xs text-muted-foreground font-mono">{req.reference}</p>
+                              <p className="text-xs text-muted-foreground font-mono tracking-wide">{req.reference}</p>
                             </div>
                           </div>
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${sConfig.color}`}>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium backdrop-blur-sm border border-white/10 dark:border-white/5 ${sConfig.color}`}>
                             {sConfig.label}
                           </span>
                         </div>
@@ -919,9 +940,12 @@ export function CitizenPortalPage() {
             NOTIFICATION PREFERENCES
         ═════════════════════════════════════════════════════════════════════ */}
         <TabsContent value="notifications">
-          <Card className="mt-4">
+          <Card className="card-gradient mt-4">
             <CardHeader>
-              <CardTitle className="text-base">Préférences de notification</CardTitle>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Bell className="size-5 text-gradient-gold" />
+                Préférences de notification
+              </CardTitle>
               <CardDescription>Choisissez comment recevoir les mises à jour de vos démarches</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -933,7 +957,7 @@ export function CitizenPortalPage() {
                   { key: 'email' as const, label: 'Email', desc: 'Recevez des notifications par courrier électronique', icon: Mail, color: 'text-amber-600 dark:text-amber-400', badge: null },
                   { key: 'ussd' as const, label: 'USSD (*144#)', desc: 'Consultez vos démarches via le code USSD *144#', icon: Hash, color: 'text-purple-600 dark:text-purple-400', badge: 'Nouveau' },
                 ].map(channel => (
-                  <div key={channel.key} className="flex items-center justify-between p-4 rounded-xl border hover:bg-muted/50 transition-colors">
+                  <div key={channel.key} className="card-interactive flex items-center justify-between p-4 rounded-xl">
                     <div className="flex items-center gap-3">
                       <channel.icon className={`h-5 w-5 ${channel.color}`} />
                       <div>
@@ -941,8 +965,8 @@ export function CitizenPortalPage() {
                           <p className="text-sm font-medium">{channel.label}</p>
                           {channel.badge && (
                             <Badge className={`text-[9px] h-4 px-1.5 border-0 ${
-                              channel.badge === 'Recommandé' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' :
-                              'bg-[#C8A45C]/10 text-[#C8A45C] dark:bg-[#D4B878]/20 dark:text-[#D4B878]'
+                              channel.badge === 'Recommandé' ? 'badge-premium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' :
+                              'badge-premium'
                             }`}>
                               {channel.badge}
                             </Badge>
@@ -958,7 +982,7 @@ export function CitizenPortalPage() {
                   </div>
                 ))}
               </div>
-              <Button className="bg-[#0B2E58] hover:bg-[#0B2E58]/90 dark:bg-[#3B7DD8] dark:hover:bg-[#3B7DD8]/90 text-white" onClick={() => setSuccessToast('Préférences de notification enregistrées')}>
+              <Button className="btn-premium" onClick={() => setSuccessToast('Préférences de notification enregistrées')}>
                 Enregistrer les préférences
               </Button>
             </CardContent>
@@ -970,7 +994,7 @@ export function CitizenPortalPage() {
           REQUEST SUBMISSION DIALOG
       ═══════════════════════════════════════════════════════════════════════ */}
       <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="glass-premium max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-[#0B2E58] dark:text-[#3B7DD8]">
               {selectedService && <selectedService.icon className="size-5" />}
@@ -984,58 +1008,58 @@ export function CitizenPortalPage() {
           {selectedService && selectedCategoryInfo && (
             <div className="space-y-5">
               {/* Service info */}
-              <div className="p-3 rounded-lg bg-muted/50 flex items-center gap-3">
-                <div className={`p-2 rounded-xl ${selectedCategoryInfo.iconBgColor}`}>
+              <div className="p-3 rounded-xl bg-gradient-to-r from-muted/50 to-muted/30 backdrop-blur-sm flex items-center gap-3 border border-[#C8A45C]/10 dark:border-[#D4B878]/5">
+                <div className={`p-2 rounded-xl bg-gradient-to-br ${selectedCategoryInfo.bgColor} shadow-sm`}>
                   <selectedService.icon className={`h-5 w-5 ${selectedCategoryInfo.textColor}`} />
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-semibold">{selectedService.name}</p>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1"><Clock className="size-3" />Délai: {selectedService.delay}</span>
-                    <span className="font-semibold text-[#0B2E58] dark:text-[#3B7DD8]">{selectedService.price}</span>
+                    <span className="font-semibold text-gradient-gold">{selectedService.price}</span>
                   </div>
                 </div>
               </div>
 
-              <Separator />
+              <div className="divider-premium" />
 
               {/* Citizen info form */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-sm">Nom *</Label>
-                  <Input placeholder="DIALLO" value={form.citizenName} onChange={e => setForm(prev => ({ ...prev, citizenName: e.target.value }))} />
+                  <Label className="text-sm font-medium">Nom *</Label>
+                  <Input placeholder="DIALLO" value={form.citizenName} onChange={e => setForm(prev => ({ ...prev, citizenName: e.target.value }))} className="glass-input focus-ring-premium" />
                   {formErrors.citizenName && <p className="text-xs text-red-500">{formErrors.citizenName}</p>}
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm">Prénom *</Label>
-                  <Input placeholder="Mamadou" value={form.citizenFirstName} onChange={e => setForm(prev => ({ ...prev, citizenFirstName: e.target.value }))} />
+                  <Label className="text-sm font-medium">Prénom *</Label>
+                  <Input placeholder="Mamadou" value={form.citizenFirstName} onChange={e => setForm(prev => ({ ...prev, citizenFirstName: e.target.value }))} className="glass-input focus-ring-premium" />
                   {formErrors.citizenFirstName && <p className="text-xs text-red-500">{formErrors.citizenFirstName}</p>}
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm">NIN (Numéro d&apos;Identification National) *</Label>
-                  <Input placeholder="XXXX-XXXX-XXXX" value={form.citizenNIN} onChange={e => setForm(prev => ({ ...prev, citizenNIN: e.target.value }))} />
+                  <Label className="text-sm font-medium">NIN (Numéro d&apos;Identification National) *</Label>
+                  <Input placeholder="XXXX-XXXX-XXXX" value={form.citizenNIN} onChange={e => setForm(prev => ({ ...prev, citizenNIN: e.target.value }))} className="glass-input focus-ring-premium font-mono tracking-wider" />
                   {formErrors.citizenNIN && <p className="text-xs text-red-500">{formErrors.citizenNIN}</p>}
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm">Téléphone *</Label>
-                  <Input placeholder="+224 XXX XXX XXX" value={form.citizenPhone} onChange={e => setForm(prev => ({ ...prev, citizenPhone: e.target.value }))} />
+                  <Label className="text-sm font-medium">Téléphone *</Label>
+                  <Input placeholder="+224 XXX XXX XXX" value={form.citizenPhone} onChange={e => setForm(prev => ({ ...prev, citizenPhone: e.target.value }))} className="glass-input focus-ring-premium" />
                   {formErrors.citizenPhone && <p className="text-xs text-red-500">{formErrors.citizenPhone}</p>}
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm">Email</Label>
-                  <Input placeholder="mamadou.diallo@email.com" type="email" value={form.citizenEmail} onChange={e => setForm(prev => ({ ...prev, citizenEmail: e.target.value }))} />
+                  <Label className="text-sm font-medium">Email</Label>
+                  <Input placeholder="mamadou.diallo@email.com" type="email" value={form.citizenEmail} onChange={e => setForm(prev => ({ ...prev, citizenEmail: e.target.value }))} className="glass-input focus-ring-premium" />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm">Adresse *</Label>
-                  <Input placeholder="Conakry, Kaloum..." value={form.citizenAddress} onChange={e => setForm(prev => ({ ...prev, citizenAddress: e.target.value }))} />
+                  <Label className="text-sm font-medium">Adresse *</Label>
+                  <Input placeholder="Conakry, Kaloum..." value={form.citizenAddress} onChange={e => setForm(prev => ({ ...prev, citizenAddress: e.target.value }))} className="glass-input focus-ring-premium" />
                   {formErrors.citizenAddress && <p className="text-xs text-red-500">{formErrors.citizenAddress}</p>}
                 </div>
               </div>
 
               {/* Motif */}
               <div className="space-y-2">
-                <Label className="text-sm">Motif de la demande</Label>
-                <Textarea placeholder="Précisez le motif de votre demande..." value={form.motif} onChange={e => setForm(prev => ({ ...prev, motif: e.target.value }))} rows={3} />
+                <Label className="text-sm font-medium">Motif de la demande</Label>
+                <Textarea placeholder="Précisez le motif de votre demande..." value={form.motif} onChange={e => setForm(prev => ({ ...prev, motif: e.target.value }))} rows={3} className="glass-input focus-ring-premium" />
               </div>
 
               {/* Delivery mode */}
@@ -1049,8 +1073,10 @@ export function CitizenPortalPage() {
                   ].map(option => (
                     <div
                       key={option.value}
-                      className={`p-3 rounded-xl border-2 cursor-pointer transition-all text-center ${
-                        form.deliveryMode === option.value ? 'border-[#0B2E58] dark:border-[#3B7DD8] bg-[#0B2E58]/5 dark:bg-[#3B7DD8]/10' : 'border-muted hover:border-muted-foreground/30'
+                      className={`p-3 rounded-xl border-2 cursor-pointer transition-all duration-300 text-center ${
+                        form.deliveryMode === option.value
+                          ? 'border-[#C8A45C] dark:border-[#D4B878] bg-gradient-to-br from-[#0B2E58]/5 to-[#C8A45C]/5 dark:from-[#3B7DD8]/10 dark:to-[#D4B878]/5 shadow-sm shadow-[#C8A45C]/10'
+                          : 'border-muted hover:border-[#C8A45C]/30 hover:shadow-sm'
                       }`}
                       onClick={() => setForm(prev => ({ ...prev, deliveryMode: option.value }))}
                     >
@@ -1065,9 +1091,9 @@ export function CitizenPortalPage() {
               {/* File Upload Section */}
               {selectedService && selectedCategoryInfo && (
                 <div className="space-y-3">
-                  <Separator />
+                  <div className="divider-premium" />
                   <h4 className="text-sm font-semibold flex items-center gap-2">
-                    <Upload className="size-4" />
+                    <Upload className="size-4 text-[#C8A45C] dark:text-[#D4B878]" />
                     Pièces justificatives à charger
                   </h4>
                   <p className="text-xs text-muted-foreground">
@@ -1079,7 +1105,7 @@ export function CitizenPortalPage() {
                       const error = uploadErrors[docName]
                       const typeInfo = uploaded ? getFileTypeIcon(uploaded.type) : null
                       return (
-                        <div key={docName} className={`p-3 rounded-lg border ${error ? 'border-red-300 bg-red-50/50 dark:border-red-800/40 dark:bg-red-900/10' : uploaded ? 'border-emerald-300 bg-emerald-50/50 dark:border-emerald-800/40 dark:bg-emerald-900/10' : 'border-dashed border-muted-foreground/30'}`}>
+                        <div key={docName} className={`p-3 rounded-xl transition-all duration-200 ${error ? 'border border-red-300 bg-red-50/50 dark:border-red-800/40 dark:bg-red-900/10' : uploaded ? 'border border-emerald-300 bg-emerald-50/50 dark:border-emerald-800/40 dark:bg-emerald-900/10' : 'border border-dashed border-[#C8A45C]/30 dark:border-[#D4B878]/20 hover:border-[#C8A45C]/50 hover:bg-[#C8A45C]/5 dark:hover:bg-[#D4B878]/5'}`}>
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 min-w-0">
                               {uploaded ? (
@@ -1093,7 +1119,7 @@ export function CitizenPortalPage() {
                                 </>
                               ) : (
                                 <>
-                                  <Paperclip className="size-3.5 text-muted-foreground shrink-0" />
+                                  <Paperclip className="size-3.5 text-[#C8A45C] dark:text-[#D4B878] shrink-0" />
                                   <p className="text-xs text-muted-foreground">{docName}</p>
                                 </>
                               )}
@@ -1125,7 +1151,7 @@ export function CitizenPortalPage() {
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    className="h-6 text-[10px] gap-1"
+                                    className="h-6 text-[10px] gap-1 border-[#C8A45C]/30 dark:border-[#D4B878]/20 text-[#0B2E58] dark:text-[#3B7DD8] hover:bg-[#C8A45C]/10 dark:hover:bg-[#D4B878]/10"
                                     onClick={() => document.getElementById(`file-upload-${docName.replace(/[^a-zA-Z0-9]/g, '-')}`)?.click()}
                                     disabled={isUploading}
                                   >
@@ -1150,7 +1176,7 @@ export function CitizenPortalPage() {
               )}
 
               {/* Terms */}
-              <div className="flex items-start gap-3 p-3 rounded-lg border">
+              <div className="flex items-start gap-3 p-3 rounded-xl border border-[#C8A45C]/15 dark:border-[#D4B878]/10 bg-gradient-to-r from-[#0B2E58]/[0.02] to-[#C8A45C]/[0.02] dark:from-[#3B7DD8]/[0.03] dark:to-[#D4B878]/[0.02]">
                 <Checkbox
                   id="terms"
                   checked={acceptedTerms}
@@ -1168,8 +1194,8 @@ export function CitizenPortalPage() {
           )}
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setRequestDialogOpen(false)}>Annuler</Button>
-            <Button className="bg-[#0B2E58] hover:bg-[#0B2E58]/90 dark:bg-[#3B7DD8] dark:hover:bg-[#3B7DD8]/90 text-white gap-2" onClick={handleSubmitRequest}>
+            <Button variant="outline" onClick={() => setRequestDialogOpen(false)} className="focus-ring-premium">Annuler</Button>
+            <Button className="btn-guinea gap-2" onClick={handleSubmitRequest}>
               <Send className="size-4" />
               Soumettre la demande
             </Button>
@@ -1181,34 +1207,34 @@ export function CitizenPortalPage() {
           REQUEST DETAIL DIALOG
       ═══════════════════════════════════════════════════════════════════════ */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="glass-premium max-w-2xl max-h-[90vh] overflow-y-auto">
           {selectedRequest && (
             <>
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${STATUS_CONFIG[selectedRequest.status].color}`}>
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold backdrop-blur-sm border border-white/10 dark:border-white/5 ${STATUS_CONFIG[selectedRequest.status].color}`}>
                     {(() => { const Icon = STATUS_CONFIG[selectedRequest.status].icon; return <Icon className="size-3.5" /> })()}
                     {STATUS_CONFIG[selectedRequest.status].label}
                   </span>
                   {selectedRequest.serviceName}
                 </DialogTitle>
-                <DialogDescription className="font-mono">{selectedRequest.reference}</DialogDescription>
+                <DialogDescription className="font-mono tracking-wide">{selectedRequest.reference}</DialogDescription>
               </DialogHeader>
 
               <div className="space-y-4">
                 {/* Citizen info */}
-                <div className="p-3 rounded-lg bg-muted/50 space-y-2">
+                <div className="p-3 rounded-xl bg-gradient-to-r from-muted/50 to-muted/30 backdrop-blur-sm space-y-2 border border-[#C8A45C]/10 dark:border-[#D4B878]/5">
                   <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Informations du citoyen</h4>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div><span className="text-muted-foreground">Nom :</span> <span className="font-medium">{selectedRequest.citizenFirstName} {selectedRequest.citizenName}</span></div>
-                    <div><span className="text-muted-foreground">NIN :</span> <span className="font-mono">{selectedRequest.citizenNIN}</span></div>
+                    <div><span className="text-muted-foreground">NIN :</span> <span className="font-mono tracking-wide">{selectedRequest.citizenNIN}</span></div>
                     <div><span className="text-muted-foreground">Tél :</span> <span className="font-medium">{selectedRequest.citizenPhone}</span></div>
                     <div><span className="text-muted-foreground">Mode :</span> <span className="font-medium">{selectedRequest.deliveryMode === 'en_ligne' ? 'En ligne' : selectedRequest.deliveryMode === 'guichet' ? 'Au guichet' : 'Par courrier'}</span></div>
                   </div>
                 </div>
 
                 {/* Service */}
-                <div className="p-3 rounded-lg bg-[#0B2E58]/5 dark:bg-[#3B7DD8]/10">
+                <div className="p-3 rounded-xl bg-gradient-to-r from-[#0B2E58]/5 to-[#3B7DD8]/5 dark:from-[#3B7DD8]/10 dark:to-[#0B2E58]/5 border border-[#C8A45C]/10 dark:border-[#D4B878]/5">
                   <div className="flex items-center gap-2">
                     <Building2 className="size-4 text-[#0B2E58] dark:text-[#3B7DD8]" />
                     <div>
@@ -1221,7 +1247,7 @@ export function CitizenPortalPage() {
                   )}
                 </div>
 
-                {/* Timeline */}
+                {/* Timeline with refined step indicators */}
                 <div>
                   <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Avancement</h4>
                   <div className="space-y-0">
@@ -1229,13 +1255,15 @@ export function CitizenPortalPage() {
                       <div key={i} className="flex gap-3">
                         <div className="flex flex-col items-center">
                           <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 border-2 ${
-                            step.status === 'completed' ? 'bg-emerald-500 border-emerald-500 text-white' :
-                            step.status === 'current' ? 'bg-[#0B2E58] border-[#0B2E58] text-white dark:bg-[#3B7DD8] dark:border-[#3B7DD8]' :
+                            step.status === 'completed' ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 border-emerald-400 text-white shadow-sm shadow-emerald-500/20' :
+                            step.status === 'current' ? 'bg-gradient-to-br from-[#0B2E58] to-[#134A8E] border-[#3B7DD8] text-white dark:from-[#3B7DD8] dark:to-[#2A6BC7] dark:border-[#5A96E6] shadow-sm shadow-[#3B7DD8]/20' :
                             'bg-background border-muted-foreground/30 text-muted-foreground'
                           }`}>
                             {step.status === 'completed' ? <Check className="h-3 w-3" /> : step.status === 'current' ? <Clock className="h-3 w-3" /> : <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />}
                           </div>
-                          {i < selectedRequest.timeline.length - 1 && <div className={`w-0.5 h-6 ${step.status === 'completed' ? 'bg-emerald-300 dark:bg-emerald-700' : 'bg-muted-foreground/20'}`} />}
+                          {i < selectedRequest.timeline.length - 1 && (
+                            <div className={`w-0.5 h-6 ${step.status === 'completed' ? 'bg-gradient-to-b from-emerald-400 to-emerald-300 dark:from-emerald-700 dark:to-emerald-600' : 'bg-muted-foreground/20'}`} />
+                          )}
                         </div>
                         <div className="pb-2">
                           <p className={`text-xs font-medium ${step.status === 'pending' ? 'text-muted-foreground' : ''}`}>{step.label}</p>
@@ -1249,15 +1277,15 @@ export function CitizenPortalPage() {
                 {/* Notes */}
                 {selectedRequest.processingNotes.length > 0 && (
                   <>
-                    <Separator />
+                    <div className="divider-premium" />
                     <div>
                       <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Notes de traitement ({selectedRequest.processingNotes.length})</h4>
                       <div className="space-y-2 max-h-40 overflow-y-auto">
                         {selectedRequest.processingNotes.map((note, i) => (
-                          <div key={i} className={`p-2 rounded-lg text-xs border ${
-                            note.type === 'info_complementaire' ? 'bg-orange-50 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800/40' :
-                            note.type === 'decision' ? 'bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800/40' :
-                            'bg-muted/50 border-muted'
+                          <div key={i} className={`p-2 rounded-lg text-xs border backdrop-blur-sm ${
+                            note.type === 'info_complementaire' ? 'bg-orange-50/80 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800/40' :
+                            note.type === 'decision' ? 'bg-blue-50/80 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800/40' :
+                            'bg-muted/30 border-muted'
                           }`}>
                             <div className="flex items-center justify-between mb-0.5">
                               <span className="font-medium">{note.author}</span>
@@ -1274,16 +1302,16 @@ export function CitizenPortalPage() {
                 {/* Uploaded Documents Section */}
                 {(selectedRequest.uploadedDocuments?.length ?? 0) > 0 && (
                   <div className="space-y-2">
-                    <Separator />
+                    <div className="divider-premium" />
                     <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                      <Paperclip className="size-3.5" />
+                      <Paperclip className="size-3.5 text-[#C8A45C] dark:text-[#D4B878]" />
                       Documents chargés ({selectedRequest.uploadedDocuments.length})
                     </h4>
                     <div className="space-y-1.5">
                       {selectedRequest.uploadedDocuments.map((doc) => {
                         const typeInfo = getFileTypeIcon(doc.type)
                         return (
-                          <div key={doc.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50 border border-muted text-xs">
+                          <div key={doc.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/30 backdrop-blur-sm border border-[#C8A45C]/10 dark:border-[#D4B878]/5 text-xs">
                             <div className="flex items-center gap-2 min-w-0">
                               <span className={`text-[8px] font-bold ${typeInfo.color}`}>{typeInfo.icon}</span>
                               <div className="min-w-0">
@@ -1307,9 +1335,9 @@ export function CitizenPortalPage() {
                 {/* Download Official Document Button */}
                 {(selectedRequest.status === 'prete' || selectedRequest.status === 'livree') && (
                   <div className="space-y-2">
-                    <Separator />
+                    <div className="divider-premium" />
                     <Button
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white gap-2"
+                      className="btn-gold w-full gap-2"
                       onClick={() => downloadCitizenDocument(selectedRequest, selectedRequest.assignedAgent)}
                     >
                       <Download className="size-4" />
@@ -1343,7 +1371,7 @@ export function CitizenPortalPage() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-white text-sm font-medium shadow-lg"
+            className="glass-premium fixed top-4 right-4 z-50 flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-5 py-3 text-white text-sm font-medium shadow-premium-lg"
           >
             <CheckCircle2 className="size-4" />
             {successToast}

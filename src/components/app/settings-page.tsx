@@ -173,26 +173,26 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 dashboard-bg-v2 min-h-screen">
       <Tabs defaultValue="general" className="space-y-6">
-        <TabsList className="w-full sm:w-auto flex-wrap">
-          <TabsTrigger value="general" className="gap-1.5">
+        <TabsList className="w-full sm:w-auto flex-wrap gap-1 bg-muted/50 p-1.5">
+          <TabsTrigger value="general" className="gap-1.5 text-sm data-[state=active]:bg-[#0B2E58] data-[state=active]:text-white">
             <Settings className="h-3.5 w-3.5" />
             Général
           </TabsTrigger>
-          <TabsTrigger value="security" className="gap-1.5">
+          <TabsTrigger value="security" className="gap-1.5 text-sm data-[state=active]:bg-[#0B2E58] data-[state=active]:text-white">
             <Shield className="h-3.5 w-3.5" />
             Sécurité
           </TabsTrigger>
-          <TabsTrigger value="notifications" className="gap-1.5">
+          <TabsTrigger value="notifications" className="gap-1.5 text-sm data-[state=active]:bg-[#0B2E58] data-[state=active]:text-white">
             <Bell className="h-3.5 w-3.5" />
             Notifications
           </TabsTrigger>
-          <TabsTrigger value="integrations" className="gap-1.5">
+          <TabsTrigger value="integrations" className="gap-1.5 text-sm data-[state=active]:bg-[#0B2E58] data-[state=active]:text-white">
             <Puzzle className="h-3.5 w-3.5" />
             Intégrations
           </TabsTrigger>
-          <TabsTrigger value="appearance" className="gap-1.5">
+          <TabsTrigger value="appearance" className="gap-1.5 text-sm data-[state=active]:bg-[#0B2E58] data-[state=active]:text-white">
             <Palette className="h-3.5 w-3.5" />
             Apparence
           </TabsTrigger>
@@ -201,7 +201,7 @@ export function SettingsPage() {
         {/* General */}
         <TabsContent value="general">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <Card>
+            <Card className="glass-premium">
               <CardHeader>
                 <CardTitle className="text-base">Informations de l&apos;institution</CardTitle>
                 <CardDescription>Configuration générale de votre organisation</CardDescription>
@@ -210,31 +210,31 @@ export function SettingsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5" /> Nom de l&apos;institution</Label>
-                    <Input defaultValue="Ministère de l'Administration Territoriale" />
+                    <Input defaultValue="Ministère de l'Administration Territoriale" className="glass-input focus-ring-premium" />
                   </div>
                   <div className="space-y-2">
                     <Label>Sigle</Label>
-                    <Input defaultValue="MAT" />
+                    <Input defaultValue="MAT" className="glass-input focus-ring-premium" />
                   </div>
                   <div className="space-y-2">
                     <Label className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" /> Adresse</Label>
-                    <Input defaultValue="Avenue de la République, Conakry" />
+                    <Input defaultValue="Avenue de la République, Conakry" className="glass-input focus-ring-premium" />
                   </div>
                   <div className="space-y-2">
                     <Label className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" /> Téléphone</Label>
-                    <Input defaultValue="+224 622 00 00 00" />
+                    <Input defaultValue="+224 622 00 00 00" className="glass-input focus-ring-premium" />
                   </div>
                   <div className="space-y-2">
                     <Label className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" /> Email de contact</Label>
-                    <Input defaultValue="contact@mat.gov.gn" />
+                    <Input defaultValue="contact@mat.gov.gn" className="glass-input focus-ring-premium" />
                   </div>
                   <div className="space-y-2">
                     <Label className="flex items-center gap-1.5"><Globe className="h-3.5 w-3.5" /> Site web</Label>
-                    <Input defaultValue="www.mat.gov.gn" />
+                    <Input defaultValue="www.mat.gov.gn" className="glass-input focus-ring-premium" />
                   </div>
                 </div>
 
-                <Separator />
+                <div className="divider-premium" />
 
                 <div className="space-y-2">
                   <Label>Logo de l&apos;institution</Label>
@@ -263,7 +263,7 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={handleSaveGeneral} disabled={savingGeneral}>
+                <Button className="btn-premium gap-2" onClick={handleSaveGeneral} disabled={savingGeneral}>
                   {savingGeneral ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   {savingGeneral ? 'Enregistrement...' : 'Enregistrer'}
                 </Button>
@@ -275,7 +275,7 @@ export function SettingsPage() {
         {/* Security */}
         <TabsContent value="security">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-            <Card>
+            <Card className="glass-premium">
               <CardHeader>
                 <CardTitle className="text-base">Politique de sécurité</CardTitle>
                 <CardDescription>Configurez les paramètres de sécurité de la plateforme</CardDescription>
@@ -314,7 +314,7 @@ export function SettingsPage() {
                   <Switch checked={ipWhitelist} onCheckedChange={setIpWhitelist} />
                 </div>
 
-                <Separator />
+                <div className="divider-premium" />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -358,7 +358,7 @@ export function SettingsPage() {
                   </ul>
                 </div>
 
-                <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={handleSaveSecurity} disabled={savingSecurity}>
+                <Button className="btn-premium gap-2" onClick={handleSaveSecurity} disabled={savingSecurity}>
                   {savingSecurity ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   {savingSecurity ? 'Enregistrement...' : 'Enregistrer'}
                 </Button>
@@ -370,7 +370,7 @@ export function SettingsPage() {
         {/* Notifications */}
         <TabsContent value="notifications">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <Card>
+            <Card className="glass-premium">
               <CardHeader>
                 <CardTitle className="text-base">Préférences de notification</CardTitle>
                 <CardDescription>Configurez les notifications par canal et par événement</CardDescription>
@@ -402,7 +402,7 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                <Separator />
+                <div className="divider-premium" />
 
                 {/* SMS */}
                 <div>
@@ -429,7 +429,7 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                <Separator />
+                <div className="divider-premium" />
 
                 {/* WhatsApp */}
                 <div>
@@ -456,7 +456,7 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={handleSaveNotifications} disabled={savingNotifications}>
+                <Button className="btn-premium gap-2" onClick={handleSaveNotifications} disabled={savingNotifications}>
                   {savingNotifications ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   {savingNotifications ? 'Enregistrement...' : 'Enregistrer les préférences'}
                 </Button>
@@ -468,7 +468,7 @@ export function SettingsPage() {
         {/* Integrations */}
         <TabsContent value="integrations">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <Card>
+            <Card className="glass-premium">
               <CardHeader>
                 <CardTitle className="text-base">Connexions & intégrations</CardTitle>
                 <CardDescription>Gérez les connexions aux services externes</CardDescription>
@@ -478,9 +478,9 @@ export function SettingsPage() {
                   const config = getIntStatus(int.status)
                   const StatusIcon = config.icon
                   return (
-                    <div key={int.name} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border gap-3 hover:bg-muted/50 transition-colors">
+                    <div key={int.name} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border gap-3 hover:bg-muted/30 transition-all group hover:border-[#C8A45C]/20 dark:hover:border-[#3B7DD8]/20 hover:shadow-sm">
                       <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg ${int.status === 'connected' ? 'bg-emerald-50 dark:bg-emerald-900/20' : int.status === 'error' ? 'bg-red-50 dark:bg-red-900/20' : 'bg-muted'}`}>
+                        <div className={`p-2 rounded-lg ${int.status === 'connected' ? 'bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-900/30' : int.status === 'error' ? 'bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-900/30' : 'bg-muted'}`}>
                           <Wifi className={`h-4 w-4 ${int.status === 'connected' ? 'text-emerald-600 dark:text-emerald-400' : int.status === 'error' ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`} />
                         </div>
                         <div>
@@ -490,11 +490,11 @@ export function SettingsPage() {
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="text-xs text-muted-foreground">{int.lastSync}</span>
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${config.color}`}>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold backdrop-blur-sm ${config.color}`}>
                           <StatusIcon className="h-3 w-3" />
                           {config.label}
                         </span>
-                        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => handleOpenIntegration(int.name)}>
+                        <Button variant="outline" size="sm" className="h-7 text-xs hover:border-[#0B2E58] dark:hover:border-[#3B7DD8]" onClick={() => handleOpenIntegration(int.name)}>
                           {int.status === 'connected' ? 'Configurer' : 'Connecter'}
                         </Button>
                       </div>
@@ -509,7 +509,7 @@ export function SettingsPage() {
         {/* Appearance */}
         <TabsContent value="appearance">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <Card>
+            <Card className="glass-premium">
               <CardHeader>
                 <CardTitle className="text-base">Apparence & langue</CardTitle>
                 <CardDescription>Personnalisez l&apos;interface de la plateforme</CardDescription>
@@ -527,17 +527,17 @@ export function SettingsPage() {
                         key={t.value}
                         onClick={() => handleThemeChange(t.value)}
                         className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
-                          theme === t.value ? 'border-brand dark:border-primary bg-brand/5 dark:bg-primary/5' : 'border-border hover:border-brand/30 dark:hover:border-primary/30'
+                          theme === t.value ? 'border-[#C8A45C] dark:border-[#D4B878] bg-[#C8A45C]/5 dark:bg-[#D4B878]/5 shadow-gold' : 'border-border hover:border-[#C8A45C]/30 dark:hover:border-[#D4B878]/30'
                         }`}
                       >
-                        <t.icon className={`h-6 w-6 ${theme === t.value ? 'text-brand dark:text-primary' : 'text-muted-foreground'}`} />
-                        <span className={`text-xs font-medium ${theme === t.value ? 'text-brand dark:text-primary' : 'text-muted-foreground'}`}>{t.label}</span>
+                        <t.icon className={`h-6 w-6 ${theme === t.value ? 'text-[#0B2E58] dark:text-[#3B7DD8]' : 'text-muted-foreground'}`} />
+                        <span className={`text-xs font-medium ${theme === t.value ? 'text-[#0B2E58] dark:text-[#3B7DD8]' : 'text-muted-foreground'}`}>{t.label}</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <Separator />
+                <div className="divider-premium" />
 
                 <div className="space-y-2">
                   <Label>Langue de l&apos;interface</Label>
@@ -555,7 +555,7 @@ export function SettingsPage() {
                   </Select>
                 </div>
 
-                <Separator />
+                <div className="divider-premium" />
 
                 <div className="p-4 rounded-xl bg-muted/50">
                   <h4 className="text-sm font-semibold mb-2">Aperçu des couleurs</h4>
@@ -579,7 +579,7 @@ export function SettingsPage() {
                   </div>
                 </div>
 
-                <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={handleSaveAppearance} disabled={savingAppearance}>
+                <Button className="btn-premium gap-2" onClick={handleSaveAppearance} disabled={savingAppearance}>
                   {savingAppearance ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   {savingAppearance ? 'Enregistrement...' : 'Enregistrer'}
                 </Button>
@@ -605,6 +605,7 @@ export function SettingsPage() {
                 placeholder="https://api.example.com/v1"
                 value={integrationConfigs.apiUrl}
                 onChange={e => setIntegrationConfigs(prev => ({ ...prev, apiUrl: e.target.value }))}
+                className="glass-input focus-ring-premium"
               />
             </div>
             <div className="space-y-2">
@@ -614,6 +615,7 @@ export function SettingsPage() {
                 placeholder="Entrez la clé API"
                 value={integrationConfigs.apiKey}
                 onChange={e => setIntegrationConfigs(prev => ({ ...prev, apiKey: e.target.value }))}
+                className="glass-input focus-ring-premium"
               />
             </div>
             <div className="space-y-2">
@@ -644,7 +646,7 @@ export function SettingsPage() {
             <DialogClose asChild>
               <Button variant="outline">Annuler</Button>
             </DialogClose>
-            <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={handleSaveIntegration} disabled={savingIntegration}>
+            <Button className="btn-premium gap-2" onClick={handleSaveIntegration} disabled={savingIntegration}>
               {savingIntegration ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               {savingIntegration ? 'Enregistrement...' : 'Enregistrer'}
             </Button>
@@ -659,7 +661,7 @@ export function SettingsPage() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-white text-sm font-medium shadow-lg"
+            className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-3 text-white text-sm font-medium shadow-premium-lg"
           >
             <CheckCircle2 className="h-4 w-4" />
             {successToast}

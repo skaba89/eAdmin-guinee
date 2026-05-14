@@ -1,14 +1,12 @@
 'use client'
 
-import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { useState, useMemo } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Mail, Lock, Eye, EyeOff, Shield, Users, Building2, IdCard, Scale, Fingerprint, Crown, ArrowRight, AlertCircle } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { Separator } from '@/components/ui/separator'
-import { useAppStore, DEMO_ACCOUNTS, ROLE_LABELS, ROLE_COLORS, type UserRole } from '@/store/app-store'
+import { useAppStore, DEMO_ACCOUNTS, ROLE_LABELS, type UserRole } from '@/store/app-store'
 
 // Guinea national colors
 const GUINEA_RED = '#CE1126'
@@ -32,6 +30,83 @@ const ROLE_ICON_COLORS: Record<UserRole, string> = {
   agence: 'text-amber-400',
   ministere: 'text-red-400',
   super_admin: 'text-[#C8A45C]',
+}
+
+// Stagger animation variants
+const containerStagger = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.08, delayChildren: 0.1 },
+  },
+}
+
+const itemSlideUp = {
+  hidden: { opacity: 0, y: 24, filter: 'blur(4px)' },
+  visible: {
+    opacity: 1,
+    y: 0,
+    filter: 'blur(0px)',
+    transition: { duration: 0.55, ease: [0.16, 1, 0.3, 1] },
+  },
+}
+
+const itemFadeScale = {
+  hidden: { opacity: 0, scale: 0.92 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] },
+  },
+}
+
+// Floating gold particles component
+function FloatingParticles() {
+  const particles = useMemo(() =>
+    Array.from({ length: 30 }, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      size: Math.random() * 3 + 1.5,
+      duration: Math.random() * 20 + 15,
+      delay: Math.random() * 10,
+      opacity: Math.random() * 0.4 + 0.1,
+    })),
+    []
+  )
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {particles.map((p) => (
+        <div
+          key={p.id}
+          className="absolute rounded-full"
+          style={{
+            left: `${p.x}%`,
+            top: `${p.y}%`,
+            width: `${p.size}px`,
+            height: `${p.size}px`,
+            backgroundColor: GUINEA_YELLOW,
+            opacity: p.opacity,
+            animation: `loginParticleFloat ${p.duration}s ease-in-out ${p.delay}s infinite`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
+// Geometric dot grid overlay
+function DotGridOverlay() {
+  return (
+    <div
+      className="absolute inset-0 opacity-[0.04] pointer-events-none"
+      style={{
+        backgroundImage: 'radial-gradient(circle, rgba(200,164,92,0.8) 1px, transparent 1px)',
+        backgroundSize: '28px 28px',
+      }}
+    />
+  )
 }
 
 export function LoginPage() {
@@ -62,44 +137,85 @@ export function LoginPage() {
     }
   }
 
+  const demoAccounts = Object.entries(DEMO_ACCOUNTS)
+
   return (
     <div className="min-h-screen flex relative overflow-hidden">
       {/* ═══ FULL-WIDTH GUINEA TRICOLOR STRIPE AT TOP ═══ */}
-      <div className="absolute top-0 left-0 right-0 h-2 z-50 flex">
+      <div className="absolute top-0 left-0 right-0 h-1.5 z-50 flex">
         <div className="flex-1" style={{ backgroundColor: GUINEA_RED }} />
         <div className="flex-1" style={{ backgroundColor: GUINEA_YELLOW }} />
         <div className="flex-1" style={{ backgroundColor: GUINEA_GREEN }} />
       </div>
 
       {/* ═══ LEFT PANEL — GUINEA BRANDING ═══ */}
-      <div className="hidden lg:flex lg:w-[45%] relative flex-col items-center justify-center p-12"
-        style={{ background: 'linear-gradient(160deg, #0B2E58 0%, #134A8E 40%, #0B2E58 100%)' }}>
-
+      <div
+        className="hidden lg:flex lg:w-[46%] relative flex-col items-center justify-center p-12 overflow-hidden"
+        style={{
+          background: `
+            radial-gradient(ellipse at 15% 15%, rgba(59,125,216,0.45) 0%, transparent 55%),
+            radial-gradient(ellipse at 85% 20%, rgba(200,164,92,0.25) 0%, transparent 50%),
+            radial-gradient(ellipse at 50% 85%, rgba(0,148,96,0.2) 0%, transparent 50%),
+            radial-gradient(ellipse at 20% 70%, rgba(206,17,38,0.1) 0%, transparent 45%),
+            radial-gradient(ellipse at 75% 60%, rgba(252,209,22,0.12) 0%, transparent 45%),
+            radial-gradient(ellipse at 50% 40%, rgba(59,125,216,0.08) 0%, transparent 60%),
+            linear-gradient(160deg, #071E3A 0%, #0B2E58 35%, #143D6B 70%, #0B2E58 100%)
+          `,
+        }}
+      >
         {/* Decorative tricolor vertical stripes */}
-        <div className="absolute left-0 top-0 bottom-0 w-2 flex flex-col">
+        <div className="absolute left-0 top-0 bottom-0 w-1.5 flex flex-col z-20">
           <div className="flex-1" style={{ backgroundColor: GUINEA_RED }} />
           <div className="flex-1" style={{ backgroundColor: GUINEA_YELLOW }} />
           <div className="flex-1" style={{ backgroundColor: GUINEA_GREEN }} />
         </div>
 
-        {/* Subtle background pattern — Guinea map outline hint */}
-        <div className="absolute inset-0 opacity-[0.03]">
-          <div className="absolute top-1/4 left-1/4 w-64 h-64 rounded-full" style={{ backgroundColor: GUINEA_RED }} />
-          <div className="absolute bottom-1/4 right-1/4 w-80 h-80 rounded-full" style={{ backgroundColor: GUINEA_GREEN }} />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full" style={{ backgroundColor: GUINEA_YELLOW }} />
-        </div>
+        {/* Floating gold particles */}
+        <FloatingParticles />
+
+        {/* Geometric dot grid overlay */}
+        <DotGridOverlay />
+
+        {/* Subtle radial glow accents */}
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] pointer-events-none"
+          style={{ background: 'radial-gradient(circle, rgba(200,164,92,0.06) 0%, transparent 70%)' }} />
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] pointer-events-none"
+          style={{ background: 'radial-gradient(circle, rgba(0,148,96,0.05) 0%, transparent 70%)' }} />
 
         <div className="relative z-10 text-center space-y-8 max-w-md">
           {/* Guinea Shield Logo */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, ease: 'easeOut' }}
+            initial={{ opacity: 0, scale: 0.7, filter: 'blur(8px)' }}
+            animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
             className="flex justify-center"
           >
             <div className="relative">
-              {/* Glow ring around logo */}
-              <div className="absolute inset-0 rounded-full blur-xl opacity-30" style={{ backgroundColor: GUINEA_YELLOW }} />
+              {/* Premium gold glow ring - outer pulse */}
+              <div
+                className="absolute -inset-5 rounded-full animate-glow-pulse"
+                style={{
+                  background: `radial-gradient(circle, ${GUINEA_YELLOW}20 0%, transparent 70%)`,
+                  boxShadow: `0 0 40px ${GUINEA_YELLOW}15, 0 0 80px ${GUINEA_YELLOW}08`,
+                }}
+              />
+              {/* Premium gold glow ring - inner ring */}
+              <div
+                className="absolute -inset-2 rounded-full"
+                style={{
+                  background: `conic-gradient(from 0deg, ${GUINEA_YELLOW}50, ${GUINEA_YELLOW}10, ${GUINEA_YELLOW}50, ${GUINEA_YELLOW}10, ${GUINEA_YELLOW}50)`,
+                  opacity: 0.6,
+                }}
+              />
+              <div className="absolute -inset-1.5 rounded-full bg-[#0B2E58]" />
+              {/* Gold ring border */}
+              <div
+                className="absolute -inset-1 rounded-full"
+                style={{
+                  border: `2px solid ${GUINEA_YELLOW}40`,
+                  boxShadow: `inset 0 0 8px ${GUINEA_YELLOW}15`,
+                }}
+              />
               <img
                 src="/logo-256.png"
                 alt="Armories de la République de Guinée"
@@ -110,52 +226,88 @@ export function LoginPage() {
 
           {/* Title */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.5 }}
+            transition={{ delay: 0.25, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           >
-            <h1 className="text-3xl font-bold text-white mb-2">
+            <h1 className="text-3xl font-bold mb-2.5 text-gradient-gold tracking-tight">
               eAdministration Suite
             </h1>
-            <p className="text-lg font-medium" style={{ color: GUINEA_YELLOW }}>
-              Guinée
+            <p className="text-lg font-semibold tracking-widest uppercase" style={{ color: `${GUINEA_YELLOW}CC` }}>
+              République de Guinée
             </p>
           </motion.div>
 
           {/* Guinea motto */}
           <motion.div
-            initial={{ opacity: 0, y: 15 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.35, duration: 0.5 }}
-            className="space-y-3"
+            transition={{ delay: 0.4, duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+            className="space-y-4"
           >
-            {/* Tricolor divider */}
+            {/* Premium tricolor divider */}
             <div className="flex items-center gap-3 justify-center">
-              <div className="h-px flex-1" style={{ backgroundColor: GUINEA_RED, opacity: 0.4 }} />
-              <span className="text-xs font-semibold tracking-widest text-white/40 uppercase">Devise nationale</span>
-              <div className="h-px flex-1" style={{ backgroundColor: GUINEA_GREEN, opacity: 0.4 }} />
+              <div className="h-px flex-1 divider-premium" />
+              <span className="text-[10px] font-semibold tracking-[0.2em] text-white/30 uppercase">Devise nationale</span>
+              <div className="h-px flex-1 divider-premium" />
             </div>
 
-            {/* Three pillars of the motto */}
-            <div className="flex items-center justify-center gap-6">
-              <div className="flex flex-col items-center gap-1">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: GUINEA_RED + '20', border: `1px solid ${GUINEA_RED}40` }}>
-                  <span className="text-lg" style={{ color: GUINEA_YELLOW }}>⚙</span>
+            {/* Three pillars of the motto — glass cards */}
+            <div className="flex items-center justify-center gap-5">
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5, duration: 0.5 }}
+                className="flex flex-col items-center gap-2"
+              >
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center backdrop-blur-md"
+                  style={{
+                    backgroundColor: GUINEA_RED + '18',
+                    border: `1px solid ${GUINEA_RED}30`,
+                    boxShadow: `inset 0 1px 0 rgba(255,255,255,0.08), 0 2px 8px ${GUINEA_RED}10`,
+                  }}
+                >
+                  <span className="text-xl" style={{ color: GUINEA_YELLOW }}>⚙</span>
                 </div>
-                <span className="text-xs font-bold text-white/80">Travail</span>
-              </div>
-              <div className="flex flex-col items-center gap-1">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: GUINEA_YELLOW + '20', border: `1px solid ${GUINEA_YELLOW}40` }}>
-                  <span className="text-lg" style={{ color: GUINEA_YELLOW }}>⚖</span>
+                <span className="text-[11px] font-bold text-white/80 tracking-wide">Travail</span>
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6, duration: 0.5 }}
+                className="flex flex-col items-center gap-2"
+              >
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center backdrop-blur-md"
+                  style={{
+                    backgroundColor: GUINEA_YELLOW + '18',
+                    border: `1px solid ${GUINEA_YELLOW}30`,
+                    boxShadow: `inset 0 1px 0 rgba(255,255,255,0.08), 0 2px 8px ${GUINEA_YELLOW}10`,
+                  }}
+                >
+                  <span className="text-xl" style={{ color: GUINEA_YELLOW }}>⚖</span>
                 </div>
-                <span className="text-xs font-bold text-white/80">Justice</span>
-              </div>
-              <div className="flex flex-col items-center gap-1">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: GUINEA_GREEN + '20', border: `1px solid ${GUINEA_GREEN}40` }}>
-                  <span className="text-lg" style={{ color: GUINEA_YELLOW }}>🤝</span>
+                <span className="text-[11px] font-bold text-white/80 tracking-wide">Justice</span>
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.7, duration: 0.5 }}
+                className="flex flex-col items-center gap-2"
+              >
+                <div
+                  className="w-12 h-12 rounded-xl flex items-center justify-center backdrop-blur-md"
+                  style={{
+                    backgroundColor: GUINEA_GREEN + '18',
+                    border: `1px solid ${GUINEA_GREEN}30`,
+                    boxShadow: `inset 0 1px 0 rgba(255,255,255,0.08), 0 2px 8px ${GUINEA_GREEN}10`,
+                  }}
+                >
+                  <span className="text-xl" style={{ color: GUINEA_YELLOW }}>🤝</span>
                 </div>
-                <span className="text-xs font-bold text-white/80">Solidarité</span>
-              </div>
+                <span className="text-[11px] font-bold text-white/80 tracking-wide">Solidarité</span>
+              </motion.div>
             </div>
           </motion.div>
 
@@ -163,181 +315,268 @@ export function LoginPage() {
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.5, duration: 0.5 }}
-            className="text-sm text-white/50 leading-relaxed"
+            transition={{ delay: 0.8, duration: 0.6 }}
+            className="text-[13px] text-white/40 leading-relaxed tracking-wide font-light"
           >
             Plateforme GovTech de nouvelle génération pour la modernisation
             de l&apos;administration publique de la République de Guinée.
             Sécurisée, souveraine et accessible à tous les citoyens.
           </motion.p>
 
-          {/* Sovereignty badge */}
+          {/* Sovereignty badge — glass effect */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.6, duration: 0.5 }}
-            className="flex items-center justify-center gap-2 text-[10px] text-white/30"
+            transition={{ delay: 0.9, duration: 0.5 }}
+            className="flex items-center justify-center gap-2"
           >
-            <Shield className="h-3 w-3" />
-            <span>Données hébergées en souveraineté nationale — Conformité Loi L/2016/018/AN</span>
+            <div
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-md"
+              style={{
+                backgroundColor: 'rgba(200,164,92,0.06)',
+                border: '1px solid rgba(200,164,92,0.12)',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
+              }}
+            >
+              <Shield className="h-3 w-3" style={{ color: `${GUINEA_YELLOW}80` }} />
+              <span className="text-[10px] text-white/35 font-medium tracking-wide">
+                Données hébergées en souveraineté nationale — Conformité Loi L/2016/018/AN
+              </span>
+            </div>
           </motion.div>
         </div>
       </div>
 
       {/* ═══ RIGHT PANEL — LOGIN FORM ═══ */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-8 bg-white dark:bg-[#0a1628] relative">
+      <div
+        className="flex-1 flex flex-col items-center justify-center p-6 sm:p-8 relative overflow-y-auto"
+        style={{
+          background: `
+            radial-gradient(ellipse at 50% 0%, rgba(200,164,92,0.03) 0%, transparent 60%),
+            radial-gradient(ellipse at 80% 100%, rgba(11,46,88,0.02) 0%, transparent 50%),
+            linear-gradient(180deg, #fafbfc 0%, #ffffff 100%)
+          `,
+        }}
+      >
+        {/* Dark mode right panel */}
+        <div className="absolute inset-0 hidden dark:block"
+          style={{
+            background: `
+              radial-gradient(ellipse at 50% 0%, rgba(200,164,92,0.03) 0%, transparent 60%),
+              radial-gradient(ellipse at 80% 100%, rgba(59,125,216,0.04) 0%, transparent 50%),
+              linear-gradient(180deg, #0a1628 0%, #0d1b30 100%)
+            `,
+          }}
+        />
+
         {/* Guinea tricolor stripe for mobile (replaces left panel) */}
-        <div className="lg:hidden absolute top-2 left-4 right-4 h-1.5 flex rounded-full overflow-hidden shadow-md">
+        <div className="lg:hidden absolute top-1.5 left-4 right-4 h-1 flex rounded-full overflow-hidden z-20"
+          style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
           <div className="flex-1" style={{ backgroundColor: GUINEA_RED }} />
           <div className="flex-1" style={{ backgroundColor: GUINEA_YELLOW }} />
           <div className="flex-1" style={{ backgroundColor: GUINEA_GREEN }} />
         </div>
 
         {/* Mobile logo */}
-        <div className="lg:hidden mb-6 mt-8 flex flex-col items-center gap-3">
+        <div className="lg:hidden mb-6 mt-8 flex flex-col items-center gap-3 relative z-10">
           <div className="relative">
-            <div className="absolute inset-0 rounded-full blur-lg opacity-20" style={{ backgroundColor: GUINEA_YELLOW }} />
+            <div className="absolute inset-0 rounded-full blur-lg opacity-25 animate-glow-pulse" style={{ backgroundColor: GUINEA_YELLOW }} />
+            <div className="absolute -inset-1 rounded-full" style={{ border: `1.5px solid ${GUINEA_YELLOW}30` }} />
             <img src="/logo-128.png" alt="Armories de la République de Guinée" className="w-16 h-16 relative z-10 object-contain" />
           </div>
           <div className="text-center">
-            <h1 className="text-xl font-bold text-[#0B2E58] dark:text-white">eAdministration Suite</h1>
-            <p className="text-sm font-medium" style={{ color: GUINEA_GREEN }}>Guinée</p>
+            <h1 className="text-xl font-bold text-gradient-navy">eAdministration Suite</h1>
+            <p className="text-sm font-semibold tracking-widest uppercase" style={{ color: GUINEA_GREEN }}>Guinée</p>
           </div>
         </div>
 
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="w-full max-w-md"
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className="w-full max-w-md relative z-10"
         >
-          {/* Login Card */}
-          <Card className="border-gray-200 dark:border-white/10 shadow-xl dark:bg-white/5 dark:backdrop-blur-xl">
+          {/* Login Card — glass-premium */}
+          <div className="glass-premium rounded-xl overflow-hidden">
             {/* Tricolor header strip */}
-            <div className="flex h-1.5 rounded-t-lg overflow-hidden">
+            <div className="flex h-1.5 overflow-hidden">
               <div className="flex-1" style={{ backgroundColor: GUINEA_RED }} />
               <div className="flex-1" style={{ backgroundColor: GUINEA_YELLOW }} />
               <div className="flex-1" style={{ backgroundColor: GUINEA_GREEN }} />
             </div>
 
-            <CardHeader className="text-center pb-2">
-              <CardTitle className="text-[#0B2E58] dark:text-white text-xl font-bold">Connexion</CardTitle>
-              <CardDescription className="text-gray-500 dark:text-white/50">
-                Accédez à votre espace de travail
-              </CardDescription>
-            </CardHeader>
+            <div className="p-6 sm:p-7 space-y-5">
+              {/* Header */}
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15, duration: 0.5 }}
+                className="text-center space-y-1.5"
+              >
+                <h2 className="text-[#0B2E58] dark:text-white text-xl font-bold tracking-tight">Connexion</h2>
+                <p className="text-sm text-gray-400 dark:text-white/40 font-medium">
+                  Accédez à votre espace de travail
+                </p>
+              </motion.div>
 
-            <CardContent className="space-y-4">
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Error message */}
-                {loginError && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex items-center gap-2 p-3 rounded-lg border"
-                    style={{ backgroundColor: GUINEA_RED + '10', borderColor: GUINEA_RED + '30' }}
-                  >
-                    <AlertCircle className="h-4 w-4 shrink-0" style={{ color: GUINEA_RED }} />
-                    <p className="text-sm" style={{ color: GUINEA_RED }}>{loginError}</p>
-                  </motion.div>
-                )}
+                <AnimatePresence mode="wait">
+                  {loginError && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -8, height: 0 }}
+                      animate={{ opacity: 1, y: 0, height: 'auto' }}
+                      exit={{ opacity: 0, y: -8, height: 0 }}
+                      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                      className="flex items-center gap-2.5 p-3 rounded-lg"
+                      style={{
+                        backgroundColor: GUINEA_RED + '08',
+                        border: `1px solid ${GUINEA_RED}20`,
+                      }}
+                    >
+                      <div className="flex items-center justify-center w-6 h-6 rounded-full shrink-0"
+                        style={{ backgroundColor: GUINEA_RED + '12' }}>
+                        <AlertCircle className="h-3.5 w-3.5" style={{ color: GUINEA_RED }} />
+                      </div>
+                      <p className="text-sm font-medium" style={{ color: GUINEA_RED }}>{loginError}</p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
                 {/* Email field */}
-                <div className="space-y-2">
-                  <Label className="text-[#0B2E58] dark:text-white/80 text-sm font-medium">Email</Label>
+                <motion.div
+                  initial={{ opacity: 0, x: -16 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.25, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                  className="space-y-2"
+                >
+                  <Label className="text-[#0B2E58] dark:text-white/70 text-xs font-semibold tracking-wide uppercase">
+                    Email
+                  </Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-white/40" />
+                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-300 dark:text-white/25" />
                     <Input
                       type="email"
                       placeholder="votre@email.gn"
                       value={email}
                       onChange={e => setEmail(e.target.value)}
-                      className="pl-10 bg-gray-50 dark:bg-white/10 border-gray-200 dark:border-white/10 text-[#0B2E58] dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:border-[#C8A45C]/50 focus:ring-[#C8A45C]/20"
+                      className="pl-10 glass-input focus-ring-premium h-11 text-[#0B2E58] dark:text-white placeholder:text-gray-300 dark:placeholder:text-white/25 text-sm font-medium"
                       required
                     />
                   </div>
-                </div>
+                </motion.div>
 
                 {/* Password field */}
-                <div className="space-y-2">
-                  <Label className="text-[#0B2E58] dark:text-white/80 text-sm font-medium">Mot de passe</Label>
+                <motion.div
+                  initial={{ opacity: 0, x: -16 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.35, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                  className="space-y-2"
+                >
+                  <Label className="text-[#0B2E58] dark:text-white/70 text-xs font-semibold tracking-wide uppercase">
+                    Mot de passe
+                  </Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-white/40" />
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-300 dark:text-white/25" />
                     <Input
                       type={showPassword ? 'text' : 'password'}
                       placeholder="••••••••"
                       value={password}
                       onChange={e => setPassword(e.target.value)}
-                      className="pl-10 pr-10 bg-gray-50 dark:bg-white/10 border-gray-200 dark:border-white/10 text-[#0B2E58] dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 focus:border-[#C8A45C]/50 focus:ring-[#C8A45C]/20"
+                      className="pl-10 pr-10 glass-input focus-ring-premium h-11 text-[#0B2E58] dark:text-white placeholder:text-gray-300 dark:placeholder:text-white/25 text-sm font-medium"
                       required
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 p-0.5 rounded-md transition-colors hover:bg-gray-100 dark:hover:bg-white/5"
                     >
                       {showPassword
-                        ? <EyeOff className="h-4 w-4 text-gray-400 dark:text-white/40 hover:text-gray-600 dark:hover:text-white/60 transition-colors" />
-                        : <Eye className="h-4 w-4 text-gray-400 dark:text-white/40 hover:text-gray-600 dark:hover:text-white/60 transition-colors" />
+                        ? <EyeOff className="h-4 w-4 text-gray-300 dark:text-white/30 hover:text-gray-500 dark:hover:text-white/60 transition-colors" />
+                        : <Eye className="h-4 w-4 text-gray-300 dark:text-white/30 hover:text-gray-500 dark:hover:text-white/60 transition-colors" />
                       }
                     </button>
                   </div>
-                </div>
+                </motion.div>
 
-                {/* Submit button — Guinea Green with gold text */}
-                <Button
-                  type="submit"
-                  disabled={isSubmitting || !email.trim() || !password.trim()}
-                  className="w-full font-semibold h-11 text-white shadow-lg transition-all duration-200"
-                  style={{
-                    background: isSubmitting || !email.trim() || !password.trim()
-                      ? '#6b7280'
-                      : `linear-gradient(135deg, ${GUINEA_GREEN}, ${GUINEA_GREEN}dd)`,
-                    boxShadow: (!isSubmitting && email.trim() && password.trim())
-                      ? `0 4px 14px ${GUINEA_GREEN}40`
-                      : 'none'
-                  }}
+                {/* Submit button — Guinea tricolor gradient (btn-guinea) */}
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.45, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
                 >
-                  {isSubmitting ? (
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                      className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full"
-                    />
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      Se connecter
-                      <ArrowRight className="h-4 w-4" />
-                    </span>
-                  )}
-                </Button>
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting || !email.trim() || !password.trim()}
+                    className="w-full h-11 font-bold text-sm tracking-wide transition-all duration-300 disabled:opacity-50"
+                    style={{
+                      background: (isSubmitting || !email.trim() || !password.trim())
+                        ? 'linear-gradient(135deg, #9ca3af, #6b7280)'
+                        : `linear-gradient(90deg, ${GUINEA_GREEN} 0%, ${GUINEA_GREEN} 30%, ${GUINEA_YELLOW} 30%, ${GUINEA_YELLOW} 36%, ${GUINEA_GREEN} 36%, ${GUINEA_GREEN} 64%, ${GUINEA_YELLOW} 64%, ${GUINEA_YELLOW} 70%, ${GUINEA_GREEN} 70%)`,
+                      backgroundSize: (isSubmitting || !email.trim() || !password.trim()) ? '100%' : '200% 100%',
+                      color: '#FFFFFF',
+                      textShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                      boxShadow: (!isSubmitting && email.trim() && password.trim())
+                        ? `0 4px 16px ${GUINEA_GREEN}35, 0 0 24px ${GUINEA_GREEN}15`
+                        : 'none',
+                      borderRadius: 'var(--radius)',
+                    }}
+                  >
+                    {isSubmitting ? (
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                        className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full"
+                      />
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        Se connecter
+                        <ArrowRight className="h-4 w-4" />
+                      </span>
+                    )}
+                  </Button>
+                </motion.div>
               </form>
 
-              <Separator className="bg-gray-200 dark:bg-white/10" />
+              {/* Premium divider */}
+              <div className="divider-premium" />
 
               {/* Register link */}
-              <div className="text-center">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.55, duration: 0.5 }}
+                className="text-center"
+              >
                 <button
                   onClick={() => navigate('register')}
-                  className="text-sm text-gray-500 dark:text-white/50 hover:text-[#0B2E58] dark:hover:text-white/80 transition-colors"
+                  className="text-sm text-gray-400 dark:text-white/35 hover:text-[#0B2E58] dark:hover:text-white/70 transition-colors duration-300 font-medium"
                 >
                   Pas encore de compte ?{' '}
-                  <span className="font-medium" style={{ color: GUINEA_GREEN }}>Créer un compte citoyen</span>
+                  <span className="font-semibold" style={{ color: GUINEA_GREEN }}>Créer un compte citoyen</span>
                 </button>
-              </div>
-            </CardContent>
-          </Card>
+              </motion.div>
+            </div>
+          </div>
 
           {/* ═══ DEMO ACCOUNTS SECTION ═══ */}
-          <div className="mt-6 space-y-3">
-            <div className="flex items-center gap-2">
-              <Fingerprint className="h-4 w-4" style={{ color: GUINEA_YELLOW }} />
-              <h3 className="text-sm font-semibold text-[#0B2E58] dark:text-white">Comptes de démonstration</h3>
-              <span className="text-[10px] text-gray-400 dark:text-white/30">— Cliquez pour connexion rapide</span>
-            </div>
+          <motion.div
+            variants={containerStagger}
+            initial="hidden"
+            animate="visible"
+            className="mt-6 space-y-3"
+          >
+            <motion.div variants={itemSlideUp} className="flex items-center gap-2.5">
+              <div className="flex items-center justify-center w-7 h-7 rounded-lg"
+                style={{ backgroundColor: `${GUINEA_YELLOW}10`, border: `1px solid ${GUINEA_YELLOW}20` }}>
+                <Fingerprint className="h-3.5 w-3.5" style={{ color: GUINEA_YELLOW }} />
+              </div>
+              <h3 className="text-sm font-semibold text-[#0B2E58] dark:text-white tracking-tight">Comptes de démonstration</h3>
+              <span className="text-[10px] text-gray-300 dark:text-white/20 font-medium">— Cliquez pour connexion rapide</span>
+            </motion.div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {Object.entries(DEMO_ACCOUNTS).map(([emailKey, account]) => {
+              {demoAccounts.map(([emailKey, account]) => {
                 const RoleIcon = ROLE_ICONS[account.user.role]
                 const roleLabel = ROLE_LABELS[account.user.role]
                 const roleColor = ROLE_ICON_COLORS[account.user.role]
@@ -355,37 +594,53 @@ export function LoginPage() {
                 return (
                   <motion.button
                     key={emailKey}
-                    whileHover={{ scale: 1.02, y: -1 }}
-                    whileTap={{ scale: 0.98 }}
+                    variants={itemFadeScale}
+                    whileHover={{ scale: 1.03, y: -2 }}
+                    whileTap={{ scale: 0.97 }}
                     onClick={() => handleQuickLogin(emailKey)}
-                    className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white dark:bg-white/5 border-2 border-gray-100 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 hover:shadow-md transition-all duration-200 text-left group"
-                    style={{ borderLeftWidth: '3px', borderLeftColor: guineaRoleBorder[account.user.role] }}
+                    className="card-interactive flex items-center gap-2.5 p-3 rounded-xl text-left group"
+                    style={{
+                      borderLeftWidth: '3px',
+                      borderLeftColor: guineaRoleBorder[account.user.role],
+                    }}
                   >
-                    <div className={`flex size-9 items-center justify-center rounded-lg bg-gray-50 dark:bg-white/10 shrink-0 ${roleColor}`}>
+                    <div
+                      className={`flex size-9 items-center justify-center rounded-lg shrink-0 ${roleColor}`}
+                      style={{
+                        backgroundColor: guineaRoleBorder[account.user.role] + '10',
+                        boxShadow: `inset 0 1px 0 rgba(255,255,255,0.05)`,
+                      }}
+                    >
                       <RoleIcon className="size-4" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 mb-0.5">
-                        <p className="text-xs font-semibold text-[#0B2E58] dark:text-white truncate">{account.user.name}</p>
+                        <p className="text-xs font-semibold text-[#0B2E58] dark:text-white truncate tracking-tight">{account.user.name}</p>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold"
-                          style={{ backgroundColor: guineaRoleBorder[account.user.role] + '15', color: guineaRoleBorder[account.user.role] }}>
+                        <span
+                          className="inline-flex items-center px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wide"
+                          style={{
+                            backgroundColor: guineaRoleBorder[account.user.role] + '12',
+                            color: guineaRoleBorder[account.user.role],
+                            border: `1px solid ${guineaRoleBorder[account.user.role]}18`,
+                          }}
+                        >
                           {roleLabel}
                         </span>
-                        <span className="text-[9px] text-gray-400 dark:text-white/30 truncate">{emailKey}</span>
+                        <span className="text-[9px] text-gray-300 dark:text-white/20 truncate font-medium">{emailKey}</span>
                       </div>
                     </div>
-                    <ArrowRight className="size-3.5 text-gray-300 dark:text-white/20 group-hover:text-[#0B2E58] dark:group-hover:text-white/60 transition-colors shrink-0" />
+                    <ArrowRight className="size-3.5 text-gray-200 dark:text-white/15 group-hover:text-[#0B2E58] dark:group-hover:text-white/50 transition-colors duration-300 shrink-0" />
                   </motion.button>
                 )
               })}
             </div>
 
-            <p className="text-[10px] text-gray-400 dark:text-white/30 text-center pt-1">
-              Mot de passe : <span className="font-mono text-gray-500 dark:text-white/50">demo123</span> • Super Admin : <span className="font-mono text-gray-500 dark:text-white/50">admin2026</span>
-            </p>
-          </div>
+            <motion.p variants={itemSlideUp} className="text-[10px] text-gray-300 dark:text-white/20 text-center pt-1 font-medium">
+              Mot de passe : <span className="font-mono text-gray-400 dark:text-white/40">demo123</span> • Super Admin : <span className="font-mono text-gray-400 dark:text-white/40">admin2026</span>
+            </motion.p>
+          </motion.div>
 
           {/* Bottom tricolor for mobile */}
           <div className="lg:hidden mt-6 flex h-1 rounded-full overflow-hidden">

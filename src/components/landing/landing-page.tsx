@@ -68,6 +68,63 @@ function CounterAnimation({ target, suffix = '' }: { target: number; suffix?: st
   return <span ref={ref}>{count.toLocaleString('fr-FR')}{suffix}</span>
 }
 
+/* ─── Floating Particles Component ───────────────────── */
+function FloatingParticles() {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {[...Array(20)].map((_, i) => (
+        <div
+          key={i}
+          className="absolute w-1 h-1 bg-[#C8A45C]/30 rounded-full"
+          style={{
+            left: `${Math.random() * 100}%`,
+            top: `${Math.random() * 100}%`,
+            animation: `float-particle ${8 + Math.random() * 12}s ease-in-out infinite`,
+            animationDelay: `${Math.random() * 5}s`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
+/* ─── Typing Reveal Text ─────────────────────────────── */
+function TypingReveal({ text, className }: { text: string; className?: string }) {
+  const [displayed, setDisplayed] = useState('')
+  const [started, setStarted] = useState(false)
+  const ref = useRef(null)
+  const inView = useInView(ref, { once: true })
+
+  useEffect(() => {
+    if (inView && !started) {
+      setStarted(true)
+    }
+  }, [inView, started])
+
+  useEffect(() => {
+    if (!started) return
+    let idx = 0
+    const timer = setInterval(() => {
+      if (idx < text.length) {
+        setDisplayed(text.slice(0, idx + 1))
+        idx++
+      } else {
+        clearInterval(timer)
+      }
+    }, 40)
+    return () => clearInterval(timer)
+  }, [started, text])
+
+  return (
+    <span ref={ref} className={className}>
+      {displayed}
+      {displayed.length < text.length && started && (
+        <span className="inline-block w-[3px] h-[0.8em] bg-[#C8A45C] ml-1 animate-pulse align-middle" />
+      )}
+    </span>
+  )
+}
+
 /* ─── Data ────────────────────────────────────────────── */
 const modules = [
   {
@@ -230,26 +287,36 @@ export function LandingPage() {
 
   return (
     <div className="min-h-screen overflow-hidden">
-      {/* ─── HERO ──────────────────────────────────────────── */}
+      {/* ─── HERO — Presidential Digital ────────────────────── */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
         {/* Background image - Conakry skyline */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{ backgroundImage: "url('/guinea-hero-conakry.png')" }}
         />
-        {/* Dark overlay with national gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0B2E58]/90 via-[#134A8E]/85 to-[#0B2E58]/90" />
-        {/* Grid pattern */}
+        {/* Sophisticated mesh gradient overlay */}
+        <div className="absolute inset-0 hero-mesh-gradient/92" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0B2E58]/60 via-transparent to-[#0B2E58]/80" />
+
+        {/* Animated moving grid lines */}
         <div
-          className="absolute inset-0 opacity-[0.04]"
+          className="absolute inset-0 opacity-[0.03]"
           style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+            backgroundImage:
+              'linear-gradient(rgba(200,164,92,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(200,164,92,0.3) 1px, transparent 1px)',
+            backgroundSize: '80px 80px',
+            animation: 'grid-drift 20s linear infinite',
           }}
         />
+
+        {/* Floating particles */}
+        <FloatingParticles />
+
         {/* Animated orbs */}
         <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-[#C8A45C]/20 rounded-full blur-[120px] animate-pulse-soft" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#3B7DD8]/20 rounded-full blur-[120px] animate-pulse-soft" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#3B7DD8]/20 rounded-full blur-[120px] animate-pulse-soft delay-500" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-[#C8A45C]/10 rounded-full blur-[150px]" />
+        <div className="absolute bottom-1/3 left-1/3 w-64 h-64 bg-[#009460]/10 rounded-full blur-[100px] animate-pulse-soft delay-300" />
 
         {/* Guinea tricolor accent line */}
         <div className="absolute top-0 left-0 right-0 h-1 flex">
@@ -276,44 +343,81 @@ export function LandingPage() {
               </p>
             </motion.div>
 
-            <Badge className="mb-6 bg-[#C8A45C]/20 text-[#C8A45C] border-[#C8A45C]/30 hover:bg-[#C8A45C]/30">
-              <Landmark className="h-3.5 w-3.5 mr-1" />
-              Plateforme Nationale de eAdministration — République de Guinée
-            </Badge>
+            {/* Premium hero badge with glassmorphism + gold border */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="mb-8 inline-block"
+            >
+              <div className="glass-premium rounded-full px-5 py-2 inline-flex items-center gap-2 animate-border-glow">
+                <Landmark className="h-4 w-4 text-[#C8A45C]" />
+                <span className="text-sm font-semibold text-gradient-gold">
+                  Plateforme Nationale de eAdministration — République de Guinée
+                </span>
+              </div>
+            </motion.div>
 
+            {/* Main heading with typing reveal effect */}
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white leading-tight tracking-tight">
-              L&apos;administration numérique
-              <br className="hidden sm:block" /> de la{' '}
-              <span className="text-[#C8A45C]">République de Guinée</span>
+              <motion.span
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.5 }}
+                className="block"
+              >
+                L&apos;administration numérique
+              </motion.span>
+              <motion.span
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.7 }}
+                className="block"
+              >
+                de la{' '}
+                <TypingReveal
+                  text="République de Guinée"
+                  className="text-gradient-gold"
+                />
+              </motion.span>
             </h1>
 
-            <p className="mt-6 text-lg sm:text-xl text-white/70 max-w-3xl mx-auto leading-relaxed">
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.8, delay: 1.2 }}
+              className="mt-6 text-lg sm:text-xl text-white/70 max-w-3xl mx-auto leading-relaxed"
+            >
               Conformément à la Circulaire n°001/PM/CAB, la plateforme eAdministration Suite assure
               la digitalisation de l&apos;ensemble des procédures administratives pour les 24 institutions
               de l&apos;État guinéen et les 8 régions administratives.
-            </p>
+            </motion.p>
 
-            <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Button
-                size="lg"
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 1.4 }}
+              className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4"
+            >
+              {/* Premium CTA button with gold shimmer */}
+              <button
                 onClick={() => navigate('login')}
-                className="h-12 px-8 text-base bg-[#C8A45C] hover:bg-[#C8A45C]/90 text-[#0B2E58] font-semibold"
+                className="btn-gold h-12 px-8 text-base font-semibold shadow-gold animate-shimmer-gold"
               >
                 Accéder à la plateforme
                 <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
+              </button>
+              {/* Glass effect outline button */}
+              <button
                 onClick={() => navigate('citizen-portal')}
-                className="h-12 px-8 text-base border-white/20 text-white hover:bg-white/10"
+                className="h-12 px-8 text-base font-semibold rounded-[var(--radius)] border border-white/20 text-white hover:bg-white/10 backdrop-blur-md bg-white/5 transition-all duration-300 hover:border-white/30 hover:shadow-lg"
               >
                 Portail Citoyen
-              </Button>
-            </div>
+              </button>
+            </motion.div>
           </motion.div>
 
-          {/* Floating stat cards */}
+          {/* Floating stat cards with glass-premium */}
           <motion.div
             initial={{ opacity: 0, y: 60 }}
             animate={{ opacity: 1, y: 0 }}
@@ -327,11 +431,11 @@ export function LandingPage() {
             ].map((stat) => (
               <div
                 key={stat.label}
-                className="glass rounded-xl p-4 text-center group hover:bg-white/10 transition-colors"
+                className="glass-premium rounded-xl p-4 text-center group hover:bg-white/10 transition-all duration-300"
               >
-                <stat.icon className="h-6 w-6 text-[#C8A45C] mx-auto mb-2" />
-                <div className="text-2xl font-bold text-white">{stat.value}</div>
-                <div className="text-sm text-white/60">{stat.label}</div>
+                <stat.icon className="h-6 w-6 text-[#C8A45C] mx-auto mb-2 group-hover:scale-110 transition-transform" />
+                <div className="text-2xl font-bold text-white tabular-nums tracking-tight">{stat.value}</div>
+                <div className="text-sm text-white/60 font-medium">{stat.label}</div>
               </div>
             ))}
           </motion.div>
@@ -351,22 +455,23 @@ export function LandingPage() {
         <div className="absolute inset-0 bg-background/92" />
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div variants={fadeUp} className="text-center mb-12">
-            <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+            <div className="badge-premium inline-flex mb-3">
+              <Building2 className="h-3.5 w-3.5" />
               Institutions de la République
-            </p>
+            </div>
             <p className="mt-2 text-xs text-muted-foreground">
               Les institutions de l&apos;État guinéen engagées dans la transformation numérique
             </p>
           </motion.div>
           <motion.div
             variants={stagger}
-            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4"
+            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 lg:gap-5"
           >
             {institutionNames.map((name) => (
               <motion.div
                 key={name}
                 variants={fadeUp}
-                className="glass-card rounded-xl p-4 text-center hover:shadow-md transition-shadow"
+                className="card-interactive rounded-xl p-4 text-center"
               >
                 <Building2 className="h-7 w-7 text-[#0B2E58]/40 dark:text-primary/40 mx-auto mb-2" />
                 <p className="text-xs font-medium text-muted-foreground leading-tight">{name}</p>
@@ -386,7 +491,7 @@ export function LandingPage() {
             </Badge>
             <h2 className="text-3xl sm:text-4xl font-bold text-foreground">
               Une nation d&apos;exception,{' '}
-              <span className="gradient-text">une richesse naturelle</span>
+              <span className="text-gradient-gold">une richesse naturelle</span>
             </h2>
             <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
               De Conakry aux hauts plateaux du Fouta Djallon, du Mont Nimba au fleuve Niger, la Guinée offre des paysages d&apos;une beauté incomparable.
@@ -427,21 +532,23 @@ export function LandingPage() {
               },
             ].map((item) => (
               <motion.div key={item.title} variants={fadeUp}>
-                <Card className="overflow-hidden hover:shadow-xl transition-all duration-300 group h-full border-transparent hover:border-[#C8A45C]/30">
+                <div className="card-interactive overflow-hidden group h-full">
                   <div className="relative h-48 overflow-hidden">
                     <div
-                      className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110"
+                      className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110"
                       style={{ backgroundImage: `url('${item.img}')` }}
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                    {/* Premium gradient overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0B2E58]/80 via-[#0B2E58]/20 to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-br from-[#C8A45C]/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                     <div className="absolute bottom-3 left-4">
                       <h3 className="text-white font-semibold text-sm">{item.title}</h3>
                     </div>
                   </div>
-                  <CardContent className="p-4">
+                  <div className="p-4 bg-card">
                     <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               </motion.div>
             ))}
           </div>
@@ -452,12 +559,13 @@ export function LandingPage() {
       <AnimatedSection className="py-24 bg-muted/30">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div variants={fadeUp} className="text-center mb-16">
-            <Badge variant="outline" className="mb-4 border-[#C8A45C]/50 text-[#C8A45C]">
+            <div className="badge-premium inline-flex mb-4">
+              <Sparkles className="h-3.5 w-3.5" />
               Modules
-            </Badge>
+            </div>
             <h2 className="text-3xl sm:text-4xl font-bold text-foreground">
               Une suite complète pour{' '}
-              <span className="gradient-text">l&apos;administration numérique</span>
+              <span className="text-gradient-gold">l&apos;administration numérique</span>
             </h2>
             <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
               Six modules intégrés conformes aux exigences réglementaires de la République de Guinée.
@@ -467,16 +575,17 @@ export function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {modules.map((mod) => (
               <motion.div key={mod.title} variants={fadeUp}>
-                <Card className="glass-card hover:shadow-lg transition-all duration-300 group border-transparent hover:border-[#C8A45C]/30 h-full">
-                  <CardContent className="p-6">
-                    <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-[#0B2E58]/10 dark:bg-primary/10 group-hover:bg-[#0B2E58] dark:group-hover:bg-primary transition-colors">
-                      <mod.icon className="h-6 w-6 text-[#0B2E58] dark:text-primary group-hover:text-white dark:group-hover:text-primary-foreground transition-colors" />
+                <div className="card-interactive h-full group">
+                  <div className="p-6">
+                    {/* Refined icon container with gradient on hover */}
+                    <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-[#0B2E58]/10 to-[#3B7DD8]/5 dark:from-primary/10 dark:to-primary/5 group-hover:from-[#0B2E58] group-hover:to-[#134A8E] dark:group-hover:from-primary dark:group-hover:to-primary/80 transition-all duration-400">
+                      <mod.icon className="h-6 w-6 text-[#0B2E58] dark:text-primary group-hover:text-[#C8A45C] transition-colors duration-400" />
                     </div>
                     <h3 className="text-lg font-semibold text-foreground mb-1">{mod.title}</h3>
-                    <p className="text-sm font-medium text-[#C8A45C] mb-3">{mod.desc}</p>
+                    <p className="text-sm font-medium text-gradient-gold mb-3">{mod.desc}</p>
                     <p className="text-sm text-muted-foreground leading-relaxed">{mod.detail}</p>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               </motion.div>
             ))}
           </div>
@@ -492,7 +601,7 @@ export function LandingPage() {
             </Badge>
             <h2 className="text-3xl sm:text-4xl font-bold text-foreground">
               Des fonctionnalités{' '}
-              <span className="gradient-text">de pointe</span>
+              <span className="text-gradient-gold">de pointe</span>
             </h2>
             <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
               Chaque fonctionnalité est conçue pour répondre aux exigences de l&apos;administration publique guinéenne.
@@ -502,8 +611,11 @@ export function LandingPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {features.map((feat) => (
               <motion.div key={feat.title} variants={fadeUp}>
-                <div className="glass-card rounded-xl p-5 h-full hover:shadow-md transition-all duration-300 group">
-                  <feat.icon className="h-8 w-8 text-[#0B2E58] dark:text-primary mb-3 group-hover:text-[#C8A45C] transition-colors" />
+                <div className="card-interactive rounded-xl p-5 h-full group">
+                  {/* Icon with gradient background */}
+                  <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-[#0B2E58]/10 to-[#C8A45C]/5 dark:from-primary/10 dark:to-gold/5 group-hover:from-[#0B2E58]/20 group-hover:to-[#C8A45C]/10 transition-all duration-300">
+                    <feat.icon className="h-5 w-5 text-[#0B2E58] dark:text-primary group-hover:text-[#C8A45C] transition-colors" />
+                  </div>
                   <h3 className="text-sm font-semibold text-foreground mb-2">{feat.title}</h3>
                   <p className="text-xs text-muted-foreground leading-relaxed">{feat.desc}</p>
                 </div>
@@ -517,13 +629,13 @@ export function LandingPage() {
       <AnimatedSection className="py-24 bg-muted/30">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div variants={fadeUp} className="text-center mb-16">
-            <Badge variant="outline" className="mb-4 border-[#C8A45C]/50 text-[#C8A45C]">
-              <Scale className="h-3.5 w-3.5 mr-1" />
+            <div className="badge-premium inline-flex mb-4">
+              <Scale className="h-3.5 w-3.5" />
               Gouvernance
-            </Badge>
+            </div>
             <h2 className="text-3xl sm:text-4xl font-bold text-foreground">
               Conformité et{' '}
-              <span className="gradient-text">Gouvernance Numérique</span>
+              <span className="text-gradient-gold">Gouvernance Numérique</span>
             </h2>
             <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
               La plateforme est conforme à l&apos;ensemble du cadre juridique et réglementaire de la République de Guinée.
@@ -533,10 +645,10 @@ export function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {LEGAL_REFERENCES.map((ref) => (
               <motion.div key={ref.id} variants={fadeUp}>
-                <Card className="glass-card hover:shadow-lg transition-all duration-300 h-full border-transparent hover:border-[#C8A45C]/30">
-                  <CardContent className="p-6">
+                <div className="card-interactive h-full">
+                  <div className="p-6">
                     <div className="flex items-start justify-between mb-3">
-                      <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[#0B2E58]/10 dark:bg-primary/10">
+                      <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-[#0B2E58]/10 to-[#3B7DD8]/5 dark:from-primary/10 dark:to-primary/5">
                         <BookOpen className="h-5 w-5 text-[#0B2E58] dark:text-primary" />
                       </div>
                       <Badge
@@ -550,27 +662,34 @@ export function LandingPage() {
                         {ref.status === 'conforme' ? 'Conforme' : 'En application'}
                       </Badge>
                     </div>
-                    <p className="text-xs font-mono text-[#C8A45C] mb-1">{ref.reference}</p>
+                    <p className="text-xs font-mono text-gradient-gold mb-1">{ref.reference}</p>
                     <h3 className="text-sm font-semibold text-foreground mb-2">{ref.title}</h3>
                     <p className="text-xs text-muted-foreground leading-relaxed">{ref.description}</p>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               </motion.div>
             ))}
           </div>
 
-          {/* Data sovereignty banner */}
+          {/* Data sovereignty banner with tricolor gradient */}
           <motion.div variants={fadeUp} className="mt-10">
-            <div className="rounded-xl bg-gradient-to-r from-[#0B2E58] to-[#134A8E] p-6 text-center">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <Database className="h-5 w-5 text-[#C8A45C]" />
-                <span className="text-[#C8A45C] font-semibold text-sm uppercase tracking-wider">
-                  Souveraineté des données
-                </span>
+            <div className="relative rounded-xl overflow-hidden p-6 text-center shadow-premium">
+              {/* Tricolor gradient background */}
+              <div className="absolute inset-0 bg-gradient-to-r from-[#0B2E58] via-[#134A8E] to-[#0B2E58]" />
+              <div className="absolute inset-0 opacity-20 bg-gradient-to-r from-[#CE1126] via-[#FCD116] to-[#009460]" style={{ backgroundSize: '200% 100%', animation: 'gradient-flow 8s ease infinite' }} />
+              {/* Top gold accent line */}
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#C8A45C]/60 to-transparent" />
+              <div className="relative z-10">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <Database className="h-5 w-5 text-[#C8A45C]" />
+                  <span className="text-[#C8A45C] font-semibold text-sm uppercase tracking-wider">
+                    Souveraineté des données
+                  </span>
+                </div>
+                <p className="text-white/80 text-sm">
+                  Hébergement des données sur le territoire national — Conformément à la Loi n°L/2016/018/AN sur la protection des données personnelles
+                </p>
               </div>
-              <p className="text-white/80 text-sm">
-                Hébergement des données sur le territoire national — Conformément à la Loi n°L/2016/018/AN sur la protection des données personnelles
-              </p>
             </div>
           </motion.div>
         </div>
@@ -586,13 +705,13 @@ export function LandingPage() {
         <div className="absolute inset-0 bg-background/93" />
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div variants={fadeUp} className="text-center mb-16">
-            <Badge variant="outline" className="mb-4 border-[#0B2E58]/30 dark:border-primary/30 text-[#0B2E58] dark:text-primary">
-              <Flag className="h-3.5 w-3.5 mr-1" />
+            <div className="badge-premium inline-flex mb-4">
+              <Flag className="h-3.5 w-3.5" />
               Souveraineté
-            </Badge>
+            </div>
             <h2 className="text-3xl sm:text-4xl font-bold text-foreground">
               Souveraineté numérique et{' '}
-              <span className="gradient-text">hébergement national</span>
+              <span className="text-gradient-gold">hébergement national</span>
             </h2>
             <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
               L&apos;infrastructure de la plateforme est entièrement hébergée sur le territoire national, garantissant la souveraineté des données de l&apos;État guinéen.
@@ -602,15 +721,15 @@ export function LandingPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {sovereigntyCards.map((card) => (
               <motion.div key={card.title} variants={fadeUp}>
-                <Card className="glass-card hover:shadow-lg transition-all duration-300 group h-full border-transparent hover:border-[#C8A45C]/30">
-                  <CardContent className="p-6 text-center">
-                    <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#0B2E58]/10 dark:bg-primary/10 group-hover:bg-[#0B2E58] dark:group-hover:bg-primary transition-colors">
-                      <card.icon className="h-7 w-7 text-[#0B2E58] dark:text-primary group-hover:text-[#C8A45C] transition-colors" />
+                <div className="card-interactive group h-full">
+                  <div className="p-6 text-center">
+                    <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#0B2E58]/10 to-[#3B7DD8]/5 dark:from-primary/10 dark:to-primary/5 group-hover:from-[#0B2E58] group-hover:to-[#134A8E] dark:group-hover:from-primary dark:group-hover:to-primary/80 transition-all duration-400">
+                      <card.icon className="h-7 w-7 text-[#0B2E58] dark:text-primary group-hover:text-[#C8A45C] transition-colors duration-400" />
                     </div>
                     <h3 className="text-sm font-semibold text-foreground mb-2">{card.title}</h3>
                     <p className="text-xs text-muted-foreground leading-relaxed">{card.desc}</p>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               </motion.div>
             ))}
           </div>
@@ -625,10 +744,13 @@ export function LandingPage() {
           style={{ backgroundImage: "url('/guinea-nimba-mountains.png')" }}
         />
         <div className="absolute inset-0 bg-[#0B2E58]/92 dark:bg-primary/92" />
+        {/* Mesh gradient overlay */}
+        <div className="absolute inset-0 opacity-30 hero-mesh-gradient" />
         <div className="absolute inset-0 opacity-[0.03]" style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
         }} />
         <div className="absolute top-0 right-0 w-96 h-96 bg-[#C8A45C]/10 rounded-full blur-[120px]" />
+        <div className="absolute bottom-1/4 left-0 w-80 h-80 bg-[#3B7DD8]/8 rounded-full blur-[100px]" />
 
         {/* Guinea tricolor accent at bottom */}
         <div className="absolute bottom-0 left-0 right-0 h-1 flex">
@@ -658,8 +780,11 @@ export function LandingPage() {
                   variants={fadeUp}
                   className="text-center"
                 >
-                  <stat.icon className="h-6 w-6 text-[#C8A45C]/60 mx-auto mb-3" />
-                  <div className="text-4xl sm:text-5xl font-bold text-[#C8A45C]">
+                  {/* Refined icon container */}
+                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/5 mb-4">
+                    <stat.icon className="h-6 w-6 text-[#C8A45C]/70" />
+                  </div>
+                  <div className="text-4xl sm:text-5xl font-bold text-gradient-gold tabular-nums tracking-tight">
                     <CounterAnimation target={stat.value} suffix={stat.suffix} />
                   </div>
                   <div className="mt-2 text-sm font-medium text-white/70">{stat.label}</div>
@@ -680,11 +805,12 @@ export function LandingPage() {
         <div className="absolute inset-0 bg-background/93" />
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div variants={fadeUp} className="text-center mb-16">
-            <Badge variant="outline" className="mb-4 border-[#C8A45C]/50 text-[#C8A45C]">
+            <div className="badge-premium inline-flex mb-4">
+              <Zap className="h-3.5 w-3.5" />
               Processus
-            </Badge>
+            </div>
             <h2 className="text-3xl sm:text-4xl font-bold text-foreground">
-              Comment ça <span className="gradient-text">fonctionne</span>
+              Comment ça <span className="text-gradient-gold">fonctionne</span>
             </h2>
             <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
               Déploiement de la plateforme dans les institutions de l&apos;État en 4 étapes réglementaires.
@@ -692,18 +818,22 @@ export function LandingPage() {
           </motion.div>
 
           <div className="relative">
-            {/* Connecting line */}
-            <div className="hidden lg:block absolute top-1/2 left-0 right-0 h-0.5 bg-gradient-to-r from-[#0B2E58]/10 via-[#C8A45C]/40 to-[#0B2E58]/10 dark:from-primary/10 dark:via-gold/40 dark:to-primary/10" />
+            {/* Connecting line with gradient effect */}
+            <div className="hidden lg:block absolute top-[2rem] left-[12%] right-[12%] h-[2px]">
+              <div className="w-full h-full bg-gradient-to-r from-[#0B2E58]/20 via-[#C8A45C]/50 to-[#0B2E58]/20 dark:from-primary/20 dark:via-[#C8A45C]/50 dark:to-primary/20 rounded-full" />
+              <div className="absolute inset-0 animate-shimmer-gold opacity-50 rounded-full" />
+            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-6">
               {steps.map((step) => (
                 <motion.div key={step.num} variants={fadeUp} className="relative">
                   <div className="text-center">
+                    {/* Step circle with gradient background and gold accents */}
                     <div className="relative inline-flex mb-6">
-                      <div className="h-16 w-16 rounded-full bg-[#0B2E58] dark:bg-primary flex items-center justify-center shadow-lg">
+                      <div className="h-16 w-16 rounded-full bg-gradient-to-br from-[#0B2E58] to-[#134A8E] dark:from-primary dark:to-primary/80 flex items-center justify-center shadow-lg shadow-navy animate-glow-pulse">
                         <step.icon className="h-7 w-7 text-[#C8A45C]" />
                       </div>
-                      <div className="absolute -top-2 -right-2 h-7 w-7 rounded-full bg-[#C8A45C] text-[#0B2E58] text-xs font-bold flex items-center justify-center">
+                      <div className="absolute -top-2 -right-2 h-7 w-7 rounded-full bg-gradient-to-br from-[#C8A45C] to-[#D4B878] text-[#0B2E58] text-xs font-bold flex items-center justify-center shadow-gold">
                         {step.num}
                       </div>
                     </div>
@@ -727,19 +857,21 @@ export function LandingPage() {
         <div className="absolute inset-0 bg-muted/90" />
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <motion.div variants={fadeUp} className="text-center mb-16">
-            <Badge variant="outline" className="mb-4 border-[#0B2E58]/30 dark:border-primary/30 text-[#0B2E58] dark:text-primary">
+            <div className="badge-premium inline-flex mb-4">
+              <Award className="h-3.5 w-3.5" />
               Témoignages
-            </Badge>
+            </div>
             <h2 className="text-3xl sm:text-4xl font-bold text-foreground">
-              Les retours des <span className="gradient-text">institutions de l&apos;État</span>
+              Les retours des <span className="text-gradient-gold">institutions de l&apos;État</span>
             </h2>
           </motion.div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {testimonials.map((t) => (
               <motion.div key={t.name} variants={fadeUp}>
-                <Card className="glass-card h-full border-transparent hover:shadow-lg transition-shadow">
-                  <CardContent className="p-6">
+                <div className="card-interactive h-full">
+                  <div className="p-6">
+                    {/* Star ratings with gold gradient */}
                     <div className="flex items-center gap-1 mb-4">
                       {[...Array(5)].map((_, i) => (
                         <Star key={i} className="h-4 w-4 fill-[#C8A45C] text-[#C8A45C]" />
@@ -749,17 +881,17 @@ export function LandingPage() {
                       &ldquo;{t.text}&rdquo;
                     </p>
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-[#0B2E58] dark:bg-primary flex items-center justify-center text-white text-sm font-bold">
+                      <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#0B2E58] to-[#134A8E] dark:from-primary dark:to-primary/80 flex items-center justify-center text-white text-sm font-bold shadow-navy">
                         {t.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-foreground">{t.name}</p>
-                        <p className="text-xs text-[#C8A45C] font-medium">{t.role}</p>
+                        <p className="text-xs text-gradient-gold font-medium">{t.role}</p>
                         <p className="text-xs text-muted-foreground">{t.org}</p>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               </motion.div>
             ))}
           </div>
@@ -773,11 +905,17 @@ export function LandingPage() {
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
           style={{ backgroundImage: "url('/guinea-fouta-djallon.png')" }}
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0B2E58]/92 via-[#134A8E]/88 to-[#0B2E58]/92 dark:from-primary/92 dark:via-primary/85 dark:to-primary/92" />
+        {/* Premium gradient background with mesh effect */}
+        <div className="absolute inset-0 hero-mesh-gradient/92" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0B2E58]/70 via-transparent to-[#0B2E58]/90" />
         <div className="absolute inset-0 opacity-[0.04]" style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
         }} />
         <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-[#C8A45C]/15 rounded-full blur-[100px]" />
+        <div className="absolute bottom-1/3 right-1/3 w-60 h-60 bg-[#3B7DD8]/10 rounded-full blur-[80px]" />
+
+        {/* Floating particles */}
+        <FloatingParticles />
 
         {/* Guinea tricolor accent */}
         <div className="absolute top-0 left-0 right-0 h-1 flex">
@@ -792,34 +930,39 @@ export function LandingPage() {
           </p>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight">
             Rejoignez la transformation numérique de{' '}
-            <span className="text-[#C8A45C]">l&apos;administration guinéenne</span>
+            <span className="text-gradient-gold">l&apos;administration guinéenne</span>
           </h2>
           <p className="mt-6 text-lg text-white/70 max-w-2xl mx-auto">
             Conformément à la Circulaire n°001/PM/CAB, toutes les institutions de l&apos;État sont appelées à adopter la plateforme eAdministration Suite.
           </p>
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Button
-              size="lg"
+            {/* Premium CTA button with gold shimmer */}
+            <button
               onClick={() => navigate('login')}
-              className="h-12 px-8 text-base bg-[#C8A45C] hover:bg-[#C8A45C]/90 text-[#0B2E58] font-semibold"
+              className="btn-gold h-12 px-8 text-base font-semibold shadow-gold animate-shimmer-gold"
             >
               Accéder à la plateforme
               <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
+            </button>
+            {/* Glass effect outline button */}
+            <button
               onClick={() => navigate('citizen-portal')}
-              className="h-12 px-8 text-base border-white/20 text-white hover:bg-white/10"
+              className="h-12 px-8 text-base font-semibold rounded-[var(--radius)] border border-white/20 text-white hover:bg-white/10 backdrop-blur-md bg-white/5 transition-all duration-300 hover:border-white/30 hover:shadow-lg"
             >
               Portail Citoyen
-            </Button>
+            </button>
           </div>
         </div>
       </section>
 
-      {/* ─── FOOTER ────────────────────────────────────────── */}
-      <footer className="bg-[#071D3A] dark:bg-background border-t border-border pt-16 pb-8">
+      {/* ─── FOOTER — Premium Dark ──────────────────────────── */}
+      <footer className="relative bg-[#071D3A] dark:bg-background border-t border-border pt-16 pb-8 overflow-hidden">
+        {/* Subtle background mesh */}
+        <div className="absolute inset-0 opacity-[0.03]" style={{
+          backgroundImage:
+            'radial-gradient(at 20% 80%, rgba(200,164,92,0.15) 0%, transparent 50%), radial-gradient(at 80% 20%, rgba(59,125,216,0.1) 0%, transparent 50%)',
+        }} />
+
         {/* Guinea tricolor at top */}
         <div className="flex h-1 mb-8">
           <div className="flex-1 bg-[#CE1126]" />
@@ -827,10 +970,10 @@ export function LandingPage() {
           <div className="flex-1 bg-[#009460]" />
         </div>
 
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           {/* Republic header */}
           <div className="text-center mb-12">
-            <p className="text-[#C8A45C] text-lg font-semibold tracking-wide">
+            <p className="text-gradient-gold text-lg font-semibold tracking-wide">
               République de Guinée — Travail · Justice · Solidarité
             </p>
             <p className="text-white/50 text-sm mt-1">
@@ -858,7 +1001,7 @@ export function LandingPage() {
                   <li key={item.label}>
                     <button
                       onClick={() => navigate(item.page)}
-                      className="text-sm text-white/60 dark:text-muted-foreground hover:text-[#C8A45C] transition-colors"
+                      className="text-sm text-white/60 dark:text-muted-foreground hover:text-[#C8A45C] transition-colors duration-200"
                     >
                       {item.label}
                     </button>
@@ -881,7 +1024,7 @@ export function LandingPage() {
                   <li key={item.label}>
                     <button
                       onClick={() => navigate(item.page)}
-                      className="text-sm text-white/60 dark:text-muted-foreground hover:text-[#C8A45C] transition-colors"
+                      className="text-sm text-white/60 dark:text-muted-foreground hover:text-[#C8A45C] transition-colors duration-200"
                     >
                       {item.label}
                     </button>
@@ -903,7 +1046,7 @@ export function LandingPage() {
                   <li key={item.label}>
                     <button
                       onClick={() => navigate(item.page)}
-                      className="text-sm text-white/60 dark:text-muted-foreground hover:text-[#C8A45C] transition-colors"
+                      className="text-sm text-white/60 dark:text-muted-foreground hover:text-[#C8A45C] transition-colors duration-200"
                     >
                       {item.label}
                     </button>
@@ -923,7 +1066,7 @@ export function LandingPage() {
                   'Décret signature électronique',
                 ].map((item) => (
                   <li key={item}>
-                    <span className="text-sm text-white/60 dark:text-muted-foreground hover:text-[#C8A45C] transition-colors cursor-pointer">
+                    <span className="text-sm text-white/60 dark:text-muted-foreground hover:text-[#C8A45C] transition-colors duration-200 cursor-pointer">
                       {item}
                     </span>
                   </li>
@@ -932,10 +1075,13 @@ export function LandingPage() {
             </div>
           </div>
 
-          <div className="border-t border-white/10 dark:border-border pt-8">
+          {/* Divider with premium style */}
+          <div className="divider-premium mb-8" />
+
+          <div className="pt-4">
             <div className="flex flex-col items-center gap-4">
               <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-[#0B2E58] dark:bg-primary flex items-center justify-center overflow-hidden">
+                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-[#0B2E58] to-[#134A8E] dark:from-primary dark:to-primary/80 flex items-center justify-center overflow-hidden shadow-navy">
                   <img src="/logo-128.png" alt="Armories de la République de Guinée" className="h-8 w-8 object-contain" />
                 </div>
                 <span className="text-sm font-semibold text-white dark:text-foreground">

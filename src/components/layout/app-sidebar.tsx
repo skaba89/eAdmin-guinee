@@ -127,6 +127,139 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Fingerprint, Home, Briefcase, BookOpen,
 }
 
+// ─── GUINEA TRICOLOR STRIPE ──────────────────────────────────────────────────
+function GuineaTricolor({ className }: { className?: string }) {
+  return (
+    <div className={cn('flex w-full h-[3px] shrink-0', className)}>
+      <div className="flex-1 bg-[#CE1126]" />
+      <div className="flex-1 bg-[#FCD116]" />
+      <div className="flex-1 bg-[#009460]" />
+    </div>
+  )
+}
+
+// ─── SECTION LABEL ───────────────────────────────────────────────────────────
+function SectionLabel({ children, collapsed }: { children: React.ReactNode; collapsed: boolean }) {
+  if (collapsed) return null
+  return (
+    <motion.p
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="text-[9px] font-semibold uppercase tracking-[0.2em] text-gold/70 dark:text-gold/60 px-4 mb-2 select-none"
+    >
+      {children}
+    </motion.p>
+  )
+}
+
+// ─── PREMIUM NAV ITEM ────────────────────────────────────────────────────────
+function PremiumNavItem({
+  page,
+  label,
+  icon,
+  isActive,
+  collapsed,
+  onClick,
+}: {
+  page: AppPage
+  label: string
+  icon?: string
+  isActive: boolean
+  collapsed: boolean
+  onClick: () => void
+}) {
+  const IconComponent = icon ? ICON_MAP[icon] : null
+
+  return (
+    <motion.button
+      key={page}
+      onClick={onClick}
+      title={collapsed ? label : undefined}
+      className={cn(
+        'group relative flex items-center w-full rounded-lg text-sm font-medium transition-all duration-300 ease-out',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/40 focus-visible:ring-offset-1 focus-visible:ring-offset-transparent',
+        collapsed ? 'justify-center px-2 py-2.5 mx-auto' : 'gap-3 px-3 py-2.5',
+        isActive
+          ? 'text-white dark:text-white'
+          : 'text-white/55 dark:text-white/50 hover:text-white/90 dark:hover:text-white/85'
+      )}
+    >
+      {/* Active background with gradient */}
+      {isActive && (
+        <motion.div
+          layoutId="activeNavBg"
+          className="absolute inset-0 rounded-lg"
+          style={{
+            background: 'linear-gradient(135deg, #0B2E58 0%, #153d6e 50%, #1a4a82 100%)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08), 0 2px 8px rgba(11,46,88,0.35)',
+          }}
+          transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+        />
+      )}
+
+      {/* Hover glow background */}
+      {!isActive && (
+        <div className="absolute inset-0 rounded-lg bg-white/[0.04] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      )}
+
+      {/* Left gold accent bar for active state */}
+      {isActive && (
+        <motion.div
+          layoutId="activeGoldBar"
+          className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[60%] rounded-r-full"
+          style={{ background: 'linear-gradient(180deg, #D4B878, #C8A45C, #D4B878)' }}
+          transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+        />
+      )}
+
+      {/* Icon */}
+      <span className={cn('relative z-10 shrink-0', collapsed && 'mx-auto')}>
+        {IconComponent && (
+          <IconComponent
+            className={cn(
+              'h-[18px] w-[18px] transition-all duration-300',
+              isActive
+                ? 'text-[#C8A45C] dark:text-[#D4B878]'
+                : 'text-white/50 dark:text-white/40 group-hover:text-white/80 dark:group-hover:text-white/70'
+            )}
+            style={isActive ? { filter: 'drop-shadow(0 0 6px rgba(200,164,92,0.4))' } : undefined}
+          />
+        )}
+      </span>
+
+      {/* Label text */}
+      <AnimatePresence mode="wait">
+        {!collapsed && (
+          <motion.span
+            initial={{ opacity: 0, width: 0 }}
+            animate={{ opacity: 1, width: 'auto' }}
+            exit={{ opacity: 0, width: 0 }}
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
+            className={cn(
+              'relative z-10 whitespace-nowrap overflow-hidden transition-all duration-200',
+              isActive && 'font-semibold'
+            )}
+          >
+            {label}
+          </motion.span>
+        )}
+      </AnimatePresence>
+
+      {/* Subtle inner glow on active */}
+      {isActive && (
+        <div
+          className="absolute inset-0 rounded-lg pointer-events-none"
+          style={{
+            background: 'radial-gradient(ellipse at 30% 50%, rgba(200,164,92,0.06) 0%, transparent 70%)',
+          }}
+        />
+      )}
+    </motion.button>
+  )
+}
+
+// ─── MAIN SIDEBAR COMPONENT ──────────────────────────────────────────────────
 export function AppSidebar() {
   const { currentPage, navigate, sidebarCollapsed, toggleSidebarCollapse, logout, user } = useAppStore()
 
@@ -134,86 +267,101 @@ export function AppSidebar() {
   const navConfig = ROLE_NAV[userRole] || ROLE_NAV.citizen
   const extraNav = ROLE_EXTRA_NAV[userRole] || []
 
-  const navItem = (page: AppPage, label: string, icon?: string) => {
-    const IconComponent = icon ? ICON_MAP[icon] : null
-    const isActive = currentPage === page
-    return (
-      <button
-        key={page}
-        onClick={() => navigate(page)}
-        className={cn(
-          'flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
-          'hover:bg-brand/8 dark:hover:bg-white/8',
-          isActive
-            ? 'bg-brand text-white shadow-md shadow-brand/20 dark:bg-primary dark:text-primary-foreground'
-            : 'text-muted-foreground hover:text-foreground'
-        )}
-      >
-        {IconComponent && (
-          <IconComponent className={cn('h-[18px] w-[18px] shrink-0', isActive && 'text-white dark:text-primary-foreground')} />
-        )}
-        <AnimatePresence mode="wait">
-          {!sidebarCollapsed && (
-            <motion.span
-              initial={{ opacity: 0, width: 0 }}
-              animate={{ opacity: 1, width: 'auto' }}
-              exit={{ opacity: 0, width: 0 }}
-              className="whitespace-nowrap overflow-hidden"
-            >
-              {label}
-            </motion.span>
-          )}
-        </AnimatePresence>
-      </button>
-    )
-  }
-
   return (
     <motion.aside
       animate={{ width: sidebarCollapsed ? 72 : 260 }}
-      transition={{ duration: 0.2, ease: 'easeInOut' }}
-      className="h-screen sticky top-0 flex flex-col border-r border-border bg-sidebar text-sidebar-foreground z-40"
+      transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+      className={cn(
+        'h-screen sticky top-0 flex flex-col z-40 overflow-hidden',
+        'border-r border-white/[0.06] dark:border-white/[0.04]'
+      )}
+      style={{
+        background: 'linear-gradient(180deg, #071d38 0%, #0a2744 25%, #0d3258 60%, #0f3a66 100%)',
+      }}
     >
-      {/* Logo — République de Guinée */}
-      <div className="flex items-center gap-3 px-4 h-16 border-b border-border shrink-0">
-        <div className="h-9 w-9 rounded-xl overflow-hidden flex items-center justify-center shrink-0 shadow-lg shadow-brand/30">
-          <img src="/logo-128.png" alt="Armories de la République de Guinée" className="h-9 w-9 object-contain" />
+      {/* Glass overlay for premium depth */}
+      <div
+        className="absolute inset-0 pointer-events-none z-0"
+        style={{
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 40%, rgba(0,0,0,0.05) 100%)',
+          backdropFilter: 'blur(1px)',
+        }}
+      />
+
+      {/* Top Guinea Tricolor */}
+      <GuineaTricolor />
+
+      {/* ═══ LOGO SECTION ═══ */}
+      <div className="relative z-10 flex items-center gap-3 px-4 h-[68px] border-b border-white/[0.06] shrink-0">
+        <div
+          className={cn(
+            'h-10 w-10 rounded-xl overflow-hidden flex items-center justify-center shrink-0',
+            'ring-[1.5px] ring-[#C8A45C]/40 dark:ring-[#D4B878]/30',
+            'shadow-[0_0_12px_rgba(200,164,92,0.15),0_2px_8px_rgba(0,0,0,0.3)]'
+          )}
+        >
+          <img
+            src="/logo-128.png"
+            alt="Armories de la République de Guinée"
+            className="h-10 w-10 object-contain"
+          />
         </div>
         <AnimatePresence mode="wait">
           {!sidebarCollapsed && (
             <motion.div
-              initial={{ opacity: 0, width: 0 }}
-              animate={{ opacity: 1, width: 'auto' }}
-              exit={{ opacity: 0, width: 0 }}
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -8 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
               className="overflow-hidden"
             >
-              <div className="font-bold text-sm leading-tight text-brand dark:text-primary">eAdmin Suite</div>
-              <div className="text-[10px] text-muted-foreground">République de Guinée</div>
+              <div className="font-bold text-[13px] leading-tight text-white tracking-wide">
+                eAdmin Suite
+              </div>
+              <div className="text-[10px] text-[#C8A45C]/80 dark:text-[#D4B878]/70 tracking-wider font-medium mt-0.5">
+                République de Guinée
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      {/* Navigation */}
-      <div className="flex-1 overflow-y-auto py-4 px-3 space-y-6">
+      {/* ═══ NAVIGATION ═══ */}
+      <div className="relative z-10 flex-1 overflow-y-auto py-5 px-3 space-y-6 scrollbar-thin">
         {/* Main modules */}
         <div>
-          {!sidebarCollapsed && (
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 px-3 mb-2">Modules</p>
-          )}
-          <div className="space-y-1">
-            {navConfig.main.map((item) => navItem(item.page, item.label, item.icon))}
+          <SectionLabel collapsed={sidebarCollapsed}>Modules</SectionLabel>
+          <div className="space-y-0.5">
+            {navConfig.main.map((item) => (
+              <PremiumNavItem
+                key={item.page}
+                page={item.page}
+                label={item.label}
+                icon={item.icon}
+                isActive={currentPage === item.page}
+                collapsed={sidebarCollapsed}
+                onClick={() => navigate(item.page)}
+              />
+            ))}
           </div>
         </div>
 
-        {/* Extra nav items (e.g., Birth certificate database for mairie/admin) */}
+        {/* Extra nav items */}
         {extraNav.length > 0 && (
           <div>
-            {!sidebarCollapsed && (
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 px-3 mb-2">Accès rapide</p>
-            )}
-            <div className="space-y-1">
-              {extraNav.map((item) => navItem(item.page, item.label, item.icon))}
+            <SectionLabel collapsed={sidebarCollapsed}>Accès rapide</SectionLabel>
+            <div className="space-y-0.5">
+              {extraNav.map((item) => (
+                <PremiumNavItem
+                  key={item.page}
+                  page={item.page}
+                  label={item.label}
+                  icon={item.icon}
+                  isActive={currentPage === item.page}
+                  collapsed={sidebarCollapsed}
+                  onClick={() => navigate(item.page)}
+                />
+              ))}
             </div>
           </div>
         )}
@@ -221,35 +369,68 @@ export function AppSidebar() {
         {/* Admin section */}
         {navConfig.admin && navConfig.admin.length > 0 && (
           <div>
-            {!sidebarCollapsed && (
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 px-3 mb-2">Administration</p>
-            )}
-            <div className="space-y-1">
-              {navConfig.admin.map((item) => navItem(item.page, item.label, item.icon))}
+            <SectionLabel collapsed={sidebarCollapsed}>Administration</SectionLabel>
+            <div className="space-y-0.5">
+              {navConfig.admin.map((item) => (
+                <PremiumNavItem
+                  key={item.page}
+                  page={item.page}
+                  label={item.label}
+                  icon={item.icon}
+                  isActive={currentPage === item.page}
+                  collapsed={sidebarCollapsed}
+                  onClick={() => navigate(item.page)}
+                />
+              ))}
             </div>
           </div>
         )}
       </div>
 
-      {/* User */}
-      <div className="border-t border-border p-3 shrink-0">
+      {/* ═══ BOTTOM TRICOLOR STRIPE ═══ */}
+      <div className="relative z-10">
+        <GuineaTricolor />
+      </div>
+
+      {/* ═══ USER SECTION ═══ */}
+      <div className="relative z-10 border-t border-white/[0.06] p-3 shrink-0">
         <div className={cn('flex items-center gap-3', sidebarCollapsed && 'justify-center')}>
-          <div className="h-8 w-8 rounded-full bg-brand/10 dark:bg-primary/20 flex items-center justify-center shrink-0">
-            <span className="text-xs font-bold text-brand dark:text-primary">
+          {/* Premium avatar with gradient */}
+          <div
+            className={cn(
+              'h-9 w-9 rounded-full flex items-center justify-center shrink-0',
+              'ring-[1.5px] ring-[#C8A45C]/30 dark:ring-[#D4B878]/25',
+              'shadow-[0_2px_8px_rgba(0,0,0,0.3)]'
+            )}
+            style={{
+              background: 'linear-gradient(135deg, #0B2E58 0%, #1a4a82 60%, #2a5a94 100%)',
+            }}
+          >
+            <span className="text-[11px] font-bold text-[#C8A45C] dark:text-[#D4B878]">
               {user?.name?.charAt(0) || 'A'}
             </span>
           </div>
+
           <AnimatePresence mode="wait">
             {!sidebarCollapsed && (
               <motion.div
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: 'auto' }}
-                exit={{ opacity: 0, width: 0 }}
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -8 }}
+                transition={{ duration: 0.25, ease: 'easeOut' }}
                 className="flex-1 min-w-0 overflow-hidden"
               >
-                <p className="text-xs font-medium truncate">{user?.name || 'Utilisateur'}</p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className={`inline-flex items-center px-1.5 py-0 rounded text-[9px] font-semibold leading-relaxed ${ROLE_COLORS[userRole]}`}>
+                <p className="text-xs font-semibold text-white/90 truncate">
+                  {user?.name || 'Utilisateur'}
+                </p>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span
+                    className={cn(
+                      'inline-flex items-center px-1.5 py-[1px] rounded text-[8px] font-bold uppercase tracking-wider',
+                      'bg-[#C8A45C]/15 text-[#C8A45C] dark:bg-[#D4B878]/15 dark:text-[#D4B878]',
+                      'border border-[#C8A45C]/20 dark:border-[#D4B878]/15'
+                    )}
+                  >
                     {ROLE_LABELS[userRole]}
                   </span>
                 </div>
@@ -259,35 +440,68 @@ export function AppSidebar() {
         </div>
 
         {/* Logout button */}
-        {!sidebarCollapsed && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={logout}
-            className="w-full mt-2 justify-start gap-2 text-muted-foreground hover:text-red-500 h-8 text-xs"
-          >
-            <LogOut className="h-3.5 w-3.5" />
-            Déconnexion
-          </Button>
-        )}
-        {sidebarCollapsed && (
-          <button
-            onClick={logout}
-            className="w-full mt-2 flex items-center justify-center p-2 rounded-lg text-muted-foreground hover:text-red-500 transition-colors"
-            title="Déconnexion"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
-        )}
+        <AnimatePresence mode="wait">
+          {!sidebarCollapsed ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={logout}
+                className={cn(
+                  'w-full mt-3 justify-start gap-2 h-8 text-xs rounded-lg',
+                  'text-white/40 hover:text-red-400 hover:bg-red-500/10',
+                  'transition-all duration-300'
+                )}
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                Déconnexion
+              </Button>
+            </motion.div>
+          ) : (
+            <motion.button
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={logout}
+              title="Déconnexion"
+              className={cn(
+                'w-full mt-3 flex items-center justify-center p-2 rounded-lg',
+                'text-white/40 hover:text-red-400 hover:bg-red-500/10',
+                'transition-all duration-300'
+              )}
+            >
+              <LogOut className="h-4 w-4" />
+            </motion.button>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Collapse toggle */}
-      <button
+      {/* ═══ COLLAPSE TOGGLE BUTTON ═══ */}
+      <motion.button
         onClick={toggleSidebarCollapse}
-        className="absolute -right-3 top-20 h-6 w-6 rounded-full border border-border bg-card flex items-center justify-center shadow-md hover:bg-accent transition-colors z-50"
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.95 }}
+        className={cn(
+          'absolute -right-3.5 top-20 h-7 w-7 rounded-full flex items-center justify-center z-50',
+          'bg-[#0B2E58] dark:bg-[#0d3258]',
+          'border-2 border-[#C8A45C]/40 dark:border-[#D4B878]/30',
+          'shadow-[0_2px_8px_rgba(0,0,0,0.3),0_0_12px_rgba(200,164,92,0.15)]',
+          'hover:border-[#C8A45C]/70 dark:hover:border-[#D4B878]/60',
+          'hover:shadow-[0_2px_12px_rgba(0,0,0,0.4),0_0_18px_rgba(200,164,92,0.25)]',
+          'transition-all duration-300'
+        )}
       >
-        {sidebarCollapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
-      </button>
+        {sidebarCollapsed ? (
+          <ChevronRight className="h-3 w-3 text-[#C8A45C] dark:text-[#D4B878]" />
+        ) : (
+          <ChevronLeft className="h-3 w-3 text-[#C8A45C] dark:text-[#D4B878]" />
+        )}
+      </motion.button>
     </motion.aside>
   )
 }

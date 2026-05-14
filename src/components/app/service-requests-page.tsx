@@ -387,32 +387,40 @@ export function ServiceRequestsPage() {
   const categories = [...new Set(requests.map(r => r.category))]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 dashboard-bg-v2 min-h-screen">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="space-y-1">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-[#0B2E58]/10 dark:bg-[#3B7DD8]/20">
-            <ClipboardCheck className="h-6 w-6 text-[#0B2E58] dark:text-[#3B7DD8]" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold text-[#0B2E58] dark:text-white">Traitement des Demandes Citoyennes</h2>
-            <p className="text-sm text-muted-foreground">Gestion et traitement des demandes reçues via le portail public Guinée Services</p>
-          </div>
-        </div>
+        <Card className="glass-premium overflow-hidden">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-2xl bg-gradient-to-br from-[#0B2E58] to-[#3B7DD8] dark:from-[#0B2E58] dark:to-[#143D6B] shadow-lg ring-1 ring-[#C8A45C]/30 dark:ring-[#D4B878]/20">
+                <ClipboardCheck className="h-6 w-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold text-gradient-navy">Traitement des Demandes Citoyennes</h2>
+                <p className="text-sm text-muted-foreground mt-0.5">Gestion et traitement des demandes reçues via le portail public Guinée Services</p>
+              </div>
+              <Badge className="badge-premium hidden sm:inline-flex">
+                <ClipboardCheck className="size-3" />
+                Guinée Services
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
       </motion.div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, i) => (
           <motion.div key={stat.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}>
-            <Card className="glass-card hover:shadow-lg transition-shadow">
+            <Card className="card-interactive premium-stat">
               <CardContent className="flex items-center gap-4 p-4">
-                <div className={`p-3 rounded-xl ${stat.bg} ${stat.color}`}>
+                <div className={`p-3 rounded-xl bg-gradient-to-br ${stat.bg} ${stat.color} shadow-sm`}>
                   <stat.icon className="h-6 w-6" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">{stat.label}</p>
-                  <p className="text-2xl font-bold">{stat.value}</p>
+                  <p className="text-2xl font-bold tabular-nums tracking-tight">{stat.value}</p>
                 </div>
               </CardContent>
             </Card>
@@ -421,7 +429,7 @@ export function ServiceRequestsPage() {
       </div>
 
       {/* Tabs + Filters */}
-      <Card>
+      <Card className="glass-premium">
         <CardContent className="p-4 space-y-4">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -460,7 +468,7 @@ export function ServiceRequestsPage() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
             <div className="relative flex-1 w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Rechercher par référence, nom, service..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10" />
+              <Input placeholder="Rechercher par référence, nom, service..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 glass-input focus-ring-premium" />
             </div>
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
               <SelectTrigger className="w-[200px]">
@@ -485,7 +493,7 @@ export function ServiceRequestsPage() {
           <AnimatePresence mode="popLayout">
             {filteredRequests.length === 0 ? (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <Card className="glass-card">
+                <Card className="card-interactive">
                   <CardContent className="flex flex-col items-center justify-center py-16 text-center">
                     <FileText className="size-12 text-muted-foreground/30 mb-3" />
                     <p className="text-muted-foreground font-medium">Aucune demande dans cette catégorie</p>
@@ -507,7 +515,7 @@ export function ServiceRequestsPage() {
                     layout
                   >
                     <Card
-                      className={`cursor-pointer hover:shadow-lg transition-all ${selectedRequest?.id === req.id ? 'ring-2 ring-[#0B2E58] dark:ring-[#3B7DD8]' : ''}`}
+                      className={`card-interactive ${selectedRequest?.id === req.id ? 'ring-2 ring-[#0B2E58] dark:ring-[#3B7DD8] shadow-premium' : ''}`}
                       onClick={() => setSelectedRequest(req)}
                     >
                       <CardContent className="p-4">
@@ -523,7 +531,7 @@ export function ServiceRequestsPage() {
                               <p className="text-xs text-muted-foreground font-mono">{req.reference}</p>
                             </div>
                           </div>
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${sConfig.color}`}>
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold backdrop-blur-sm ${sConfig.color}`}>
                             <SIcon className="size-3" />
                             {sConfig.label}
                           </span>
@@ -545,7 +553,7 @@ export function ServiceRequestsPage() {
                         {/* Quick action for soumises */}
                         {req.status === 'soumise' && (
                           <div className="mt-3 flex gap-2">
-                            <Button size="sm" className="bg-[#0B2E58] hover:bg-[#0B2E58]/90 dark:bg-[#3B7DD8] dark:hover:bg-[#3B7DD8]/90 text-white gap-1 h-7 text-xs" onClick={(e) => { e.stopPropagation(); handleTakeCharge(req) }}>
+                            <Button size="sm" className="btn-premium gap-1 h-7 text-xs" onClick={(e) => { e.stopPropagation(); handleTakeCharge(req) }}>
                               <Play className="size-3" />
                               Prendre en charge
                             </Button>
@@ -568,7 +576,7 @@ export function ServiceRequestsPage() {
         <div className="lg:col-span-1">
           {selectedRequest ? (
             <motion.div key={selectedRequest.id} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-              <Card className="glass-card sticky top-24">
+              <Card className="glass-premium sticky top-24">
                 <CardHeader className="pb-3">
                   <div className="flex items-center gap-2">
                     <Badge className={`text-[10px] font-semibold ${STATUS_CONFIG[selectedRequest.status].color}`}>
@@ -740,7 +748,7 @@ export function ServiceRequestsPage() {
                   {/* Processing notes */}
                   {selectedRequest.processingNotes.length > 0 && (
                     <>
-                      <Separator />
+                      <div className="divider-premium" />
                       <div>
                         <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Notes de traitement ({selectedRequest.processingNotes.length})</h4>
                         <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
@@ -763,10 +771,10 @@ export function ServiceRequestsPage() {
                   )}
 
                   {/* Action buttons */}
-                  <Separator />
+                  <div className="divider-premium" />
                   <div className="flex flex-wrap gap-2">
                     {selectedRequest.status === 'soumise' && (
-                      <Button size="sm" className="flex-1 bg-[#0B2E58] hover:bg-[#0B2E58]/90 dark:bg-[#3B7DD8] dark:hover:bg-[#3B7DD8]/90 text-white gap-1" onClick={() => handleTakeCharge(selectedRequest)}>
+                      <Button size="sm" className="btn-premium flex-1 gap-1" onClick={() => handleTakeCharge(selectedRequest)}>
                         <Play className="size-3.5" />
                         Prendre en charge
                       </Button>
@@ -784,13 +792,13 @@ export function ServiceRequestsPage() {
                       </>
                     )}
                     {selectedRequest.status === 'validee' && (
-                      <Button size="sm" className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white gap-1" onClick={() => setGenerateDialogOpen(true)}>
+                      <Button size="sm" className="btn-gold flex-1 gap-1" onClick={() => setGenerateDialogOpen(true)}>
                         <Stamp className="size-3.5" />
                         Générer le document
                       </Button>
                     )}
                     {selectedRequest.status === 'prete' && (
-                      <Button size="sm" className="flex-1 bg-[#0B2E58] hover:bg-[#0B2E58]/90 dark:bg-[#3B7DD8] dark:hover:bg-[#3B7DD8]/90 text-white gap-1" onClick={() => setDeliveryDialogOpen(true)}>
+                      <Button size="sm" className="btn-premium flex-1 gap-1" onClick={() => setDeliveryDialogOpen(true)}>
                         <Download className="size-3.5" />
                         Livrer le document
                       </Button>
@@ -811,7 +819,7 @@ export function ServiceRequestsPage() {
 
                   {/* Generate Official Document */}
                   {selectedRequest.status === 'validee' && (
-                    <Button size="sm" className="w-full bg-[#C8A45C] hover:bg-[#C8A45C]/90 text-[#0B2E58] gap-2 font-semibold" onClick={() => setGenerateDocDialogOpen(true)}>
+                    <Button size="sm" className="btn-gold w-full gap-2" onClick={() => setGenerateDocDialogOpen(true)}>
                       <FileText className="size-4" />
                       Générer le document officiel
                     </Button>
@@ -827,7 +835,7 @@ export function ServiceRequestsPage() {
                         </div>
                         <p className="text-[10px] text-muted-foreground">Généré le {new Date(selectedRequest.generatedDocument.generatedAt).toLocaleDateString('fr-FR')} par {selectedRequest.generatedDocument.generatedBy}</p>
                       </div>
-                      <Button size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white gap-2" onClick={handleDownloadDocument}>
+                      <Button size="sm" className="btn-premium w-full gap-2" onClick={handleDownloadDocument}>
                         <Download className="size-4" />
                         Télécharger le document officiel
                       </Button>
@@ -837,7 +845,7 @@ export function ServiceRequestsPage() {
               </Card>
             </motion.div>
           ) : (
-            <Card className="glass-card">
+            <Card className="card-interactive">
               <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                 <ClipboardCheck className="size-12 text-muted-foreground/30 mb-3" />
                 <p className="text-sm text-muted-foreground">Sélectionnez une demande pour voir les détails</p>
@@ -865,11 +873,12 @@ export function ServiceRequestsPage() {
               value={noteText}
               onChange={e => setNoteText(e.target.value)}
               rows={4}
+              className="glass-input focus-ring-premium"
             />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNoteDialogOpen(false)}>Annuler</Button>
-            <Button className="bg-[#0B2E58] hover:bg-[#0B2E58]/90 dark:bg-[#3B7DD8] dark:hover:bg-[#3B7DD8]/90 text-white" onClick={noteType === 'info_complementaire' ? handleRequestMoreInfo : handleAddNote} disabled={!noteText.trim()}>
+            <Button className="btn-premium" onClick={noteType === 'info_complementaire' ? handleRequestMoreInfo : handleAddNote} disabled={!noteText.trim()}>
               {noteType === 'info_complementaire' ? 'Envoyer la demande' : 'Publier la note'}
             </Button>
           </DialogFooter>
@@ -926,7 +935,7 @@ export function ServiceRequestsPage() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeliveryDialogOpen(false)}>Annuler</Button>
-            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2" onClick={handleDeliver}>
+            <Button className="btn-premium gap-2" onClick={handleDeliver}>
               <CheckCircle2 className="size-4" />
               Confirmer la livraison
             </Button>
@@ -966,7 +975,7 @@ export function ServiceRequestsPage() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setGenerateDialogOpen(false)}>Annuler</Button>
-            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2" onClick={handleGenerateAndMarkReady}>
+            <Button className="btn-gold gap-2" onClick={handleGenerateAndMarkReady}>
               <Stamp className="size-4" />
               Générer et marquer prêt
             </Button>
@@ -985,7 +994,7 @@ export function ServiceRequestsPage() {
             <DialogDescription>Motivez le rejet de cette demande</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <Textarea placeholder="Raison du rejet..." value={rejectReason} onChange={e => setRejectReason(e.target.value)} rows={3} />
+            <Textarea placeholder="Raison du rejet..." value={rejectReason} onChange={e => setRejectReason(e.target.value)} rows={3} className="glass-input focus-ring-premium" />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRejectDialogOpen(false)}>Annuler</Button>
@@ -1024,7 +1033,7 @@ export function ServiceRequestsPage() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setGenerateDocDialogOpen(false)}>Annuler</Button>
-            <Button className="bg-[#C8A45C] hover:bg-[#C8A45C]/90 text-[#0B2E58] gap-2 font-semibold" onClick={handleGenerateDocument}>
+            <Button className="btn-gold gap-2" onClick={handleGenerateDocument}>
               <FileText className="size-4" />
               Confirmer la génération
             </Button>

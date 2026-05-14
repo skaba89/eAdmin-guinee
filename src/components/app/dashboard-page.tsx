@@ -55,14 +55,14 @@ const CHART_COLORS = ['#0B2E58', '#3B7DD8', '#C8A45C', '#10B981', '#EF4444', '#8
 
 // ─── KPI DATA ────────────────────────────────────────────────────────────────
 const GOV_KPI = [
-  { label: 'Courriers interministériels', value: '14 250', change: '+18.3%', trend: 'up' as const, icon: Mail, color: 'bg-[#0B2E58]/10 dark:bg-[#3B7DD8]/20' },
-  { label: 'Documents officiels', value: '87 450', change: '+22.1%', trend: 'up' as const, icon: FileText, color: 'bg-[#0B2E58]/10 dark:bg-[#3B7DD8]/20' },
-  { label: 'Procédures numérisées', value: '234', change: '+45.2%', trend: 'up' as const, icon: GitBranch, color: 'bg-[#0B2E58]/10 dark:bg-[#3B7DD8]/20' },
-  { label: 'Délai moyen traitement', value: '1.8 jours', change: '-32.5%', trend: 'down' as const, icon: Clock, color: 'bg-[#0B2E58]/10 dark:bg-[#3B7DD8]/20' },
-  { label: 'Conformité réglementaire', value: '99.2%', change: '+2.1%', trend: 'up' as const, icon: Shield, color: 'bg-[#0B2E58]/10 dark:bg-[#3B7DD8]/20' },
-  { label: 'Satisfaction citoyenne', value: '4.7/5', change: '+0.4', trend: 'up' as const, icon: Users, color: 'bg-[#0B2E58]/10 dark:bg-[#3B7DD8]/20' },
-  { label: 'Institutions connectées', value: '18/24', change: '+3', trend: 'up' as const, icon: Building2, color: 'bg-[#0B2E58]/10 dark:bg-[#3B7DD8]/20' },
-  { label: 'Demandes citoyennes', value: '8 730', change: '+28.7%', trend: 'up' as const, icon: UserCheck, color: 'bg-[#0B2E58]/10 dark:bg-[#3B7DD8]/20' },
+  { label: 'Courriers interministériels', value: '14 250', change: '+18.3%', trend: 'up' as const, icon: Mail, color: 'bg-[#0B2E58]/10 dark:bg-[#3B7DD8]/20', gradient: 'from-[#0B2E58] to-[#3B7DD8]', borderGradient: 'from-[#0B2E58] via-[#3B7DD8] to-[#0B2E58]' },
+  { label: 'Documents officiels', value: '87 450', change: '+22.1%', trend: 'up' as const, icon: FileText, color: 'bg-[#0B2E58]/10 dark:bg-[#3B7DD8]/20', gradient: 'from-[#3B7DD8] to-[#5A96E6]', borderGradient: 'from-[#3B7DD8] via-[#5A96E6] to-[#3B7DD8]' },
+  { label: 'Procédures numérisées', value: '234', change: '+45.2%', trend: 'up' as const, icon: GitBranch, color: 'bg-[#0B2E58]/10 dark:bg-[#3B7DD8]/20', gradient: 'from-[#C8A45C] to-[#D4B878]', borderGradient: 'from-[#C8A45C] via-[#D4B878] to-[#C8A45C]' },
+  { label: 'Délai moyen traitement', value: '1.8 jours', change: '-32.5%', trend: 'down' as const, icon: Clock, color: 'bg-[#0B2E58]/10 dark:bg-[#3B7DD8]/20', gradient: 'from-[#10B981] to-[#34D399]', borderGradient: 'from-[#10B981] via-[#34D399] to-[#10B981]' },
+  { label: 'Conformité réglementaire', value: '99.2%', change: '+2.1%', trend: 'up' as const, icon: Shield, color: 'bg-[#0B2E58]/10 dark:bg-[#3B7DD8]/20', gradient: 'from-[#0B2E58] to-[#143D6B]', borderGradient: 'from-[#0B2E58] via-[#143D6B] to-[#0B2E58]' },
+  { label: 'Satisfaction citoyenne', value: '4.7/5', change: '+0.4', trend: 'up' as const, icon: Users, color: 'bg-[#0B2E58]/10 dark:bg-[#3B7DD8]/20', gradient: 'from-[#3B7DD8] to-[#C8A45C]', borderGradient: 'from-[#3B7DD8] via-[#C8A45C] to-[#3B7DD8]' },
+  { label: 'Institutions connectées', value: '18/24', change: '+3', trend: 'up' as const, icon: Building2, color: 'bg-[#0B2E58]/10 dark:bg-[#3B7DD8]/20', gradient: 'from-[#C8A45C] to-[#0B2E58]', borderGradient: 'from-[#C8A45C] via-[#0B2E58] to-[#C8A45C]' },
+  { label: 'Demandes citoyennes', value: '8 730', change: '+28.7%', trend: 'up' as const, icon: UserCheck, color: 'bg-[#0B2E58]/10 dark:bg-[#3B7DD8]/20', gradient: 'from-[#8B5CF6] to-[#A78BFA]', borderGradient: 'from-[#8B5CF6] via-[#A78BFA] to-[#8B5CF6]' },
 ]
 
 // ─── MINISTRIES DATA FOR AREA CHART ──────────────────────────────────────────
@@ -105,10 +105,10 @@ const docTypeData = [
 
 // ─── PND PROGRESS DATA ───────────────────────────────────────────────────────
 const pndAxes = [
-  { name: 'Axe 1: Gouvernance démocratique', value: 72, color: '#0B2E58' },
-  { name: 'Axe 2: Transformation structurelle', value: 58, color: '#C8A45C' },
-  { name: 'Axe 3: Capital humain', value: 65, color: '#3B7DD8' },
-  { name: 'Axe 4: Environnement durable', value: 45, color: '#10B981' },
+  { name: 'Axe 1: Gouvernance démocratique', value: 72, color: '#0B2E58', gradientFrom: '#0B2E58', gradientTo: '#3B7DD8' },
+  { name: 'Axe 2: Transformation structurelle', value: 58, color: '#C8A45C', gradientFrom: '#A88A3C', gradientTo: '#D4B878' },
+  { name: 'Axe 3: Capital humain', value: 65, color: '#3B7DD8', gradientFrom: '#3B7DD8', gradientTo: '#5A96E6' },
+  { name: 'Axe 4: Environnement durable', value: 45, color: '#10B981', gradientFrom: '#059669', gradientTo: '#34D399' },
 ]
 
 // ─── RECENT GOVERNMENT ACTIVITIES ────────────────────────────────────────────
@@ -184,12 +184,12 @@ export default function DashboardPage() {
   const navigate = useAppStore((s) => s.navigate)
 
   const quickActions = [
-    { label: 'Nouveau courrier officiel', icon: Mail, color: 'bg-[#0B2E58] hover:bg-[#0B2E58]/90 text-white', onClick: () => navigate('courriers') },
-    { label: 'Upload document réglementaire', icon: Upload, color: 'bg-[#3B7DD8] hover:bg-[#3B7DD8]/90 text-white', onClick: () => navigate('ged') },
-    { label: 'Procédure administrative', icon: GitBranch, color: 'bg-[#C8A45C] hover:bg-[#C8A45C]/90 text-white', onClick: () => navigate('workflow') },
-    { label: 'Demandes citoyennes', icon: UserCheck, color: 'bg-emerald-600 hover:bg-emerald-600/90 text-white', onClick: () => navigate('service-requests') },
-    { label: 'Portail Citoyen', icon: UserCheck, color: 'bg-purple-600 hover:bg-purple-600/90 text-white', onClick: () => navigate('citizen-portal') },
-    { label: 'Signatures électroniques', icon: PenTool, color: 'bg-rose-600 hover:bg-rose-600/90 text-white', onClick: () => navigate('signatures') },
+    { label: 'Nouveau courrier officiel', icon: Mail, btnClass: 'btn-premium', onClick: () => navigate('courriers') },
+    { label: 'Upload document réglementaire', icon: Upload, btnClass: 'btn-gold', onClick: () => navigate('ged') },
+    { label: 'Procédure administrative', icon: GitBranch, btnClass: 'btn-guinea', onClick: () => navigate('workflow') },
+    { label: 'Demandes citoyennes', icon: UserCheck, btnClass: 'bg-gradient-to-br from-emerald-600 to-emerald-500 text-white hover:from-emerald-500 hover:to-emerald-400 shadow-lg shadow-emerald-500/20', onClick: () => navigate('service-requests') },
+    { label: 'Portail Citoyen', icon: Users, btnClass: 'bg-gradient-to-br from-purple-600 to-purple-500 text-white hover:from-purple-500 hover:to-purple-400 shadow-lg shadow-purple-500/20', onClick: () => navigate('citizen-portal') },
+    { label: 'Signatures électroniques', icon: PenTool, btnClass: 'bg-gradient-to-br from-rose-600 to-rose-500 text-white hover:from-rose-500 hover:to-rose-400 shadow-lg shadow-rose-500/20', onClick: () => navigate('signatures') },
   ]
 
   return (
@@ -197,41 +197,47 @@ export default function DashboardPage() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="space-y-6 p-4 md:p-6"
+      className="space-y-6 p-4 md:p-6 dashboard-bg-v2"
     >
       {/* ═══════════════════════════════════════════════════════════════════════
           PAGE HEADER — PRESIDENTIAL COMMAND CENTER
       ═══════════════════════════════════════════════════════════════════════ */}
       <motion.div variants={itemVariants}>
-        <Card className="glass-card overflow-hidden border-[#C8A45C]/20 dark:border-[#D4B878]/20 bg-gradient-to-br from-[#0B2E58]/[0.03] via-transparent to-[#C8A45C]/[0.03] dark:from-[#3B7DD8]/[0.05] dark:to-[#D4B878]/[0.03]">
-          <CardContent className="p-6">
+        <Card className="glass-premium overflow-hidden bg-gradient-to-br from-[#0B2E58]/[0.03] via-transparent to-[#C8A45C]/[0.03] dark:from-[#3B7DD8]/[0.06] dark:via-transparent dark:to-[#D4B878]/[0.04]">
+          <CardContent className="p-6 relative z-10">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-4">
-                <div className="flex size-12 items-center justify-center rounded-xl bg-[#0B2E58] dark:bg-[#3B7DD8] shadow-lg">
-                  <Landmark className="size-6 text-white" />
+                <div className="relative flex size-14 items-center justify-center">
+                  {/* Gold ring with glow */}
+                  <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-[#C8A45C] to-[#D4B878] p-[2px] shadow-lg shadow-[#C8A45C]/20 dark:shadow-[#D4B878]/15 animate-glow-pulse">
+                    <div className="flex size-full items-center justify-center rounded-[10px] bg-gradient-to-br from-[#0B2E58] to-[#143D6B] dark:from-[#143D6B] dark:to-[#1A4A80]">
+                      <Landmark className="size-6 text-white" />
+                    </div>
+                  </div>
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold tracking-tight text-[#0B2E58] dark:text-white">
-                    Centre de Commandement Interministériel
+                  <h1 className="text-2xl font-bold tracking-tight">
+                    <span className="text-gradient-navy">Centre de Commandement</span>{' '}
+                    <span className="text-gradient-gold">Interministériel</span>
                   </h1>
                   <p className="text-sm text-muted-foreground mt-0.5">
                     Tableau de bord de la modernisation administrative — République de Guinée
                   </p>
                 </div>
               </div>
-              <div className="flex flex-col items-start gap-2 sm:items-end">
-                <Badge className="bg-[#C8A45C] text-[#0B2E58] hover:bg-[#C8A45C]/90 border-0 font-semibold text-xs gap-1.5 shadow-sm">
+              <div className="flex flex-col items-start gap-2.5 sm:items-end">
+                <Badge className="badge-premium border-0 font-semibold text-xs gap-1.5">
                   <Activity className="size-3" />
                   Circulaire n°001/PM/CAB
                 </Badge>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Building2 className="size-3.5" />
                   <span className="font-medium">18/24 institutions connectées</span>
-                  <div className="flex gap-0.5">
+                  <div className="flex gap-[3px]">
                     {Array.from({ length: 24 }).map((_, i) => (
                       <div
                         key={i}
-                        className={`size-1.5 rounded-full ${i < 18 ? 'bg-emerald-500' : 'bg-muted-foreground/20'}`}
+                        className={`size-1.5 rounded-full transition-all duration-300 ${i < 18 ? 'bg-gradient-to-t from-emerald-500 to-emerald-400 shadow-[0_0_4px_rgba(16,185,129,0.3)]' : 'bg-muted-foreground/20'}`}
                       />
                     ))}
                   </div>
@@ -243,7 +249,7 @@ export default function DashboardPage() {
       </motion.div>
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          KPI CARDS — 2 ROWS OF 4
+          KPI CARDS — 2 ROWS OF 4 (PREMIUM INTERACTIVE)
       ═══════════════════════════════════════════════════════════════════════ */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:gap-4">
         {GOV_KPI.map((kpi) => {
@@ -252,19 +258,21 @@ export default function DashboardPage() {
           const isPositiveChange = kpi.label.includes('Délai') ? !isUp : isUp
           return (
             <motion.div key={kpi.label} variants={itemVariants}>
-              <Card className="glass-card overflow-hidden py-0 shadow-md transition-shadow hover:shadow-lg border-l-2 border-l-[#0B2E58] dark:border-l-[#3B7DD8]">
+              <Card className="card-interactive overflow-hidden py-0 border-0 relative">
+                {/* Gradient left border accent */}
+                <div className={`absolute left-0 top-0 bottom-0 w-[3px] bg-gradient-to-b ${kpi.gradient}`} />
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
-                    <div className={`flex size-9 items-center justify-center rounded-lg ${kpi.color}`}>
-                      <Icon className="size-4 text-[#0B2E58] dark:text-[#3B7DD8]" />
+                    <div className={`flex size-9 items-center justify-center rounded-lg bg-gradient-to-br ${kpi.gradient} shadow-sm`}>
+                      <Icon className="size-4 text-white" />
                     </div>
-                    <div className={`flex items-center gap-0.5 text-xs font-semibold ${isPositiveChange ? 'text-emerald-600' : 'text-red-500'}`}>
+                    <div className={`flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold ${isPositiveChange ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 dark:text-emerald-400' : 'text-red-500 bg-red-50 dark:bg-red-900/20 dark:text-red-400'}`}>
                       {isUp ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />}
                       {kpi.change}
                     </div>
                   </div>
                   <div className="mt-3">
-                    <p className="text-xl font-bold tracking-tight text-[#0B2E58] dark:text-white">
+                    <p className="text-xl font-bold tracking-tight tabular-nums text-[#0B2E58] dark:text-white premium-stat">
                       {kpi.value}
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">{kpi.label}</p>
@@ -277,20 +285,37 @@ export default function DashboardPage() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          CHARTS ROW 1: LINE + AREA
+          CHARTS ROW 1: LINE + AREA (PREMIUM)
       ═══════════════════════════════════════════════════════════════════════ */}
       <div className="grid gap-4 md:grid-cols-2">
         <motion.div variants={itemVariants}>
-          <Card className="shadow-md">
+          <Card className="card-interactive shadow-premium overflow-hidden border-0">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
-                Courriers interministériels
-              </CardTitle>
-              <CardDescription className="text-xs">Volume mensuel sur 12 mois</CardDescription>
+              <div className="flex items-center gap-2.5">
+                <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#0B2E58] to-[#3B7DD8] shadow-sm">
+                  <Mail className="size-4 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
+                    Courriers interministériels
+                  </CardTitle>
+                  <CardDescription className="text-xs">Volume mensuel sur 12 mois</CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={MONTHLY_DATA} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                  <defs>
+                    <linearGradient id="lineGradNavy" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#0B2E58" />
+                      <stop offset="100%" stopColor="#3B7DD8" />
+                    </linearGradient>
+                    <linearGradient id="lineGradGold" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#C8A45C" />
+                      <stop offset="100%" stopColor="#D4B878" />
+                    </linearGradient>
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                   <XAxis dataKey="month" tick={{ fontSize: 11 }} className="text-muted-foreground" />
                   <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" />
@@ -300,19 +325,19 @@ export default function DashboardPage() {
                     type="monotone"
                     dataKey="courriers"
                     name="Courriers"
-                    stroke="#0B2E58"
+                    stroke="url(#lineGradNavy)"
                     strokeWidth={2.5}
                     dot={{ r: 3, fill: '#0B2E58' }}
-                    activeDot={{ r: 5 }}
+                    activeDot={{ r: 5, fill: '#3B7DD8' }}
                   />
                   <Line
                     type="monotone"
                     dataKey="documents"
                     name="Documents"
-                    stroke="#C8A45C"
+                    stroke="url(#lineGradGold)"
                     strokeWidth={2}
                     dot={{ r: 3, fill: '#C8A45C' }}
-                    activeDot={{ r: 5 }}
+                    activeDot={{ r: 5, fill: '#D4B878' }}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -321,35 +346,42 @@ export default function DashboardPage() {
         </motion.div>
 
         <motion.div variants={itemVariants}>
-          <Card className="shadow-md">
+          <Card className="card-interactive shadow-premium overflow-hidden border-0">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
-                Documents archivés par institution
-              </CardTitle>
-              <CardDescription className="text-xs">Top 5 ministères — Volume mensuel</CardDescription>
+              <div className="flex items-center gap-2.5">
+                <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#C8A45C] to-[#D4B878] shadow-sm">
+                  <FileText className="size-4 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
+                    Documents archivés par institution
+                  </CardTitle>
+                  <CardDescription className="text-xs">Top 5 ministères — Volume mensuel</CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <AreaChart data={ministryAreaData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                   <defs>
                     <linearGradient id="mefGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#0B2E58" stopOpacity={0.15} />
+                      <stop offset="5%" stopColor="#0B2E58" stopOpacity={0.2} />
                       <stop offset="95%" stopColor="#0B2E58" stopOpacity={0.01} />
                     </linearGradient>
                     <linearGradient id="mptGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#C8A45C" stopOpacity={0.15} />
+                      <stop offset="5%" stopColor="#C8A45C" stopOpacity={0.2} />
                       <stop offset="95%" stopColor="#C8A45C" stopOpacity={0.01} />
                     </linearGradient>
                     <linearGradient id="mepuGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3B7DD8" stopOpacity={0.15} />
+                      <stop offset="5%" stopColor="#3B7DD8" stopOpacity={0.2} />
                       <stop offset="95%" stopColor="#3B7DD8" stopOpacity={0.01} />
                     </linearGradient>
                     <linearGradient id="msGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.15} />
+                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.2} />
                       <stop offset="95%" stopColor="#10B981" stopOpacity={0.01} />
                     </linearGradient>
                     <linearGradient id="mdcGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.15} />
+                      <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.2} />
                       <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0.01} />
                     </linearGradient>
                   </defs>
@@ -371,20 +403,35 @@ export default function DashboardPage() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          CHARTS ROW 2: BAR + PIE
+          CHARTS ROW 2: BAR + PIE (PREMIUM)
       ═══════════════════════════════════════════════════════════════════════ */}
       <div className="grid gap-4 md:grid-cols-2">
         <motion.div variants={itemVariants}>
-          <Card className="shadow-md">
+          <Card className="card-interactive shadow-premium overflow-hidden border-0">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
-                Performance par région administrative
-              </CardTitle>
-              <CardDescription className="text-xs">Taux de conformité et volume par région</CardDescription>
+              <div className="flex items-center gap-2.5">
+                <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#3B7DD8] to-[#5A96E6] shadow-sm">
+                  <Building2 className="size-4 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
+                    Performance par région administrative
+                  </CardTitle>
+                  <CardDescription className="text-xs">Taux de conformité et volume par région</CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={regionData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                  <defs>
+                    {CHART_COLORS.map((color, idx) => (
+                      <linearGradient key={idx} id={`barGrad${idx}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={color} stopOpacity={1} />
+                        <stop offset="100%" stopColor={color} stopOpacity={0.7} />
+                      </linearGradient>
+                    ))}
+                  </defs>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                   <XAxis dataKey="region" tick={{ fontSize: 10 }} className="text-muted-foreground" />
                   <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" />
@@ -392,7 +439,7 @@ export default function DashboardPage() {
                   <Legend iconType="circle" wrapperStyle={{ fontSize: '11px' }} />
                   <Bar dataKey="performance" name="Performance (%)" radius={[4, 4, 0, 0]}>
                     {regionData.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                      <Cell key={`cell-${index}`} fill={`url(#barGrad${index % CHART_COLORS.length})`} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -402,12 +449,19 @@ export default function DashboardPage() {
         </motion.div>
 
         <motion.div variants={itemVariants}>
-          <Card className="shadow-md">
+          <Card className="card-interactive shadow-premium overflow-hidden border-0">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
-                Répartition par type de document
-              </CardTitle>
-              <CardDescription className="text-xs">Décrets, Arrêtés, Circulaires, Notes, Rapports, Autres</CardDescription>
+              <div className="flex items-center gap-2.5">
+                <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#8B5CF6] to-[#A78BFA] shadow-sm">
+                  <FileText className="size-4 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
+                    Répartition par type de document
+                  </CardTitle>
+                  <CardDescription className="text-xs">Décrets, Arrêtés, Circulaires, Notes, Rapports, Autres</CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -436,14 +490,16 @@ export default function DashboardPage() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          PND — PLAN NATIONAL DE DÉVELOPPEMENT
+          PND — PLAN NATIONAL DE DÉVELOPPEMENT (PREMIUM)
       ═══════════════════════════════════════════════════════════════════════ */}
       <motion.div variants={itemVariants}>
-        <Card className="shadow-md border-[#C8A45C]/20 dark:border-[#D4B878]/20">
+        <Card className="card-interactive overflow-hidden border-0 relative">
+          {/* Gold top accent line */}
+          <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#0B2E58] via-[#C8A45C] to-[#0B2E58] dark:from-[#3B7DD8] dark:via-[#D4B878] dark:to-[#3B7DD8]" />
           <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <div className="flex size-8 items-center justify-center rounded-lg bg-[#C8A45C]/10 dark:bg-[#D4B878]/20">
-                <Shield className="size-4 text-[#C8A45C] dark:text-[#D4B878]" />
+            <div className="flex items-center gap-2.5">
+              <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#C8A45C] to-[#D4B878] shadow-sm">
+                <Shield className="size-4 text-white" />
               </div>
               <div>
                 <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
@@ -458,15 +514,28 @@ export default function DashboardPage() {
               <div key={axe.name} className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-medium text-[#0B2E58] dark:text-white">{axe.name}</span>
-                  <span className="font-bold" style={{ color: axe.color }}>{axe.value}%</span>
+                  <span className="font-bold tabular-nums" style={{ color: axe.color }}>{axe.value}%</span>
                 </div>
-                <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-muted">
+                <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-muted/60">
                   <motion.div
                     className="absolute left-0 top-0 h-full rounded-full"
-                    style={{ backgroundColor: axe.color }}
+                    style={{
+                      background: `linear-gradient(90deg, ${axe.gradientFrom}, ${axe.gradientTo})`,
+                    }}
                     initial={{ width: 0 }}
                     animate={{ width: `${axe.value}%` }}
                     transition={{ duration: 1.2, ease: 'easeOut', delay: 0.3 }}
+                  />
+                  {/* Shimmer effect on progress */}
+                  <motion.div
+                    className="absolute top-0 h-full rounded-full opacity-30"
+                    style={{
+                      background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)',
+                      width: '20%',
+                    }}
+                    initial={{ left: '-20%' }}
+                    animate={{ left: '120%' }}
+                    transition={{ duration: 2, ease: 'easeInOut', delay: 1.5, repeat: Infinity, repeatDelay: 3 }}
                   />
                 </div>
               </div>
@@ -476,17 +545,24 @@ export default function DashboardPage() {
       </motion.div>
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          ACTIVITY + QUICK ACTIONS ROW
+          ACTIVITY + QUICK ACTIONS ROW (PREMIUM)
       ═══════════════════════════════════════════════════════════════════════ */}
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Recent Activity */}
         <motion.div variants={itemVariants} className="lg:col-span-2">
-          <Card className="shadow-md">
+          <Card className="card-interactive shadow-premium overflow-hidden border-0">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
-                Activité récente interministérielle
-              </CardTitle>
-              <CardDescription className="text-xs">Dernières actions sur la plateforme gouvernementale</CardDescription>
+              <div className="flex items-center gap-2.5">
+                <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#0B2E58] to-[#3B7DD8] shadow-sm">
+                  <Activity className="size-4 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
+                    Activité récente interministérielle
+                  </CardTitle>
+                  <CardDescription className="text-xs">Dernières actions sur la plateforme gouvernementale</CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="px-4">
               <div className="max-h-96 space-y-1 overflow-y-auto pr-1">
@@ -495,13 +571,13 @@ export default function DashboardPage() {
                   return (
                     <div
                       key={activity.id}
-                      className="flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-muted/50"
+                      className="flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 hover:bg-gradient-to-r hover:from-muted/50 hover:to-transparent hover:shadow-sm group"
                     >
-                      <div className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${activityColors[activity.type]}`}>
+                      <div className={`flex size-8 shrink-0 items-center justify-center rounded-lg backdrop-blur-sm ${activityColors[activity.type]} transition-transform duration-200 group-hover:scale-110`}>
                         <IconComp className="size-4" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{activity.label}</p>
+                        <p className="truncate text-sm font-medium group-hover:text-[#0B2E58] dark:group-hover:text-white transition-colors">{activity.label}</p>
                       </div>
                       <span className="shrink-0 text-xs text-muted-foreground">{activity.time}</span>
                     </div>
@@ -514,23 +590,30 @@ export default function DashboardPage() {
 
         {/* Quick Actions */}
         <motion.div variants={itemVariants}>
-          <Card className="shadow-md">
+          <Card className="card-interactive shadow-premium overflow-hidden border-0">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
-                Actions rapides
-              </CardTitle>
-              <CardDescription className="text-xs">Raccourcis pour les tâches fréquentes</CardDescription>
+              <div className="flex items-center gap-2.5">
+                <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#C8A45C] to-[#0B2E58] shadow-sm">
+                  <Plus className="size-4 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
+                    Actions rapides
+                  </CardTitle>
+                  <CardDescription className="text-xs">Raccourcis pour les tâches fréquentes</CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="grid grid-cols-3 gap-3">
               {quickActions.map((action) => (
-                <Button
+                <button
                   key={action.label}
-                  className={`${action.color} h-auto flex-col gap-2 rounded-xl py-4 text-xs font-semibold shadow-sm transition-all hover:scale-[1.02]`}
+                  className={`${action.btnClass} h-auto flex-col gap-2 rounded-xl py-4 text-xs font-semibold inline-flex items-center justify-center transition-all duration-300 hover:scale-[1.03] hover:-translate-y-0.5 active:scale-[0.98]`}
                   onClick={action.onClick}
                 >
                   <action.icon className="size-5" />
                   {action.label}
-                </Button>
+                </button>
               ))}
             </CardContent>
           </Card>
@@ -538,19 +621,24 @@ export default function DashboardPage() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          HEATMAP — ACTIVITÉ INTERMINISTÉRIELLE
+          HEATMAP — ACTIVITÉ INTERMINISTÉRIELLE (PREMIUM)
       ═══════════════════════════════════════════════════════════════════════ */}
       <motion.div variants={itemVariants}>
-        <Card className="shadow-md">
+        <Card className="card-interactive shadow-premium overflow-hidden border-0">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
-                  Activité interministérielle par jour et heure
-                </CardTitle>
-                <CardDescription className="text-xs mt-0.5">
-                  Intensité d&apos;utilisation de la plateforme gouvernementale
-                </CardDescription>
+              <div className="flex items-center gap-2.5">
+                <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#0B2E58] to-[#10B981] shadow-sm">
+                  <Clock className="size-4 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
+                    Activité interministérielle par jour et heure
+                  </CardTitle>
+                  <CardDescription className="text-xs mt-0.5">
+                    Intensité d&apos;utilisation de la plateforme gouvernementale
+                  </CardDescription>
+                </div>
               </div>
               <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                 <span>Faible</span>
@@ -569,7 +657,7 @@ export default function DashboardPage() {
                 {/* Hour labels */}
                 <div className="mb-1 flex gap-0.5 pl-10">
                   {heatmapData.hours.map((h) => (
-                    <div key={h} className="flex-1 text-center text-[10px] text-muted-foreground">
+                    <div key={h} className="flex-1 text-center text-[10px] text-muted-foreground font-medium">
                       {h}
                     </div>
                   ))}
@@ -585,7 +673,7 @@ export default function DashboardPage() {
                       return (
                         <div
                           key={`${day}-${hourIndex}`}
-                          className={`flex-1 aspect-square min-w-0 rounded-sm ${getHeatmapColor(value)} transition-colors hover:opacity-80`}
+                          className={`flex-1 aspect-square min-w-0 rounded-sm ${getHeatmapColor(value)} transition-all duration-200 hover:opacity-80 hover:scale-110 hover:z-10 relative`}
                           title={`${day} ${heatmapData.hours[hourIndex]}: ${value} activités`}
                         />
                       )
@@ -599,21 +687,25 @@ export default function DashboardPage() {
       </motion.div>
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          SOVEREIGNTY BADGE
+          SOVEREIGNTY BADGE (PREMIUM)
       ═══════════════════════════════════════════════════════════════════════ */}
       <motion.div variants={itemVariants}>
-        <Card className="shadow-sm border-[#0B2E58]/10 dark:border-[#3B7DD8]/20 bg-gradient-to-r from-[#0B2E58]/[0.02] to-[#C8A45C]/[0.02] dark:from-[#3B7DD8]/[0.05] dark:to-[#D4B878]/[0.03]">
-          <CardContent className="p-4">
+        <Card className="glass-premium overflow-hidden bg-gradient-to-r from-[#0B2E58]/[0.03] via-transparent to-[#C8A45C]/[0.03] dark:from-[#3B7DD8]/[0.06] dark:via-transparent dark:to-[#D4B878]/[0.04]">
+          <CardContent className="p-4 relative z-10">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-lg bg-[#0B2E58] dark:bg-[#3B7DD8]">
-                <Lock className="size-5 text-white" />
+              <div className="relative flex size-11 items-center justify-center">
+                <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-[#0B2E58] to-[#3B7DD8] p-[1.5px] shadow-md">
+                  <div className="flex size-full items-center justify-center rounded-[10px] bg-gradient-to-br from-[#0B2E58] to-[#143D6B] dark:from-[#143D6B] dark:to-[#1A4A80]">
+                    <Lock className="size-5 text-white" />
+                  </div>
+                </div>
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-sm font-semibold text-[#0B2E58] dark:text-white">
                     Données hébergées en souveraineté nationale
                   </p>
-                  <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-600 dark:text-emerald-400 gap-1">
+                  <Badge variant="outline" className="badge-premium border-0 text-[10px] gap-1">
                     <Server className="size-3" />
                     Data Center Conakry
                   </Badge>
@@ -622,8 +714,10 @@ export default function DashboardPage() {
                   Conformité Loi L/2016/018/AN relative à la protection des données personnelles
                 </p>
               </div>
-              <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium shrink-0">
-                <Shield className="size-4" />
+              <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-semibold shrink-0">
+                <div className="flex size-5 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
+                  <Shield className="size-3.5" />
+                </div>
                 Certifié
               </div>
             </div>

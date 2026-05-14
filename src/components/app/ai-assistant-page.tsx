@@ -136,7 +136,7 @@ export function AiAssistantPage() {
   }
 
   return (
-    <div className="h-full flex flex-col lg:flex-row bg-background">
+    <div className="h-full flex flex-col lg:flex-row bg-background dashboard-bg-v2">
       {/* Left Sidebar - Conversation History */}
       <AnimatePresence mode="wait">
         {sidebarOpen && (
@@ -145,14 +145,14 @@ export function AiAssistantPage() {
             animate={{ width: 280, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ duration: 0.2, ease: 'easeInOut' }}
-            className="h-full border-r border-border bg-card flex flex-col shrink-0 overflow-hidden"
+            className="h-full border-r border-border glass-premium flex flex-col shrink-0 overflow-hidden"
           >
             {/* Sidebar Header */}
             <div className="px-4 py-4 border-b border-border shrink-0">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-lg bg-brand flex items-center justify-center">
-                    <Sparkles className="h-4 w-4 text-gold" />
+                  <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-[#0B2E58] to-[#3B7DD8] dark:from-[#0B2E58] dark:to-[#143D6B] flex items-center justify-center shadow-md ring-1 ring-[#C8A45C]/30 dark:ring-[#D4B878]/20">
+                    <Sparkles className="h-4 w-4 text-[#C8A45C] dark:text-[#D4B878]" />
                   </div>
                   <div>
                     <h2 className="text-sm font-bold text-brand dark:text-primary">Assistant IA</h2>
@@ -170,7 +170,7 @@ export function AiAssistantPage() {
               </div>
               <Button
                 onClick={handleNewChat}
-                className="w-full gap-2 bg-brand hover:bg-brand/90 text-white"
+                className="btn-premium w-full gap-2"
                 size="sm"
               >
                 <Plus className="h-4 w-4" />
@@ -191,10 +191,10 @@ export function AiAssistantPage() {
                     <div
                       key={conv.id}
                       className={cn(
-                        'group flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-colors',
+                        'group flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200',
                         activeConversationId === conv.id
-                          ? 'bg-brand/10 dark:bg-brand/20 text-brand dark:text-primary'
-                          : 'hover:bg-muted text-foreground'
+                          ? 'bg-gradient-to-r from-[#0B2E58]/10 to-[#3B7DD8]/5 dark:from-[#0B2E58]/20 dark:to-[#3B7DD8]/10 text-[#0B2E58] dark:text-[#3B7DD8] border-l-2 border-[#C8A45C]'
+                          : 'hover:bg-muted/50 text-foreground'
                       )}
                       onClick={() => setActiveConversation(conv.id)}
                     >
@@ -233,7 +233,7 @@ export function AiAssistantPage() {
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col min-w-0 h-full">
         {/* Chat Header */}
-        <div className="px-6 py-3 border-b border-border bg-card/80 backdrop-blur-sm shrink-0 flex items-center justify-between">
+        <div className="px-6 py-3 border-b border-border glass-nav shrink-0 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {!sidebarOpen && (
               <Button
@@ -274,10 +274,10 @@ export function AiAssistantPage() {
         {messages.length === 0 && (
           <div className="px-6 py-6 shrink-0">
             <div className="text-center mb-6">
-              <div className="inline-flex h-16 w-16 rounded-2xl bg-brand/10 dark:bg-brand/20 items-center justify-center mb-3">
-                <Sparkles className="h-8 w-8 text-brand dark:text-primary" />
+              <div className="inline-flex h-16 w-16 rounded-2xl bg-gradient-to-br from-[#0B2E58] to-[#3B7DD8] dark:from-[#0B2E58] dark:to-[#143D6B] items-center justify-center mb-3 shadow-lg ring-1 ring-[#C8A45C]/30 dark:ring-[#D4B878]/20">
+                <Sparkles className="h-8 w-8 text-[#C8A45C] dark:text-[#D4B878]" />
               </div>
-              <h2 className="text-lg font-bold text-foreground">Comment puis-je vous aider?</h2>
+              <h2 className="text-lg font-bold text-gradient-navy">Comment puis-je vous aider?</h2>
               <p className="text-sm text-muted-foreground mt-1">
                 Choisissez une action rapide ou posez votre question
               </p>
@@ -286,14 +286,14 @@ export function AiAssistantPage() {
               {QUICK_ACTIONS.map((action) => (
                 <Card
                   key={action.label}
-                  className="cursor-pointer hover:shadow-md hover:border-brand/30 transition-all group"
+                  className="card-interactive group"
                   onClick={() => handleQuickAction(action.prompt)}
                 >
                   <CardContent className="p-4">
                     <div className={cn('h-10 w-10 rounded-lg flex items-center justify-center mb-3', action.color)}>
                       <action.icon className="h-5 w-5" />
                     </div>
-                    <h3 className="text-sm font-semibold text-foreground group-hover:text-brand dark:group-hover:text-primary transition-colors">
+                    <h3 className="text-sm font-semibold text-foreground group-hover:text-[#0B2E58] dark:group-hover:text-[#3B7DD8] transition-colors">
                       {action.label}
                     </h3>
                     <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
@@ -322,16 +322,16 @@ export function AiAssistantPage() {
                   )}
                 >
                   {msg.role === 'assistant' && (
-                    <div className="h-8 w-8 rounded-full bg-brand/10 dark:bg-brand/20 flex items-center justify-center shrink-0 mt-1">
-                      <Bot className="h-4 w-4 text-brand dark:text-primary" />
+                    <div className="h-8 w-8 rounded-full bg-gradient-to-br from-[#0B2E58]/10 to-[#3B7DD8]/10 dark:from-[#0B2E58]/20 dark:to-[#3B7DD8]/20 flex items-center justify-center shrink-0 mt-1 ring-1 ring-[#C8A45C]/20 dark:ring-[#D4B878]/10">
+                      <Bot className="h-4 w-4 text-[#0B2E58] dark:text-[#3B7DD8]" />
                     </div>
                   )}
                   <div
                     className={cn(
                       'max-w-[75%] rounded-2xl px-4 py-3',
                       msg.role === 'user'
-                        ? 'bg-brand text-white rounded-br-md'
-                        : 'bg-muted text-foreground rounded-bl-md'
+                        ? 'bg-gradient-to-r from-[#0B2E58] to-[#143D6B] dark:from-[#143D6B] dark:to-[#1A4A80] text-white rounded-br-md shadow-md'
+                        : 'glass-premium text-foreground rounded-bl-md'
                     )}
                   >
                     <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
@@ -343,7 +343,7 @@ export function AiAssistantPage() {
                     </p>
                   </div>
                   {msg.role === 'user' && (
-                    <div className="h-8 w-8 rounded-full bg-brand flex items-center justify-center shrink-0 mt-1">
+                    <div className="h-8 w-8 rounded-full bg-gradient-to-br from-[#0B2E58] to-[#3B7DD8] dark:from-[#0B2E58] dark:to-[#143D6B] flex items-center justify-center shrink-0 mt-1 ring-1 ring-[#C8A45C]/30 dark:ring-[#D4B878]/20">
                       <User className="h-4 w-4 text-white" />
                     </div>
                   )}
@@ -357,10 +357,10 @@ export function AiAssistantPage() {
                   animate={{ opacity: 1, y: 0 }}
                   className="flex gap-3 justify-start"
                 >
-                  <div className="h-8 w-8 rounded-full bg-brand/10 dark:bg-brand/20 flex items-center justify-center shrink-0 mt-1">
-                    <Bot className="h-4 w-4 text-brand dark:text-primary" />
+                  <div className="h-8 w-8 rounded-full bg-gradient-to-br from-[#0B2E58]/10 to-[#3B7DD8]/10 dark:from-[#0B2E58]/20 dark:to-[#3B7DD8]/20 flex items-center justify-center shrink-0 mt-1 ring-1 ring-[#C8A45C]/20 dark:ring-[#D4B878]/10">
+                    <Bot className="h-4 w-4 text-[#0B2E58] dark:text-[#3B7DD8]" />
                   </div>
-                  <div className="bg-muted rounded-2xl rounded-bl-md px-4 py-3">
+                  <div className="glass-premium rounded-2xl rounded-bl-md px-4 py-3">
                     <div className="flex items-center gap-1.5">
                       <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                       <span className="text-xs text-muted-foreground">L&apos;assistant rédige...</span>
@@ -382,7 +382,7 @@ export function AiAssistantPage() {
                 <button
                   key={action.label}
                   onClick={() => handleQuickAction(action.prompt)}
-                  className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs bg-muted/60 hover:bg-muted border border-border/50 hover:border-brand/30 transition-colors text-muted-foreground hover:text-foreground"
+                  className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs glass-premium hover:border-[#C8A45C]/30 dark:hover:border-[#3B7DD8]/30 transition-all text-muted-foreground hover:text-foreground"
                 >
                   <action.icon className="h-3 w-3" />
                   {action.label}
@@ -393,7 +393,7 @@ export function AiAssistantPage() {
         )}
 
         {/* Input Area */}
-        <div className="px-6 py-4 border-t border-border bg-card/80 backdrop-blur-sm shrink-0">
+        <div className="px-6 py-4 border-t border-border glass-nav shrink-0">
           <div className="max-w-3xl mx-auto">
             <div className="flex items-end gap-3">
               <div className="flex-1 relative">
@@ -406,9 +406,8 @@ export function AiAssistantPage() {
                   disabled={isLoading}
                   rows={1}
                   className={cn(
-                    'w-full resize-none rounded-xl border border-border/50 bg-muted/30 px-4 py-3 pr-12',
+                    'w-full resize-none rounded-xl glass-input focus-ring-premium px-4 py-3 pr-12',
                     'text-sm text-foreground placeholder:text-muted-foreground',
-                    'focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand/50',
                     'disabled:opacity-50 disabled:cursor-not-allowed',
                     'max-h-32 overflow-y-auto'
                   )}
@@ -423,18 +422,17 @@ export function AiAssistantPage() {
                   }}
                 />
               </div>
-              <Button
+              <button
                 onClick={handleSend}
                 disabled={!input.trim() || isLoading}
-                className="h-12 w-12 rounded-xl bg-brand hover:bg-brand/90 text-white shrink-0"
-                size="icon"
+                className="h-12 w-12 rounded-xl btn-premium shrink-0 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
                 ) : (
                   <Send className="h-5 w-5" />
                 )}
-              </Button>
+              </button>
             </div>
             <p className="text-[10px] text-muted-foreground mt-2 text-center">
               L&apos;assistant IA peut faire des erreurs. Vérifiez les informations importantes auprès des services compétents.

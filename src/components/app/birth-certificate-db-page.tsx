@@ -248,13 +248,13 @@ export function BirthCertificateDbPage() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="space-y-6 p-4 md:p-6"
+      className="space-y-6 p-4 md:p-6 dashboard-bg-v2 min-h-screen"
     >
       {/* ═════════════════════════════════════════════════════════════════════
           HEADER
       ═════════════════════════════════════════════════════════════════════ */}
       <motion.div variants={itemVariants}>
-        <Card className="glass-card overflow-hidden border-[#C8A45C]/20 dark:border-[#D4B878]/20 bg-gradient-to-br from-[#0B2E58] via-[#0B2E58]/95 to-[#134A8E] dark:from-[#0B2E58] dark:via-[#071D3A] dark:to-[#0B2E58]">
+        <Card className="glass-premium overflow-hidden border-[#C8A45C]/20 dark:border-[#D4B878]/20 bg-gradient-to-br from-[#0B2E58] via-[#0B2E58]/95 to-[#134A8E] dark:from-[#0B2E58] dark:via-[#071D3A] dark:to-[#0B2E58]">
           <CardContent className="p-6 text-white relative">
             {/* Guinea tricolor */}
             <div className="flex gap-0 mb-4 -mx-6 -mt-6">
@@ -264,7 +264,7 @@ export function BirthCertificateDbPage() {
             </div>
 
             <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-              <div className="flex size-14 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm shadow-xl border border-white/20">
+              <div className="flex size-14 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm shadow-xl border border-[#C8A45C]/30 ring-1 ring-[#C8A45C]/20">
                 <BookOpen className="size-7 text-white" />
               </div>
               <div className="flex-1">
@@ -275,7 +275,7 @@ export function BirthCertificateDbPage() {
                 </p>
               </div>
               <div className="flex flex-col gap-2">
-                <Badge className="bg-[#C8A45C] text-[#0B2E58] hover:bg-[#C8A45C]/90 border-0 font-semibold text-xs gap-1.5 shadow-sm">
+                <Badge className="badge-premium border-0 bg-[#C8A45C] text-[#0B2E58] hover:bg-[#C8A45C]/90 font-semibold text-xs gap-1.5 shadow-sm">
                   <Database className="size-3" />
                   Base Nationale
                 </Badge>
@@ -300,13 +300,13 @@ export function BirthCertificateDbPage() {
             { label: 'Par commune', value: Object.keys(stats.byCommune).length, icon: MapPin, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
             { label: 'Vérifications', value: stats.verificationCount, icon: Shield, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-900/20' },
           ].map((stat) => (
-            <Card key={stat.label} className="shadow-sm border-[#0B2E58]/5 dark:border-[#3B7DD8]/10">
+            <Card key={stat.label} className="card-interactive premium-stat">
               <CardContent className="flex items-center gap-3 p-4">
-                <div className={`p-2.5 rounded-xl ${stat.bg} ${stat.color}`}>
+                <div className={`p-2.5 rounded-xl bg-gradient-to-br ${stat.bg} ${stat.color} shadow-sm`}>
                   <stat.icon className="size-5" />
                 </div>
                 <div>
-                  <p className="text-xl font-bold text-[#0B2E58] dark:text-white">{stat.value}</p>
+                  <p className="text-xl font-bold text-[#0B2E58] dark:text-white tabular-nums tracking-tight">{stat.value}</p>
                   <p className="text-xs text-muted-foreground">{stat.label}</p>
                 </div>
               </CardContent>
@@ -337,10 +337,10 @@ export function BirthCertificateDbPage() {
           <div className="mt-4 space-y-4">
             {/* Advanced Search Form */}
             <motion.div variants={itemVariants}>
-              <Card className="shadow-md">
+              <Card className="glass-premium shadow-md">
                 <CardHeader className="pb-3">
                   <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-[#0B2E58]/5 dark:bg-[#3B7DD8]/10 text-[#0B2E58] dark:text-[#3B7DD8]">
+                    <div className="p-2.5 rounded-xl bg-gradient-to-br from-[#0B2E58]/5 to-[#3B7DD8]/5 dark:from-[#3B7DD8]/10 dark:to-[#0B2E58]/10 text-[#0B2E58] dark:text-[#3B7DD8] ring-1 ring-[#C8A45C]/20 dark:ring-[#D4B878]/15">
                       <Search className="size-5" />
                     </div>
                     <div>
@@ -359,6 +359,7 @@ export function BirthCertificateDbPage() {
                         value={searchName}
                         onChange={e => setSearchName(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                        className="glass-input focus-ring-premium"
                       />
                     </div>
 
@@ -370,7 +371,7 @@ export function BirthCertificateDbPage() {
                         value={searchActeNumber}
                         onChange={e => setSearchActeNumber(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                        className="font-mono text-sm"
+                        className="font-mono text-sm glass-input focus-ring-premium"
                       />
                     </div>
 
@@ -381,6 +382,7 @@ export function BirthCertificateDbPage() {
                         type="date"
                         value={searchBirthDate}
                         onChange={e => setSearchBirthDate(e.target.value)}
+                        className="glass-input focus-ring-premium"
                       />
                     </div>
 
@@ -392,6 +394,7 @@ export function BirthCertificateDbPage() {
                         value={searchBirthPlace}
                         onChange={e => setSearchBirthPlace(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                        className="glass-input focus-ring-premium"
                       />
                     </div>
 
@@ -446,7 +449,7 @@ export function BirthCertificateDbPage() {
                   <div className="flex gap-3 pt-2">
                     <Button
                       onClick={handleSearch}
-                      className="bg-[#0B2E58] hover:bg-[#0B2E58]/90 dark:bg-[#3B7DD8] dark:hover:bg-[#3B7DD8]/90 text-white gap-2"
+                      className="btn-premium gap-2"
                     >
                       <Search className="size-4" />
                       Rechercher
@@ -463,7 +466,7 @@ export function BirthCertificateDbPage() {
             {/* Search Results Table */}
             {hasSearched && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                <Card className="shadow-md">
+                <Card className="glass-premium shadow-md">
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <div>
@@ -549,7 +552,7 @@ export function BirthCertificateDbPage() {
                           {paginatedResults.map((record) => (
                             <Card
                               key={record.id}
-                              className="cursor-pointer hover:shadow-md transition-shadow"
+                              className="card-interactive"
                               onClick={() => { setDetailRecord(record); setDetailOpen(true) }}
                             >
                               <CardContent className="p-4">
@@ -558,7 +561,7 @@ export function BirthCertificateDbPage() {
                                     <p className="font-semibold text-sm">{record.lastName} {record.firstName}</p>
                                     <p className="text-xs text-muted-foreground font-mono">{record.acteNumber}</p>
                                   </div>
-                                  <Badge className={`text-[10px] font-medium ${STATUS_BADGE[record.status].color}`}>
+                                  <Badge className={`text-[10px] font-semibold backdrop-blur-sm ${STATUS_BADGE[record.status].color}`}>
                                     {STATUS_BADGE[record.status].label}
                                   </Badge>
                                 </div>
@@ -571,9 +574,10 @@ export function BirthCertificateDbPage() {
                           ))}
                         </div>
 
+                    <div className="divider-premium my-4" />
                         {/* Pagination */}
                         {totalPages > 1 && (
-                          <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                          <div className="flex items-center justify-between">
                             <p className="text-xs text-muted-foreground">
                               Page {currentPage} sur {totalPages} — {sortedResults.length} résultat(s)
                             </p>
@@ -629,10 +633,10 @@ export function BirthCertificateDbPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Verification Form */}
               <motion.div variants={itemVariants}>
-                <Card className="shadow-md h-fit">
+                <Card className="glass-premium shadow-md h-fit">
                   <CardHeader>
                     <div className="flex items-center gap-3">
-                      <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400">
+                      <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-900/30 text-emerald-600 dark:text-emerald-400 ring-1 ring-[#C8A45C]/20 dark:ring-[#D4B878]/15">
                         <Shield className="size-5" />
                       </div>
                       <div>
@@ -649,6 +653,7 @@ export function BirthCertificateDbPage() {
                           placeholder="Prénom du citoyen"
                           value={verifyFirstName}
                           onChange={e => setVerifyFirstName(e.target.value)}
+                          className="glass-input focus-ring-premium"
                         />
                       </div>
                       <div className="space-y-1.5">
@@ -657,6 +662,7 @@ export function BirthCertificateDbPage() {
                           placeholder="Nom du citoyen"
                           value={verifyLastName}
                           onChange={e => setVerifyLastName(e.target.value)}
+                          className="glass-input focus-ring-premium"
                         />
                       </div>
                       <div className="space-y-1.5">
@@ -665,6 +671,7 @@ export function BirthCertificateDbPage() {
                           type="date"
                           value={verifyBirthDate}
                           onChange={e => setVerifyBirthDate(e.target.value)}
+                          className="glass-input focus-ring-premium"
                         />
                       </div>
                       <div className="space-y-1.5">
@@ -673,6 +680,7 @@ export function BirthCertificateDbPage() {
                           placeholder="Ex: Conakry, Kankan..."
                           value={verifyBirthPlace}
                           onChange={e => setVerifyBirthPlace(e.target.value)}
+                          className="glass-input focus-ring-premium"
                         />
                       </div>
                     </div>
@@ -681,7 +689,7 @@ export function BirthCertificateDbPage() {
                       <Button
                         onClick={handleVerify}
                         disabled={!verifyFirstName.trim() || !verifyLastName.trim()}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 flex-1"
+                        className="btn-gold gap-2 flex-1"
                       >
                         <Shield className="size-4" />
                         Vérifier
@@ -697,7 +705,7 @@ export function BirthCertificateDbPage() {
 
               {/* Verification Result */}
               <motion.div variants={itemVariants}>
-                <Card className="shadow-md h-fit">
+                <Card className="glass-premium shadow-md h-fit">
                   <CardHeader>
                     <CardTitle className="text-base flex items-center gap-2">
                       <FileText className="size-4" />
@@ -751,7 +759,7 @@ export function BirthCertificateDbPage() {
                           </div>
                         )}
 
-                        <Separator />
+                        <div className="divider-premium" />
 
                         {/* Record details */}
                         <div className="space-y-3">
@@ -788,7 +796,7 @@ export function BirthCertificateDbPage() {
                             </div>
                           </div>
 
-                          <Separator />
+                          <div className="divider-premium" />
 
                           <div className="space-y-2">
                             <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Parents</h5>
@@ -806,7 +814,7 @@ export function BirthCertificateDbPage() {
                             </div>
                           </div>
 
-                          <Separator />
+                          <div className="divider-premium" />
 
                           <div className="space-y-2">
                             <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Enregistrement</h5>
@@ -850,7 +858,7 @@ export function BirthCertificateDbPage() {
           REGIONAL STATS
       ═════════════════════════════════════════════════════════════════════ */}
       <motion.div variants={itemVariants}>
-        <Card className="shadow-sm">
+        <Card className="glass-premium shadow-sm">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white flex items-center gap-2">
               <MapPin className="size-4" />
@@ -884,7 +892,7 @@ export function BirthCertificateDbPage() {
             <>
               <DialogHeader>
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-[#0B2E58]/5 dark:bg-[#3B7DD8]/10 text-[#0B2E58] dark:text-[#3B7DD8]">
+                  <div className="p-2.5 rounded-xl bg-gradient-to-br from-[#0B2E58]/5 to-[#3B7DD8]/5 dark:from-[#3B7DD8]/10 dark:to-[#0B2E58]/10 text-[#0B2E58] dark:text-[#3B7DD8] ring-1 ring-[#C8A45C]/20 dark:ring-[#D4B878]/15">
                     <BookOpen className="size-5" />
                   </div>
                   <div>
@@ -910,7 +918,7 @@ export function BirthCertificateDbPage() {
                   )}
                 </div>
 
-                <Separator />
+                <div className="divider-premium" />
 
                 {/* Birth Information */}
                 <div>
@@ -942,7 +950,7 @@ export function BirthCertificateDbPage() {
                   </div>
                 </div>
 
-                <Separator />
+                <div className="divider-premium" />
 
                 {/* Parents Information */}
                 <div>
@@ -992,7 +1000,7 @@ export function BirthCertificateDbPage() {
                   </div>
                 </div>
 
-                <Separator />
+                <div className="divider-premium" />
 
                 {/* Registration Information */}
                 <div>
@@ -1027,7 +1035,7 @@ export function BirthCertificateDbPage() {
                 {/* Notes */}
                 {detailRecord.notes && detailRecord.status !== 'corrected' && (
                   <>
-                    <Separator />
+                    <div className="divider-premium" />
                     <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/40">
                       <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">Notes</p>
                       <p className="text-sm text-amber-600/80 dark:text-amber-400/80">{detailRecord.notes}</p>
@@ -1037,7 +1045,7 @@ export function BirthCertificateDbPage() {
 
                 {detailRecord.status === 'cancelled' && detailRecord.notes && (
                   <>
-                    <Separator />
+                    <div className="divider-premium" />
                     <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/40">
                       <p className="text-xs font-medium text-red-700 dark:text-red-400 mb-1">Motif d&apos;annulation</p>
                       <p className="text-sm text-red-600/80 dark:text-red-400/80">{detailRecord.notes}</p>

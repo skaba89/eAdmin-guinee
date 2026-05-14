@@ -95,21 +95,21 @@ export function MairieDashboardPage() {
 
   // Stats for mairie
   const stats = [
-    { label: 'Demandes reçues', value: mairieRequests.filter(r => r.status === 'soumise').length, icon: Send, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-900/20' },
-    { label: 'En traitement', value: mairieRequests.filter(r => ['en_cours', 'pieces_complementaires'].includes(r.status)).length, icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
-    { label: 'Documents prêts', value: mairieRequests.filter(r => r.status === 'prete').length, icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
-    { label: 'Livrées ce mois', value: mairieRequests.filter(r => r.status === 'livree').length, icon: Download, color: 'text-[#0B2E58] dark:text-[#3B7DD8]', bg: 'bg-[#0B2E58]/5 dark:bg-[#3B7DD8]/10' },
+    { label: 'Demandes reçues', value: mairieRequests.filter(r => r.status === 'soumise').length, icon: Send, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-900/20', gradient: 'from-sky-500 to-sky-600' },
+    { label: 'En traitement', value: mairieRequests.filter(r => ['en_cours', 'pieces_complementaires'].includes(r.status)).length, icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20', gradient: 'from-amber-500 to-amber-600' },
+    { label: 'Documents prêts', value: mairieRequests.filter(r => r.status === 'prete').length, icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20', gradient: 'from-emerald-500 to-emerald-600' },
+    { label: 'Livrées ce mois', value: mairieRequests.filter(r => r.status === 'livree').length, icon: Download, color: 'text-[#0B2E58] dark:text-[#3B7DD8]', bg: 'bg-[#0B2E58]/5 dark:bg-[#3B7DD8]/10', gradient: 'from-[#0B2E58] to-[#3B7DD8]' },
   ]
 
   // Pipeline counters
   const pipeline = [
-    { status: 'soumise', label: 'Soumises', count: mairieRequests.filter(r => r.status === 'soumise').length, color: 'bg-sky-500' },
-    { status: 'en_cours', label: 'En cours', count: mairieRequests.filter(r => r.status === 'en_cours').length, color: 'bg-amber-500' },
-    { status: 'pieces_complementaires', label: 'Pièces à compléter', count: mairieRequests.filter(r => r.status === 'pieces_complementaires').length, color: 'bg-orange-500' },
-    { status: 'validee', label: 'Validées', count: mairieRequests.filter(r => r.status === 'validee').length, color: 'bg-blue-500' },
-    { status: 'prete', label: 'Prêtes', count: mairieRequests.filter(r => r.status === 'prete').length, color: 'bg-emerald-500' },
-    { status: 'livree', label: 'Livrées', count: mairieRequests.filter(r => r.status === 'livree').length, color: 'bg-[#0B2E58]' },
-    { status: 'rejetee', label: 'Rejetées', count: mairieRequests.filter(r => r.status === 'rejetee').length, color: 'bg-red-500' },
+    { status: 'soumise', label: 'Soumises', count: mairieRequests.filter(r => r.status === 'soumise').length, color: 'bg-sky-500', gradient: 'from-sky-400 to-sky-600' },
+    { status: 'en_cours', label: 'En cours', count: mairieRequests.filter(r => r.status === 'en_cours').length, color: 'bg-amber-500', gradient: 'from-amber-400 to-amber-600' },
+    { status: 'pieces_complementaires', label: 'Pièces à compléter', count: mairieRequests.filter(r => r.status === 'pieces_complementaires').length, color: 'bg-orange-500', gradient: 'from-orange-400 to-orange-600' },
+    { status: 'validee', label: 'Validées', count: mairieRequests.filter(r => r.status === 'validee').length, color: 'bg-blue-500', gradient: 'from-blue-400 to-blue-600' },
+    { status: 'prete', label: 'Prêtes', count: mairieRequests.filter(r => r.status === 'prete').length, color: 'bg-emerald-500', gradient: 'from-emerald-400 to-emerald-600' },
+    { status: 'livree', label: 'Livrées', count: mairieRequests.filter(r => r.status === 'livree').length, color: 'bg-[#0B2E58]', gradient: 'from-[#0B2E58] to-[#3B7DD8]' },
+    { status: 'rejetee', label: 'Rejetées', count: mairieRequests.filter(r => r.status === 'rejetee').length, color: 'bg-red-500', gradient: 'from-red-400 to-red-600' },
   ]
 
   const handleTakeCharge = (req: CitizenRequest) => {
@@ -256,32 +256,39 @@ export function MairieDashboardPage() {
           HEADER — MAIRIE DE KALOUM
       ═══════════════════════════════════════════════════════════════════════ */}
       <motion.div variants={itemVariants}>
-        <Card className="glass-card overflow-hidden border-[#C8A45C]/20 dark:border-[#D4B878]/20 bg-gradient-to-br from-[#0B2E58] via-[#0B2E58]/95 to-[#134A8E] dark:from-[#0B2E58] dark:via-[#071D3A] dark:to-[#0B2E58]">
-          <CardContent className="p-6 text-white relative">
-            {/* Guinea tricolor */}
+        <Card className="glass-premium overflow-hidden border-[#C8A45C]/20 dark:border-[#D4B878]/20 bg-gradient-to-br from-[#0B2E58] via-[#134A8E] to-[#0B2E58] dark:from-[#0B2E58] dark:via-[#071D3A] dark:to-[#0B2E58] shadow-premium-lg">
+          <CardContent className="p-6 text-white relative overflow-hidden">
+            {/* Premium inner glow overlay */}
+            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.06] via-transparent to-white/[0.02] pointer-events-none" />
+
+            {/* Guinea tricolor with gradient fade */}
             <div className="flex gap-0 mb-4 -mx-6 -mt-6">
-              <div className="flex-1 h-1.5" style={{ backgroundColor: '#CE1126' }} />
-              <div className="flex-1 h-1.5" style={{ backgroundColor: '#FCD116' }} />
-              <div className="flex-1 h-1.5" style={{ backgroundColor: '#009460' }} />
+              <div className="flex-1 h-2 bg-gradient-to-r from-[#CE1126] to-[#CE1126]/60" />
+              <div className="flex-1 h-2 bg-gradient-to-r from-[#FCD116]/60 to-[#FCD116]" />
+              <div className="flex-1 h-2 bg-gradient-to-r from-[#009460] to-[#009460]/60" />
             </div>
 
-            <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-              <div className="flex size-14 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm shadow-xl border border-white/20">
-                <Building2 className="size-7 text-white" />
+            <div className="flex flex-col md:flex-row items-start md:items-center gap-4 relative z-10">
+              {/* Icon container with gold ring + glow */}
+              <div className="relative">
+                <div className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-[#C8A45C]/40 to-[#D4B878]/20 blur-sm" />
+                <div className="relative flex size-14 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm border border-[#C8A45C]/30 shadow-lg">
+                  <Building2 className="size-7 text-white" />
+                </div>
               </div>
               <div className="flex-1">
-                <p className="text-xs uppercase tracking-widest text-white/60 font-medium">République de Guinée</p>
-                <h2 className="text-2xl font-bold mt-0.5">{user?.mairie || 'Mairie de Kaloum'}</h2>
+                <p className="text-xs uppercase tracking-[0.2em] text-[#C8A45C]/80 font-semibold">République de Guinée</p>
+                <h2 className="text-2xl font-bold mt-0.5 text-gradient-gold">{user?.mairie || 'Mairie de Kaloum'}</h2>
                 <p className="text-sm text-white/70 mt-1">
                   Tableau de bord — État Civil & Résidence • {user?.name || 'Agent de Mairie'}
                 </p>
               </div>
               <div className="flex flex-col gap-2">
-                <Badge className="bg-[#C8A45C] text-[#0B2E58] hover:bg-[#C8A45C]/90 border-0 font-semibold text-xs gap-1.5 shadow-sm">
+                <Badge className="badge-premium bg-[#C8A45C] text-[#0B2E58] hover:bg-[#C8A45C]/90 border-0 font-semibold text-xs gap-1.5 shadow-gold">
                   <Building2 className="size-3" />
                   Agent de Mairie
                 </Badge>
-                <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-xs gap-1.5">
+                <Badge className="badge-premium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs gap-1.5">
                   <CheckCircle2 className="size-3" />
                   {mairieRequests.length} demande(s) mairie
                 </Badge>
@@ -297,13 +304,15 @@ export function MairieDashboardPage() {
       <motion.div variants={itemVariants}>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {stats.map((stat) => (
-            <Card key={stat.label} className="shadow-sm border-[#0B2E58]/5 dark:border-[#3B7DD8]/10">
-              <CardContent className="flex items-center gap-3 p-4">
-                <div className={`p-2.5 rounded-xl ${stat.bg} ${stat.color}`}>
-                  <stat.icon className="size-5" />
+            <Card key={stat.label} className="card-interactive overflow-hidden group">
+              <CardContent className="flex items-center gap-3 p-4 relative">
+                {/* Top gradient accent line */}
+                <div className={`absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r ${stat.gradient} opacity-60 group-hover:opacity-100 transition-opacity`} />
+                <div className={`p-2.5 rounded-xl bg-gradient-to-br ${stat.gradient} bg-opacity-10 shadow-sm`}>
+                  <stat.icon className="size-5 text-white" />
                 </div>
                 <div>
-                  <p className="text-xl font-bold text-[#0B2E58] dark:text-white">{stat.value}</p>
+                  <p className="text-xl font-bold tabular-nums tracking-tight text-[#0B2E58] dark:text-white premium-stat">{stat.value}</p>
                   <p className="text-xs text-muted-foreground">{stat.label}</p>
                 </div>
               </CardContent>
@@ -316,10 +325,10 @@ export function MairieDashboardPage() {
           PIPELINE VISUAL
       ═══════════════════════════════════════════════════════════════════════ */}
       <motion.div variants={itemVariants}>
-        <Card className="shadow-md">
+        <Card className="card-premium overflow-hidden">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white flex items-center gap-2">
-              <ClipboardCheck className="size-4" />
+              <ClipboardCheck className="size-4 text-[#C8A45C]" />
               Pipeline de traitement — État Civil & Résidence
             </CardTitle>
             <CardDescription className="text-xs">Vue d&apos;ensemble du flux de demandes assignées à votre mairie</CardDescription>
@@ -329,33 +338,42 @@ export function MairieDashboardPage() {
               {pipeline.map((step, i) => (
                 <div key={step.status} className="flex items-center">
                   <div className="flex flex-col items-center min-w-[80px]">
-                    <div className={`w-12 h-12 rounded-full ${step.color} text-white flex items-center justify-center font-bold text-lg shadow-md`}>
-                      {step.count}
+                    {/* Pipeline step circle with gradient background and glow */}
+                    <div className="relative">
+                      {step.count > 0 && (
+                        <div className={`absolute -inset-1.5 rounded-full bg-gradient-to-br ${step.gradient} opacity-20 blur-md`} />
+                      )}
+                      <div className={`relative w-12 h-12 rounded-full bg-gradient-to-br ${step.gradient} text-white flex items-center justify-center font-bold text-lg shadow-md`}>
+                        {step.count}
+                      </div>
                     </div>
                     <p className="text-[10px] font-medium text-muted-foreground mt-1.5 text-center">{step.label}</p>
                   </div>
                   {i < pipeline.length - 1 && (
-                    <ArrowRight className="size-4 text-muted-foreground/40 mx-1 shrink-0" />
+                    <div className="flex items-center mx-1 shrink-0">
+                      <div className="w-4 h-[2px] bg-gradient-to-r from-muted-foreground/30 to-muted-foreground/10 rounded-full" />
+                      <ArrowRight className="size-3 text-muted-foreground/40 shrink-0" />
+                    </div>
                   )}
                 </div>
               ))}
             </div>
-            {/* Progress bar */}
+            {/* Progress bar with gradient fill */}
             <div className="mt-4">
               <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
                 <span>Taux de traitement</span>
-                <span className="font-semibold">
+                <span className="font-semibold tabular-nums tracking-tight">
                   {mairieRequests.length > 0
                     ? Math.round((mairieRequests.filter(r => ['validee', 'prete', 'livree'].includes(r.status)).length / mairieRequests.length) * 100)
                     : 0}%
                 </span>
               </div>
-              <Progress
-                value={mairieRequests.length > 0
-                  ? (mairieRequests.filter(r => ['validee', 'prete', 'livree'].includes(r.status)).length / mairieRequests.length) * 100
-                  : 0}
-                className="h-2"
-              />
+              <div className="h-2 rounded-full bg-muted/50 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-[#0B2E58] via-[#3B7DD8] to-[#C8A45C] transition-all duration-700 ease-out"
+                  style={{ width: `${mairieRequests.length > 0 ? (mairieRequests.filter(r => ['validee', 'prete', 'livree'].includes(r.status)).length / mairieRequests.length) * 100 : 0}%` }}
+                />
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -365,12 +383,12 @@ export function MairieDashboardPage() {
           TABS: REQUESTS + BIRTH CERTIFICATE DB
       ═══════════════════════════════════════════════════════════════════════ */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="w-full sm:w-auto h-auto flex-wrap gap-1 bg-muted/50 p-1.5">
-          <TabsTrigger value="pipeline" className="gap-1.5 text-sm data-[state=active]:bg-[#0B2E58] data-[state=active]:text-white">
+        <TabsList className="w-full sm:w-auto h-auto flex-wrap gap-1 bg-muted/50 p-1.5 shadow-sm">
+          <TabsTrigger value="pipeline" className="gap-1.5 text-sm data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0B2E58] data-[state=active]:to-[#134A8E] data-[state=active]:text-white data-[state=active]:shadow-md">
             <FileText className="size-4" />
             Demandes ({mairieRequests.length})
           </TabsTrigger>
-          <TabsTrigger value="birth-db" className="gap-1.5 text-sm data-[state=active]:bg-[#0B2E58] data-[state=active]:text-white">
+          <TabsTrigger value="birth-db" className="gap-1.5 text-sm data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0B2E58] data-[state=active]:to-[#134A8E] data-[state=active]:text-white data-[state=active]:shadow-md">
             <Database className="size-4" />
             Base État Civil
           </TabsTrigger>
@@ -381,15 +399,15 @@ export function MairieDashboardPage() {
         ═════════════════════════════════════════════════════════════════════ */}
         <TabsContent value="pipeline">
           <div className="mt-4">
-            {/* Quick actions */}
+            {/* Quick actions with premium styling */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
               {[
-                { label: 'Demandes à traiter', icon: Send, color: 'bg-sky-600 hover:bg-sky-600/90 text-white', count: mairieRequests.filter(r => r.status === 'soumise').length },
-                { label: 'En cours', icon: Clock, color: 'bg-amber-600 hover:bg-amber-600/90 text-white', count: mairieRequests.filter(r => ['en_cours', 'pieces_complementaires'].includes(r.status)).length },
-                { label: 'Documents prêts', icon: CheckCircle2, color: 'bg-emerald-600 hover:bg-emerald-600/90 text-white', count: mairieRequests.filter(r => r.status === 'prete').length },
-                { label: 'Tout voir', icon: FileText, color: 'bg-[#0B2E58] hover:bg-[#0B2E58]/90 text-white dark:bg-[#3B7DD8] dark:hover:bg-[#3B7DD8]/90', count: mairieRequests.length },
+                { label: 'Demandes à traiter', icon: Send, color: 'bg-gradient-to-br from-sky-500 to-sky-700 hover:from-sky-600 hover:to-sky-800 text-white', count: mairieRequests.filter(r => r.status === 'soumise').length },
+                { label: 'En cours', icon: Clock, color: 'bg-gradient-to-br from-amber-500 to-amber-700 hover:from-amber-600 hover:to-amber-800 text-white', count: mairieRequests.filter(r => ['en_cours', 'pieces_complementaires'].includes(r.status)).length },
+                { label: 'Documents prêts', icon: CheckCircle2, color: 'bg-gradient-to-br from-emerald-500 to-emerald-700 hover:from-emerald-600 hover:to-emerald-800 text-white', count: mairieRequests.filter(r => r.status === 'prete').length },
+                { label: 'Tout voir', icon: FileText, color: 'bg-gradient-to-br from-[#0B2E58] to-[#134A8E] hover:from-[#0B2E58]/90 hover:to-[#134A8E]/90 text-white dark:from-[#3B7DD8] dark:to-[#5A96E6] dark:hover:from-[#3B7DD8]/90 dark:hover:to-[#5A96E6]/90', count: mairieRequests.length },
               ].map(action => (
-                <Button key={action.label} className={`${action.color} h-auto flex-col gap-1.5 rounded-xl py-3 text-xs font-semibold shadow-sm`} onClick={() => {}}>
+                <Button key={action.label} className={`${action.color} h-auto flex-col gap-1.5 rounded-xl py-3 text-xs font-semibold shadow-md transition-all hover:scale-[1.02] hover:shadow-lg`} onClick={() => {}}>
                   <action.icon className="size-4" />
                   {action.label}
                   <span className="text-[10px] opacity-70">({action.count})</span>
@@ -397,14 +415,14 @@ export function MairieDashboardPage() {
               ))}
             </div>
 
-            {/* Search */}
+            {/* Search with glass input */}
             <div className="relative mb-4">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Rechercher par référence, nom, service..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-10 glass-input focus-ring-premium"
               />
             </div>
 
@@ -415,7 +433,7 @@ export function MairieDashboardPage() {
                 <AnimatePresence mode="popLayout">
                   {filteredRequests.length === 0 ? (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                      <Card className="glass-card">
+                      <Card className="glass-premium">
                         <CardContent className="flex flex-col items-center justify-center py-16 text-center">
                           <FileText className="size-12 text-muted-foreground/30 mb-3" />
                           <p className="text-muted-foreground font-medium">Aucune demande pour votre mairie</p>
@@ -437,23 +455,27 @@ export function MairieDashboardPage() {
                           layout
                         >
                           <Card
-                            className={`cursor-pointer hover:shadow-lg transition-all ${selectedRequest?.id === req.id ? 'ring-2 ring-[#0B2E58] dark:ring-[#3B7DD8]' : ''}`}
+                            className={`card-interactive overflow-hidden ${selectedRequest?.id === req.id ? 'ring-2 ring-[#0B2E58] dark:ring-[#3B7DD8] border-[#C8A45C]/30 shadow-gold' : ''}`}
                             onClick={() => setSelectedRequest(req)}
                           >
                             <CardContent className="p-4">
                               <div className="flex items-start justify-between mb-2">
                                 <div className="flex items-center gap-3">
-                                  <Avatar className="size-10">
-                                    <AvatarFallback className={`${sConfig.color} text-xs font-bold`}>
-                                      {req.citizenFirstName[0]}{req.citizenName[0]}
-                                    </AvatarFallback>
-                                  </Avatar>
+                                  {/* Refined avatar with ring */}
+                                  <div className="relative">
+                                    <Avatar className="size-10 ring-2 ring-white/50 dark:ring-white/10">
+                                      <AvatarFallback className={`${sConfig.color} text-xs font-bold`}>
+                                        {req.citizenFirstName[0]}{req.citizenName[0]}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                  </div>
                                   <div>
                                     <p className="font-semibold text-sm">{req.citizenFirstName} {req.citizenName}</p>
                                     <p className="text-xs text-muted-foreground font-mono">{req.reference}</p>
                                   </div>
                                 </div>
-                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${sConfig.color}`}>
+                                {/* Status badge with glass effect */}
+                                <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium backdrop-blur-sm ${sConfig.color} border border-current/10`}>
                                   <SIcon className="size-3" />
                                   {sConfig.label}
                                 </span>
@@ -465,10 +487,10 @@ export function MairieDashboardPage() {
                                   {req.assignedAgent && <span className="flex items-center gap-1"><User className="size-3" />{req.assignedAgent}</span>}
                                 </div>
                               </div>
-                              {/* Quick action for soumises */}
+                              {/* Quick action for soumises with premium styling */}
                               {req.status === 'soumise' && (
                                 <div className="mt-3 flex gap-2">
-                                  <Button size="sm" className="bg-[#0B2E58] hover:bg-[#0B2E58]/90 dark:bg-[#3B7DD8] dark:hover:bg-[#3B7DD8]/90 text-white gap-1 h-7 text-xs" onClick={(e) => { e.stopPropagation(); handleTakeCharge(req) }}>
+                                  <Button size="sm" className="btn-premium gap-1 h-7 text-xs" onClick={(e) => { e.stopPropagation(); handleTakeCharge(req) }}>
                                     <Play className="size-3" />
                                     Prendre en charge
                                   </Button>
@@ -487,10 +509,10 @@ export function MairieDashboardPage() {
               <div className="lg:col-span-1">
                 {selectedRequest ? (
                   <motion.div key={selectedRequest.id} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-                    <Card className="glass-card sticky top-24">
+                    <Card className="glass-premium sticky top-24 shadow-premium">
                       <CardHeader className="pb-3">
                         <div className="flex items-center gap-2">
-                          <Badge className={`text-[10px] font-semibold ${STATUS_CONFIG[selectedRequest.status].color}`}>
+                          <Badge className={`badge-premium text-[10px] font-semibold ${STATUS_CONFIG[selectedRequest.status].color}`}>
                             {STATUS_CONFIG[selectedRequest.status].label}
                           </Badge>
                         </div>
@@ -498,28 +520,28 @@ export function MairieDashboardPage() {
                         <CardDescription className="text-xs font-mono">{selectedRequest.reference}</CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-4">
-                        {/* Citizen info */}
-                        <div className="p-3 rounded-lg bg-muted/50 space-y-2">
+                        {/* Citizen info with glass effect */}
+                        <div className="p-3 rounded-lg bg-gradient-to-br from-muted/40 to-muted/20 backdrop-blur-sm space-y-2 border border-muted/50">
                           <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Informations du citoyen</h4>
                           <div className="grid grid-cols-1 gap-1.5 text-xs">
-                            <div className="flex items-center gap-2"><User className="size-3 text-muted-foreground" /><span className="font-medium">{selectedRequest.citizenFirstName} {selectedRequest.citizenName}</span></div>
-                            <div className="flex items-center gap-2"><Hash className="size-3 text-muted-foreground" />NIN : {selectedRequest.citizenNIN}</div>
-                            <div className="flex items-center gap-2"><Phone className="size-3 text-muted-foreground" />{selectedRequest.citizenPhone}</div>
-                            <div className="flex items-center gap-2"><MapPin className="size-3 text-muted-foreground" />{selectedRequest.citizenAddress}</div>
+                            <div className="flex items-center gap-2"><User className="size-3 text-[#C8A45C]" /><span className="font-medium">{selectedRequest.citizenFirstName} {selectedRequest.citizenName}</span></div>
+                            <div className="flex items-center gap-2"><Hash className="size-3 text-[#C8A45C]" />NIN : {selectedRequest.citizenNIN}</div>
+                            <div className="flex items-center gap-2"><Phone className="size-3 text-[#C8A45C]" />{selectedRequest.citizenPhone}</div>
+                            <div className="flex items-center gap-2"><MapPin className="size-3 text-[#C8A45C]" />{selectedRequest.citizenAddress}</div>
                           </div>
                         </div>
 
                         {/* Required documents */}
                         <div>
                           <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
-                            <Paperclip className="size-3.5" />
+                            <Paperclip className="size-3.5 text-[#C8A45C]" />
                             Pièces justificatives ({selectedRequest.uploadedDocuments.length} / {selectedRequest.documents.length})
                           </h4>
                           <div className="space-y-1.5">
                             {selectedRequest.documents.map((docName, i) => {
                               const uploaded = selectedRequest.uploadedDocuments.find(d => d.requiredDocName === docName)
                               return (
-                                <div key={i} className={`flex items-center justify-between p-2 rounded-lg text-xs border ${uploaded ? (uploaded.verified ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-800/40 dark:bg-emerald-900/10' : 'border-amber-200 bg-amber-50/50 dark:border-amber-800/40 dark:bg-amber-900/10') : 'border-dashed border-muted-foreground/30 bg-muted/20'}`}>
+                                <div key={i} className={`flex items-center justify-between p-2 rounded-lg text-xs border backdrop-blur-sm ${uploaded ? (uploaded.verified ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-800/40 dark:bg-emerald-900/10' : 'border-amber-200 bg-amber-50/50 dark:border-amber-800/40 dark:bg-amber-900/10') : 'border-dashed border-muted-foreground/30 bg-muted/20'}`}>
                                   <div className="flex items-center gap-2 min-w-0">
                                     {uploaded ? (
                                       <>
@@ -544,7 +566,7 @@ export function MairieDashboardPage() {
                                             <FileCheck className="size-2.5" /> Vérifié
                                           </Badge>
                                         ) : (
-                                          <Button size="sm" variant="outline" className="h-5 text-[9px] gap-0.5 px-1.5" onClick={() => handleVerifyDocument(selectedRequest.id, uploaded.id)}>
+                                          <Button size="sm" variant="outline" className="h-5 text-[9px] gap-0.5 px-1.5 focus-ring-premium" onClick={() => handleVerifyDocument(selectedRequest.id, uploaded.id)}>
                                             <Check className="size-2.5" /> Vérifier
                                           </Button>
                                         )}
@@ -555,7 +577,7 @@ export function MairieDashboardPage() {
                                     ) : (
                                       <>
                                         <input type="file" accept={ACCEPTED_FILE_TYPES} className="hidden" id={`mairie-upload-${i}`} onChange={async (e) => { if (e.target.files?.[0]) { await handleAddDocumentToRequest(e.target.files[0], selectedRequest.id); e.target.value = '' } }} />
-                                        <Button size="sm" variant="outline" className="h-5 text-[9px] gap-0.5 px-1.5" onClick={() => document.getElementById(`mairie-upload-${i}`)?.click()}>
+                                        <Button size="sm" variant="outline" className="h-5 text-[9px] gap-0.5 px-1.5 focus-ring-premium" onClick={() => document.getElementById(`mairie-upload-${i}`)?.click()}>
                                           <UploadIcon className="size-2.5" /> Ajouter
                                         </Button>
                                       </>
@@ -567,7 +589,7 @@ export function MairieDashboardPage() {
                           </div>
                         </div>
 
-                        {/* Timeline */}
+                        {/* Timeline with refined step indicators */}
                         <div>
                           <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Avancement</h4>
                           <div className="space-y-0">
@@ -575,13 +597,15 @@ export function MairieDashboardPage() {
                               <div key={i} className="flex gap-3">
                                 <div className="flex flex-col items-center">
                                   <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 border-2 ${
-                                    step.status === 'completed' ? 'bg-emerald-500 border-emerald-500 text-white' :
-                                    step.status === 'current' ? 'bg-[#0B2E58] border-[#0B2E58] text-white dark:bg-[#3B7DD8] dark:border-[#3B7DD8]' :
+                                    step.status === 'completed' ? 'bg-gradient-to-br from-emerald-400 to-emerald-600 border-emerald-500 text-white shadow-sm' :
+                                    step.status === 'current' ? 'bg-gradient-to-br from-[#0B2E58] to-[#3B7DD8] border-[#3B7DD8] text-white dark:from-[#3B7DD8] dark:to-[#5A96E6] dark:border-[#5A96E6] shadow-sm' :
                                     'bg-background border-muted-foreground/30 text-muted-foreground'
                                   }`}>
                                     {step.status === 'completed' ? <Check className="h-3 w-3" /> : step.status === 'current' ? <Clock className="h-3 w-3" /> : <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />}
                                   </div>
-                                  {i < selectedRequest.timeline.length - 1 && <div className={`w-0.5 h-6 ${step.status === 'completed' ? 'bg-emerald-300 dark:bg-emerald-700' : 'bg-muted-foreground/20'}`} />}
+                                  {i < selectedRequest.timeline.length - 1 && (
+                                    <div className={`w-0.5 h-6 ${step.status === 'completed' ? 'bg-gradient-to-b from-emerald-300 to-emerald-200 dark:from-emerald-700 dark:to-emerald-800' : 'bg-muted-foreground/20'}`} />
+                                  )}
                                 </div>
                                 <div className="pb-2">
                                   <p className={`text-xs font-medium ${step.status === 'pending' ? 'text-muted-foreground' : ''}`}>{step.label}</p>
@@ -595,15 +619,15 @@ export function MairieDashboardPage() {
                         {/* Processing notes */}
                         {selectedRequest.processingNotes.length > 0 && (
                           <>
-                            <Separator />
+                            <div className="divider-premium" />
                             <div>
                               <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Notes ({selectedRequest.processingNotes.length})</h4>
                               <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
                                 {selectedRequest.processingNotes.map((note, i) => (
-                                  <div key={i} className={`p-2 rounded-lg text-xs border ${
-                                    note.type === 'info_complementaire' ? 'bg-orange-50 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800/40' :
-                                    note.type === 'decision' ? 'bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800/40' :
-                                    'bg-muted/50 border-muted'
+                                  <div key={i} className={`p-2 rounded-lg text-xs border backdrop-blur-sm ${
+                                    note.type === 'info_complementaire' ? 'bg-orange-50/80 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800/40' :
+                                    note.type === 'decision' ? 'bg-blue-50/80 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800/40' :
+                                    'bg-muted/40 border-muted/50'
                                   }`}>
                                     <div className="flex items-center justify-between mb-0.5">
                                       <span className="font-medium">{note.author}</span>
@@ -617,35 +641,35 @@ export function MairieDashboardPage() {
                           </>
                         )}
 
-                        {/* Action buttons */}
-                        <Separator />
+                        {/* Action buttons with premium styling */}
+                        <div className="divider-premium" />
                         <div className="flex flex-wrap gap-2">
                           {selectedRequest.status === 'soumise' && (
-                            <Button size="sm" className="flex-1 bg-[#0B2E58] hover:bg-[#0B2E58]/90 dark:bg-[#3B7DD8] dark:hover:bg-[#3B7DD8]/90 text-white gap-1" onClick={() => handleTakeCharge(selectedRequest)}>
+                            <Button size="sm" className="flex-1 btn-premium gap-1" onClick={() => handleTakeCharge(selectedRequest)}>
                               <Play className="size-3.5" />
                               Prendre en charge
                             </Button>
                           )}
                           {(selectedRequest.status === 'en_cours' || selectedRequest.status === 'pieces_complementaires') && (
-                            <Button size="sm" className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white gap-1" onClick={() => handleValidate(selectedRequest)}>
+                            <Button size="sm" className="flex-1 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white gap-1 shadow-md" onClick={() => handleValidate(selectedRequest)}>
                               <Check className="size-3.5" />
                               Valider
                             </Button>
                           )}
                           {selectedRequest.status === 'validee' && (
-                            <Button size="sm" className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white gap-1" onClick={() => setGenerateDocDialogOpen(true)}>
+                            <Button size="sm" className="flex-1 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white gap-1 shadow-md" onClick={() => setGenerateDocDialogOpen(true)}>
                               <Stamp className="size-3.5" />
                               Générer le document
                             </Button>
                           )}
                           {selectedRequest.status === 'prete' && (
-                            <Button size="sm" className="flex-1 bg-[#0B2E58] hover:bg-[#0B2E58]/90 dark:bg-[#3B7DD8] dark:hover:bg-[#3B7DD8]/90 text-white gap-1" onClick={() => setDeliveryDialogOpen(true)}>
+                            <Button size="sm" className="flex-1 btn-premium gap-1" onClick={() => setDeliveryDialogOpen(true)}>
                               <Download className="size-3.5" />
                               Livrer
                             </Button>
                           )}
                           {selectedRequest.status !== 'livree' && selectedRequest.status !== 'rejetee' && (
-                            <Button size="sm" variant="outline" className="gap-1" onClick={() => setNoteDialogOpen(true)}>
+                            <Button size="sm" variant="outline" className="gap-1 focus-ring-premium" onClick={() => setNoteDialogOpen(true)}>
                               <MessageSquare className="size-3.5" />
                               Note
                             </Button>
@@ -654,7 +678,7 @@ export function MairieDashboardPage() {
 
                         {/* Generate Official Document */}
                         {selectedRequest.status === 'validee' && (
-                          <Button size="sm" className="w-full bg-[#C8A45C] hover:bg-[#C8A45C]/90 text-[#0B2E58] gap-2 font-semibold" onClick={() => setGenerateDocDialogOpen(true)}>
+                          <Button size="sm" className="w-full btn-gold gap-2 font-semibold" onClick={() => setGenerateDocDialogOpen(true)}>
                             <FileText className="size-4" />
                             Générer le document officiel
                           </Button>
@@ -663,13 +687,13 @@ export function MairieDashboardPage() {
                         {/* Download Generated Document */}
                         {(selectedRequest.status === 'prete' || selectedRequest.status === 'livree') && selectedRequest.generatedDocument && (
                           <div className="space-y-2">
-                            <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800/40">
+                            <div className="p-2.5 rounded-lg bg-gradient-to-br from-emerald-50/80 to-emerald-100/40 dark:from-emerald-900/15 dark:to-emerald-900/5 border border-emerald-200/80 dark:border-emerald-800/40 backdrop-blur-sm">
                               <div className="flex items-center gap-2">
                                 <FileCheck className="size-3.5 text-emerald-600 dark:text-emerald-400" />
                                 <p className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">Document généré le {new Date(selectedRequest.generatedDocument.generatedAt).toLocaleDateString('fr-FR')}</p>
                               </div>
                             </div>
-                            <Button size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white gap-2" onClick={handleDownloadDocument}>
+                            <Button size="sm" className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white gap-2 shadow-md" onClick={handleDownloadDocument}>
                               <Download className="size-4" />
                               Télécharger le document
                             </Button>
@@ -679,7 +703,7 @@ export function MairieDashboardPage() {
                     </Card>
                   </motion.div>
                 ) : (
-                  <Card className="glass-card">
+                  <Card className="glass-premium">
                     <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                       <Building2 className="size-12 text-muted-foreground/30 mb-3" />
                       <p className="text-sm text-muted-foreground">Sélectionnez une demande</p>
@@ -697,11 +721,12 @@ export function MairieDashboardPage() {
         ═════════════════════════════════════════════════════════════════════ */}
         <TabsContent value="birth-db">
           <div className="mt-4 space-y-4">
-            {/* Quick verification card */}
-            <Card className="shadow-md border-emerald-200 dark:border-emerald-800/40">
+            {/* Quick verification card with premium styling */}
+            <Card className="card-premium overflow-hidden">
+              <div className="h-[2px] bg-gradient-to-r from-emerald-500 via-emerald-400 to-[#C8A45C]" />
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400">
+                  <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-sm">
                     <Shield className="size-5" />
                   </div>
                   <div>
@@ -719,6 +744,7 @@ export function MairieDashboardPage() {
                       value={quickVerifyName}
                       onChange={e => { setQuickVerifyName(e.target.value); setQuickVerifySearched(false) }}
                       onKeyDown={e => e.key === 'Enter' && handleQuickVerify()}
+                      className="glass-input focus-ring-premium"
                     />
                   </div>
                   <div className="sm:w-48 space-y-1.5">
@@ -727,10 +753,11 @@ export function MairieDashboardPage() {
                       type="date"
                       value={quickVerifyDate}
                       onChange={e => { setQuickVerifyDate(e.target.value); setQuickVerifySearched(false) }}
+                      className="glass-input focus-ring-premium"
                     />
                   </div>
                   <div className="flex items-end">
-                    <Button onClick={handleQuickVerify} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
+                    <Button onClick={handleQuickVerify} className="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white gap-2 shadow-md">
                       <Shield className="size-4" />
                       Vérifier
                     </Button>
@@ -740,7 +767,7 @@ export function MairieDashboardPage() {
                 {quickVerifySearched && (
                   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
                     {quickVerifyNotFound ? (
-                      <div className="flex items-center gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/40">
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-red-50/80 to-red-100/40 dark:from-red-900/10 dark:to-red-900/5 border border-red-200 dark:border-red-800/40 backdrop-blur-sm">
                         <XCircle className="size-5 text-red-500 shrink-0" />
                         <div>
                           <p className="font-medium text-red-700 dark:text-red-400 text-sm">Aucun enregistrement trouvé</p>
@@ -748,7 +775,7 @@ export function MairieDashboardPage() {
                         </div>
                       </div>
                     ) : quickVerifyResult ? (
-                      <div className="flex items-center gap-3 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800/40">
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-emerald-50/80 to-emerald-100/40 dark:from-emerald-900/10 dark:to-emerald-900/5 border border-emerald-200 dark:border-emerald-800/40 backdrop-blur-sm">
                         <CheckCircle2 className="size-5 text-emerald-500 shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-emerald-700 dark:text-emerald-400 text-sm">{quickVerifyResult.firstName} {quickVerifyResult.lastName}</p>
@@ -756,7 +783,7 @@ export function MairieDashboardPage() {
                             Né(e) le {quickVerifyResult.birthDate} à {quickVerifyResult.birthPlace} — Acte N° {quickVerifyResult.acteNumber} — {quickVerifyResult.commune}
                           </p>
                         </div>
-                        <Badge className={`text-[10px] shrink-0 ${quickVerifyResult.status === 'active' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : quickVerifyResult.status === 'corrected' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
+                        <Badge className={`badge-premium text-[10px] shrink-0 ${quickVerifyResult.status === 'active' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : quickVerifyResult.status === 'corrected' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
                           {quickVerifyResult.status === 'active' ? 'Actif' : quickVerifyResult.status === 'corrected' ? 'Corrigé' : 'Annulé'}
                         </Badge>
                       </div>
@@ -766,11 +793,12 @@ export function MairieDashboardPage() {
               </CardContent>
             </Card>
 
-            {/* Search + Results */}
-            <Card className="shadow-md">
+            {/* Search + Results with premium styling */}
+            <Card className="card-premium overflow-hidden">
+              <div className="h-[2px] bg-gradient-to-r from-[#0B2E58] via-[#3B7DD8] to-[#C8A45C]" />
               <CardHeader>
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400">
+                  <div className="p-2.5 rounded-xl bg-gradient-to-br from-[#0B2E58] to-[#3B7DD8] text-white shadow-sm">
                     <Database className="size-5" />
                   </div>
                   <div>
@@ -787,11 +815,11 @@ export function MairieDashboardPage() {
                       placeholder="Rechercher par nom, numéro d'acte, lieu..."
                       value={birthSearch}
                       onChange={e => { setBirthSearch(e.target.value); setBirthSearched(false) }}
-                      className="pl-10"
+                      className="pl-10 glass-input focus-ring-premium"
                       onKeyDown={e => e.key === 'Enter' && handleBirthSearch()}
                     />
                   </div>
-                  <Button onClick={handleBirthSearch} className="bg-[#0B2E58] hover:bg-[#0B2E58]/90 dark:bg-[#3B7DD8] dark:hover:bg-[#3B7DD8]/90 text-white gap-2">
+                  <Button onClick={handleBirthSearch} className="btn-premium gap-2">
                     <Search className="size-4" />
                     Rechercher
                   </Button>
@@ -809,11 +837,11 @@ export function MairieDashboardPage() {
                       <div className="space-y-3">
                         <p className="text-sm text-muted-foreground">{birthResults.length} résultat(s) trouvé(s)</p>
                         {birthResults.map((record) => (
-                          <Card key={record.id} className="border-blue-200 dark:border-blue-800/40">
+                          <Card key={record.id} className="card-interactive overflow-hidden border-[#3B7DD8]/20 dark:border-[#3B7DD8]/10">
                             <CardContent className="p-4">
                               <div className="flex items-start justify-between mb-3">
                                 <div className="flex items-center gap-3">
-                                  <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400">
+                                  <div className="p-2 rounded-lg bg-gradient-to-br from-[#0B2E58] to-[#3B7DD8] text-white shadow-sm">
                                     <Baby className="size-5" />
                                   </div>
                                   <div>
@@ -821,7 +849,7 @@ export function MairieDashboardPage() {
                                     <p className="text-xs text-muted-foreground font-mono">{record.acteNumber}</p>
                                   </div>
                                 </div>
-                                <Badge className={`text-[10px] ${record.status === 'active' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : record.status === 'corrected' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
+                                <Badge className={`badge-premium text-[10px] ${record.status === 'active' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : record.status === 'corrected' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
                                   {record.status === 'active' ? 'Actif' : record.status === 'corrected' ? 'Corrigé' : 'Annulé'}
                                 </Badge>
                               </div>
@@ -868,17 +896,16 @@ export function MairieDashboardPage() {
                 )}
 
                 {/* Link to full database page */}
-                <div className="pt-2 border-t">
-                  <Button
-                    variant="outline"
-                    className="w-full gap-2 text-[#0B2E58] dark:text-[#3B7DD8] border-[#0B2E58]/20 dark:border-[#3B7DD8]/20 hover:bg-[#0B2E58]/5 dark:hover:bg-[#3B7DD8]/5"
-                    onClick={() => navigate('birth-certificate-db')}
-                  >
-                    <BookOpen className="size-4" />
-                    Ouvrir la base complète des actes de naissance
-                    <ArrowRight className="size-4 ml-auto" />
-                  </Button>
-                </div>
+                <div className="pt-2 divider-premium" />
+                <Button
+                  variant="outline"
+                  className="w-full gap-2 text-[#0B2E58] dark:text-[#3B7DD8] border-[#0B2E58]/20 dark:border-[#3B7DD8]/20 hover:bg-[#0B2E58]/5 dark:hover:bg-[#3B7DD8]/5 focus-ring-premium transition-all hover:scale-[1.01]"
+                  onClick={() => navigate('birth-certificate-db')}
+                >
+                  <BookOpen className="size-4" />
+                  Ouvrir la base complète des actes de naissance
+                  <ArrowRight className="size-4 ml-auto" />
+                </Button>
               </CardContent>
             </Card>
           </div>
@@ -889,19 +916,22 @@ export function MairieDashboardPage() {
           QUICK NAVIGATION
       ═══════════════════════════════════════════════════════════════════════ */}
       <motion.div variants={itemVariants}>
-        <Card className="shadow-sm border-[#C8A45C]/20 dark:border-[#D4B878]/20 bg-gradient-to-r from-[#0B2E58]/[0.02] to-[#C8A45C]/[0.02] dark:from-[#3B7DD8]/[0.05] dark:to-[#D4B878]/[0.03]">
+        <Card className="glass-premium overflow-hidden border-[#C8A45C]/20 dark:border-[#D4B878]/20 bg-gradient-to-r from-[#0B2E58]/[0.02] to-[#C8A45C]/[0.02] dark:from-[#3B7DD8]/[0.05] dark:to-[#D4B878]/[0.03]">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">Actions rapides</CardTitle>
+            <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white flex items-center gap-2">
+              <ArrowRight className="size-4 text-[#C8A45C]" />
+              Actions rapides
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
-                { label: 'GED Documents', icon: FileText, color: 'bg-[#0B2E58] hover:bg-[#0B2E58]/90 text-white', onClick: () => navigate('ged') },
-                { label: 'Courriers', icon: Mail, color: 'bg-[#3B7DD8] hover:bg-[#3B7DD8]/90 text-white', onClick: () => navigate('courriers') },
-                { label: 'Paramètres', icon: Building2, color: 'bg-[#C8A45C] hover:bg-[#C8A45C]/90 text-[#0B2E58]', onClick: () => navigate('settings') },
-                { label: 'Toutes les demandes', icon: ClipboardCheck, color: 'bg-emerald-600 hover:bg-emerald-600/90 text-white', onClick: () => navigate('service-requests') },
+                { label: 'GED Documents', icon: FileText, color: 'bg-gradient-to-br from-[#0B2E58] to-[#134A8E] hover:from-[#0B2E58]/90 hover:to-[#134A8E]/90 text-white', onClick: () => navigate('ged') },
+                { label: 'Courriers', icon: Mail, color: 'bg-gradient-to-br from-[#3B7DD8] to-[#5A96E6] hover:from-[#3B7DD8]/90 hover:to-[#5A96E6]/90 text-white', onClick: () => navigate('courriers') },
+                { label: 'Paramètres', icon: Building2, color: 'btn-gold', onClick: () => navigate('settings') },
+                { label: 'Toutes les demandes', icon: ClipboardCheck, color: 'bg-gradient-to-br from-emerald-500 to-emerald-700 hover:from-emerald-600 hover:to-emerald-800 text-white', onClick: () => navigate('service-requests') },
               ].map(action => (
-                <Button key={action.label} className={`${action.color} h-auto flex-col gap-2 rounded-xl py-3 text-xs font-semibold shadow-sm transition-all hover:scale-[1.02]`} onClick={action.onClick}>
+                <Button key={action.label} className={`${action.color} h-auto flex-col gap-2 rounded-xl py-3 text-xs font-semibold shadow-md transition-all hover:scale-[1.02] hover:shadow-lg`} onClick={action.onClick}>
                   <action.icon className="size-4" />
                   {action.label}
                 </Button>
@@ -913,31 +943,31 @@ export function MairieDashboardPage() {
 
       {/* Generate Document Dialog */}
       <Dialog open={generateDocDialogOpen} onOpenChange={setGenerateDocDialogOpen}>
-        <DialogContent>
+        <DialogContent className="glass-premium">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileText className="size-5 text-[#C8A45C]" />
+              <FileText className="size-5 text-gradient-gold" />
               Générer le document officiel
             </DialogTitle>
             <DialogDescription>Générez le document officiel pour cette demande</DialogDescription>
           </DialogHeader>
           {selectedRequest && (
             <div className="space-y-4 py-2">
-              <div className="p-3 rounded-lg bg-muted/50 text-sm">
+              <div className="p-3 rounded-lg bg-gradient-to-br from-muted/40 to-muted/20 text-sm border border-muted/50">
                 <p><strong>Référence :</strong> <span className="font-mono">{selectedRequest.reference}</span></p>
                 <p><strong>Service :</strong> {selectedRequest.serviceName}</p>
                 <p><strong>Citoyen :</strong> {selectedRequest.citizenFirstName} {selectedRequest.citizenName}</p>
               </div>
-              <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/40">
+              <div className="p-3 rounded-lg bg-gradient-to-r from-amber-50/80 to-amber-100/40 dark:from-amber-900/10 dark:to-amber-900/5 border border-amber-200 dark:border-amber-800/40 backdrop-blur-sm">
                 <p className="text-xs text-amber-700 dark:text-amber-400">
-                  En confirmant, le document officiel sera généré et la demande passera au statut "Document prêt".
+                  En confirmant, le document officiel sera généré et la demande passera au statut &quot;Document prêt&quot;.
                 </p>
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setGenerateDocDialogOpen(false)}>Annuler</Button>
-            <Button className="bg-[#C8A45C] hover:bg-[#C8A45C]/90 text-[#0B2E58] gap-2 font-semibold" onClick={handleGenerateDocument}>
+            <Button variant="outline" onClick={() => setGenerateDocDialogOpen(false)} className="focus-ring-premium">Annuler</Button>
+            <Button className="btn-gold gap-2 font-semibold" onClick={handleGenerateDocument}>
               <FileText className="size-4" />
               Confirmer la génération
             </Button>
@@ -947,17 +977,20 @@ export function MairieDashboardPage() {
 
       {/* Note Dialog */}
       <Dialog open={noteDialogOpen} onOpenChange={setNoteDialogOpen}>
-        <DialogContent>
+        <DialogContent className="glass-premium">
           <DialogHeader>
-            <DialogTitle>Ajouter une note</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="size-5 text-[#C8A45C]" />
+              Ajouter une note
+            </DialogTitle>
             <DialogDescription>Ajoutez une note au dossier de traitement</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <Textarea placeholder="Rédigez votre note..." value={noteText} onChange={e => setNoteText(e.target.value)} rows={4} />
+            <Textarea placeholder="Rédigez votre note..." value={noteText} onChange={e => setNoteText(e.target.value)} rows={4} className="glass-input focus-ring-premium" />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setNoteDialogOpen(false)}>Annuler</Button>
-            <Button className="bg-[#0B2E58] hover:bg-[#0B2E58]/90 dark:bg-[#3B7DD8] dark:hover:bg-[#3B7DD8]/90 text-white" onClick={handleAddNote} disabled={!noteText.trim()}>
+            <Button variant="outline" onClick={() => setNoteDialogOpen(false)} className="focus-ring-premium">Annuler</Button>
+            <Button className="btn-premium" onClick={handleAddNote} disabled={!noteText.trim()}>
               Publier la note
             </Button>
           </DialogFooter>
@@ -966,7 +999,7 @@ export function MairieDashboardPage() {
 
       {/* Delivery Dialog */}
       <Dialog open={deliveryDialogOpen} onOpenChange={setDeliveryDialogOpen}>
-        <DialogContent>
+        <DialogContent className="glass-premium">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Download className="size-5 text-emerald-600" />
@@ -976,7 +1009,7 @@ export function MairieDashboardPage() {
           </DialogHeader>
           {selectedRequest && (
             <div className="space-y-4 py-2">
-              <div className="p-3 rounded-lg bg-muted/50 text-sm">
+              <div className="p-3 rounded-lg bg-gradient-to-br from-muted/40 to-muted/20 text-sm border border-muted/50">
                 <p><strong>Référence :</strong> <span className="font-mono">{selectedRequest.reference}</span></p>
                 <p><strong>Service :</strong> {selectedRequest.serviceName}</p>
                 <p><strong>Citoyen :</strong> {selectedRequest.citizenFirstName} {selectedRequest.citizenName}</p>
@@ -992,7 +1025,7 @@ export function MairieDashboardPage() {
                     <div
                       key={option.value}
                       className={`p-3 rounded-xl border-2 cursor-pointer transition-all text-center ${
-                        deliveryMode === option.value ? 'border-[#0B2E58] dark:border-[#3B7DD8] bg-[#0B2E58]/5 dark:bg-[#3B7DD8]/10' : 'border-muted'
+                        deliveryMode === option.value ? 'border-[#C8A45C] dark:border-[#D4B878] bg-gradient-to-br from-[#0B2E58]/5 to-[#C8A45C]/5 dark:from-[#3B7DD8]/10 dark:to-[#D4B878]/10 shadow-sm' : 'border-muted hover:border-muted-foreground/30'
                       }`}
                       onClick={() => setDeliveryMode(option.value)}
                     >
@@ -1004,15 +1037,15 @@ export function MairieDashboardPage() {
                 {deliveryMode === 'guichet' && (
                   <div className="space-y-1.5">
                     <Label className="text-xs">Lieu de retrait</Label>
-                    <Input placeholder="Mairie de Kaloum, Bureau d'État Civil..." value={deliveryLocation} onChange={e => setDeliveryLocation(e.target.value)} />
+                    <Input placeholder="Mairie de Kaloum, Bureau d'État Civil..." value={deliveryLocation} onChange={e => setDeliveryLocation(e.target.value)} className="glass-input focus-ring-premium" />
                   </div>
                 )}
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeliveryDialogOpen(false)}>Annuler</Button>
-            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2" onClick={handleDeliver}>
+            <Button variant="outline" onClick={() => setDeliveryDialogOpen(false)} className="focus-ring-premium">Annuler</Button>
+            <Button className="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white gap-2 shadow-md" onClick={handleDeliver}>
               <CheckCircle2 className="size-4" />
               Confirmer la livraison
             </Button>
@@ -1027,7 +1060,7 @@ export function MairieDashboardPage() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-white text-sm font-medium shadow-lg"
+            className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-3 text-white text-sm font-medium shadow-lg backdrop-blur-sm border border-emerald-500/30"
           >
             <CheckCircle2 className="size-4" />
             {successToast}
