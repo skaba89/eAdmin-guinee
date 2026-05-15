@@ -173,23 +173,70 @@ export const useAppStore = create<AppState>()(
       toggleSidebarCollapse: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
 
       login: (email: string, password: string) => {
+        // First check hardcoded demo accounts
         const account = DEMO_ACCOUNTS[email]
-        if (!account) {
-          set({ loginError: 'Email non reconnu. Utilisez un des comptes démo ci-dessous.' })
+        if (account) {
+          if (password !== account.password) {
+            set({ loginError: 'Mot de passe incorrect.' })
+            return false
+          }
+          const defaultPage = ROLE_DEFAULT_PAGE[account.user.role]
+          set({
+            isAuth: true,
+            currentPage: defaultPage,
+            user: account.user,
+            loginError: null,
+          })
+          return true
+        }
+        // Then check persisted users store (for registered users)
+        try {
+          // Dynamic import to avoid circular dependency at module level
+          const usersStoreModule = require('@/store/users-store')
+          const usersStore = usersStoreModule.useUsersStore.getState()
+          const userAccount = usersStore.getUserByEmail(email)
+          if (!userAccount) {
+            set({ loginError: 'Email non reconnu. Utilisez un des comptes démo ci-dessous.' })
+            return false
+          }
+          if (userAccount.password !== password) {
+            set({ loginError: 'Mot de passe incorrect.' })
+            return false
+          }
+          if (userAccount.status === 'suspendu') {
+            set({ loginError: 'Votre compte a été suspendu. Contactez l\'administrateur.' })
+            return false
+          }
+          if (userAccount.status === 'inactif') {
+            set({ loginError: 'Votre compte est inactif. Contactez l\'administrateur.' })
+            return false
+          }
+          // Record login timestamp
+          usersStore.recordLogin(userAccount.id)
+          const userInfo: UserInfo = {
+            id: userAccount.id,
+            name: userAccount.name,
+            email: userAccount.email,
+            role: userAccount.role,
+            institution: userAccount.institution || 'Non spécifié',
+            fonction: ROLE_LABELS[userAccount.role],
+            phone: userAccount.phone,
+            nin: userAccount.nin,
+            mairie: userAccount.mairie,
+            agence: userAccount.agence,
+          }
+          const defaultPage = ROLE_DEFAULT_PAGE[userAccount.role]
+          set({
+            isAuth: true,
+            currentPage: defaultPage,
+            user: userInfo,
+            loginError: null,
+          })
+          return true
+        } catch {
+          set({ loginError: 'Erreur de connexion. Réessayez.' })
           return false
         }
-        if (password !== account.password) {
-          set({ loginError: 'Mot de passe incorrect.' })
-          return false
-        }
-        const defaultPage = ROLE_DEFAULT_PAGE[account.user.role]
-        set({
-          isAuth: true,
-          currentPage: defaultPage,
-          user: account.user,
-          loginError: null,
-        })
-        return true
       },
 
       logout: () => set({

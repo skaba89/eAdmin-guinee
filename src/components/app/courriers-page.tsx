@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Mail, MailOpen, Send, Clock, Plus, Search, Filter,
@@ -30,47 +30,67 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { BRAND } from '@/lib/constants'
 import { useAppStore } from '@/store/app-store'
+import {
+  useCourriersStore,
+  type Courrier,
+  type CourrierType,
+  type CourrierStatus,
+  type CourrierPriority,
+  type CourrierDirection,
+  type CourrierAttachment,
+  type CourrierNote,
+} from '@/store/courriers-store'
 
-type CourrierPriority = 'URGENT' | 'IMPORTANT' | 'NORMAL' | 'CONFIDENTIEL'
-type CourrierStatus = 'En attente de visa SG' | 'En cours de validation' | 'Diffusée' | 'Transmis au Ministre' | 'En attente visa SG' | 'Visa obtenu' | 'Visé' | 'En cours' | 'Traité' | 'Archivé' | 'En attente' | 'Diffusé' | 'En commission'
+// ─── DISPLAY MAPPINGS ────────────────────────────────────────────────────────
+
 type CourrierTab = 'tous' | 'presidentiels' | 'primature' | 'interministeriels' | 'emanations' | 'urgents'
 
-interface PieceJointe {
-  name: string
-  type: string
-  size: string
-  data: string
+const PRIORITY_DISPLAY: Record<CourrierPriority, string> = {
+  urgente: 'URGENTE',
+  haute: 'HAUTE',
+  normale: 'NORMALE',
+  basse: 'BASSE',
 }
 
-interface Courrier {
-  id: string
-  reference: string
-  objet: string
-  expediteur: string
-  priority: CourrierPriority
-  circuit: string
-  statut: CourrierStatus
-  sla: string
-  slaHours?: number
-  date: string
-  notes?: string[]
-  piecesJointes?: PieceJointe[]
+const PRIORITY_CONFIG: Record<CourrierPriority, { color: string; icon: React.ElementType }> = {
+  urgente: { color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800', icon: AlertTriangle },
+  haute: { color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-800', icon: AlertTriangle },
+  normale: { color: 'bg-brand/10 text-brand dark:bg-primary/20 dark:text-primary border-brand/20 dark:border-primary/20', icon: Mail },
+  basse: { color: 'bg-slate-100 text-slate-600 dark:bg-slate-800/30 dark:text-slate-400 border-slate-200 dark:border-slate-700', icon: Shield },
 }
 
-const COURRIERS: Courrier[] = [
-  { id: '1', reference: 'CR-2026-8721', objet: 'Note du Cabinet du Premier Ministre — Préparation du Conseil des Ministres', expediteur: 'Primature', priority: 'URGENT', circuit: 'SG → Cabinet PM → Conseil des Ministres', statut: 'En attente de visa SG', sla: '3h 45m restantes', slaHours: 4, date: '2026-05-09' },
-  { id: '2', reference: 'CR-2026-8720', objet: "Demande d'avis budgétaire — Projet de décret financier", expediteur: 'MEF → MATD', priority: 'IMPORTANT', circuit: 'Direction Financière → SG → Ministre', statut: 'En cours de validation', sla: '18h 20m restantes', slaHours: 48, date: '2026-05-08' },
-  { id: '3', reference: 'CR-2026-8719', objet: 'Circulaire de rentrée administrative 2026-2027', expediteur: 'MEFNA', priority: 'NORMAL', circuit: 'Rédaction → Visa SG → Diffusion', statut: 'Diffusée', sla: '', date: '2026-05-07' },
-  { id: '4', reference: 'CR-2026-8718', objet: "Rapport d'inspection — Services déconcentrés de Kindia", expediteur: 'MATD', priority: 'IMPORTANT', circuit: 'Inspection → Direction → SG → Ministre', statut: 'Transmis au Ministre', sla: '36h restantes', slaHours: 48, date: '2026-05-06' },
-  { id: '5', reference: 'CR-2026-8717', objet: "Demande d'autorisation de mission à l'étranger", expediteur: 'MPTEN', priority: 'NORMAL', circuit: 'Service → Direction → SG → Ministre', statut: 'En attente visa SG', sla: '42h restantes', slaHours: 48, date: '2026-05-05' },
-  { id: '6', reference: 'CR-2026-8716', objet: "Projet d'arrêté — Organisation de la Journée de l'Indépendance", expediteur: 'Présidence', priority: 'URGENT', circuit: 'Cabinet Présidentiel → SGG → Président', statut: 'Visa obtenu', sla: '', date: '2026-05-05' },
-  { id: '7', reference: 'CR-2026-8715', objet: "Communication — Résultats de l'appel d'offres marché public", expediteur: 'MEF', priority: 'CONFIDENTIEL', circuit: 'Commission → Direction Marchés → Contrôle Financier', statut: 'En cours', sla: '24h restantes', slaHours: 48, date: '2026-05-04' },
-  { id: '8', reference: 'CR-2026-8714', objet: "Note de service — Affectation des cadres de la fonction publique", expediteur: 'MFP', priority: 'NORMAL', circuit: 'Direction RH → SG → Ministre', statut: 'Traité', sla: '', date: '2026-05-03' },
-  { id: '9', reference: 'CR-2026-8713', objet: "Demande d'avis juridique — Contentieux minier", expediteur: 'MJ → MMG', priority: 'IMPORTANT', circuit: 'Service Juridique → Direction → SG → Ministre', statut: 'En attente', sla: '12h restantes', slaHours: 48, date: '2026-05-03' },
-  { id: '10', reference: 'CR-2026-8712', objet: 'Rapport épidémiologique hebdomadaire', expediteur: 'MS', priority: 'NORMAL', circuit: 'Direction Santé → SG → Diffusion', statut: 'Diffusé', sla: '', date: '2026-05-02' },
-  { id: '11', reference: 'CR-2026-8711', objet: 'Projet de loi — Code du numérique révisé', expediteur: 'MPTEN → AN', priority: 'CONFIDENTIEL', circuit: 'Rédaction → Commission → Assemblée → Promulgation', statut: 'En commission', sla: '72h restantes', slaHours: 96, date: '2026-05-01' },
-  { id: '12', reference: 'CR-2026-8710', objet: 'Invitation — Conseil interministériel du 15 mai 2026', expediteur: 'Primature', priority: 'URGENT', circuit: 'SG → Cabinet PM → Tous les Ministères', statut: 'Diffusée', sla: '', date: '2026-05-01' },
-]
+const STATUS_LABELS: Record<CourrierStatus, string> = {
+  en_attente: 'En attente',
+  en_cours: 'En cours',
+  vise: 'Visé',
+  traite: 'Traité',
+  archive: 'Archivé',
+  rejete: 'Rejeté',
+}
+
+const STATUS_COLORS: Record<CourrierStatus, string> = {
+  en_attente: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  en_cours: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400',
+  vise: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+  traite: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+  archive: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400',
+  rejete: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+}
+
+const DIRECTION_LABELS: Record<CourrierDirection, string> = {
+  entrant: 'Entrant',
+  sortant: 'Sortant',
+  interne: 'Interne',
+}
+
+const TYPE_LABELS: Record<CourrierType, string> = {
+  presidentiel: 'Présidentiel',
+  primature: 'Primature',
+  interministeriel: 'Interministériel',
+  emanation: 'Émanation',
+  urgent: 'Urgent',
+  ordinaire: 'Ordinaire',
+}
 
 const DESTINATION_SERVICES = [
   'Secrétariat Général (SG)',
@@ -78,37 +98,14 @@ const DESTINATION_SERVICES = [
   'Direction Financière',
   'Direction des Ressources Humaines',
   'Direction Juridique',
-  'Direction de l\'Urbanisme',
+  "Direction de l'Urbanisme",
   'Direction de la Coopération',
   'Ministère des Finances (MEF)',
   'Ministère de la Justice (MJ)',
   'Ministère de la Santé (MS)',
-  'Ministère de l\'Éducation (MEN)',
+  "Ministère de l'Éducation (MEN)",
   'Présidence de la République',
 ]
-
-const PRIORITY_CONFIG: Record<CourrierPriority, { color: string; icon: React.ElementType }> = {
-  URGENT: { color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800', icon: AlertTriangle },
-  IMPORTANT: { color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border-orange-200 dark:border-orange-800', icon: AlertTriangle },
-  NORMAL: { color: 'bg-brand/10 text-brand dark:bg-primary/20 dark:text-primary border-brand/20 dark:border-primary/20', icon: Mail },
-  CONFIDENTIEL: { color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800', icon: Shield },
-}
-
-const STATUS_COLORS: Record<string, string> = {
-  'En attente de visa SG': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  'En cours de validation': 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400',
-  'Diffusée': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-  'Transmis au Ministre': 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
-  'En attente visa SG': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  'Visa obtenu': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-  'Visé': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-  'En cours': 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400',
-  'Traité': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-  'Archivé': 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400',
-  'En attente': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  'Diffusé': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-  'En commission': 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
-}
 
 const TAB_CONFIG: { value: CourrierTab; label: string; icon?: React.ElementType }[] = [
   { value: 'tous', label: 'Tous les courriers' },
@@ -121,40 +118,170 @@ const TAB_CONFIG: { value: CourrierTab; label: string; icon?: React.ElementType 
 
 const ITEMS_PER_PAGE = 10
 
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function getFileIcon(fileName: string) {
+  const ext = fileName.split('.').pop()?.toLowerCase()
+  if (ext === 'pdf') return FileText
+  if (['doc', 'docx'].includes(ext || '')) return FileType
+  if (['xls', 'xlsx'].includes(ext || '')) return FileSpreadsheet
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext || '')) return FileImage
+  return FileText
+}
+
+function computeSlaInfo(deadline?: string): { text: string; hoursLeft: number } | null {
+  if (!deadline) return null
+  const now = Date.now()
+  const dl = new Date(deadline).getTime()
+  const diffMs = dl - now
+  if (diffMs <= 0) return { text: 'Échu', hoursLeft: 0 }
+  const hoursLeft = diffMs / 3600000
+  if (hoursLeft < 1) return { text: `${Math.round(diffMs / 60000)}m restantes`, hoursLeft }
+  if (hoursLeft < 24) return { text: `${hoursLeft.toFixed(1)}h restantes`, hoursLeft }
+  const days = Math.floor(hoursLeft / 24)
+  const remHours = Math.round(hoursLeft % 24)
+  return { text: `${days}j ${remHours}h restantes`, hoursLeft }
+}
+
+function formatDate(isoDate: string): string {
+  try {
+    return new Date(isoDate).toLocaleDateString('fr-FR', { year: 'numeric', month: '2-digit', day: '2-digit' })
+  } catch {
+    return isoDate
+  }
+}
+
+function formatNoteDate(isoDate: string): string {
+  try {
+    return new Date(isoDate).toLocaleString('fr-FR')
+  } catch {
+    return isoDate
+  }
+}
+
+const NOTE_TYPE_ICON: Record<CourrierNote['type'], React.ElementType> = {
+  note: CircleDot,
+  visa: Stamp,
+  transfert: ArrowRight,
+  rejet: X,
+}
+
+// ─── COMPONENT ───────────────────────────────────────────────────────────────
+
 export function CourriersPage() {
+  // Store
+  const store = useCourriersStore()
+  const navigate = useAppStore((s) => s.navigate)
+
+  // Local UI state
   const [activeTab, setActiveTab] = useState<CourrierTab>('tous')
-  const [search, setSearch] = useState('')
-  const [priorityFilter, setPriorityFilter] = useState<string>('tous')
   const [showFilters, setShowFilters] = useState(false)
   const [newCourrierDialog, setNewCourrierDialog] = useState(false)
-  const [courriers, setCourriers] = useState(COURRIERS)
-  const [newCourrier, setNewCourrier] = useState({ objet: '', expediteur: '', priority: 'NORMAL' as CourrierPriority, circuit: '' })
   const [successToast, setSuccessToast] = useState('')
-  const navigate = useAppStore((s) => s.navigate)
+
+  // New courrier form
+  const [newCourrier, setNewCourrier] = useState({
+    object: '',
+    from: '',
+    to: '',
+    type: 'ordinaire' as CourrierType,
+    priority: 'normale' as CourrierPriority,
+    direction: 'entrant' as CourrierDirection,
+    deadline: '',
+  })
 
   // File upload state
   const [courrierFiles, setCourrierFiles] = useState<File[]>([])
   const [courrierDragActive, setCourrierDragActive] = useState(false)
   const courrierFileInputRef = useRef<HTMLInputElement>(null)
 
-  // Format file size
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  // Detail dialog
+  const [detailDialog, setDetailDialog] = useState(false)
+  const [detailCourrierId, setDetailCourrierId] = useState<string | null>(null)
+
+  // Transfer dialog
+  const [transferDialog, setTransferDialog] = useState(false)
+  const [transferCourrierId, setTransferCourrierId] = useState<string | null>(null)
+  const [transferDestination, setTransferDestination] = useState('')
+  const [transferNote, setTransferNote] = useState('')
+
+  // Reject dialog
+  const [rejectDialog, setRejectDialog] = useState(false)
+  const [rejectCourrierId, setRejectCourrierId] = useState<string | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+
+  // Archive confirmation
+  const [archiveDialog, setArchiveDialog] = useState(false)
+  const [archiveCourrierId, setArchiveCourrierId] = useState<string | null>(null)
+
+  // Add note dialog
+  const [addNoteDialog, setAddNoteDialog] = useState(false)
+  const [addNoteCourrierId, setAddNoteCourrierId] = useState<string | null>(null)
+  const [noteText, setNoteText] = useState('')
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1)
+
+  // ── Toast helper ──────────────────────────────────────────────────────────
+
+  const showToast = (message: string) => {
+    setSuccessToast(message)
+    setTimeout(() => setSuccessToast(''), 4000)
   }
 
-  // Get file icon
-  const getFileIcon = (fileName: string) => {
-    const ext = fileName.split('.').pop()?.toLowerCase()
-    if (ext === 'pdf') return FileText
-    if (['doc', 'docx'].includes(ext || '')) return FileType
-    if (['xls', 'xlsx'].includes(ext || '')) return FileSpreadsheet
-    if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext || '')) return FileImage
-    return FileText
+  // ── Filtered courriers from store + tab ──────────────────────────────────
+
+  const storeFiltered = store.getFilteredCourriers()
+
+  const filtered = useMemo(() => {
+    return storeFiltered.filter(c => {
+      if (activeTab === 'tous') return true
+      if (activeTab === 'presidentiels') return c.type === 'presidentiel'
+      if (activeTab === 'primature') return c.type === 'primature'
+      if (activeTab === 'interministeriels') return c.type === 'interministeriel'
+      if (activeTab === 'emanations') return c.type === 'emanation'
+      if (activeTab === 'urgents') return c.priority === 'urgente'
+      return true
+    })
+  }, [storeFiltered, activeTab])
+
+  // Pagination logic
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE))
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+  const paginatedFiltered = filtered.slice(
+    (safeCurrentPage - 1) * ITEMS_PER_PAGE,
+    safeCurrentPage * ITEMS_PER_PAGE
+  )
+
+  // ── Stats from store ─────────────────────────────────────────────────────
+
+  const stats = store.getStats()
+
+  const statCards = [
+    { label: 'Courriers officiels', value: String(stats.total), icon: Mail, color: 'text-brand dark:text-primary', bg: 'bg-brand/5 dark:bg-primary/10' },
+    { label: 'Entrants', value: String(stats.byType?.interministeriel ?? 0), icon: MailOpen, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-900/20' },
+    { label: 'Sortants', value: String(stats.byType?.emanation ?? 0), icon: Send, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
+    { label: 'En attente de visa', value: String(stats.byStatus?.en_attente ?? 0), icon: Stamp, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+    { label: 'Urgents (délai 24h)', value: String(stats.urgentCount), icon: AlertTriangle, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/20' },
+    { label: 'SLA respecté', value: '96.8%', icon: Gauge, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20', isProgress: true, progressValue: 96.8 },
+  ]
+
+  // ── SLA color helper ─────────────────────────────────────────────────────
+
+  const getSlaColor = (priority: CourrierPriority) => {
+    if (priority === 'urgente') return 'text-red-600 dark:text-red-400'
+    if (priority === 'haute') return 'text-orange-600 dark:text-orange-400'
+    return 'text-amber-600 dark:text-amber-400'
   }
 
-  // Drag handlers
+  // ── Drag handlers ────────────────────────────────────────────────────────
+
   const handleCourrierDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
@@ -186,57 +313,40 @@ export function CourriersPage() {
     setCourrierFiles(prev => prev.filter((_, i) => i !== index))
   }
 
-  // Download attached file
-  const handleDownloadPieceJointe = (pj: PieceJointe) => {
+  // ── Download attachment ──────────────────────────────────────────────────
+
+  const handleDownloadAttachment = (att: CourrierAttachment) => {
+    if (!att.fileData) {
+      showToast('Aucune donnée de fichier disponible')
+      return
+    }
     const a = document.createElement('a')
-    a.href = pj.data
-    a.download = pj.name
+    a.href = att.fileData
+    a.download = att.fileName
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
-    showToast(`Fichier ${pj.name} téléchargé`)
+    showToast(`Fichier ${att.fileName} téléchargé`)
   }
 
-  // Detail dialog
-  const [detailDialog, setDetailDialog] = useState(false)
-  const [detailCourrier, setDetailCourrier] = useState<Courrier | null>(null)
-
-  // Transfer dialog
-  const [transferDialog, setTransferDialog] = useState(false)
-  const [transferCourrier, setTransferCourrier] = useState<Courrier | null>(null)
-  const [transferDestination, setTransferDestination] = useState('')
-  const [transferNote, setTransferNote] = useState('')
-
-  // Archive confirmation
-  const [archiveDialog, setArchiveDialog] = useState(false)
-  const [archiveCourrier, setArchiveCourrier] = useState<Courrier | null>(null)
-
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1)
-
-  const showToast = (message: string) => {
-    setSuccessToast(message)
-    setTimeout(() => setSuccessToast(''), 4000)
-  }
+  // ── Create courrier ──────────────────────────────────────────────────────
 
   const createCourrier = () => {
-    if (!newCourrier.objet || !newCourrier.expediteur) return
-    const id = String(courriers.length + 1)
-    const ref = `CR-2026-${8722 + courriers.length}`
+    if (!newCourrier.object || !newCourrier.from) return
 
-    // Process attached files
-    const processFiles = (): Promise<PieceJointe[]> => {
+    const processFiles = (): Promise<CourrierAttachment[]> => {
       if (courrierFiles.length === 0) return Promise.resolve([])
       return Promise.all(
-        courrierFiles.map(file => {
-          return new Promise<PieceJointe>((resolve) => {
+        courrierFiles.map((file, idx) => {
+          return new Promise<CourrierAttachment>((resolve) => {
             const reader = new FileReader()
             reader.onload = () => {
               resolve({
-                name: file.name,
-                type: file.type,
-                size: formatFileSize(file.size),
-                data: reader.result as string,
+                id: `att-${Date.now()}-${idx}`,
+                fileName: file.name,
+                fileType: file.type,
+                fileSize: file.size,
+                fileData: reader.result as string,
               })
             }
             reader.readAsDataURL(file)
@@ -245,125 +355,135 @@ export function CourriersPage() {
       )
     }
 
-    processFiles().then(piecesJointes => {
-      const created: Courrier = {
-        id,
-        reference: ref,
-        objet: newCourrier.objet,
-        expediteur: newCourrier.expediteur,
+    processFiles().then(attachments => {
+      const created = store.addCourrier({
+        object: newCourrier.object,
+        from: newCourrier.from,
+        to: newCourrier.to || 'Secrétariat Général',
+        type: newCourrier.type,
+        status: 'en_attente',
         priority: newCourrier.priority,
-        circuit: newCourrier.circuit || 'Rédaction → Visa SG → Ministre',
-        statut: 'En attente',
-        sla: '48h restantes',
-        slaHours: 48,
-        date: new Date().toISOString().slice(0, 10),
-        piecesJointes,
-      }
-      setCourriers(prev => [created, ...prev])
-      setNewCourrier({ objet: '', expediteur: '', priority: 'NORMAL', circuit: '' })
+        direction: newCourrier.direction,
+        date: new Date().toISOString(),
+        deadline: newCourrier.deadline || undefined,
+        assignedTo: undefined,
+        assignedToRole: undefined,
+      })
+
+      // Add attachments one by one
+      attachments.forEach(att => {
+        store.addAttachment(created.id, att)
+      })
+
+      setNewCourrier({ object: '', from: '', to: '', type: 'ordinaire', priority: 'normale', direction: 'entrant', deadline: '' })
       setCourrierFiles([])
       setNewCourrierDialog(false)
       setCurrentPage(1)
-      showToast(`Courrier ${ref} créé avec succès${piecesJointes.length > 0 ? ` (${piecesJointes.length} pièce(s) jointe(s))` : ''}`)
+      showToast(`Courrier ${created.reference} créé avec succès${attachments.length > 0 ? ` (${attachments.length} pièce(s) jointe(s))` : ''}`)
     })
   }
 
-  const handleConsulter = (courrier: Courrier) => {
-    setDetailCourrier(courrier)
+  // ── Workflow actions ─────────────────────────────────────────────────────
+
+  const handleConsulter = (courrierId: string) => {
+    setDetailCourrierId(courrierId)
     setDetailDialog(true)
   }
 
-  const handleViser = (courrier: Courrier) => {
-    setCourriers(prev => prev.map(c =>
-      c.id === courrier.id
-        ? { ...c, statut: 'Visé' as CourrierStatus, sla: '', notes: [...(c.notes || []), `[${new Date().toLocaleString('fr-FR')}] Visa accordé — Statut changé en « Visé »`] }
-        : c
-    ))
-    showToast(`Courrier ${courrier.reference} visé avec succès`)
+  const handleViser = (courrierId: string) => {
+    const c = store.getCourrierById(courrierId)
+    if (!c) return
+    store.visaCourrier(courrierId, 'Secrétaire Général', 'SG', `Visa accordé — Statut changé en « Visé »`)
+    showToast(`Courrier ${c.reference} visé avec succès`)
   }
 
-  const handleTransferOpen = (courrier: Courrier) => {
-    setTransferCourrier(courrier)
+  const handleTransferOpen = (courrierId: string) => {
+    setTransferCourrierId(courrierId)
     setTransferDestination('')
     setTransferNote('')
     setTransferDialog(true)
   }
 
   const handleTransferConfirm = () => {
-    if (!transferCourrier || !transferDestination) return
-    setCourriers(prev => prev.map(c =>
-      c.id === transferCourrier.id
-        ? {
-            ...c,
-            statut: 'Transmis au Ministre' as CourrierStatus,
-            circuit: `${c.circuit} → ${transferDestination}`,
-            notes: [...(c.notes || []), `[${new Date().toLocaleString('fr-FR')}] Transféré vers ${transferDestination}${transferNote ? ` — Note: ${transferNote}` : ''}`],
-          }
-        : c
-    ))
+    if (!transferCourrierId || !transferDestination) return
+    const c = store.getCourrierById(transferCourrierId)
+    if (!c) return
+    store.transferCourrier(
+      transferCourrierId,
+      transferDestination,
+      'Secrétaire Général',
+      'SG',
+      transferNote || `Transféré vers ${transferDestination}`
+    )
     setTransferDialog(false)
-    showToast(`Courrier ${transferCourrier.reference} transféré vers ${transferDestination}`)
+    showToast(`Courrier ${c.reference} transféré vers ${transferDestination}`)
   }
 
-  const handleTraiter = (courrier: Courrier) => {
-    setCourriers(prev => prev.map(c =>
-      c.id === courrier.id
-        ? { ...c, statut: 'Traité' as CourrierStatus, sla: '', notes: [...(c.notes || []), `[${new Date().toLocaleString('fr-FR')}] Courrier traité`] }
-        : c
-    ))
-    showToast(`Courrier ${courrier.reference} marqué comme traité`)
+  const handleTraiter = (courrierId: string) => {
+    const c = store.getCourrierById(courrierId)
+    if (!c) return
+    store.treatCourrier(courrierId)
+    showToast(`Courrier ${c.reference} marqué comme traité`)
   }
 
-  const handleArchiveOpen = (courrier: Courrier) => {
-    setArchiveCourrier(courrier)
+  const handleRejectOpen = (courrierId: string) => {
+    setRejectCourrierId(courrierId)
+    setRejectReason('')
+    setRejectDialog(true)
+  }
+
+  const handleRejectConfirm = () => {
+    if (!rejectCourrierId || !rejectReason) return
+    const c = store.getCourrierById(rejectCourrierId)
+    if (!c) return
+    store.rejectCourrier(rejectCourrierId, 'Secrétaire Général', 'SG', rejectReason)
+    setRejectDialog(false)
+    showToast(`Courrier ${c.reference} rejeté`)
+  }
+
+  const handleArchiveOpen = (courrierId: string) => {
+    setArchiveCourrierId(courrierId)
     setArchiveDialog(true)
   }
 
   const handleArchiveConfirm = () => {
-    if (!archiveCourrier) return
-    setCourriers(prev => prev.map(c =>
-      c.id === archiveCourrier.id
-        ? { ...c, statut: 'Archivé' as CourrierStatus, sla: '', notes: [...(c.notes || []), `[${new Date().toLocaleString('fr-FR')}] Courrier archivé`] }
-        : c
-    ))
+    if (!archiveCourrierId) return
+    const c = store.getCourrierById(archiveCourrierId)
+    if (!c) return
+    store.archiveCourrier(archiveCourrierId)
     setArchiveDialog(false)
-    showToast(`Courrier ${archiveCourrier.reference} archivé avec succès`)
+    showToast(`Courrier ${c.reference} archivé avec succès`)
   }
 
-  const filtered = courriers.filter(c => {
-    const matchTab = activeTab === 'tous' ||
-      (activeTab === 'presidentiels' && c.expediteur.includes('Présidence')) ||
-      (activeTab === 'primature' && c.expediteur.includes('Primature')) ||
-      (activeTab === 'interministeriels' && c.expediteur.includes('→')) ||
-      (activeTab === 'emanations' && !c.expediteur.includes('→') && !c.expediteur.includes('Présidence') && !c.expediteur.includes('Primature')) ||
-      (activeTab === 'urgents' && c.priority === 'URGENT')
-    const matchSearch = c.objet.toLowerCase().includes(search.toLowerCase()) ||
-      c.reference.toLowerCase().includes(search.toLowerCase()) ||
-      c.expediteur.toLowerCase().includes(search.toLowerCase())
-    const matchPriority = priorityFilter === 'tous' || c.priority === priorityFilter
-    return matchTab && matchSearch && matchPriority
-  })
+  const handleAddNoteOpen = (courrierId: string) => {
+    setAddNoteCourrierId(courrierId)
+    setNoteText('')
+    setAddNoteDialog(true)
+  }
 
-  // Pagination logic
-  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
-  const paginatedFiltered = filtered.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  )
+  const handleAddNoteConfirm = () => {
+    if (!addNoteCourrierId || !noteText.trim()) return
+    store.addNote(addNoteCourrierId, {
+      text: noteText,
+      author: 'Utilisateur connecté',
+      authorRole: 'Agent',
+      type: 'note',
+    })
+    setAddNoteDialog(false)
+    showToast('Note ajoutée avec succès')
+  }
 
-  const statCards = [
-    { label: 'Courriers officiels', value: '14 250', icon: Mail, color: 'text-brand dark:text-primary', bg: 'bg-brand/5 dark:bg-primary/10' },
-    { label: 'Entrants (interministériels)', value: '8 730', icon: MailOpen, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-900/20' },
-    { label: 'Sortants (émanations)', value: '5 520', icon: Send, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
-    { label: 'En attente de visa', value: '412', icon: Stamp, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
-    { label: 'Urgents (délai 24h)', value: '87', icon: AlertTriangle, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/20' },
-    { label: 'SLA respecté', value: '96.8%', icon: Gauge, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20', isProgress: true, progressValue: 96.8 },
-  ]
+  // ── Resolved detail courrier ─────────────────────────────────────────────
 
-  const getSlaColor = (sla: string, priority: CourrierPriority) => {
-    if (!sla) return 'text-muted-foreground'
-    if (priority === 'URGENT') return 'text-red-600 dark:text-red-400'
-    return 'text-amber-600 dark:text-amber-400'
+  const detailCourrier = detailCourrierId ? store.getCourrierById(detailCourrierId) : null
+  const transferCourrier = transferCourrierId ? store.getCourrierById(transferCourrierId) : null
+  const archiveCourrier = archiveCourrierId ? store.getCourrierById(archiveCourrierId) : null
+  const rejectCourrier = rejectCourrierId ? store.getCourrierById(rejectCourrierId) : null
+
+  // ── Workflow action disabled states ──────────────────────────────────────
+
+  const isActionDisabled = (status: CourrierStatus) => {
+    return status === 'traite' || status === 'archive' || status === 'rejete'
   }
 
   return (
@@ -496,8 +616,8 @@ export function CourriersPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Rechercher par référence, objet, expéditeur..."
-                value={search}
-                onChange={e => { setSearch(e.target.value); setCurrentPage(1) }}
+                value={store.searchQuery}
+                onChange={e => { store.setSearchQuery(e.target.value); setCurrentPage(1) }}
                 className="pl-10"
               />
             </div>
@@ -526,20 +646,50 @@ export function CourriersPage() {
                 className="overflow-hidden"
               >
                 <div className="flex flex-wrap gap-3 pt-3 border-t">
-                  <Select value={priorityFilter} onValueChange={(v) => { setPriorityFilter(v); setCurrentPage(1) }}>
+                  <Select value={store.filterPriority} onValueChange={(v) => { store.setFilterPriority(v as CourrierPriority | 'all'); setCurrentPage(1) }}>
                     <SelectTrigger className="w-[160px]">
                       <SelectValue placeholder="Priorité" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="tous">Toutes priorités</SelectItem>
-                      <SelectItem value="URGENT">URGENT</SelectItem>
-                      <SelectItem value="IMPORTANT">IMPORTANT</SelectItem>
-                      <SelectItem value="NORMAL">NORMAL</SelectItem>
-                      <SelectItem value="CONFIDENTIEL">CONFIDENTIEL</SelectItem>
+                      <SelectItem value="all">Toutes priorités</SelectItem>
+                      <SelectItem value="urgente">URGENTE</SelectItem>
+                      <SelectItem value="haute">HAUTE</SelectItem>
+                      <SelectItem value="normale">NORMALE</SelectItem>
+                      <SelectItem value="basse">BASSE</SelectItem>
                     </SelectContent>
                   </Select>
-                  {priorityFilter !== 'tous' && (
-                    <Button variant="ghost" size="sm" onClick={() => { setPriorityFilter('tous'); setCurrentPage(1) }}>
+                  <Select value={store.filterStatus} onValueChange={(v) => { store.setFilterStatus(v as CourrierStatus | 'all'); setCurrentPage(1) }}>
+                    <SelectTrigger className="w-[170px]">
+                      <SelectValue placeholder="Statut" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous statuts</SelectItem>
+                      <SelectItem value="en_attente">En attente</SelectItem>
+                      <SelectItem value="en_cours">En cours</SelectItem>
+                      <SelectItem value="vise">Visé</SelectItem>
+                      <SelectItem value="traite">Traité</SelectItem>
+                      <SelectItem value="archive">Archivé</SelectItem>
+                      <SelectItem value="rejete">Rejeté</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={store.filterDirection} onValueChange={(v) => { store.setFilterDirection(v as CourrierDirection | 'all'); setCurrentPage(1) }}>
+                    <SelectTrigger className="w-[150px]">
+                      <SelectValue placeholder="Direction" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Toutes directions</SelectItem>
+                      <SelectItem value="entrant">Entrant</SelectItem>
+                      <SelectItem value="sortant">Sortant</SelectItem>
+                      <SelectItem value="interne">Interne</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {(store.filterPriority !== 'all' || store.filterStatus !== 'all' || store.filterDirection !== 'all') && (
+                    <Button variant="ghost" size="sm" onClick={() => {
+                      store.setFilterPriority('all')
+                      store.setFilterStatus('all')
+                      store.setFilterDirection('all')
+                      setCurrentPage(1)
+                    }}>
                       <X className="h-3 w-3 mr-1" />
                       Réinitialiser
                     </Button>
@@ -581,8 +731,8 @@ export function CourriersPage() {
               <Label>Objet du courrier</Label>
               <Input
                 placeholder="Ex: Note du Cabinet du Premier Ministre — ..."
-                value={newCourrier.objet}
-                onChange={e => setNewCourrier(prev => ({ ...prev, objet: e.target.value }))}
+                value={newCourrier.object}
+                onChange={e => setNewCourrier(prev => ({ ...prev, object: e.target.value }))}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -590,29 +740,64 @@ export function CourriersPage() {
                 <Label>Expéditeur</Label>
                 <Input
                   placeholder="Ex: Primature, MEF, MATD..."
-                  value={newCourrier.expediteur}
-                  onChange={e => setNewCourrier(prev => ({ ...prev, expediteur: e.target.value }))}
+                  value={newCourrier.from}
+                  onChange={e => setNewCourrier(prev => ({ ...prev, from: e.target.value }))}
                 />
               </div>
+              <div className="space-y-2">
+                <Label>Destinataire</Label>
+                <Input
+                  placeholder="Ex: Secrétariat Général, Ministre..."
+                  value={newCourrier.to}
+                  onChange={e => setNewCourrier(prev => ({ ...prev, to: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label>Priorité</Label>
                 <Select value={newCourrier.priority} onValueChange={(v) => setNewCourrier(prev => ({ ...prev, priority: v as CourrierPriority }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="NORMAL">NORMAL</SelectItem>
-                    <SelectItem value="IMPORTANT">IMPORTANT</SelectItem>
-                    <SelectItem value="URGENT">URGENT</SelectItem>
-                    <SelectItem value="CONFIDENTIEL">CONFIDENTIEL</SelectItem>
+                    <SelectItem value="normale">NORMALE</SelectItem>
+                    <SelectItem value="haute">HAUTE</SelectItem>
+                    <SelectItem value="urgente">URGENTE</SelectItem>
+                    <SelectItem value="basse">BASSE</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select value={newCourrier.type} onValueChange={(v) => setNewCourrier(prev => ({ ...prev, type: v as CourrierType }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ordinaire">Ordinaire</SelectItem>
+                    <SelectItem value="presidentiel">Présidentiel</SelectItem>
+                    <SelectItem value="primature">Primature</SelectItem>
+                    <SelectItem value="interministeriel">Interministériel</SelectItem>
+                    <SelectItem value="emanation">Émanation</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Direction</Label>
+                <Select value={newCourrier.direction} onValueChange={(v) => setNewCourrier(prev => ({ ...prev, direction: v as CourrierDirection }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="entrant">Entrant</SelectItem>
+                    <SelectItem value="sortant">Sortant</SelectItem>
+                    <SelectItem value="interne">Interne</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Circuit de validation (optionnel)</Label>
+              <Label>Date limite (optionnel)</Label>
               <Input
-                placeholder="Ex: SG → Cabinet PM → Conseil des Ministres"
-                value={newCourrier.circuit}
-                onChange={e => setNewCourrier(prev => ({ ...prev, circuit: e.target.value }))}
+                type="date"
+                value={newCourrier.deadline}
+                onChange={e => setNewCourrier(prev => ({ ...prev, deadline: e.target.value }))}
               />
             </div>
 
@@ -672,7 +857,7 @@ export function CourriersPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setNewCourrierDialog(false); setCourrierFiles([]) }}>Annuler</Button>
-            <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={createCourrier} disabled={!newCourrier.objet || !newCourrier.expediteur}>
+            <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={createCourrier} disabled={!newCourrier.object || !newCourrier.from}>
               <Send className="h-4 w-4" />
               Créer le courrier
             </Button>
@@ -690,70 +875,92 @@ export function CourriersPage() {
             </DialogTitle>
             <DialogDescription>Informations complètes du courrier officiel</DialogDescription>
           </DialogHeader>
-          {detailCourrier && (
+          {detailCourrier && (() => {
+            const c = detailCourrier
+            const pConfig = PRIORITY_CONFIG[c.priority]
+            const PIcon = pConfig.icon
+            const slaInfo = computeSlaInfo(c.deadline)
+            return (
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <span className="text-xs text-muted-foreground font-medium">Référence</span>
-                  <p className="text-sm font-mono font-medium text-brand dark:text-primary">{detailCourrier.reference}</p>
+                  <p className="text-sm font-mono font-medium text-brand dark:text-primary">{c.reference}</p>
                 </div>
                 <div className="space-y-1">
                   <span className="text-xs text-muted-foreground font-medium">Date</span>
-                  <p className="text-sm">{detailCourrier.date}</p>
+                  <p className="text-sm">{formatDate(c.date)}</p>
                 </div>
               </div>
               <Separator />
               <div className="space-y-1">
                 <span className="text-xs text-muted-foreground font-medium">Objet</span>
-                <p className="text-sm font-medium">{detailCourrier.objet}</p>
+                <p className="text-sm font-medium">{c.object}</p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <span className="text-xs text-muted-foreground font-medium">Expéditeur</span>
                   <div className="flex items-center gap-1.5">
                     <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-                    <p className="text-sm">{detailCourrier.expediteur}</p>
+                    <p className="text-sm">{c.from}</p>
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <span className="text-xs text-muted-foreground font-medium">Priorité</span>
-                  <div>
-                    {(() => {
-                      const pConfig = PRIORITY_CONFIG[detailCourrier.priority]
-                      const PIcon = pConfig.icon
-                      return (
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${pConfig.color}`}>
-                          <PIcon className="h-3 w-3" />
-                          {detailCourrier.priority}
-                        </span>
-                      )
-                    })()}
+                  <span className="text-xs text-muted-foreground font-medium">Destinataire</span>
+                  <div className="flex items-center gap-1.5">
+                    <Send className="h-3.5 w-3.5 text-muted-foreground" />
+                    <p className="text-sm">{c.to}</p>
                   </div>
                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <span className="text-xs text-muted-foreground font-medium">Priorité</span>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${pConfig.color}`}>
+                    <PIcon className="h-3 w-3" />
+                    {PRIORITY_DISPLAY[c.priority]}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-xs text-muted-foreground font-medium">Type</span>
+                  <Badge variant="outline" className="text-xs">{TYPE_LABELS[c.type]}</Badge>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <span className="text-xs text-muted-foreground font-medium">Direction</span>
+                  <Badge variant="outline" className="text-xs">{DIRECTION_LABELS[c.direction]}</Badge>
+                </div>
+                {c.assignedTo && (
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground font-medium">Assigné à</span>
+                    <p className="text-sm">{c.assignedTo} <span className="text-muted-foreground text-xs">({c.assignedToRole})</span></p>
+                  </div>
+                )}
               </div>
               <div className="space-y-1">
                 <span className="text-xs text-muted-foreground font-medium">Circuit de validation</span>
                 <div className="flex items-center gap-1.5">
                   <Route className="h-3.5 w-3.5 text-muted-foreground" />
-                  <p className="text-sm">{detailCourrier.circuit}</p>
+                  <p className="text-sm">{c.from} → {c.to}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <span className="text-xs text-muted-foreground font-medium">Statut</span>
                   <div>
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[detailCourrier.statut] || 'bg-gray-100 text-gray-700'}`}>
-                      {detailCourrier.statut}
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[c.status]}`}>
+                      {STATUS_LABELS[c.status]}
                     </span>
                   </div>
                 </div>
                 <div className="space-y-1">
                   <span className="text-xs text-muted-foreground font-medium">SLA</span>
                   <p className="text-sm">
-                    {detailCourrier.sla ? (
-                      <span className={`inline-flex items-center gap-1 font-medium ${getSlaColor(detailCourrier.sla, detailCourrier.priority)}`}>
+                    {slaInfo ? (
+                      <span className={`inline-flex items-center gap-1 font-medium ${getSlaColor(c.priority)}`}>
                         <Timer className="h-3.5 w-3.5" />
-                        {detailCourrier.sla}
+                        {slaInfo.text}
                       </span>
                     ) : (
                       <span className="text-muted-foreground">—</span>
@@ -761,45 +968,61 @@ export function CourriersPage() {
                   </p>
                 </div>
               </div>
-              {detailCourrier.notes && detailCourrier.notes.length > 0 && (
+              {/* Notes / Processing history */}
+              {c.notes.length > 0 && (
                 <>
                   <Separator />
                   <div className="space-y-2">
                     <span className="text-xs text-muted-foreground font-medium">Historique de traitement</span>
                     <div className="max-h-40 overflow-y-auto space-y-1.5">
-                      {detailCourrier.notes.map((note, idx) => (
-                        <div key={idx} className="flex items-start gap-2 text-xs p-2 rounded-lg bg-muted/50">
-                          <CircleDot className="h-3 w-3 mt-0.5 text-brand dark:text-primary shrink-0" />
-                          <span>{note}</span>
-                        </div>
-                      ))}
+                      {c.notes.map((note) => {
+                        const NIcon = NOTE_TYPE_ICON[note.type] || CircleDot
+                        return (
+                          <div key={note.id} className="flex items-start gap-2 text-xs p-2 rounded-lg bg-muted/50">
+                            <NIcon className={`h-3 w-3 mt-0.5 shrink-0 ${
+                              note.type === 'visa' ? 'text-emerald-600' :
+                              note.type === 'transfert' ? 'text-sky-600' :
+                              note.type === 'rejet' ? 'text-red-600' :
+                              'text-brand dark:text-primary'
+                            }`} />
+                            <div className="flex-1">
+                              <span>{note.text}</span>
+                              <div className="text-muted-foreground mt-0.5">
+                                {note.author} ({note.authorRole}) — {formatNoteDate(note.date)}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 </>
               )}
               {/* Attached files */}
-              {detailCourrier.piecesJointes && detailCourrier.piecesJointes.length > 0 && (
+              {c.attachments.length > 0 && (
                 <>
                   <Separator />
                   <div className="space-y-2">
                     <span className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
                       <Paperclip className="h-3 w-3" />
-                      Pièces jointes ({detailCourrier.piecesJointes.length})
+                      Pièces jointes ({c.attachments.length})
                     </span>
                     <div className="space-y-1.5">
-                      {detailCourrier.piecesJointes.map((pj, idx) => {
-                        const FIcon = getFileIcon(pj.name)
+                      {c.attachments.map((att) => {
+                        const FIcon = getFileIcon(att.fileName)
                         return (
-                          <div key={idx} className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 border border-muted-foreground/10">
+                          <div key={att.id} className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 border border-muted-foreground/10">
                             <FIcon className="h-4 w-4 text-brand dark:text-primary shrink-0" />
                             <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium truncate">{pj.name}</p>
-                              <p className="text-[10px] text-muted-foreground">{pj.size}</p>
+                              <p className="text-xs font-medium truncate">{att.fileName}</p>
+                              <p className="text-[10px] text-muted-foreground">{formatFileSize(att.fileSize)}</p>
                             </div>
-                            <Button variant="ghost" size="sm" className="h-6 text-xs gap-1 shrink-0" onClick={() => handleDownloadPieceJointe(pj)}>
-                              <Download className="h-3 w-3" />
-                              Télécharger
-                            </Button>
+                            {att.fileData && (
+                              <Button variant="ghost" size="sm" className="h-6 text-xs gap-1 shrink-0" onClick={() => handleDownloadAttachment(att)}>
+                                <Download className="h-3 w-3" />
+                                Télécharger
+                              </Button>
+                            )}
                           </div>
                         )
                       })}
@@ -808,7 +1031,8 @@ export function CourriersPage() {
                 </>
               )}
             </div>
-          )}
+            )
+          })()}
           <DialogFooter>
             <Button variant="outline" onClick={() => setDetailDialog(false)}>Fermer</Button>
           </DialogFooter>
@@ -824,7 +1048,7 @@ export function CourriersPage() {
               Transférer le courrier
             </DialogTitle>
             <DialogDescription>
-              {transferCourrier && `Transférer ${transferCourrier.reference} — ${transferCourrier.objet.slice(0, 60)}...`}
+              {transferCourrier && `Transférer ${transferCourrier.reference} — ${transferCourrier.object.slice(0, 60)}...`}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -856,6 +1080,70 @@ export function CourriersPage() {
             <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={handleTransferConfirm} disabled={!transferDestination}>
               <ArrowRight className="h-4 w-4" />
               Confirmer le transfert
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject Dialog */}
+      <Dialog open={rejectDialog} onOpenChange={setRejectDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <X className="h-5 w-5 text-red-600" />
+              Rejeter le courrier
+            </DialogTitle>
+            <DialogDescription>
+              {rejectCourrier && `Rejeter ${rejectCourrier.reference} — ${rejectCourrier.object.slice(0, 60)}...`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Motif du rejet</Label>
+              <Textarea
+                placeholder="Précisez le motif du rejet..."
+                value={rejectReason}
+                onChange={e => setRejectReason(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectDialog(false)}>Annuler</Button>
+            <Button className="bg-red-600 hover:bg-red-700 text-white gap-2" onClick={handleRejectConfirm} disabled={!rejectReason.trim()}>
+              <X className="h-4 w-4" />
+              Confirmer le rejet
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Note Dialog */}
+      <Dialog open={addNoteDialog} onOpenChange={setAddNoteDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-brand dark:text-primary" />
+              Ajouter une note
+            </DialogTitle>
+            <DialogDescription>Ajouter une note de traitement au courrier</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label>Note</Label>
+              <Textarea
+                placeholder="Rédigez votre note..."
+                value={noteText}
+                onChange={e => setNoteText(e.target.value)}
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddNoteDialog(false)}>Annuler</Button>
+            <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={handleAddNoteConfirm} disabled={!noteText.trim()}>
+              <CheckCircle2 className="h-4 w-4" />
+              Ajouter
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -893,7 +1181,7 @@ export function CourriersPage() {
                   <TableHead className="text-xs font-semibold min-w-[280px]">Objet</TableHead>
                   <TableHead className="text-xs font-semibold">Expéditeur / Destinataire</TableHead>
                   <TableHead className="text-xs font-semibold">Priorité</TableHead>
-                  <TableHead className="text-xs font-semibold hidden lg:table-cell">Circuit</TableHead>
+                  <TableHead className="text-xs font-semibold hidden lg:table-cell">Type / Direction</TableHead>
                   <TableHead className="text-xs font-semibold">Statut</TableHead>
                   <TableHead className="text-xs font-semibold">SLA</TableHead>
                   <TableHead className="text-xs font-semibold w-10">Actions</TableHead>
@@ -903,7 +1191,8 @@ export function CourriersPage() {
                 {paginatedFiltered.map((c, i) => {
                   const pConfig = PRIORITY_CONFIG[c.priority]
                   const PriorityIcon = pConfig.icon
-                  const statusColor = STATUS_COLORS[c.statut] || 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
+                  const statusColor = STATUS_COLORS[c.status]
+                  const slaInfo = computeSlaInfo(c.deadline)
                   return (
                     <motion.tr
                       key={c.id}
@@ -916,36 +1205,42 @@ export function CourriersPage() {
                         <span className="font-mono text-xs font-medium text-brand dark:text-primary">{c.reference}</span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm leading-tight line-clamp-2">{c.objet}</span>
+                        <span className="text-sm leading-tight line-clamp-2">{c.object}</span>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1.5">
-                          <Building2 className="h-3 w-3 text-muted-foreground shrink-0" />
-                          <span className="text-xs text-muted-foreground truncate max-w-[130px]">{c.expediteur}</span>
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <Building2 className="h-3 w-3 text-muted-foreground shrink-0" />
+                            <span className="text-xs text-muted-foreground truncate max-w-[130px]">{c.from}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <Send className="h-3 w-3 text-muted-foreground shrink-0" />
+                            <span className="text-xs text-muted-foreground truncate max-w-[130px]">{c.to}</span>
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${pConfig.color}`}>
                           <PriorityIcon className="h-3 w-3" />
-                          {c.priority}
+                          {PRIORITY_DISPLAY[c.priority]}
                         </span>
                       </TableCell>
                       <TableCell className="hidden lg:table-cell">
-                        <div className="flex items-center gap-1 max-w-[200px]">
-                          <Route className="h-3 w-3 text-muted-foreground shrink-0" />
-                          <span className="text-[10px] text-muted-foreground truncate">{c.circuit}</span>
+                        <div className="flex items-center gap-1.5">
+                          <Badge variant="outline" className="text-[10px] h-5">{TYPE_LABELS[c.type]}</Badge>
+                          <span className="text-[10px] text-muted-foreground">{DIRECTION_LABELS[c.direction]}</span>
                         </div>
                       </TableCell>
                       <TableCell>
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${statusColor}`}>
-                          {c.statut}
+                          {STATUS_LABELS[c.status]}
                         </span>
                       </TableCell>
                       <TableCell>
-                        {c.sla ? (
-                          <span className={`inline-flex items-center gap-1 text-xs font-medium ${getSlaColor(c.sla, c.priority)}`}>
+                        {slaInfo ? (
+                          <span className={`inline-flex items-center gap-1 text-xs font-medium ${slaInfo.hoursLeft === 0 ? 'text-gray-500' : getSlaColor(c.priority)}`}>
                             <Timer className="h-3 w-3" />
-                            {c.sla}
+                            {slaInfo.text}
                           </span>
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>
@@ -959,20 +1254,26 @@ export function CourriersPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem className="gap-2" onClick={() => handleConsulter(c)}>
+                            <DropdownMenuItem className="gap-2" onClick={() => handleConsulter(c.id)}>
                               <Eye className="h-4 w-4" /> Consulter
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="gap-2" onClick={() => handleViser(c)} disabled={c.statut === 'Visé' || c.statut === 'Traité' || c.statut === 'Archivé'}>
+                            <DropdownMenuItem className="gap-2" onClick={() => handleViser(c.id)} disabled={isActionDisabled(c.status) || c.status === 'vise'}>
                               <Stamp className="h-4 w-4" /> Viser
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="gap-2" onClick={() => handleTransferOpen(c)} disabled={c.statut === 'Traité' || c.statut === 'Archivé'}>
+                            <DropdownMenuItem className="gap-2" onClick={() => handleTransferOpen(c.id)} disabled={isActionDisabled(c.status)}>
                               <ArrowRight className="h-4 w-4" /> Transférer
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="gap-2" onClick={() => handleTraiter(c)} disabled={c.statut === 'Traité' || c.statut === 'Archivé'}>
+                            <DropdownMenuItem className="gap-2" onClick={() => handleTraiter(c.id)} disabled={isActionDisabled(c.status)}>
                               <FileCheck className="h-4 w-4" /> Traiter
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="gap-2" onClick={() => handleArchiveOpen(c)} disabled={c.statut === 'Archivé'}>
-                              <CheckCircle2 className="h-4 w-4" /> Archiver
+                            <DropdownMenuItem className="gap-2" onClick={() => handleRejectOpen(c.id)} disabled={isActionDisabled(c.status)}>
+                              <X className="h-4 w-4" /> Rejeter
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="gap-2" onClick={() => handleAddNoteOpen(c.id)}>
+                              <FileText className="h-4 w-4" /> Ajouter une note
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="gap-2" onClick={() => handleArchiveOpen(c.id)} disabled={c.status === 'archive'}>
+                              <Archive className="h-4 w-4" /> Archiver
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -983,16 +1284,23 @@ export function CourriersPage() {
               </TableBody>
             </Table>
           </div>
+          {filtered.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <Mail className="h-10 w-10 mb-3 opacity-30" />
+              <p className="text-sm font-medium">Aucun courrier trouvé</p>
+              <p className="text-xs">Modifiez vos filtres ou créez un nouveau courrier</p>
+            </div>
+          )}
           <div className="flex items-center justify-between p-4 border-t">
             <span className="text-xs text-muted-foreground">
-              {filtered.length} courrier(s) affiché(s) sur {courriers.length} — Page {currentPage} sur {totalPages}
+              {filtered.length} courrier(s) affiché(s) sur {store.courriers.length} — Page {safeCurrentPage} sur {totalPages}
             </span>
             <div className="flex items-center gap-1">
               <Button
                 variant="outline"
                 size="sm"
                 className="text-xs h-8"
-                disabled={currentPage === 1}
+                disabled={safeCurrentPage === 1}
                 onClick={() => setCurrentPage(p => p - 1)}
               >
                 <ChevronLeft className="h-3.5 w-3.5 mr-1" />
@@ -1003,7 +1311,7 @@ export function CourriersPage() {
                   key={page}
                   variant="outline"
                   size="sm"
-                  className={`text-xs h-8 w-8 p-0 ${page === currentPage ? 'bg-brand text-white dark:bg-primary' : ''}`}
+                  className={`text-xs h-8 w-8 p-0 ${page === safeCurrentPage ? 'bg-brand text-white dark:bg-primary' : ''}`}
                   onClick={() => setCurrentPage(page)}
                 >
                   {page}
@@ -1013,7 +1321,7 @@ export function CourriersPage() {
                 variant="outline"
                 size="sm"
                 className="text-xs h-8"
-                disabled={currentPage === totalPages}
+                disabled={safeCurrentPage === totalPages}
                 onClick={() => setCurrentPage(p => p + 1)}
               >
                 Suivant

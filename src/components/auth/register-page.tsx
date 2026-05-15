@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { useAppStore, DEMO_ACCOUNTS, type UserInfo } from '@/store/app-store'
+import { useAppStore, type UserInfo } from '@/store/app-store'
+import { useUsersStore } from '@/store/users-store'
 
 // Guinea tricolor
 const GUINEA_RED = '#CE1126'
@@ -95,23 +96,27 @@ export function RegisterPage() {
     // Simulate account creation
     await new Promise(resolve => setTimeout(resolve, 800))
 
-    // Create a citizen account and auto-login
-    const newUser: UserInfo = {
-      id: `citizen-${Date.now()}`,
-      name: `${form.lastName} ${form.firstName}`,
-      email: form.email,
-      role: 'citizen',
-      institution: form.institution || 'Citoyen',
-      fonction: 'Citoyenne guinéenne',
-      phone: form.phone,
-      nin: form.nin,
+    // Check if email already exists in users store
+    const usersStore = useUsersStore.getState()
+    const existingUser = usersStore.getUserByEmail(form.email)
+    if (existingUser) {
+      setErrors(prev => ({ ...prev, email: 'Cet email est déjà utilisé' }))
+      setIsSubmitting(false)
+      return
     }
 
-    // Store in DEMO_ACCOUNTS temporarily for login
-    DEMO_ACCOUNTS[form.email] = {
+    // Create account in users store (persisted)
+    usersStore.addUser({
+      email: form.email,
+      name: `${form.lastName} ${form.firstName}`,
+      firstName: form.firstName,
+      role: 'citizen',
+      status: 'actif',
+      phone: form.phone,
+      nin: form.nin,
+      institution: form.institution || 'Citoyen',
       password: form.password,
-      user: newUser,
-    }
+    })
 
     setSuccess(true)
     setIsSubmitting(false)

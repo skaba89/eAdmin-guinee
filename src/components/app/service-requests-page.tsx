@@ -349,7 +349,7 @@ export function ServiceRequestsPage() {
       htmlContent,
       generatedAt: new Date().toISOString(),
       generatedBy: req.assignedAgent || 'Agent traitant',
-      fileName: `${req.reference.replace(/\\//g, '-')}-${req.serviceName.replace(/\\s+/g, '-').toLowerCase()}.html`,
+      fileName: `${req.reference.replaceAll('/', '-')}-${req.serviceName.replace(/\s+/g, '-').toLowerCase()}.html`,
     }
   }
 

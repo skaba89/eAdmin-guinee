@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   UserCog, Search, Plus, Download, Upload, MoreHorizontal,
@@ -27,70 +27,131 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
 } from '@/components/ui/alert-dialog'
 import { Label } from '@/components/ui/label'
-import { DEMO_STATS } from '@/lib/constants'
+import { useUsersStore, type UserAccount, type UserAccountStatus } from '@/store/users-store'
 
-interface UserRow {
-  id: string
-  name: string
-  email: string
-  role: string
-  institution: string
-  status: 'actif' | 'inactif' | 'suspendu'
-  lastLogin: string
+// ─── ROLE DISPLAY MAPPING ──────────────────────────────────────────────────────
+
+type StoreRole = UserAccount['role']
+
+const ROLE_LABELS: Record<StoreRole, string> = {
+  super_admin: 'Super Admin',
+  admin_general: 'Admin Général',
+  ministere: 'Ministère',
+  mairie: 'Mairie',
+  agence: 'Agence',
+  citizen: 'Citoyen',
 }
 
-const FAKE_USERS: UserRow[] = [
-  { id: '1', name: 'Amadou Diallo', email: 'a.diallo@mat.gov.gn', role: 'Admin', institution: 'Ministère de l\'Administration Territoriale', status: 'actif', lastLogin: '2024-12-15 09:30' },
-  { id: '2', name: 'Aissatou Baldé', email: 'a.balde@finances.gov.gn', role: 'Directeur', institution: 'Ministère des Finances', status: 'actif', lastLogin: '2024-12-15 08:45' },
-  { id: '3', name: 'Ibrahima Sow', email: 'i.sow@mat.gov.gn', role: 'Chef de service', institution: 'Direction de l\'Urbanisme', status: 'actif', lastLogin: '2024-12-14 16:20' },
-  { id: '4', name: 'Fatoumata Camara', email: 'f.camara@rh.gov.gn', role: 'Agent', institution: 'Direction des Ressources Humaines', status: 'actif', lastLogin: '2024-12-15 10:15' },
-  { id: '5', name: 'Mamadou Keïta', email: 'm.keita@justice.gov.gn', role: 'Directeur', institution: 'Ministère de la Justice', status: 'actif', lastLogin: '2024-12-14 14:30' },
-  { id: '6', name: 'Mariama Condé', email: 'm.conde@sgg.gov.gn', role: 'Chef de service', institution: 'Secrétariat Général du Gouvernement', status: 'actif', lastLogin: '2024-12-15 07:50' },
-  { id: '7', name: 'Abdoulaye Bah', email: 'a.bah@budget.gov.gn', role: 'Agent', institution: 'Direction Générale du Budget', status: 'inactif', lastLogin: '2024-11-28 11:00' },
-  { id: '8', name: 'Kadiatou Sylla', email: 'k.sylla@education.gov.gn', role: 'Lecteur', institution: 'Ministère de l\'Éducation', status: 'actif', lastLogin: '2024-12-13 09:00' },
-  { id: '9', name: 'Sékou Touré', email: 's.toure@sante.gov.gn', role: 'Agent', institution: 'Ministère de la Santé', status: 'suspendu', lastLogin: '2024-12-01 15:45' },
-  { id: '10', name: 'Djenabou Diallo', email: 'd.diallo@coop.gov.gn', role: 'Chef de service', institution: 'Direction de la Coopération', status: 'actif', lastLogin: '2024-12-14 13:20' },
-  { id: '11', name: 'Alpha Condé', email: 'a.conde@presidence.gov.gn', role: 'Admin', institution: 'Présidence de la République', status: 'actif', lastLogin: '2024-12-15 06:30' },
-  { id: '12', name: 'Aminata Touré', email: 'a.toure@social.gov.gn', role: 'Lecteur', institution: 'Ministère des Affaires Sociales', status: 'actif', lastLogin: '2024-12-12 10:00' },
-]
-
-const ROLE_CONFIG: Record<string, { color: string; icon: React.ElementType }> = {
-  Admin: { color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', icon: Shield },
-  Directeur: { color: 'bg-brand/10 text-brand dark:bg-primary/20 dark:text-primary', icon: UserCog },
-  'Chef de service': { color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: Users },
-  Agent: { color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400', icon: UserPlus },
-  Lecteur: { color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400', icon: Eye },
+const ROLE_CONFIG: Record<StoreRole, { color: string; icon: React.ElementType }> = {
+  super_admin: { color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', icon: Shield },
+  admin_general: { color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', icon: Shield },
+  ministere: { color: 'bg-brand/10 text-brand dark:bg-primary/20 dark:text-primary', icon: UserCog },
+  mairie: { color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: Users },
+  agence: { color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400', icon: UserPlus },
+  citizen: { color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400', icon: Eye },
 }
 
-const STATUS_CONFIG = {
+const STATUS_CONFIG: Record<UserAccountStatus, { label: string; color: string; icon: React.ElementType }> = {
   actif: { label: 'Actif', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', icon: CheckCircle2 },
   inactif: { label: 'Inactif', color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400', icon: Clock },
   suspendu: { label: 'Suspendu', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', icon: XCircle },
+  en_attente: { label: 'En attente', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: Clock },
 }
 
+const ALL_ROLES: StoreRole[] = ['super_admin', 'admin_general', 'ministere', 'mairie', 'agence', 'citizen']
+
+// ─── HELPERS ───────────────────────────────────────────────────────────────────
+
+function displayName(u: UserAccount): string {
+  return u.firstName ? `${u.firstName} ${u.name}` : u.name
+}
+
+function formatLastLogin(iso?: string): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function getInstitution(u: UserAccount): string {
+  return u.institution || u.mairie || u.agence || 'Non assigné'
+}
+
+// ─── CSV EXPORT ────────────────────────────────────────────────────────────────
+
+function exportUsersCSV(users: UserAccount[]) {
+  const headers = ['ID', 'Prénom', 'Nom', 'Email', 'Rôle', 'Statut', 'Téléphone', 'NIN', 'Institution', 'Mairie', 'Agence', 'Date création', 'Dernière connexion']
+  const rows = users.map(u => [
+    u.id,
+    u.firstName ?? '',
+    u.name,
+    u.email,
+    ROLE_LABELS[u.role],
+    STATUS_CONFIG[u.status].label,
+    u.phone ?? '',
+    u.nin ?? '',
+    u.institution ?? '',
+    u.mairie ?? '',
+    u.agence ?? '',
+    formatLastLogin(u.createdAt),
+    formatLastLogin(u.lastLogin),
+  ])
+
+  const escapeCSV = (v: string) => {
+    if (v.includes(',') || v.includes('"') || v.includes('\n')) {
+      return `"${v.replace(/"/g, '""')}"`
+    }
+    return v
+  }
+
+  const csvContent = [
+    headers.map(escapeCSV).join(','),
+    ...rows.map(row => row.map(escapeCSV).join(',')),
+  ].join('\n')
+
+  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `utilisateurs_export_${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+// ─── COMPONENT ─────────────────────────────────────────────────────────────────
+
 export function UsersPage() {
+  const store = useUsersStore()
+
+  // ── Local UI state ───────────────────────────────────────────────────────
   const [search, setSearch] = useState('')
-  const [roleFilter, setRoleFilter] = useState('tous')
-  const [statusFilter, setStatusFilter] = useState('tous')
-  const [institutionFilter, setInstitutionFilter] = useState('tous')
+  const [roleFilter, setRoleFilter] = useState<StoreRole | 'all'>('all')
+  const [statusFilter, setStatusFilter] = useState<UserAccountStatus | 'all'>('all')
+  const [institutionFilter, setInstitutionFilter] = useState('all')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [users, setUsers] = useState<UserRow[]>(FAKE_USERS)
-  const [newUser, setNewUser] = useState({ firstName: '', lastName: '', email: '', role: '', institution: '' })
+  const [newUser, setNewUser] = useState({
+    firstName: '', name: '', email: '', role: '' as StoreRole | '',
+    institution: '', phone: '', nin: '',
+  })
   const [successToast, setSuccessToast] = useState('')
 
   // Profile dialog
   const [profileDialog, setProfileDialog] = useState(false)
-  const [profileUser, setProfileUser] = useState<UserRow | null>(null)
+  const [profileUser, setProfileUser] = useState<UserAccount | null>(null)
 
   // Edit dialog
   const [editDialog, setEditDialog] = useState(false)
-  const [editUser, setEditUser] = useState<UserRow | null>(null)
-  const [editForm, setEditForm] = useState({ name: '', email: '', role: '', institution: '' })
+  const [editUser, setEditUser] = useState<UserAccount | null>(null)
+  const [editForm, setEditForm] = useState({
+    firstName: '', name: '', email: '', role: '' as StoreRole, institution: '',
+  })
 
   // Reset password confirmation
   const [resetPasswordDialog, setResetPasswordDialog] = useState(false)
-  const [resetPasswordUser, setResetPasswordUser] = useState<UserRow | null>(null)
+  const [resetPasswordUser, setResetPasswordUser] = useState<UserAccount | null>(null)
 
   // Delete user confirmation
   const [deleteUserDialog, setDeleteUserDialog] = useState(false)
@@ -102,12 +163,12 @@ export function UsersPage() {
 
   // Bulk change role dialog
   const [bulkRoleDialog, setBulkRoleDialog] = useState(false)
-  const [bulkRole, setBulkRole] = useState('')
+  const [bulkRole, setBulkRole] = useState<StoreRole | ''>('')
 
-  const showToast = (message: string) => {
+  // ── Toast ────────────────────────────────────────────────────────────────
+  const showToast = useCallback((message: string) => {
     setSuccessToast(message)
-    setTimeout(() => setSuccessToast(''), 4000)
-  }
+  }, [])
 
   useEffect(() => {
     if (successToast) {
@@ -116,18 +177,21 @@ export function UsersPage() {
     }
   }, [successToast])
 
-  const institutions = [...new Set(FAKE_USERS.map(u => u.institution))]
-  const roles = [...new Set(FAKE_USERS.map(u => u.role))]
+  // ── Derived data ─────────────────────────────────────────────────────────
+  const institutions = useMemo(
+    () => [...new Set(store.users.map(u => getInstitution(u)).filter(Boolean))],
+    [store.users]
+  )
 
-  const filtered = users.filter(u => {
-    const matchSearch = u.name.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase())
-    const matchRole = roleFilter === 'tous' || u.role === roleFilter
-    const matchStatus = statusFilter === 'tous' || u.status === statusFilter
-    const matchInst = institutionFilter === 'tous' || u.institution === institutionFilter
-    return matchSearch && matchRole && matchStatus && matchInst
-  })
+  const filtered = useMemo(() => {
+    const base = store.getFilteredUsers(search, roleFilter, statusFilter)
+    if (institutionFilter === 'all') return base
+    return base.filter(u => getInstitution(u) === institutionFilter)
+  }, [store, search, roleFilter, statusFilter, institutionFilter])
 
+  const stats = useMemo(() => store.getStats(), [store])
+
+  // ── Selection ────────────────────────────────────────────────────────────
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
   }
@@ -140,69 +204,88 @@ export function UsersPage() {
     }
   }
 
-  // === User dropdown handlers ===
-  const handleViewProfile = (user: UserRow) => {
+  // ── User dropdown handlers ───────────────────────────────────────────────
+  const handleViewProfile = (user: UserAccount) => {
     setProfileUser(user)
     setProfileDialog(true)
   }
 
-  const handleEditOpen = (user: UserRow) => {
+  const handleEditOpen = (user: UserAccount) => {
     setEditUser(user)
-    setEditForm({ name: user.name, email: user.email, role: user.role, institution: user.institution })
+    setEditForm({
+      firstName: user.firstName ?? '',
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      institution: getInstitution(user),
+    })
     setEditDialog(true)
   }
 
   const handleEditSave = () => {
     if (!editUser) return
-    setUsers(prev => prev.map(u =>
-      u.id === editUser.id
-        ? { ...u, name: editForm.name, email: editForm.email, role: editForm.role, institution: editForm.institution }
-        : u
-    ))
+    const updates: Partial<UserAccount> = {
+      firstName: editForm.firstName || undefined,
+      name: editForm.name,
+      email: editForm.email,
+      role: editForm.role,
+    }
+    // Set the appropriate institution field based on role
+    if (editForm.role === 'mairie') {
+      updates.mairie = editForm.institution
+      updates.institution = undefined
+      updates.agence = undefined
+    } else if (editForm.role === 'agence') {
+      updates.agence = editForm.institution
+      updates.institution = undefined
+      updates.mairie = undefined
+    } else {
+      updates.institution = editForm.institution
+      updates.mairie = undefined
+      updates.agence = undefined
+    }
+    store.updateUser(editUser.id, updates)
     setEditDialog(false)
-    showToast(`Utilisateur ${editForm.name} modifié avec succès`)
+    showToast(`Utilisateur ${displayName(editUser)} modifié avec succès`)
   }
 
-  const handleResetPasswordOpen = (user: UserRow) => {
+  const handleResetPasswordOpen = (user: UserAccount) => {
     setResetPasswordUser(user)
     setResetPasswordDialog(true)
   }
 
   const handleResetPasswordConfirm = () => {
     if (!resetPasswordUser) return
+    store.updateUser(resetPasswordUser.id, { password: `temp-${Date.now()}` })
     setResetPasswordDialog(false)
-    showToast(`Mot de passe réinitialisé pour ${resetPasswordUser.name}`)
+    showToast(`Mot de passe réinitialisé pour ${displayName(resetPasswordUser)}`)
   }
 
-  const handleDeleteUserOpen = (user: UserRow) => {
+  const handleDeleteUserOpen = (user: UserAccount) => {
     setDeleteUserId(user.id)
-    setDeleteUserName(user.name)
+    setDeleteUserName(displayName(user))
     setDeleteUserDialog(true)
   }
 
   const handleDeleteUserConfirm = () => {
     if (!deleteUserId) return
-    setUsers(prev => prev.filter(u => u.id !== deleteUserId))
+    store.deleteUser(deleteUserId)
     setSelectedIds(prev => prev.filter(id => id !== deleteUserId))
     setDeleteUserDialog(false)
     showToast(`Utilisateur ${deleteUserName} supprimé`)
   }
 
-  // === Bulk action handlers ===
-  const handleBulkDeactivate = () => {
-    setUsers(prev => prev.map(u =>
-      selectedIds.includes(u.id) ? { ...u, status: 'inactif' as const } : u
-    ))
-    showToast(`${selectedIds.length} utilisateur(s) désactivé(s)`)
+  // ── Bulk action handlers ─────────────────────────────────────────────────
+  const handleBulkSuspend = () => {
+    store.suspendMultiple(selectedIds)
+    showToast(`${selectedIds.length} utilisateur(s) suspendu(s)`)
     setSelectedIds([])
   }
 
   const handleBulkRoleConfirm = () => {
     if (!bulkRole) return
-    setUsers(prev => prev.map(u =>
-      selectedIds.includes(u.id) ? { ...u, role: bulkRole } : u
-    ))
-    showToast(`Rôle "${bulkRole}" appliqué à ${selectedIds.length} utilisateur(s)`)
+    store.changeMultipleRoles(selectedIds, bulkRole)
+    showToast(`Rôle "${ROLE_LABELS[bulkRole]}" appliqué à ${selectedIds.length} utilisateur(s)`)
     setBulkRoleDialog(false)
     setBulkRole('')
     setSelectedIds([])
@@ -213,33 +296,63 @@ export function UsersPage() {
   }
 
   const handleBulkDeleteConfirm = () => {
-    setUsers(prev => prev.filter(u => !selectedIds.includes(u.id)))
+    store.deleteMultiple(selectedIds)
     showToast(`${selectedIds.length} utilisateur(s) supprimé(s)`)
     setSelectedIds([])
     setBulkDeleteDialog(false)
   }
 
-  // === Export/Import handlers ===
+  // ── Export/Import handlers ───────────────────────────────────────────────
   const handleExport = () => {
-    showToast('Export des utilisateurs en CSV en cours...')
+    exportUsersCSV(filtered)
+    showToast(`${filtered.length} utilisateur(s) exporté(s) en CSV`)
   }
 
   const handleImport = () => {
     showToast('Import en cours de traitement...')
   }
 
-  const stats = [
-    { label: 'Total utilisateurs', value: DEMO_STATS.users.total, icon: Users, color: 'text-brand dark:text-primary', bg: 'bg-brand/5 dark:bg-primary/10' },
-    { label: 'Actifs', value: DEMO_STATS.users.actifs, icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
-    { label: 'Administrateurs', value: DEMO_STATS.users.admin, icon: Shield, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/20' },
-    { label: 'Invités', value: DEMO_STATS.users.invite, icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+  // ── Add user handler ────────────────────────────────────────────────────
+  const handleAddUser = () => {
+    const role = (newUser.role || 'citizen') as StoreRole
+    const userData: Omit<UserAccount, 'id' | 'createdAt'> = {
+      email: newUser.email || 'email@gov.gn',
+      name: newUser.name || 'Nouvel utilisateur',
+      firstName: newUser.firstName || undefined,
+      role,
+      status: 'actif',
+      phone: newUser.phone || undefined,
+      nin: newUser.nin || undefined,
+      password: 'demo123',
+    }
+    // Set the appropriate institution field based on role
+    if (role === 'mairie') {
+      userData.mairie = newUser.institution || undefined
+    } else if (role === 'agence') {
+      userData.agence = newUser.institution || undefined
+    } else {
+      userData.institution = newUser.institution || undefined
+    }
+    store.addUser(userData)
+    const fullName = newUser.firstName ? `${newUser.firstName} ${newUser.name}` : newUser.name
+    setNewUser({ firstName: '', name: '', email: '', role: '', institution: '', phone: '', nin: '' })
+    setDialogOpen(false)
+    showToast(`Utilisateur ${fullName || 'Nouvel utilisateur'} créé avec succès`)
+  }
+
+  // ── Stats display ────────────────────────────────────────────────────────
+  const statsDisplay = [
+    { label: 'Total utilisateurs', value: stats.total, icon: Users, color: 'text-brand dark:text-primary', bg: 'bg-brand/5 dark:bg-primary/10' },
+    { label: 'Actifs', value: stats.active, icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
+    { label: 'Administrateurs', value: (stats.byRole['super_admin'] ?? 0) + (stats.byRole['admin_general'] ?? 0), icon: Shield, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/20' },
+    { label: 'Connexions récentes', value: stats.recentLogins, icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
   ]
 
   return (
     <div className="space-y-6">
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, i) => (
+        {statsDisplay.map((stat, i) => (
           <motion.div key={stat.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}>
             <Card className="glass-card hover:shadow-lg transition-shadow">
               <CardContent className="flex items-center gap-4">
@@ -264,30 +377,31 @@ export function UsersPage() {
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Rechercher par nom ou email..."
+                  placeholder="Rechercher par nom, email, téléphone..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   className="pl-10"
                 />
               </div>
-              <Select value={roleFilter} onValueChange={setRoleFilter}>
-                <SelectTrigger className="w-[150px]">
+              <Select value={roleFilter} onValueChange={v => setRoleFilter(v as StoreRole | 'all')}>
+                <SelectTrigger className="w-[170px]">
                   <SelectValue placeholder="Rôle" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="tous">Tous les rôles</SelectItem>
-                  {roles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                  <SelectItem value="all">Tous les rôles</SelectItem>
+                  {ALL_ROLES.map(r => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter} onValueChange={v => setStatusFilter(v as UserAccountStatus | 'all')}>
                 <SelectTrigger className="w-[140px]">
                   <SelectValue placeholder="Statut" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="tous">Tous</SelectItem>
+                  <SelectItem value="all">Tous</SelectItem>
                   <SelectItem value="actif">Actif</SelectItem>
                   <SelectItem value="inactif">Inactif</SelectItem>
                   <SelectItem value="suspendu">Suspendu</SelectItem>
+                  <SelectItem value="en_attente">En attente</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={institutionFilter} onValueChange={setInstitutionFilter}>
@@ -295,7 +409,7 @@ export function UsersPage() {
                   <SelectValue placeholder="Institution" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="tous">Toutes les institutions</SelectItem>
+                  <SelectItem value="all">Toutes les institutions</SelectItem>
                   {institutions.map(inst => <SelectItem key={inst} value={inst}>{inst}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -329,7 +443,7 @@ export function UsersPage() {
                       </div>
                       <div className="space-y-2">
                         <Label>Nom</Label>
-                        <Input placeholder="Nom de famille" value={newUser.lastName} onChange={e => setNewUser(prev => ({ ...prev, lastName: e.target.value }))} />
+                        <Input placeholder="Nom de famille" value={newUser.name} onChange={e => setNewUser(prev => ({ ...prev, name: e.target.value }))} />
                       </div>
                     </div>
                     <div className="space-y-2">
@@ -339,10 +453,10 @@ export function UsersPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Rôle</Label>
-                        <Select value={newUser.role} onValueChange={v => setNewUser(prev => ({ ...prev, role: v }))}>
+                        <Select value={newUser.role} onValueChange={v => setNewUser(prev => ({ ...prev, role: v as StoreRole }))}>
                           <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
                           <SelectContent>
-                            {roles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                            {ALL_ROLES.map(r => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}
                           </SelectContent>
                         </Select>
                       </div>
@@ -356,26 +470,20 @@ export function UsersPage() {
                         </Select>
                       </div>
                     </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Téléphone</Label>
+                        <Input placeholder="+224 6XX XX XX XX" value={newUser.phone} onChange={e => setNewUser(prev => ({ ...prev, phone: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>NIN</Label>
+                        <Input placeholder="NIN-XXXX-XXXXX" value={newUser.nin} onChange={e => setNewUser(prev => ({ ...prev, nin: e.target.value }))} />
+                      </div>
+                    </div>
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setDialogOpen(false)}>Annuler</Button>
-                    <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90" onClick={() => {
-                      const newId = String(Date.now())
-                      const fullName = `${newUser.firstName} ${newUser.lastName}`.trim()
-                      const created: UserRow = {
-                        id: newId,
-                        name: fullName || 'Nouvel utilisateur',
-                        email: newUser.email || 'email@gov.gn',
-                        role: newUser.role || 'Agent',
-                        institution: newUser.institution || 'Non assigné',
-                        status: 'actif',
-                        lastLogin: new Date().toISOString().slice(0, 16).replace('T', ' '),
-                      }
-                      setUsers(prev => [created, ...prev])
-                      setNewUser({ firstName: '', lastName: '', email: '', role: '', institution: '' })
-                      setDialogOpen(false)
-                      showToast(`Utilisateur ${fullName || 'Nouvel utilisateur'} créé avec succès`)
-                    }}>
+                    <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90" onClick={handleAddUser}>
                       Créer l&apos;utilisateur
                     </Button>
                   </DialogFooter>
@@ -392,9 +500,9 @@ export function UsersPage() {
               className="flex items-center gap-3 pt-2 border-t"
             >
               <span className="text-sm text-muted-foreground">{selectedIds.length} sélectionné(s)</span>
-              <Button variant="outline" size="sm" className="gap-1" onClick={handleBulkDeactivate}>
+              <Button variant="outline" size="sm" className="gap-1" onClick={handleBulkSuspend}>
                 <XCircle className="h-3.5 w-3.5" />
-                Désactiver
+                Suspendre
               </Button>
               <Button variant="outline" size="sm" className="gap-1" onClick={() => { setBulkRole(''); setBulkRoleDialog(true) }}>
                 <Shield className="h-3.5 w-3.5" />
@@ -432,11 +540,12 @@ export function UsersPage() {
             </TableHeader>
             <TableBody>
               {filtered.map((user, i) => {
-                const rConfig = ROLE_CONFIG[user.role] || ROLE_CONFIG.Agent
+                const rConfig = ROLE_CONFIG[user.role]
                 const sConfig = STATUS_CONFIG[user.status]
                 const RoleIcon = rConfig.icon
                 const StatusIcon = sConfig.icon
-                const initials = user.name.split(' ').map(n => n[0]).join('')
+                const fullName = displayName(user)
+                const initials = fullName.split(' ').map(n => n[0]).join('')
                 return (
                   <motion.tr
                     key={user.id}
@@ -459,7 +568,7 @@ export function UsersPage() {
                           </AvatarFallback>
                         </Avatar>
                         <div>
-                          <p className="text-sm font-medium">{user.name}</p>
+                          <p className="text-sm font-medium">{fullName}</p>
                           <p className="text-xs text-muted-foreground">{user.email}</p>
                         </div>
                       </div>
@@ -467,11 +576,11 @@ export function UsersPage() {
                     <TableCell className="hidden md:table-cell">
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${rConfig.color}`}>
                         <RoleIcon className="h-3 w-3" />
-                        {user.role}
+                        {ROLE_LABELS[user.role]}
                       </span>
                     </TableCell>
                     <TableCell className="hidden lg:table-cell text-sm text-muted-foreground max-w-[200px] truncate">
-                      {user.institution}
+                      {getInstitution(user)}
                     </TableCell>
                     <TableCell>
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${sConfig.color}`}>
@@ -479,7 +588,7 @@ export function UsersPage() {
                         {sConfig.label}
                       </span>
                     </TableCell>
-                    <TableCell className="hidden xl:table-cell text-xs text-muted-foreground">{user.lastLogin}</TableCell>
+                    <TableCell className="hidden xl:table-cell text-xs text-muted-foreground">{formatLastLogin(user.lastLogin)}</TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -512,7 +621,7 @@ export function UsersPage() {
       </Card>
 
       <div className="text-sm text-muted-foreground text-center">
-        {filtered.length} utilisateur(s) affiché(s) sur {users.length}
+        {filtered.length} utilisateur(s) affiché(s) sur {store.users.length}
       </div>
 
       {/* ===== DIALOGS ===== */}
@@ -527,62 +636,70 @@ export function UsersPage() {
             </DialogTitle>
             <DialogDescription>Détails du compte utilisateur</DialogDescription>
           </DialogHeader>
-          {profileUser && (
-            <div className="grid gap-4 py-4">
-              <div className="flex items-center gap-4">
-                <Avatar className="h-16 w-16">
-                  <AvatarFallback className="bg-brand/10 text-brand dark:bg-primary/20 dark:text-primary text-xl">
-                    {profileUser.name.split(' ').map(n => n[0]).join('')}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="text-lg font-semibold">{profileUser.name}</p>
-                  <p className="text-sm text-muted-foreground">{profileUser.email}</p>
-                </div>
-              </div>
-              <Separator />
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <span className="text-xs text-muted-foreground font-medium">Rôle</span>
+          {profileUser && (() => {
+            const fullName = displayName(profileUser)
+            const rc = ROLE_CONFIG[profileUser.role]
+            const RIcon = rc.icon
+            const sc = STATUS_CONFIG[profileUser.status]
+            const SIcon = sc.icon
+            return (
+              <div className="grid gap-4 py-4">
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-16 w-16">
+                    <AvatarFallback className="bg-brand/10 text-brand dark:bg-primary/20 dark:text-primary text-xl">
+                      {fullName.split(' ').map(n => n[0]).join('')}
+                    </AvatarFallback>
+                  </Avatar>
                   <div>
-                    {(() => {
-                      const rc = ROLE_CONFIG[profileUser.role] || ROLE_CONFIG.Agent
-                      const RIcon = rc.icon
-                      return (
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${rc.color}`}>
-                          <RIcon className="h-3 w-3" />
-                          {profileUser.role}
-                        </span>
-                      )
-                    })()}
+                    <p className="text-lg font-semibold">{fullName}</p>
+                    <p className="text-sm text-muted-foreground">{profileUser.email}</p>
+                    {profileUser.phone && <p className="text-sm text-muted-foreground">{profileUser.phone}</p>}
+                  </div>
+                </div>
+                <Separator />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground font-medium">Rôle</span>
+                    <div>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${rc.color}`}>
+                        <RIcon className="h-3 w-3" />
+                        {ROLE_LABELS[profileUser.role]}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground font-medium">Statut</span>
+                    <div>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${sc.color}`}>
+                        <SIcon className="h-3 w-3" />
+                        {sc.label}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <span className="text-xs text-muted-foreground font-medium">Statut</span>
-                  <div>
-                    {(() => {
-                      const sc = STATUS_CONFIG[profileUser.status]
-                      const SIcon = sc.icon
-                      return (
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${sc.color}`}>
-                          <SIcon className="h-3 w-3" />
-                          {sc.label}
-                        </span>
-                      )
-                    })()}
+                  <span className="text-xs text-muted-foreground font-medium">Institution</span>
+                  <p className="text-sm">{getInstitution(profileUser)}</p>
+                </div>
+                {profileUser.nin && (
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground font-medium">NIN</span>
+                    <p className="text-sm">{profileUser.nin}</p>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground font-medium">Date de création</span>
+                    <p className="text-sm">{formatLastLogin(profileUser.createdAt)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground font-medium">Dernière connexion</span>
+                    <p className="text-sm">{formatLastLogin(profileUser.lastLogin)}</p>
                   </div>
                 </div>
               </div>
-              <div className="space-y-1">
-                <span className="text-xs text-muted-foreground font-medium">Institution</span>
-                <p className="text-sm">{profileUser.institution}</p>
-              </div>
-              <div className="space-y-1">
-                <span className="text-xs text-muted-foreground font-medium">Dernière connexion</span>
-                <p className="text-sm">{profileUser.lastLogin}</p>
-              </div>
-            </div>
-          )}
+            )
+          })()}
           <DialogFooter>
             <Button variant="outline" onClick={() => setProfileDialog(false)}>Fermer</Button>
           </DialogFooter>
@@ -600,9 +717,15 @@ export function UsersPage() {
             <DialogDescription>Modifier les informations du compte</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label>Nom complet</Label>
-              <Input value={editForm.name} onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))} />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Prénom</Label>
+                <Input value={editForm.firstName} onChange={e => setEditForm(prev => ({ ...prev, firstName: e.target.value }))} />
+              </div>
+              <div className="space-y-2">
+                <Label>Nom</Label>
+                <Input value={editForm.name} onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))} />
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Email</Label>
@@ -611,10 +734,10 @@ export function UsersPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Rôle</Label>
-                <Select value={editForm.role} onValueChange={v => setEditForm(prev => ({ ...prev, role: v }))}>
+                <Select value={editForm.role} onValueChange={v => setEditForm(prev => ({ ...prev, role: v as StoreRole }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {roles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                    {ALL_ROLES.map(r => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -647,7 +770,7 @@ export function UsersPage() {
               Réinitialiser le mot de passe
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {resetPasswordUser && `Voulez-vous réinitialiser le mot de passe de ${resetPasswordUser.name} ? Un nouveau mot de passe temporaire sera généré et envoyé par email.`}
+              {resetPasswordUser && `Voulez-vous réinitialiser le mot de passe de ${displayName(resetPasswordUser)} ? Un nouveau mot de passe temporaire sera généré et envoyé par email.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -716,12 +839,12 @@ export function UsersPage() {
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
               <Label>Nouveau rôle</Label>
-              <Select value={bulkRole} onValueChange={setBulkRole}>
+              <Select value={bulkRole} onValueChange={v => setBulkRole(v as StoreRole)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Sélectionner un rôle" />
                 </SelectTrigger>
                 <SelectContent>
-                  {roles.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                  {ALL_ROLES.map(r => <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
