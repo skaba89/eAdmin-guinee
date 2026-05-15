@@ -222,7 +222,7 @@ export function LoginPage() {
                 }}
               />
               <img
-                src="/logo-256.png"
+                src="/images/coat-of-arms.png"
                 alt="Armories de la République de Guinée"
                 className="w-28 h-28 relative z-10 drop-shadow-2xl object-contain"
               />
