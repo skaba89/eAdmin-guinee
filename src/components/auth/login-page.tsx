@@ -163,10 +163,10 @@ export function LoginPage() {
           `,
         }}
       >
-        {/* Background image of Guinea — Conakry */}
+        {/* Background image — Palais du Peuple, Conakry */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-15"
-          style={{ backgroundImage: "url('/guinea-hero-conakry.png')" }}
+          style={{ backgroundImage: "url('/images/palais-du-peuple-full.jpg')" }}
         />
         {/* Decorative tricolor vertical stripes */}
         <div className="absolute left-0 top-0 bottom-0 w-1.5 flex flex-col z-20">
@@ -222,7 +222,7 @@ export function LoginPage() {
                 }}
               />
               <img
-                src="/images/coat-of-arms.png"
+                src="/images/coat-of-arms-official.svg"
                 alt="Armories de la République de Guinée"
                 className="w-28 h-28 relative z-10 drop-shadow-2xl object-contain"
               />
@@ -238,9 +238,13 @@ export function LoginPage() {
             <h1 className="text-3xl font-bold mb-2.5 text-gradient-gold tracking-tight">
               eAdministration Suite
             </h1>
-            <p className="text-lg font-semibold tracking-widest uppercase" style={{ color: `${GUINEA_YELLOW}CC` }}>
-              République de Guinée
-            </p>
+            <div className="flex items-center justify-center gap-2">
+              <img src="/images/flag-guinea.svg" alt="Drapeau de la Guinée" className="h-5 w-7 object-contain" />
+              <p className="text-lg font-semibold tracking-widest uppercase" style={{ color: `${GUINEA_YELLOW}CC` }}>
+                République de Guinée
+              </p>
+              <img src="/images/flag-guinea.svg" alt="Drapeau de la Guinée" className="h-5 w-7 object-contain" />
+            </div>
           </motion.div>
 
           {/* Guinea motto */}
@@ -387,7 +391,7 @@ export function LoginPage() {
           <div className="relative">
             <div className="absolute inset-0 rounded-full blur-lg opacity-25 animate-glow-pulse" style={{ backgroundColor: GUINEA_YELLOW }} />
             <div className="absolute -inset-1 rounded-full" style={{ border: `1.5px solid ${GUINEA_YELLOW}30` }} />
-            <img src="/logo-128.png" alt="Armories de la République de Guinée" className="w-16 h-16 relative z-10 object-contain" />
+            <img src="/images/coat-of-arms-official.svg" alt="Armories de la République de Guinée" className="w-16 h-16 relative z-10 object-contain" />
           </div>
           <div className="text-center">
             <h1 className="text-xl font-bold text-gradient-navy">eAdministration Suite</h1>

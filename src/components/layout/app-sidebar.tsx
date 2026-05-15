@@ -301,7 +301,7 @@ export function AppSidebar() {
           )}
         >
           <img
-            src="/images/coat-of-arms.png"
+            src="/images/coat-of-arms-official.svg"
             alt="Armories de la République de Guinée"
             className="h-10 w-10 object-contain"
           />

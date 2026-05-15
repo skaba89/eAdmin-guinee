@@ -338,8 +338,13 @@ export function LandingPage() {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="mb-4"
             >
-              <p className="text-[#C8A45C] text-sm sm:text-base font-semibold tracking-wider uppercase">
-                🇬🇳 République de Guinée — Travail · Justice · Solidarité
+              <div className="flex items-center justify-center gap-3">
+                <img src="/images/flag-guinea.svg" alt="Drapeau de la Guinée" className="h-6 w-8 sm:h-7 sm:w-9 object-contain drop-shadow-lg" />
+                <img src="/images/coat-of-arms-official.svg" alt="Armories de la République de Guinée" className="h-10 w-10 sm:h-12 sm:w-12 object-contain drop-shadow-lg" />
+                <img src="/images/flag-guinea.svg" alt="Drapeau de la Guinée" className="h-6 w-8 sm:h-7 sm:w-9 object-contain drop-shadow-lg" />
+              </div>
+              <p className="text-[#C8A45C] text-sm sm:text-base font-semibold tracking-wider uppercase mt-3">
+                République de Guinée — Travail · Justice · Solidarité
               </p>
             </motion.div>
 
@@ -447,10 +452,10 @@ export function LandingPage() {
 
       {/* ─── INSTITUTIONS DE LA RÉPUBLIQUE ────────────────── */}
       <AnimatedSection className="py-20 relative overflow-hidden">
-        {/* Background image - Grand Mosque of Conakry */}
+        {/* Background image - Palais du Peuple (Assemblée Nationale) */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "url('/guinea-mosque-conakry.png')" }}
+          style={{ backgroundImage: "url('/images/palais-du-peuple-full.jpg')" }}
         />
         <div className="absolute inset-0 bg-background/95" />
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -501,6 +506,11 @@ export function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
               {
+                img: '/images/palais-du-peuple.jpg',
+                title: 'Palais du Peuple',
+                desc: 'Siège de l\'Assemblée Nationale, symbole de la démocratie et de la souveraineté de la République de Guinée.',
+              },
+              {
                 img: '/guinea-hero-conakry.png',
                 title: 'Conakry, la capitale',
                 desc: 'Métropole dynamique bordée par l\'Atlantique, carrefour économique et culturel de l\'Afrique de l\'Ouest.',
@@ -524,11 +534,6 @@ export function LandingPage() {
                 img: '/guinea-mosque-conakry.png',
                 title: 'Grande Mosquée de Conakry',
                 desc: 'L\'un des plus grands édifices religieux d\'Afrique, symbole de la ferveur spirituelle guinéenne.',
-              },
-              {
-                img: '/guinea-culture-dance.png',
-                title: 'Culture et traditions',
-                desc: 'Danses traditionnelles, djembé et griots perpétuent l\'héritage culturel riche et diversifié de la Guinée.',
               },
             ].map((item) => (
               <motion.div key={item.title} variants={fadeUp}>
@@ -762,9 +767,13 @@ export function LandingPage() {
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <AnimatedSection>
             <motion.div variants={fadeUp} className="text-center mb-16">
-              <p className="text-[#C8A45C] text-sm font-semibold tracking-wider uppercase mb-2">
-                🇬🇳 République de Guinée
-              </p>
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <img src="/images/flag-guinea.svg" alt="Drapeau de la Guinée" className="h-5 w-7 object-contain" />
+                <p className="text-[#C8A45C] text-sm font-semibold tracking-wider uppercase">
+                  République de Guinée
+                </p>
+                <img src="/images/flag-guinea.svg" alt="Drapeau de la Guinée" className="h-5 w-7 object-contain" />
+              </div>
               <h2 className="text-3xl sm:text-4xl font-bold text-white">
                 Des résultats au service de l&apos;État
               </h2>
@@ -925,9 +934,13 @@ export function LandingPage() {
         </div>
 
         <div className="relative z-10 mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-[#C8A45C] text-sm font-semibold tracking-wider uppercase mb-4">
-            🇬🇳 République de Guinée
-          </p>
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <img src="/images/coat-of-arms-official.svg" alt="Armories de la République de Guinée" className="h-8 w-8 object-contain" />
+            <p className="text-[#C8A45C] text-sm font-semibold tracking-wider uppercase">
+              République de Guinée
+            </p>
+            <img src="/images/flag-guinea.svg" alt="Drapeau de la Guinée" className="h-5 w-7 object-contain" />
+          </div>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight">
             Rejoignez la transformation numérique de{' '}
             <span className="text-gradient-gold">l&apos;administration guinéenne</span>
@@ -1082,7 +1095,7 @@ export function LandingPage() {
             <div className="flex flex-col items-center gap-4">
               <div className="flex items-center gap-2">
                 <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-[#0B2E58] to-[#134A8E] dark:from-primary dark:to-primary/80 flex items-center justify-center overflow-hidden shadow-navy">
-                  <img src="/images/coat-of-arms.png" alt="Armories de la République de Guinée" className="h-8 w-8 object-contain" />
+                  <img src="/images/coat-of-arms-official.svg" alt="Armories de la République de Guinée" className="h-8 w-8 object-contain" />
                 </div>
                 <span className="text-sm font-semibold text-white dark:text-foreground">
                   eAdministration Suite

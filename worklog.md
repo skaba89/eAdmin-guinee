@@ -73,3 +73,33 @@ Stage Summary:
 - 4 composants mis à jour pour utiliser les nouvelles armoiries
 - Toutes les images de la landing page sont maintenant des photos réalistes de Guinée
 - Build réussi, 0 erreurs TypeScript
+---
+Task ID: guinea-official-images
+Agent: Main Agent
+Task: Replace placeholder images with real official images of the Republic of Guinea (Conakry)
+
+Work Log:
+- Audited all components for placeholder Guinea images (emoji flags 🇬🇳, fake PNG coat-of-arms, unused images)
+- Found 3 emoji flags in landing-page.tsx, 5 references to fake coat-of-arms.png (actually JPEG), and unused official images already in public/
+- Downloaded real official images from Wikimedia Commons: SVG flag, SVG coat of arms, Palais du Peuple photos
+- Copied 7 official images to /public/images/: flag-guinea.svg, flag-guinea-hd.png, coat-of-arms-official.svg, coat-of-arms-official-hd.png, palais-du-peuple.jpg, palais-du-peuple-full.jpg, defile-palais-conakry.jpg
+- Replaced 3 🇬🇳 emoji flags in landing-page.tsx with real SVG flag + coat-of-arms images
+- Replaced all 5 references to /images/coat-of-arms.png (fake JPEG) with /images/coat-of-arms-official.svg (real SVG)
+- Updated login-page.tsx: coat-of-arms → official SVG, mobile logo → official SVG, background → Palais du Peuple
+- Updated app-sidebar.tsx: coat-of-arms → official SVG
+- Updated public-nav.tsx: coat-of-arms → official SVG
+- Updated register-page.tsx: added official coat-of-arms + flag SVG to header
+- Updated landing-page.tsx institutions section background: mosque → Palais du Peuple
+- Updated landing-page.tsx gallery: added Palais du Peuple card, removed culture card
+- Regenerated all favicon/app-icon files from the real coat-of-arms PNG
+- Build passes with 0 errors, TypeScript compilation clean
+
+Stage Summary:
+- All 3 emoji flags replaced with real SVG images
+- All 5 fake coat-of-arms.png references replaced with real official SVG
+- Login page background now shows Palais du Peuple (National Assembly)
+- Institutions section background shows Palais du Peuple
+- Gallery includes Palais du Peuple card
+- Register page now shows official coat-of-arms + flag
+- All favicons regenerated from real coat-of-arms
+- 0 TypeScript errors, build succeeds

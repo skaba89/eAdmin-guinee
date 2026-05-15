@@ -177,11 +177,15 @@ export function RegisterPage() {
           </div>
 
           <div className="flex items-center gap-3 justify-center mb-2">
-            <div className="h-12 w-12 rounded-2xl bg-white/10 backdrop-blur-lg flex items-center justify-center border border-white/20">
-              <Sparkles className="h-6 w-6 text-[#C8A45C]" />
+            <div className="h-12 w-12 rounded-2xl bg-white/10 backdrop-blur-lg flex items-center justify-center border border-white/20 overflow-hidden">
+              <img src="/images/coat-of-arms-official.svg" alt="Armories de la République de Guinée" className="h-10 w-10 object-contain" />
             </div>
           </div>
-          <h1 className="text-xl font-bold text-white">Créer un compte citoyen</h1>
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <img src="/images/flag-guinea.svg" alt="Drapeau de la Guinée" className="h-4 w-6 object-contain" />
+            <h1 className="text-xl font-bold text-white">Créer un compte citoyen</h1>
+            <img src="/images/flag-guinea.svg" alt="Drapeau de la Guinée" className="h-4 w-6 object-contain" />
+          </div>
           <p className="text-xs text-white/50 mt-1">Rejoignez la plateforme eAdministration — République de Guinée</p>
         </div>
 

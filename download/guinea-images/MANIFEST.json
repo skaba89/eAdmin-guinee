@@ -1,0 +1,150 @@
+{
+  "collection": "Republic of Guinea (Conakry) - Official Government Images",
+  "description": "Images for use in a government e-administration application for the Republic of Guinea (West Africa, capital Conakry). NOT Guinea-Bissau, NOT Equatorial Guinea, NOT Papua New Guinea.",
+  "downloaded_date": "2026-05-15",
+  "license_note": "All images sourced from Wikimedia Commons under Creative Commons licenses or public domain. Verify license terms before official government use.",
+  "images": [
+    {
+      "category": "National Flag",
+      "filename": "flag_of_guinea.svg",
+      "format": "SVG",
+      "size_bytes": 205,
+      "resolution": "Scalable (viewBox 900x600)",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Flag_of_Guinea.svg",
+      "direct_url": "https://upload.wikimedia.org/wikipedia/commons/e/ed/Flag_of_Guinea.svg",
+      "description": "Official national flag of the Republic of Guinea. A vertical tricolor of red (left, #CE1126 - symbolizing sacrifice/labor), yellow (center, #FCD116 - symbolizing the sun/justice), and green (right, #009460 - symbolizing vegetation/solidarity). Adopted on November 10, 1958.",
+      "license": "Public domain",
+      "recommended_use": "Primary flag asset for web application - scales perfectly at any size"
+    },
+    {
+      "category": "National Flag (PNG fallback)",
+      "filename": "flag_of_guinea_hd.png",
+      "format": "PNG",
+      "size_bytes": 3072,
+      "resolution": "900 x 600 pixels",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Flag_of_Guinea.svg",
+      "direct_url": "Converted from SVG using cairosvg",
+      "description": "PNG rasterized version of the official flag. Same vertical tricolor: red (#CE1126), yellow (#FCD116), green (#009460). Use as fallback where SVG is not supported.",
+      "license": "Public domain",
+      "recommended_use": "PNG fallback for environments that don't support SVG"
+    },
+    {
+      "category": "Coat of Arms / National Emblem",
+      "filename": "coat_of_arms_guinea.svg",
+      "format": "SVG",
+      "size_bytes": 251000,
+      "resolution": "Scalable",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Coat_of_Arms_of_Guinea.svg",
+      "direct_url": "https://upload.wikimedia.org/wikipedia/commons/5/58/Coat_of_Arms_of_Guinea.svg",
+      "description": "Official coat of arms (Sceau national) of the Republic of Guinea. Features a white shield with a white dove carrying a golden olive branch, over a ribbon with the national motto 'TRAVAIL, JUSTICE, SOLIDARITÉ' (Work, Justice, Solidarity). The shield is supported by a lion and an elephant, with the flag colors (red, yellow, green) as a banner below. Adopted in its current form in December 1997.",
+      "license": "Creative Commons Attribution-Share Alike 4.0 International",
+      "recommended_use": "Primary coat of arms asset - scales perfectly for web headers, letterheads, and official documents"
+    },
+    {
+      "category": "Coat of Arms / National Emblem (PNG fallback)",
+      "filename": "coat_of_arms_guinea_hd.png",
+      "format": "PNG",
+      "size_bytes": 513000,
+      "resolution": "1305 x 1463 pixels",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Coat_of_Arms_of_Guinea.svg",
+      "direct_url": "Converted from SVG using cairosvg",
+      "description": "PNG rasterized version of the official coat of arms. Features dove with olive branch, national motto, lion and elephant supporters. Use as fallback where SVG is not supported.",
+      "license": "Creative Commons Attribution-Share Alike 4.0 International",
+      "recommended_use": "PNG fallback for environments that don't support SVG"
+    },
+    {
+      "category": "National Assembly Building (Palais du Peuple)",
+      "filename": "palais_du_peuple_entree.jpg",
+      "format": "JPEG",
+      "size_bytes": 1144791,
+      "resolution": "2560 x 1920 pixels",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Entre_principal_du_palais_du_peuple_conakry.jpg",
+      "direct_url": "https://upload.wikimedia.org/wikipedia/commons/0/06/Entre_principal_du_palais_du_peuple_conakry.jpg",
+      "description": "Main entrance of the Palais du Peuple (People's Palace) in Conakry, Guinea. This five-story government building houses the National Assembly (Assemblée Nationale) of Guinea. Located at the entrance of the Kaloum peninsula in central Conakry. The photo shows the main gate and entrance facade of the building.",
+      "license": "Creative Commons Attribution-Share Alike 4.0 International",
+      "attribution": "Photo by Aboubacarkhoraa on Wikimedia Commons",
+      "recommended_use": "Primary photo for the National Assembly / Parliament section of the application"
+    },
+    {
+      "category": "Palais du Peuple - Full Building View",
+      "filename": "palais_du_peuple_guinea.jpg",
+      "format": "JPEG",
+      "size_bytes": 576266,
+      "resolution": "2560 x 1920 pixels",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Palais_du_peuple_de_la_Guin%C3%A9e.jpg",
+      "direct_url": "https://upload.wikimedia.org/wikipedia/commons/d/d7/Palais_du_peuple_de_la_Guin%C3%A9e.jpg",
+      "description": "Full view of the Palais du Peuple (People's Palace) in Conakry, Guinea. This is the seat of the National Assembly of Guinea. The building is a five-story government structure located in central Conakry at the entrance of the Kaloum peninsula.",
+      "license": "Creative Commons Attribution-Share Alike 4.0 International",
+      "attribution": "Photo by Aboubacarkhoraa on Wikimedia Commons",
+      "recommended_use": "Alternative wider view of the National Assembly building"
+    },
+    {
+      "category": "Palais du Peuple - Fountain Area",
+      "filename": "fontaine_palais_du_peuple.jpg",
+      "format": "JPEG",
+      "size_bytes": 5500000,
+      "resolution": "4032 x 3024 pixels",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Fontaine_du_palais_du_peuple_conakry.jpg",
+      "direct_url": "https://upload.wikimedia.org/wikipedia/commons/3/38/Fontaine_du_palais_du_peuple_conakry.jpg",
+      "description": "Fountain area at the Palais du Peuple (People's Palace) in Conakry, Guinea. Shows the ornamental fountain in front of the National Assembly building, providing context of the building's surroundings and grounds.",
+      "license": "Creative Commons Attribution-Share Alike 4.0 International",
+      "recommended_use": "Contextual photo showing the grounds and approach to the National Assembly"
+    },
+    {
+      "category": "Government Palace / Military Parade",
+      "filename": "defile_palais_conakry.jpg",
+      "format": "JPEG",
+      "size_bytes": 2000000,
+      "resolution": "2763 x 2512 pixels",
+      "source_url": "https://commons.wikimedia.org/wiki/File:D%C3%A9fil%C3%A9_au_palais_de_Conakry_04.jpg",
+      "direct_url": "https://upload.wikimedia.org/wikipedia/commons/a/a2/D%C3%A9fil%C3%A9_au_palais_de_Conakry_04.jpg",
+      "description": "Military parade (défilé) at the Palace in Conakry, Guinea. Shows the Guinean armed forces during an official ceremony at a government palace, with the national flag and official decorations visible. This image captures the ceremonial use of the government palace grounds.",
+      "license": "Creative Commons Attribution-Share Alike 4.0 International",
+      "recommended_use": "Photo showing government ceremony/official event at the palace"
+    },
+    {
+      "category": "Historical Government Palace",
+      "filename": "gouverneurspalast_conakry_1956.jpg",
+      "format": "JPEG",
+      "size_bytes": 575000,
+      "resolution": "Historical photo (1956)",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Conakry_-_franz%C3%B6sischer_Gouverneurspalast_-_1956.jpg",
+      "direct_url": "https://upload.wikimedia.org/wikipedia/commons/0/04/Conakry_-_franz%C3%B6sischer_Gouverneurspalast_-_1956.jpg",
+      "description": "Historical photo of the French Governor's Palace (Palais du Gouverneur) in Conakry, from 1956, during the colonial era. This building later became an important government building after Guinea's independence in 1958. It represents the colonial architectural heritage of Guinea's government buildings.",
+      "license": "Public domain (historical photo pre-independence)",
+      "recommended_use": "Historical/archival context - shows the colonial-era government palace"
+    }
+  ],
+  "missing_images": {
+    "presidential_palace": {
+      "name": "Palais Présidentiel Sekhoutoureya",
+      "note": "No freely licensed photo found on Wikimedia Commons. The Sekhoutoureah Presidential Palace (opened 2010, Chinese-built) is the official residence of the President. Stock photos are available on Getty Images and Alamy but require licensing. Recommend contacting the Présidence de la République de Guinée (presidence.gov.gn) for an official image.",
+      "stock_photo_sources": [
+        "https://www.gettyimages.com/detail/photo/presidential-palace-high-angle-view-conakry-guinea-royalty-free-image/1314499799",
+        "https://www.istockphoto.com/photo/sekhoutoureah-presidential-palace-at-dusk-conakry-guinea-gm1314406566-402637410"
+      ]
+    },
+    "ministry_building": {
+      "name": "Government Ministry Building (modern)",
+      "note": "No freely licensed photo of a modern Guinea government ministry building found on Wikimedia Commons. The Palais du Peuple photos above can serve as the primary government building image. For ministry-specific images, recommend contacting the relevant government ministry or the Service-Public (service-public.gov.gn)."
+    }
+  },
+  "official_government_sources": {
+    "presidency": "https://presidence.gov.gn",
+    "government": "https://gouvernement.gov.gn",
+    "national_assembly": "https://www.assemblee.gov.gn",
+    "service_public": "https://service-public.gov.gn",
+    "prime_minister": "https://primature.gov.gn",
+    "cnt": "https://cnt.gov.gn"
+  },
+  "flag_specifications": {
+    "colors": {
+      "red": {"hex": "#CE1126", "rgb": [206, 17, 38], "symbolism": "Sacrifice / Labor / People's determination"},
+      "yellow": {"hex": "#FCD116", "rgb": [252, 209, 22], "symbolism": "Sun / Justice / Mineral wealth"},
+      "green": {"hex": "#009460", "rgb": [0, 148, 96], "symbolism": "Vegetation / Solidarity / Agricultural wealth"}
+    },
+    "orientation": "Vertical stripes (left to right: red, yellow, green)",
+    "proportions": "3:2 (width:height)",
+    "adopted": "November 10, 1958"
+  }
+}
