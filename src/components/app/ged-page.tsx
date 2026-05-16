@@ -8,8 +8,7 @@ import {
   Lock, Shield, Brain, Building2, Calendar, X, FolderOpen,
   CheckCircle2, Clock, AlertCircle, BookOpen, FileSignature,
   ScrollText, BarChart3, MapPin, Library, Mail, GitBranch, PenTool, UserCheck,
-  ChevronLeft, ChevronRight, AlertTriangle, FileImage, FileSpreadsheet, FileType, Paperclip,
-  RotateCcw
+  ChevronLeft, ChevronRight, AlertTriangle, FileImage, FileSpreadsheet, FileType, Paperclip
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -27,85 +26,82 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Label } from '@/components/ui/label'
 import { BRAND } from '@/lib/constants'
 import { useAppStore } from '@/store/app-store'
-import {
-  useGedStore,
-  type GedDocument,
-  type DocumentClassification,
-  type DocumentStatus,
-  type DocumentCategory,
-} from '@/store/ged-store'
 
-// ─── Display‑label mappings (store values → French UI labels) ────────────────
+type DocClassification = 'PUBLIC' | 'DIFFUSION LIMITÉE' | 'CONFIDENTIEL' | 'SECRET'
+type DocStatus = 'Signé' | 'En vigueur' | 'En cours' | 'Publié' | 'Diffusée' | 'Classé'
+type DocType = 'Décret' | 'Arrêté' | 'Circulaire' | 'Note de service' | 'Rapport' | 'Ordonnance'
 
-const CLASSIFICATION_LABELS: Record<DocumentClassification, string> = {
-  public: 'PUBLIC',
-  interne: 'DIFFUSION LIMITÉE',
-  confidentiel: 'CONFIDENTIEL',
-  secret: 'SECRET',
+interface Document {
+  id: string
+  reference: string
+  objet: string
+  type: DocType
+  institution: string
+  taille: string
+  classification: DocClassification
+  statut: DocStatus
+  date: string
+  fileName?: string
+  fileType?: string
+  fileData?: string
 }
 
-const STATUS_LABELS: Record<DocumentStatus, string> = {
-  brouillon: 'Brouillon',
-  en_cours: 'En cours',
-  valide: 'Validé',
-  archive: 'Archivé',
-  rejete: 'Rejeté',
-}
+const DOCUMENTS: Document[] = [
+  { id: '1', reference: 'D/2026/012/PRG/SGG', objet: 'Décret n°D/2026/012/PRG/SGG portant organisation du Ministère des Finances', type: 'Décret', institution: "Ministère de l'Économie et des Finances", taille: '2.4 MB', classification: 'PUBLIC', statut: 'Signé', date: '2026-01-15' },
+  { id: '2', reference: 'A/2026/045/MEF/CAB', objet: 'Arrêté n°A/2026/045/MEF/CAB fixant les modalités d\'exécution du budget 2026', type: 'Arrêté', institution: "Ministère de l'Économie et des Finances", taille: '1.8 MB', classification: 'PUBLIC', statut: 'En vigueur', date: '2026-01-20' },
+  { id: '3', reference: 'C/2026/003/PM/CAB', objet: 'Circulaire n°C/2026/003/PM/CAB relative à la généralisation de l\'administration électronique', type: 'Circulaire', institution: 'Primature', taille: '890 KB', classification: 'PUBLIC', statut: 'Diffusée', date: '2026-02-01' },
+  { id: '4', reference: 'NS/2026/089/MATD/SG', objet: 'Note de service n°NS/2026/089/MATD/SG relative à l\'organisation des élections locales', type: 'Note de service', institution: 'MATD', taille: '456 KB', classification: 'DIFFUSION LIMITÉE', statut: 'En cours', date: '2026-02-10' },
+  { id: '5', reference: 'R/2025/CC/ANN', objet: 'Rapport annuel 2025 — Cour des Comptes', type: 'Rapport', institution: 'Cour des Comptes', taille: '12.4 MB', classification: 'CONFIDENTIEL', statut: 'Classé', date: '2026-03-01' },
+  { id: '6', reference: 'D/2026/008/PRG/SGG', objet: 'Décret n°D/2026/008/PRG/SGG portant nomination des gouverneurs de région', type: 'Décret', institution: 'Présidence', taille: '1.2 MB', classification: 'PUBLIC', statut: 'Signé', date: '2026-01-25' },
+  { id: '7', reference: 'A/2026/112/MPTEN/CAB', objet: 'Arrêté n°A/2026/112/MPTEN/CAB portant attribution de fréquences radioélectriques', type: 'Arrêté', institution: 'MPTEN', taille: '678 KB', classification: 'PUBLIC', statut: 'Publié', date: '2026-02-15' },
+  { id: '8', reference: 'C/2026/007/MEF/CAB', objet: 'Circulaire n°C/2026/007/MEF/CAB sur les marchés publics 2026', type: 'Circulaire', institution: 'MEF', taille: '1.5 MB', classification: 'DIFFUSION LIMITÉE', statut: 'Diffusée', date: '2026-02-20' },
+  { id: '9', reference: 'D/2026/015/PRG/SGG', objet: 'Décret n°D/2026/015/PRG/SGG portant création de l\'Agence Nationale du Numérique', type: 'Décret', institution: 'Présidence', taille: '2.1 MB', classification: 'PUBLIC', statut: 'En vigueur', date: '2026-03-05' },
+  { id: '10', reference: 'NS/2026/134/MS/CAB', objet: 'Note de service n°NS/2026/134/MS/CAB — Campagne de vaccination COVID-19', type: 'Note de service', institution: 'Ministère de la Santé', taille: '320 KB', classification: 'PUBLIC', statut: 'En cours', date: '2026-03-10' },
+  { id: '11', reference: 'A/2026/078/MJ/CAB', objet: 'Arrêté n°A/2026/078/MJ/CAB portant organisation des tribunaux', type: 'Arrêté', institution: 'Ministère de la Justice', taille: '1.9 MB', classification: 'PUBLIC', statut: 'Signé', date: '2026-03-12' },
+  { id: '12', reference: 'R/2025/PND/T3', objet: 'Rapport de suivi PND — 3e trimestre 2025', type: 'Rapport', institution: 'Ministère du Plan', taille: '8.7 MB', classification: 'DIFFUSION LIMITÉE', statut: 'Diffusée', date: '2026-01-30' },
+  { id: '13', reference: 'C/2026/001/MFP/CAB', objet: 'Circulaire n°C/2026/001/MFP/CAB sur la réforme de la fonction publique', type: 'Circulaire', institution: 'MFP', taille: '950 KB', classification: 'PUBLIC', statut: 'En vigueur', date: '2026-01-08' },
+  { id: '14', reference: 'D/2025/198/PRG/SGG', objet: 'Décret n°D/2025/198/PRG/SGG portant budget général de l\'État 2026', type: 'Décret', institution: 'Présidence', taille: '15.3 MB', classification: 'CONFIDENTIEL', statut: 'Signé', date: '2025-12-20' },
+  { id: '15', reference: 'O/2026/003/PRG', objet: 'Ordonnance n°O/2026/003/PRG portant mesure d\'urgence économique', type: 'Ordonnance', institution: 'Présidence', taille: '3.2 MB', classification: 'DIFFUSION LIMITÉE', statut: 'En vigueur', date: '2026-02-28' },
+]
 
-const CATEGORY_LABELS: Record<DocumentCategory, string> = {
-  etat_civil: 'État civil',
-  justice: 'Justice',
-  identification: 'Identification',
-  urbanisme: 'Urbanisme',
-  entreprise: 'Entreprise',
-  education: 'Éducation',
-  sante: 'Santé',
-  residence: 'Résidence',
-  administratif: 'Administratif',
-  financier: 'Financier',
-}
-
-const ROLE_LABELS: Record<string, string> = {
-  super_admin: 'Primature',
-  admin_general: 'Présidence',
-  mairie: 'Mairie',
-  ministere: 'Ministère',
-  agence: 'Agence',
-}
-
-// ─── Visual config objects (keyed by store values) ────────────────────────────
-
-const CLASSIFICATION_CONFIG: Record<DocumentClassification, { color: string; icon: React.ElementType }> = {
-  public: { color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', icon: BookOpen },
-  interne: { color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: AlertCircle },
-  confidentiel: { color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', icon: Lock },
-  secret: { color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400', icon: Shield },
-}
-
-const STATUS_CONFIG: Record<DocumentStatus, { color: string; icon: React.ElementType }> = {
-  brouillon: { color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400', icon: FileText },
-  en_cours: { color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400', icon: Clock },
-  valide: { color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', icon: CheckCircle2 },
-  archive: { color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400', icon: Lock },
-  rejete: { color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', icon: AlertCircle },
-}
-
-// ─── Tab definitions (now based on DocumentCategory) ─────────────────────────
-
-const CATEGORY_TABS: { value: string; label: string; icon?: React.ElementType }[] = [
+const TYPE_TABS = [
   { value: 'tous', label: 'Tous' },
-  { value: 'administratif', label: 'Administratif' },
-  { value: 'financier', label: 'Financier' },
-  { value: 'etat_civil', label: 'État civil' },
-  { value: 'justice', label: 'Justice' },
-  { value: 'urbanisme', label: 'Urbanisme' },
-  { value: 'entreprise', label: 'Entreprise' },
-  { value: 'education', label: 'Éducation' },
-  { value: 'sante', label: 'Santé' },
+  { value: 'Décret', label: 'Décrets présidentiels' },
+  { value: 'Arrêté', label: 'Arrêtés ministériels' },
+  { value: 'Circulaire', label: 'Circulaires' },
+  { value: 'Note de service', label: 'Notes de service' },
+  { value: 'Rapport', label: 'Rapports officiels' },
   { value: 'confidentiel', label: 'Documents confidentiels', icon: Shield },
 ]
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+const CLASSIFICATION_CONFIG: Record<DocClassification, { color: string; icon: React.ElementType }> = {
+  'PUBLIC': { color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', icon: BookOpen },
+  'DIFFUSION LIMITÉE': { color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: AlertCircle },
+  'CONFIDENTIEL': { color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', icon: Lock },
+  'SECRET': { color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400', icon: Shield },
+}
+
+const STATUS_CONFIG: Record<DocStatus, { color: string; icon: React.ElementType }> = {
+  'Signé': { color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', icon: FileSignature },
+  'En vigueur': { color: 'bg-brand/10 text-brand dark:bg-primary/20 dark:text-primary', icon: CheckCircle2 },
+  'En cours': { color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400', icon: Clock },
+  'Publié': { color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400', icon: FileCheck },
+  'Diffusée': { color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400', icon: Archive },
+  'Classé': { color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400', icon: Lock },
+}
+
+const INSTITUTION_COUNTS = [
+  { name: 'Présidence', count: 4, color: 'bg-brand dark:bg-primary' },
+  { name: 'MEF', count: 3, color: 'bg-gold' },
+  { name: 'Primature', count: 1, color: 'bg-emerald-500' },
+  { name: 'MATD', count: 1, color: 'bg-sky-500' },
+  { name: 'Cour des Comptes', count: 1, color: 'bg-red-500' },
+  { name: 'MPTEN', count: 1, color: 'bg-violet-500' },
+  { name: 'Ministère de la Santé', count: 1, color: 'bg-teal-500' },
+  { name: 'Ministère de la Justice', count: 1, color: 'bg-orange-500' },
+  { name: 'Ministère du Plan', count: 1, color: 'bg-pink-500' },
+  { name: 'MFP', count: 1, color: 'bg-cyan-500' },
+]
 
 const REGIONS = [
   { value: 'toutes', label: 'Toutes les régions' },
@@ -119,92 +115,23 @@ const REGIONS = [
   { value: 'mamou', label: 'Mamou' },
 ]
 
-const SIDEBAR_COLORS = [
-  'bg-brand dark:bg-primary', 'bg-gold', 'bg-emerald-500', 'bg-sky-500',
-  'bg-red-500', 'bg-violet-500', 'bg-teal-500', 'bg-orange-500',
-  'bg-pink-500', 'bg-cyan-500',
-]
-
 const PAGE_SIZE = 10
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const formatFileSize = (bytes: number): string => {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
-const getFileIcon = (fileName: string) => {
-  const ext = fileName.split('.').pop()?.toLowerCase()
-  if (ext === 'pdf') return FileText
-  if (['doc', 'docx'].includes(ext || '')) return FileType
-  if (['xls', 'xlsx'].includes(ext || '')) return FileSpreadsheet
-  if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext || '')) return FileImage
-  return FileText
-}
-
-/** Derive a short official-looking reference from GedDocument data. */
-const getDocReference = (doc: GedDocument): string => {
-  const catPrefix: Record<DocumentCategory, string> = {
-    etat_civil: 'EC', justice: 'JU', identification: 'ID',
-    urbanisme: 'UR', entreprise: 'EN', education: 'ED',
-    sante: 'SA', residence: 'RE', administratif: 'AD', financier: 'FI',
-  }
-  const year = doc.createdAt.slice(0, 4)
-  const seq = doc.id.replace(/^(ged-demo-|ged-)/, '').padStart(3, '0').toUpperCase()
-  return `${catPrefix[doc.category]}/${year}/${seq}`
-}
-
-/** Get display institution from createdByRole. */
-const getInstitutionLabel = (doc: GedDocument): string =>
-  ROLE_LABELS[doc.createdByRole] || doc.createdByRole
-
-// ─── Component ────────────────────────────────────────────────────────────────
-
 export function GedPage() {
-  // ── Store ─────────────────────────────────────────────────────────────────
-  const store = useGedStore()
-  const {
-    addDocument,
-    updateDocument,
-    deleteDocument,
-    archiveDocument,
-    restoreDocument,
-    reclassifyDocument,
-    addTag,
-    removeTag,
-    setSearchQuery,
-    setFilterCategory,
-    setFilterClassification,
-    getFilteredDocuments,
-    getStats,
-    searchQuery,
-    filterCategory,
-    filterClassification,
-    documents,
-  } = store
-
-  // ── Local UI state ────────────────────────────────────────────────────────
+  const [search, setSearch] = useState('')
   const [activeTab, setActiveTab] = useState('tous')
+  const [classificationFilter, setClassificationFilter] = useState<string>('tous')
   const [institutionFilter, setInstitutionFilter] = useState<string>('tous')
   const [regionFilter, setRegionFilter] = useState<string>('toutes')
   const [dateFrom, setDateFrom] = useState<string>('')
   const [dateTo, setDateTo] = useState<string>('')
   const [showFilters, setShowFilters] = useState(false)
   const [uploadDialog, setUploadDialog] = useState(false)
+  const [documents, setDocuments] = useState(DOCUMENTS)
+  const [newDoc, setNewDoc] = useState({ objet: '', type: 'Note de service' as DocType, institution: '', classification: 'PUBLIC' as DocClassification })
   const [successToast, setSuccessToast] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const navigate = useAppStore((s) => s.navigate)
-
-  // Upload form state
-  const [newDoc, setNewDoc] = useState({
-    title: '',
-    description: '',
-    category: 'administratif' as DocumentCategory,
-    classification: 'public' as DocumentClassification,
-    createdByRole: 'admin_general',
-  })
 
   // File upload state
   const [uploadFile, setUploadFile] = useState<File | null>(null)
@@ -214,211 +141,42 @@ export function GedPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Dialog states
-  const [viewDoc, setViewDoc] = useState<GedDocument | null>(null)
-  const [reclassifyDoc, setReclassifyDoc] = useState<GedDocument | null>(null)
-  const [reclassifyValue, setReclassifyValue] = useState<DocumentClassification>('public')
-  const [deleteDoc, setDeleteDoc] = useState<GedDocument | null>(null)
+  const [viewDoc, setViewDoc] = useState<Document | null>(null)
+  const [reclassifyDoc, setReclassifyDoc] = useState<Document | null>(null)
+  const [reclassifyValue, setReclassifyValue] = useState<DocClassification>('PUBLIC')
+  const [deleteDoc, setDeleteDoc] = useState<Document | null>(null)
   const [exportDialog, setExportDialog] = useState(false)
-  const [newTagDoc, setNewTagDoc] = useState<GedDocument | null>(null)
-  const [newTagValue, setNewTagValue] = useState('')
 
-  // ── Toast helper ──────────────────────────────────────────────────────────
-  const showToast = useCallback((msg: string) => {
+  const showToast = (msg: string) => {
     setSuccessToast(msg)
     setTimeout(() => setSuccessToast(''), 4000)
-  }, [])
-
-  // ── Sync tab → store filterCategory ──────────────────────────────────────
-  const handleTabChange = useCallback((tab: string) => {
-    setActiveTab(tab)
-    setCurrentPage(1)
-    if (tab === 'tous' || tab === 'confidentiel') {
-      setFilterCategory('all')
-    } else {
-      setFilterCategory(tab as DocumentCategory)
-    }
-  }, [setFilterCategory])
-
-  // ── Store-based filtered docs, then apply local filters ──────────────────
-  const storeFiltered = useMemo(() => getFilteredDocuments(), [documents, searchQuery, filterCategory, filterClassification])
-
-  const filteredDocs = useMemo(() => {
-    return storeFiltered.filter(doc => {
-      // Tab filter: "confidentiel" tab shows confidentiel + secret only
-      if (activeTab === 'confidentiel') {
-        if (doc.classification !== 'confidentiel' && doc.classification !== 'secret') return false
-      }
-      // Institution / role filter
-      if (institutionFilter !== 'tous') {
-        if (getInstitutionLabel(doc) !== institutionFilter) return false
-      }
-      // Date range filter
-      const docDate = doc.createdAt.slice(0, 10)
-      if (dateFrom && docDate < dateFrom) return false
-      if (dateTo && docDate > dateTo) return false
-      return true
-    })
-  }, [storeFiltered, activeTab, institutionFilter, dateFrom, dateTo])
-
-  // ── Pagination ───────────────────────────────────────────────────────────
-  const totalPages = Math.max(1, Math.ceil(filteredDocs.length / PAGE_SIZE))
-  const paginatedDocs = filteredDocs.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
-
-  const handleFilterChange = (setter: (v: string) => void) => (value: string) => {
-    setter(value)
-    setCurrentPage(1)
   }
 
-  const handleSearchChange = (value: string) => {
-    setSearchQuery(value)
-    setCurrentPage(1)
+  // File type icon helper
+  const getFileIcon = (fileName: string) => {
+    const ext = fileName.split('.').pop()?.toLowerCase()
+    if (ext === 'pdf') return FileText
+    if (['doc', 'docx'].includes(ext || '')) return FileType
+    if (['xls', 'xlsx'].includes(ext || '')) return FileSpreadsheet
+    if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext || '')) return FileImage
+    return FileText
   }
 
-  const handleClassificationFilterChange = (value: string) => {
-    setFilterClassification(value === 'tous' ? 'all' : (value as DocumentClassification))
-    setCurrentPage(1)
+  // Format file size
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
-  // ── Stats from store ─────────────────────────────────────────────────────
-  const storeStats = useMemo(() => getStats(), [documents])
-
-  const stats = useMemo(() => {
-    const confidentialCount = documents.filter(d => d.classification === 'confidentiel' || d.classification === 'secret').length
-    const totalSizeMB = storeStats.totalSize / (1024 * 1024)
-    const digitizationRate = storeStats.total > 0 ? Math.min(100, (storeStats.byStatus.valide / storeStats.total) * 100) : 0
-    return [
-      { label: 'Documents officiels', value: storeStats.total.toLocaleString('fr-FR'), icon: FileText, color: 'text-brand dark:text-primary', bg: 'bg-brand/5 dark:bg-primary/10' },
-      { label: 'Catégories actives', value: String(Object.keys(storeStats.byCategory).length), icon: ScrollText, color: 'text-gold dark:text-gold', bg: 'bg-gold/5 dark:bg-gold/10' },
-      { label: 'Documents validés', value: storeStats.byStatus.valide.toLocaleString('fr-FR'), icon: BookOpen, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-900/20' },
-      { label: 'Documents confidentiels', value: confidentialCount.toLocaleString('fr-FR'), icon: Lock, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/20' },
-      { label: 'En cours de traitement', value: storeStats.byStatus.en_cours.toLocaleString('fr-FR'), icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
-      { label: 'Taux de validation', value: `${digitizationRate.toFixed(1)}%`, icon: BarChart3, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20', isProgress: true, progressValue: digitizationRate },
-    ]
-  }, [storeStats, documents])
-
-  // ── File upload ──────────────────────────────────────────────────────────
-  const handleFileSelect = useCallback((file: File) => {
-    const allowedTypes = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'image/png',
-      'image/jpeg',
-      'image/jpg',
-    ]
-    if (!allowedTypes.includes(file.type) && !file.name.match(/\.(pdf|doc|docx|xls|xlsx|png|jpg|jpeg)$/i)) {
-      showToast('Format de fichier non supporté. Utilisez PDF, DOC, DOCX, XLS, XLSX, PNG ou JPG.')
-      return
-    }
-    setUploadFile(file)
-    setUploadProgress(0)
-  }, [showToast])
-
-  const handleDrag = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true)
-    } else if (e.type === 'dragleave') {
-      setDragActive(false)
-    }
-  }, [])
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragActive(false)
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileSelect(e.dataTransfer.files[0])
-    }
-  }, [handleFileSelect])
-
-  const uploadDocument = () => {
-    if (!newDoc.title) return
-
-    if (uploadFile) {
-      setIsUploading(true)
-      setUploadProgress(0)
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval)
-            return 90
-          }
-          return prev + Math.random() * 20
-        })
-      }, 200)
-
-      const reader = new FileReader()
-      reader.onload = () => {
-        clearInterval(progressInterval)
-        setUploadProgress(100)
-        const base64Data = reader.result as string
-        setTimeout(() => {
-          const created = addDocument({
-            title: newDoc.title,
-            description: newDoc.description || newDoc.title,
-            category: newDoc.category,
-            classification: newDoc.classification,
-            status: 'en_cours',
-            fileName: uploadFile.name,
-            fileType: uploadFile.type || 'application/octet-stream',
-            fileSize: uploadFile.size,
-            fileData: base64Data,
-            createdBy: 'Utilisateur connecté',
-            createdByRole: newDoc.createdByRole,
-            tags: [],
-          })
-          setNewDoc({ title: '', description: '', category: 'administratif', classification: 'public', createdByRole: 'admin_general' })
-          setUploadFile(null)
-          setUploadProgress(0)
-          setIsUploading(false)
-          setUploadDialog(false)
-          showToast(`Document ${getDocReference(created)} importé avec succès (${uploadFile.name})`)
-        }, 400)
-      }
-      reader.readAsDataURL(uploadFile)
-    } else {
-      const created = addDocument({
-        title: newDoc.title,
-        description: newDoc.description || newDoc.title,
-        category: newDoc.category,
-        classification: newDoc.classification,
-        status: 'en_cours',
-        fileName: 'document-sans-fichier.pdf',
-        fileType: 'application/pdf',
-        fileSize: 0,
-        createdBy: 'Utilisateur connecté',
-        createdByRole: newDoc.createdByRole,
-        tags: [],
-      })
-      setNewDoc({ title: '', description: '', category: 'administratif', classification: 'public', createdByRole: 'admin_general' })
-      setUploadDialog(false)
-      showToast(`Document ${getDocReference(created)} importé avec succès`)
-    }
-  }
-
-  // ── Dropdown actions ─────────────────────────────────────────────────────
-  const handleConsulter = (doc: GedDocument) => {
-    setViewDoc(doc)
-  }
-
-  const generateOfficialDocument = (doc: GedDocument): string => {
-    const ref = getDocReference(doc)
-    const institution = getInstitutionLabel(doc)
-    const classLabel = CLASSIFICATION_LABELS[doc.classification]
-    const statusLabel = STATUS_LABELS[doc.status]
-    const catLabel = CATEGORY_LABELS[doc.category]
-    const dateStr = doc.createdAt.slice(0, 10)
-
+  // Generate official Republic of Guinea HTML document
+  const generateOfficialDocument = (doc: Document): string => {
     return `<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${catLabel} n°${ref} — République de Guinée</title>
+  <title>${doc.type} n°${doc.reference} — République de Guinée</title>
   <style>
     @page { size: A4; margin: 2cm; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -458,50 +216,194 @@ export function GedPage() {
   <div class="header">
     <h1>République de Guinée</h1>
     <div class="motto">Travail — Justice — Solidarité</div>
-    <div class="institution">${institution}</div>
+    <div class="institution">${doc.institution}</div>
   </div>
   <div class="doc-title">
-    <h2>${catLabel}</h2>
-    <div class="ref">n°${ref}</div>
+    <h2>${doc.type}</h2>
+    <div class="ref">n°${doc.reference}</div>
   </div>
   <div class="content">
-    <p><strong>${doc.title}</strong></p>
+    <p><strong>${doc.objet}</strong></p>
     <p>Conformément aux dispositions constitutionnelles et aux textes réglementaires en vigueur en République de Guinée, le présent document est émis pour pleine et entière application par l'institution susvisée et tous les services concernés.</p>
-    <p>Les mesures prévues par le présent ${catLabel.toLowerCase()} entrent en vigueur à compter de la date de sa signature. Tous les ministères, institutions et organismes concernés sont tenus de veiller à sa stricte application dans les meilleurs délais.</p>
-    <p>Le présent ${catLabel.toLowerCase()} sera publié au Journal Officiel de la République de Guinée et notifié à toutes les parties prenantes concernées.</p>
+    <p>Les mesures prévues par le présent ${doc.type.toLowerCase()} entrent en vigueur à compter de la date de sa signature. Tous les ministères, institutions et organismes concernés sont tenus de veiller à sa stricte application dans les meilleurs délais.</p>
+    <p>Le présent ${doc.type.toLowerCase()} sera publié au Journal Officiel de la République de Guinée et notifié à toutes les parties prenantes concernées.</p>
   </div>
   <div class="metadata">
-    <div><span class="label">Classification :</span> <span class="value">${classLabel}</span></div>
-    <div><span class="label">Statut :</span> <span class="value">${statusLabel}</span></div>
-    <div><span class="label">Catégorie :</span> <span class="value">${catLabel}</span></div>
-    <div><span class="label">Date :</span> <span class="value">${dateStr}</span></div>
+    <div><span class="label">Classification :</span> <span class="value">${doc.classification}</span></div>
+    <div><span class="label">Statut :</span> <span class="value">${doc.statut}</span></div>
+    <div><span class="label">Type :</span> <span class="value">${doc.type}</span></div>
+    <div><span class="label">Date :</span> <span class="value">${doc.date}</span></div>
   </div>
   <div style="text-align: center;">
-    <div class="classification">${classLabel}</div>
+    <div class="classification">${doc.classification}</div>
   </div>
   <div class="signature">
-    <div class="date">Fait à Conakry, le ${dateStr}</div>
-    <div class="signataire">${institution}</div>
+    <div class="date">Fait à Conakry, le ${doc.date}</div>
+    <div class="signataire">${doc.institution}</div>
     <div class="line"></div>
     <div class="label-sign">Signature & Cachet officiel</div>
   </div>
   <div class="footer">
-    Ce document est généré par le système eAdministration Suite de la République de Guinée — ${ref} — ${new Date().toLocaleDateString('fr-FR')}
+    Ce document est généré par le système eAdministration Suite de la République de Guinée — ${doc.reference} — ${new Date().toLocaleDateString('fr-FR')}
   </div>
 </body>
 </html>`
   }
 
-  const handleTelecharger = (doc: GedDocument) => {
-    const ref = getDocReference(doc)
-    showToast(`Téléchargement de ${ref} en cours...`)
+  // Handle file selection
+  const handleFileSelect = useCallback((file: File) => {
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
+    ]
+    if (!allowedTypes.includes(file.type) && !file.name.match(/\.(pdf|doc|docx|xls|xlsx|png|jpg|jpeg)$/i)) {
+      showToast('Format de fichier non supporté. Utilisez PDF, DOC, DOCX, XLS, XLSX, PNG ou JPG.')
+      return
+    }
+    setUploadFile(file)
+    setUploadProgress(0)
+  }, [showToast])
+
+  // Drag and drop handlers
+  const handleDrag = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true)
+    } else if (e.type === 'dragleave') {
+      setDragActive(false)
+    }
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragActive(false)
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFileSelect(e.dataTransfer.files[0])
+    }
+  }, [handleFileSelect])
+
+  const uploadDocument = () => {
+    if (!newDoc.objet || !newDoc.institution) return
+    const id = String(documents.length + 1)
+    const ref = `NS/2026/${134 + documents.length}/NEW/SG`
+
+    if (uploadFile) {
+      setIsUploading(true)
+      setUploadProgress(0)
+      // Simulate upload progress
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval)
+            return 90
+          }
+          return prev + Math.random() * 20
+        })
+      }, 200)
+
+      const reader = new FileReader()
+      reader.onload = () => {
+        clearInterval(progressInterval)
+        setUploadProgress(100)
+        const base64Data = reader.result as string
+        const created: Document = {
+          id,
+          reference: ref,
+          objet: newDoc.objet,
+          type: newDoc.type,
+          institution: newDoc.institution,
+          taille: formatFileSize(uploadFile.size),
+          classification: newDoc.classification,
+          statut: 'En cours',
+          date: new Date().toISOString().slice(0, 10),
+          fileName: uploadFile.name,
+          fileType: uploadFile.type,
+          fileData: base64Data,
+        }
+        setTimeout(() => {
+          setDocuments(prev => [created, ...prev])
+          setNewDoc({ objet: '', type: 'Note de service', institution: '', classification: 'PUBLIC' })
+          setUploadFile(null)
+          setUploadProgress(0)
+          setIsUploading(false)
+          setUploadDialog(false)
+          showToast(`Document ${ref} importé avec succès (${uploadFile.name})`)
+        }, 400)
+      }
+      reader.readAsDataURL(uploadFile)
+    } else {
+      const created: Document = {
+        id,
+        reference: ref,
+        objet: newDoc.objet,
+        type: newDoc.type,
+        institution: newDoc.institution,
+        taille: '256 KB',
+        classification: newDoc.classification,
+        statut: 'En cours',
+        date: new Date().toISOString().slice(0, 10),
+      }
+      setDocuments(prev => [created, ...prev])
+      setNewDoc({ objet: '', type: 'Note de service', institution: '', classification: 'PUBLIC' })
+      setUploadDialog(false)
+      showToast(`Document ${ref} importé avec succès`)
+    }
+  }
+
+  // Filtered documents with all filters applied
+  const filteredDocs = useMemo(() => {
+    return documents.filter(doc => {
+      const matchSearch = doc.objet.toLowerCase().includes(search.toLowerCase()) ||
+        doc.reference.toLowerCase().includes(search.toLowerCase()) ||
+        doc.institution.toLowerCase().includes(search.toLowerCase())
+      const matchTab = activeTab === 'tous' ||
+        (activeTab === 'confidentiel' && (doc.classification === 'CONFIDENTIEL' || doc.classification === 'SECRET')) ||
+        (activeTab !== 'confidentiel' && doc.type === activeTab)
+      const matchClassification = classificationFilter === 'tous' || doc.classification === classificationFilter
+      const matchInstitution = institutionFilter === 'tous' || doc.institution === institutionFilter
+      const matchDateFrom = !dateFrom || doc.date >= dateFrom
+      const matchDateTo = !dateTo || doc.date <= dateTo
+      return matchSearch && matchTab && matchClassification && matchInstitution && matchDateFrom && matchDateTo
+    })
+  }, [documents, search, activeTab, classificationFilter, institutionFilter, dateFrom, dateTo])
+
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(filteredDocs.length / PAGE_SIZE))
+  const paginatedDocs = filteredDocs.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  // Reset to page 1 when filters change
+  const handleFilterChange = (setter: (v: string) => void) => (value: string) => {
+    setter(value)
+    setCurrentPage(1)
+  }
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value)
+    setCurrentPage(1)
+  }
+
+  // Dropdown actions
+  const handleConsulter = (doc: Document) => {
+    setViewDoc(doc)
+  }
+
+  const handleTelecharger = (doc: Document) => {
+    showToast(`Téléchargement de ${doc.reference} en cours...`)
     setTimeout(() => {
       const htmlContent = generateOfficialDocument(doc)
       const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${ref.replace(/\//g, '-')}.html`
+      a.download = `${doc.reference.replace(/\//g, '-')}.html`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -509,7 +411,8 @@ export function GedPage() {
     }, 600)
   }
 
-  const handleDownloadOriginal = (doc: GedDocument) => {
+  // Download original uploaded file
+  const handleDownloadOriginal = (doc: Document) => {
     if (!doc.fileData || !doc.fileName) return
     const a = document.createElement('a')
     a.href = doc.fileData
@@ -520,66 +423,68 @@ export function GedPage() {
     showToast(`Fichier original ${doc.fileName} téléchargé`)
   }
 
-  const handleArchiver = (doc: GedDocument) => {
-    archiveDocument(doc.id, 'Archivage depuis la GED')
-    showToast(`Document ${getDocReference(doc)} archivé avec succès`)
+  const handleArchiver = (doc: Document) => {
+    setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, statut: 'Classé' as DocStatus } : d))
+    showToast(`Document ${doc.reference} archivé avec succès`)
   }
 
-  const handleRestaurer = (doc: GedDocument) => {
-    restoreDocument(doc.id)
-    showToast(`Document ${getDocReference(doc)} restauré avec succès`)
-  }
-
-  const handleReclassifier = (doc: GedDocument) => {
+  const handleReclassifier = (doc: Document) => {
     setReclassifyDoc(doc)
     setReclassifyValue(doc.classification)
   }
 
   const confirmReclassify = () => {
     if (!reclassifyDoc) return
-    reclassifyDocument(reclassifyDoc.id, reclassifyValue)
-    showToast(`Document ${getDocReference(reclassifyDoc)} reclassifié en ${CLASSIFICATION_LABELS[reclassifyValue]}`)
+    setDocuments(prev => prev.map(d => d.id === reclassifyDoc.id ? { ...d, classification: reclassifyValue } : d))
+    showToast(`Document ${reclassifyDoc.reference} reclassifié en ${reclassifyValue}`)
     setReclassifyDoc(null)
   }
 
-  const handleSupprimer = (doc: GedDocument) => {
+  const handleSupprimer = (doc: Document) => {
     setDeleteDoc(doc)
   }
 
   const confirmDelete = () => {
     if (!deleteDoc) return
-    const ref = getDocReference(deleteDoc)
-    deleteDocument(deleteDoc.id)
-    showToast(`Document ${ref} supprimé`)
+    setDocuments(prev => prev.filter(d => d.id !== deleteDoc.id))
+    showToast(`Document ${deleteDoc.reference} supprimé`)
     setDeleteDoc(null)
   }
 
-  // ── AI Classification (demo) ─────────────────────────────────────────────
+  // AI Classification
   const handleAiClassification = () => {
-    const classifications: DocumentClassification[] = ['public', 'interne', 'confidentiel', 'secret']
-    const nonSecretDocs = documents.filter(d => d.classification === 'public' || d.classification === 'interne')
-    const count = Math.min(Math.floor(Math.random() * 3) + 1, nonSecretDocs.length)
+    const classifications: DocClassification[] = ['PUBLIC', 'DIFFUSION LIMITÉE', 'CONFIDENTIEL', 'SECRET']
+    const nonPublicDocs = documents.filter(d => d.classification === 'PUBLIC' || d.classification === 'DIFFUSION LIMITÉE')
+    const count = Math.min(Math.floor(Math.random() * 3) + 1, nonPublicDocs.length)
     const indicesToReclassify = new Set<number>()
     while (indicesToReclassify.size < count) {
-      indicesToReclassify.add(Math.floor(Math.random() * nonSecretDocs.length))
+      indicesToReclassify.add(Math.floor(Math.random() * nonPublicDocs.length))
     }
-    Array.from(indicesToReclassify).forEach(i => {
-      const newClass = classifications[Math.floor(Math.random() * classifications.length)]
-      reclassifyDocument(nonSecretDocs[i].id, newClass)
-    })
+    const idsToReclassify = new Set(Array.from(indicesToReclassify).map(i => nonPublicDocs[i].id))
+    setDocuments(prev => prev.map(d => {
+      if (idsToReclassify.has(d.id)) {
+        const newClass = classifications[Math.floor(Math.random() * classifications.length)]
+        return { ...d, classification: newClass }
+      }
+      return d
+    }))
     showToast(`${count} documents reclassifiés par l'IA`)
   }
 
-  // ── Export ────────────────────────────────────────────────────────────────
-  const handleExport = () => setExportDialog(true)
+  // Export to National Archives
+  const handleExport = () => {
+    setExportDialog(true)
+  }
+
   const confirmExport = () => {
-    showToast(`${filteredDocs.length} documents exportés vers les Archives Nationales`)
+    const count = filteredDocs.length
+    showToast(`${count} documents exportés vers les Archives Nationales`)
     setExportDialog(false)
   }
 
-  // ── Reset filters ─────────────────────────────────────────────────────────
+  // Reset filters
   const resetFilters = () => {
-    setFilterClassification('all')
+    setClassificationFilter('tous')
     setInstitutionFilter('tous')
     setRegionFilter('toutes')
     setDateFrom('')
@@ -587,30 +492,28 @@ export function GedPage() {
     setCurrentPage(1)
   }
 
-  const hasActiveFilters = filterClassification !== 'all' || institutionFilter !== 'tous' || regionFilter !== 'toutes' || dateFrom !== '' || dateTo !== ''
+  const hasActiveFilters = classificationFilter !== 'tous' || institutionFilter !== 'tous' || regionFilter !== 'toutes' || dateFrom !== '' || dateTo !== ''
 
-  const uniqueInstitutions = useMemo(() => [...new Set(documents.map(d => getInstitutionLabel(d)))], [documents])
+  const uniqueInstitutions = [...new Set(DOCUMENTS.map(d => d.institution))]
 
-  // ── Sidebar: institution counts ──────────────────────────────────────────
-  const institutionCounts = useMemo(() => {
-    const counts: Record<string, number> = {}
-    documents.forEach(d => {
-      const inst = getInstitutionLabel(d)
-      counts[inst] = (counts[inst] || 0) + 1
-    })
-    return Object.entries(counts)
-      .sort((a, b) => b[1] - a[1])
-      .map(([name, count], i) => ({ name, count, color: SIDEBAR_COLORS[i % SIDEBAR_COLORS.length] }))
-  }, [documents])
+  const stats = [
+    { label: 'Documents officiels', value: '87 450', icon: FileText, color: 'text-brand dark:text-primary', bg: 'bg-brand/5 dark:bg-primary/10' },
+    { label: 'Décrets & arrêtés', value: '4 230', icon: ScrollText, color: 'text-gold dark:text-gold', bg: 'bg-gold/5 dark:bg-gold/10' },
+    { label: 'Circulaires & notes', value: '12 870', icon: BookOpen, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-900/20' },
+    { label: 'Documents confidentiels', value: '1 340', icon: Lock, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/20' },
+    { label: 'En cours de traitement', value: '2 150', icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+    { label: 'Taux de numérisation', value: '78.3%', icon: BarChart3, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20', isProgress: true, progressValue: 78.3 },
+  ]
 
-  // ── Pagination helper ────────────────────────────────────────────────────
+  // Generate page numbers for pagination
   const getPageNumbers = () => {
     const pages: number[] = []
-    for (let i = 1; i <= totalPages; i++) pages.push(i)
+    for (let i = 1; i <= totalPages; i++) {
+      pages.push(i)
+    }
     return pages
   }
 
-  // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -686,13 +589,13 @@ export function GedPage() {
         </Card>
       </motion.div>
 
-      {/* Document Category Tabs */}
+      {/* Document Type Tabs */}
       <Card>
         <CardContent className="p-4">
-          <Tabs value={activeTab} onValueChange={handleTabChange}>
+          <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setCurrentPage(1) }}>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
               <TabsList className="flex-wrap h-auto gap-1 bg-muted/50 p-1">
-                {CATEGORY_TABS.map(tab => (
+                {TYPE_TABS.map(tab => (
                   <TabsTrigger key={tab.value} value={tab.value} className="gap-1.5 text-xs data-[state=active]:bg-brand data-[state=active]:text-white dark:data-[state=active]:bg-primary">
                     {tab.icon && <tab.icon className="h-3 w-3" />}
                     {tab.label}
@@ -716,8 +619,8 @@ export function GedPage() {
               <div className="relative flex-1 w-full">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Rechercher par titre, description, fichier, catégorie..."
-                  value={searchQuery}
+                  placeholder="Rechercher par référence, objet, institution..."
+                  value={search}
                   onChange={e => handleSearchChange(e.target.value)}
                   className="pl-10"
                 />
@@ -747,22 +650,22 @@ export function GedPage() {
                   className="overflow-hidden"
                 >
                   <div className="flex flex-wrap gap-3 pt-3 mt-3 border-t">
-                    <Select value={filterClassification === 'all' ? 'tous' : filterClassification} onValueChange={handleClassificationFilterChange}>
-                      <SelectTrigger className="w-full sm:w-[220px]">
+                    <Select value={classificationFilter} onValueChange={handleFilterChange(setClassificationFilter)}>
+                      <SelectTrigger className="w-[200px]">
                         <Shield className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
                         <SelectValue placeholder="Classification" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="tous">Toutes classifications</SelectItem>
-                        <SelectItem value="public">PUBLIC</SelectItem>
-                        <SelectItem value="interne">DIFFUSION LIMITÉE</SelectItem>
-                        <SelectItem value="confidentiel">CONFIDENTIEL</SelectItem>
-                        <SelectItem value="secret">SECRET</SelectItem>
+                        <SelectItem value="PUBLIC">PUBLIC</SelectItem>
+                        <SelectItem value="DIFFUSION LIMITÉE">DIFFUSION LIMITÉE</SelectItem>
+                        <SelectItem value="CONFIDENTIEL">CONFIDENTIEL</SelectItem>
+                        <SelectItem value="SECRET">SECRET</SelectItem>
                       </SelectContent>
                     </Select>
 
                     <Select value={institutionFilter} onValueChange={handleFilterChange(setInstitutionFilter)}>
-                      <SelectTrigger className="w-full sm:w-[220px]">
+                      <SelectTrigger className="w-[220px]">
                         <Building2 className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
                         <SelectValue placeholder="Institution" />
                       </SelectTrigger>
@@ -775,7 +678,7 @@ export function GedPage() {
                     </Select>
 
                     <Select value={regionFilter} onValueChange={handleFilterChange(setRegionFilter)}>
-                      <SelectTrigger className="w-full sm:w-[160px]">
+                      <SelectTrigger className="w-[160px]">
                         <MapPin className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
                         <SelectValue placeholder="Région" />
                       </SelectTrigger>
@@ -786,8 +689,8 @@ export function GedPage() {
                       </SelectContent>
                     </Select>
 
-                    <Input type="date" className="w-full sm:w-[160px]" placeholder="Date début" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setCurrentPage(1) }} />
-                    <Input type="date" className="w-full sm:w-[160px]" placeholder="Date fin" value={dateTo} onChange={e => { setDateTo(e.target.value); setCurrentPage(1) }} />
+                    <Input type="date" className="w-[160px]" placeholder="Date début" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setCurrentPage(1) }} />
+                    <Input type="date" className="w-[160px]" placeholder="Date fin" value={dateTo} onChange={e => { setDateTo(e.target.value); setCurrentPage(1) }} />
 
                     {hasActiveFilters && (
                       <Button variant="ghost" size="sm" onClick={resetFilters}>
@@ -814,8 +717,8 @@ export function GedPage() {
                   <TableHeader>
                     <TableRow className="bg-muted/30">
                       <TableHead className="text-xs font-semibold">Référence</TableHead>
-                      <TableHead className="text-xs font-semibold min-w-[300px]">Titre</TableHead>
-                      <TableHead className="text-xs font-semibold">Catégorie</TableHead>
+                      <TableHead className="text-xs font-semibold min-w-[300px]">Objet</TableHead>
+                      <TableHead className="text-xs font-semibold">Type</TableHead>
                       <TableHead className="text-xs font-semibold hidden lg:table-cell">Institution</TableHead>
                       <TableHead className="text-xs font-semibold hidden md:table-cell">Taille</TableHead>
                       <TableHead className="text-xs font-semibold">Classification</TableHead>
@@ -834,10 +737,9 @@ export function GedPage() {
                     ) : (
                       paginatedDocs.map((doc, i) => {
                         const classConfig = CLASSIFICATION_CONFIG[doc.classification]
-                        const statusConfig = STATUS_CONFIG[doc.status]
+                        const statusConfig = STATUS_CONFIG[doc.statut]
                         const ClassIcon = classConfig.icon
                         const StatusIcon = statusConfig.icon
-                        const ref = getDocReference(doc)
                         return (
                           <motion.tr
                             key={doc.id}
@@ -847,36 +749,36 @@ export function GedPage() {
                             className="hover:bg-muted/50 transition-colors group"
                           >
                             <TableCell>
-                              <span className="font-mono text-xs font-medium text-brand dark:text-primary">{ref}</span>
+                              <span className="font-mono text-xs font-medium text-brand dark:text-primary">{doc.reference}</span>
                             </TableCell>
                             <TableCell>
                               <div className="flex items-start gap-2">
                                 <FileText className="h-4 w-4 text-brand dark:text-primary shrink-0 mt-0.5" />
-                                <span className="text-sm leading-tight line-clamp-2">{doc.title}</span>
+                                <span className="text-sm leading-tight line-clamp-2">{doc.objet}</span>
                               </div>
                             </TableCell>
                             <TableCell>
-                              <Badge variant="outline" className="text-[10px] font-medium">{CATEGORY_LABELS[doc.category]}</Badge>
+                              <Badge variant="outline" className="text-[10px] font-medium">{doc.type}</Badge>
                             </TableCell>
                             <TableCell className="hidden lg:table-cell">
                               <div className="flex items-center gap-1.5">
                                 <Building2 className="h-3 w-3 text-muted-foreground shrink-0" />
-                                <span className="text-xs text-muted-foreground truncate max-w-[150px]">{getInstitutionLabel(doc)}</span>
+                                <span className="text-xs text-muted-foreground truncate max-w-[150px]">{doc.institution}</span>
                               </div>
                             </TableCell>
                             <TableCell className="hidden md:table-cell">
-                              <span className="text-xs text-muted-foreground">{formatFileSize(doc.fileSize)}</span>
+                              <span className="text-xs text-muted-foreground">{doc.taille}</span>
                             </TableCell>
                             <TableCell>
                               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${classConfig.color}`}>
                                 <ClassIcon className="h-3 w-3" />
-                                {CLASSIFICATION_LABELS[doc.classification]}
+                                {doc.classification}
                               </span>
                             </TableCell>
                             <TableCell>
                               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${statusConfig.color}`}>
                                 <StatusIcon className="h-3 w-3" />
-                                {STATUS_LABELS[doc.status]}
+                                {doc.statut}
                               </span>
                             </TableCell>
                             <TableCell>
@@ -893,15 +795,9 @@ export function GedPage() {
                                   <DropdownMenuItem className="gap-2" onClick={() => handleTelecharger(doc)}>
                                     <Download className="h-4 w-4" /> Télécharger
                                   </DropdownMenuItem>
-                                  {doc.status === 'archive' ? (
-                                    <DropdownMenuItem className="gap-2" onClick={() => handleRestaurer(doc)}>
-                                      <RotateCcw className="h-4 w-4" /> Restaurer
-                                    </DropdownMenuItem>
-                                  ) : (
-                                    <DropdownMenuItem className="gap-2" onClick={() => handleArchiver(doc)}>
-                                      <Archive className="h-4 w-4" /> Archiver
-                                    </DropdownMenuItem>
-                                  )}
+                                  <DropdownMenuItem className="gap-2" onClick={() => handleArchiver(doc)}>
+                                    <Archive className="h-4 w-4" /> Archiver
+                                  </DropdownMenuItem>
                                   <DropdownMenuItem className="gap-2" onClick={() => handleReclassifier(doc)}>
                                     <Tag className="h-4 w-4" /> Reclassifier
                                   </DropdownMenuItem>
@@ -973,8 +869,8 @@ export function GedPage() {
               <CardDescription className="text-xs">Répartition des documents officiels</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              {institutionCounts.map(inst => {
-                const maxCount = Math.max(...institutionCounts.map(i => i.count))
+              {INSTITUTION_COUNTS.map(inst => {
+                const maxCount = Math.max(...INSTITUTION_COUNTS.map(i => i.count))
                 const pct = (inst.count / maxCount) * 100
                 return (
                   <div key={inst.name} className="space-y-1">
@@ -1009,14 +905,14 @@ export function GedPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {(['public', 'interne', 'confidentiel', 'secret'] as DocumentClassification[]).map(cls => {
+              {(['PUBLIC', 'DIFFUSION LIMITÉE', 'CONFIDENTIEL', 'SECRET'] as DocClassification[]).map(cls => {
                 const count = documents.filter(d => d.classification === cls).length
                 const config = CLASSIFICATION_CONFIG[cls]
                 return (
                   <div key={cls} className="flex items-center justify-between p-2 rounded-lg bg-muted/30">
                     <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${config.color} px-2 py-0.5 rounded-full`}>
                       <config.icon className="h-3 w-3" />
-                      {CLASSIFICATION_LABELS[cls]}
+                      {cls}
                     </span>
                     <span className="text-xs font-bold">{count}</span>
                   </div>
@@ -1044,7 +940,7 @@ export function GedPage() {
 
       {/* Upload Document Dialog */}
       <Dialog open={uploadDialog} onOpenChange={(open) => { setUploadDialog(open); if (!open) { setUploadFile(null); setUploadProgress(0); setIsUploading(false) } }}>
-        <DialogContent className="max-w-[95vw] sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Upload className="h-5 w-5 text-brand dark:text-primary" />
@@ -1119,61 +1015,53 @@ export function GedPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Titre du document</Label>
+              <Label>Objet du document</Label>
               <Input
                 placeholder="Ex: Décret n°D/2026/... portant organisation..."
-                value={newDoc.title}
-                onChange={e => setNewDoc(prev => ({ ...prev, title: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Description</Label>
-              <Input
-                placeholder="Description courte du document..."
-                value={newDoc.description}
-                onChange={e => setNewDoc(prev => ({ ...prev, description: e.target.value }))}
+                value={newDoc.objet}
+                onChange={e => setNewDoc(prev => ({ ...prev, objet: e.target.value }))}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Catégorie</Label>
-                <Select value={newDoc.category} onValueChange={(v) => setNewDoc(prev => ({ ...prev, category: v as DocumentCategory }))}>
+                <Label>Type de document</Label>
+                <Select value={newDoc.type} onValueChange={(v) => setNewDoc(prev => ({ ...prev, type: v as DocType }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {(Object.entries(CATEGORY_LABELS) as [DocumentCategory, string][]).map(([key, label]) => (
-                      <SelectItem key={key} value={key}>{label}</SelectItem>
-                    ))}
+                    <SelectItem value="Décret">Décret</SelectItem>
+                    <SelectItem value="Arrêté">Arrêté</SelectItem>
+                    <SelectItem value="Circulaire">Circulaire</SelectItem>
+                    <SelectItem value="Note de service">Note de service</SelectItem>
+                    <SelectItem value="Rapport">Rapport</SelectItem>
+                    <SelectItem value="Ordonnance">Ordonnance</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label>Classification</Label>
-                <Select value={newDoc.classification} onValueChange={(v) => setNewDoc(prev => ({ ...prev, classification: v as DocumentClassification }))}>
+                <Select value={newDoc.classification} onValueChange={(v) => setNewDoc(prev => ({ ...prev, classification: v as DocClassification }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="public">PUBLIC</SelectItem>
-                    <SelectItem value="interne">DIFFUSION LIMITÉE</SelectItem>
-                    <SelectItem value="confidentiel">CONFIDENTIEL</SelectItem>
-                    <SelectItem value="secret">SECRET</SelectItem>
+                    <SelectItem value="PUBLIC">PUBLIC</SelectItem>
+                    <SelectItem value="DIFFUSION LIMITÉE">DIFFUSION LIMITÉE</SelectItem>
+                    <SelectItem value="CONFIDENTIEL">CONFIDENTIEL</SelectItem>
+                    <SelectItem value="SECRET">SECRET</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Institution / Rôle</Label>
-              <Select value={newDoc.createdByRole} onValueChange={(v) => setNewDoc(prev => ({ ...prev, createdByRole: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {(Object.entries(ROLE_LABELS) as [string, string][]).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Institution</Label>
+              <Input
+                placeholder="Ex: Ministère des Finances, Présidence..."
+                value={newDoc.institution}
+                onChange={e => setNewDoc(prev => ({ ...prev, institution: e.target.value }))}
+              />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setUploadDialog(false); setUploadFile(null); setUploadProgress(0) }}>Annuler</Button>
-            <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={uploadDocument} disabled={!newDoc.title || isUploading}>
+            <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={uploadDocument} disabled={!newDoc.objet || !newDoc.institution || isUploading}>
               <Upload className="h-4 w-4" />
               {isUploading ? 'Chargement...' : 'Importer le document'}
             </Button>
@@ -1183,7 +1071,7 @@ export function GedPage() {
 
       {/* Document Consultation Dialog */}
       <Dialog open={!!viewDoc} onOpenChange={(open) => { if (!open) setViewDoc(null) }}>
-        <DialogContent className="max-w-[95vw] sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Eye className="h-5 w-5 text-brand dark:text-primary" />
@@ -1191,161 +1079,106 @@ export function GedPage() {
             </DialogTitle>
             <DialogDescription>Détails et aperçu du document officiel</DialogDescription>
           </DialogHeader>
-          {viewDoc && (() => {
-            const ref = getDocReference(viewDoc)
-            return (
-              <div className="space-y-4">
-                {/* Document metadata */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Référence</Label>
-                    <p className="text-sm font-mono font-semibold text-brand dark:text-primary">{ref}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Catégorie</Label>
-                    <Badge variant="outline" className="text-xs font-medium">{CATEGORY_LABELS[viewDoc.category]}</Badge>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Institution</Label>
-                    <p className="text-sm">{getInstitutionLabel(viewDoc)}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Classification</Label>
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${CLASSIFICATION_CONFIG[viewDoc.classification].color}`}>
-                      {(() => { const Ic = CLASSIFICATION_CONFIG[viewDoc.classification].icon; return <Ic className="h-3 w-3" /> })()}
-                      {CLASSIFICATION_LABELS[viewDoc.classification]}
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Statut</Label>
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_CONFIG[viewDoc.status].color}`}>
-                      {(() => { const Ic = STATUS_CONFIG[viewDoc.status].icon; return <Ic className="h-3 w-3" /> })()}
-                      {STATUS_LABELS[viewDoc.status]}
-                    </span>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Date</Label>
-                    <p className="text-sm">{viewDoc.createdAt.slice(0, 10)}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Taille</Label>
-                    <p className="text-sm">{formatFileSize(viewDoc.fileSize)}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Créé par</Label>
-                    <p className="text-sm">{viewDoc.createdBy}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Version</Label>
-                    <p className="text-sm">v{viewDoc.version}</p>
+          {viewDoc && (
+            <div className="space-y-4">
+              {/* Document metadata */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Référence</Label>
+                  <p className="text-sm font-mono font-semibold text-brand dark:text-primary">{viewDoc.reference}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Type</Label>
+                  <Badge variant="outline" className="text-xs font-medium">{viewDoc.type}</Badge>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Institution</Label>
+                  <p className="text-sm">{viewDoc.institution}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Classification</Label>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${CLASSIFICATION_CONFIG[viewDoc.classification].color}`}>
+                    {(() => { const Ic = CLASSIFICATION_CONFIG[viewDoc.classification].icon; return <Ic className="h-3 w-3" /> })()}
+                    {viewDoc.classification}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Statut</Label>
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_CONFIG[viewDoc.statut].color}`}>
+                    {(() => { const Ic = STATUS_CONFIG[viewDoc.statut].icon; return <Ic className="h-3 w-3" /> })()}
+                    {viewDoc.statut}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Date</Label>
+                  <p className="text-sm">{viewDoc.date}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Taille</Label>
+                  <p className="text-sm">{viewDoc.taille}</p>
+                </div>
+              </div>
+
+              {/* Uploaded file info */}
+              {viewDoc.fileName && (
+                <div className="rounded-lg border border-brand/20 dark:border-primary/20 bg-brand/5 dark:bg-primary/5 p-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-brand/10 dark:bg-primary/20">
+                      {(() => { const FIcon = getFileIcon(viewDoc.fileName); return <FIcon className="h-5 w-5 text-brand dark:text-primary" /> })()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{viewDoc.fileName}</p>
+                      <p className="text-xs text-muted-foreground">{viewDoc.fileType} — {viewDoc.taille}</p>
+                    </div>
+                    <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
                   </div>
                 </div>
+              )}
 
-                {/* Description */}
-                {viewDoc.description && (
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Description</Label>
-                    <p className="text-sm">{viewDoc.description}</p>
-                  </div>
-                )}
+              <Separator />
 
-                {/* Tags */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs text-muted-foreground">Étiquettes</Label>
-                    <Button variant="ghost" size="sm" className="h-6 text-xs gap-1" onClick={() => { setNewTagDoc(viewDoc); setNewTagValue('') }}>
-                      <Plus className="h-3 w-3" /> Ajouter
-                    </Button>
+              {/* Simulated document preview */}
+              <div className="border rounded-lg p-6 bg-white dark:bg-gray-900 shadow-inner">
+                {/* Republic of Guinea header */}
+                <div className="text-center space-y-1 mb-6">
+                  <div className="flex items-center justify-center gap-3 mb-2">
+                    <div className="w-8 h-5 bg-[#CE1126] rounded-sm" />
+                    <div className="w-8 h-5 bg-[#FCD116] rounded-sm" />
+                    <div className="w-8 h-5 bg-[#009460] rounded-sm" />
                   </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {viewDoc.tags.length === 0 ? (
-                      <span className="text-xs text-muted-foreground italic">Aucune étiquette</span>
-                    ) : (
-                      viewDoc.tags.map(tag => (
-                        <Badge key={tag} variant="secondary" className="text-xs gap-1 pr-1">
-                          {tag}
-                          <button
-                            className="hover:text-red-500 transition-colors rounded-full hover:bg-red-100 dark:hover:bg-red-900/30 p-0.5"
-                            onClick={() => { removeTag(viewDoc.id, tag); setViewDoc({ ...viewDoc, tags: viewDoc.tags.filter(t => t !== tag) }) }}
-                          >
-                            <X className="h-2.5 w-2.5" />
-                          </button>
-                        </Badge>
-                      ))
-                    )}
-                  </div>
+                  <p className="text-xs font-semibold tracking-widest uppercase text-muted-foreground">République de Guinée</p>
+                  <p className="text-[10px] text-muted-foreground">Travail — Justice — Solidarité</p>
+                  <Separator className="my-2" />
                 </div>
 
-                {/* Uploaded file info */}
-                {viewDoc.fileName && (
-                  <div className="rounded-lg border border-brand/20 dark:border-primary/20 bg-brand/5 dark:bg-primary/5 p-3">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-brand/10 dark:bg-primary/20">
-                        {(() => { const FIcon = getFileIcon(viewDoc.fileName); return <FIcon className="h-5 w-5 text-brand dark:text-primary" /> })()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{viewDoc.fileName}</p>
-                        <p className="text-xs text-muted-foreground">{viewDoc.fileType} — {formatFileSize(viewDoc.fileSize)}</p>
-                      </div>
-                      <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
-                    </div>
+                {/* Document content */}
+                <div className="space-y-4 text-sm leading-relaxed">
+                  <div className="text-center">
+                    <p className="font-bold text-base">{viewDoc.type} n°{viewDoc.reference}</p>
                   </div>
-                )}
+                  <p className="text-justify first-letter:text-3xl first-letter:font-bold first-letter:float-left first-letter:mr-1 first-letter:mt-1">
+                    {viewDoc.objet}
+                  </p>
+                  <p className="text-justify text-muted-foreground">
+                    Conformément aux dispositions constitutionnelles et aux textes réglementaires en vigueur en République de Guinée, le présent document est émis pour pleine et entière application par l&apos;institution susvisée et tous les services concernés.
+                  </p>
+                  <p className="text-justify text-muted-foreground">
+                    Les mesures prévues par le présent {viewDoc.type.toLowerCase()} entrent en vigueur à compter de la date de sa signature. Tous les ministères, institutions et organismes concernés sont tenus de veiller à sa stricte application dans les meilleurs délais.
+                  </p>
+                </div>
 
-                {/* Archive info */}
-                {viewDoc.status === 'archive' && viewDoc.archiveDate && (
-                  <div className="rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-900/10 p-3 space-y-1">
-                    <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">Document archivé</p>
-                    <p className="text-xs text-amber-600/80 dark:text-amber-300/80">Date d&apos;archivage : {viewDoc.archiveDate.slice(0, 10)}</p>
-                    {viewDoc.archiveReason && <p className="text-xs text-amber-600/80 dark:text-amber-300/80">Motif : {viewDoc.archiveReason}</p>}
-                  </div>
-                )}
-
-                <Separator />
-
-                {/* Simulated document preview */}
-                <div className="border rounded-lg p-6 bg-white dark:bg-gray-900 shadow-inner">
-                  {/* Republic of Guinea header */}
-                  <div className="text-center space-y-1 mb-6">
-                    <div className="flex items-center justify-center gap-3 mb-2">
-                      <div className="w-8 h-5 bg-[#CE1126] rounded-sm" />
-                      <div className="w-8 h-5 bg-[#FCD116] rounded-sm" />
-                      <div className="w-8 h-5 bg-[#009460] rounded-sm" />
-                    </div>
-                    <p className="text-xs font-semibold tracking-widest uppercase text-muted-foreground">République de Guinée</p>
-                    <p className="text-[10px] text-muted-foreground">Travail — Justice — Solidarité</p>
-                    <Separator className="my-2" />
-                  </div>
-
-                  {/* Document content */}
-                  <div className="space-y-4 text-sm leading-relaxed">
-                    <div className="text-center">
-                      <p className="font-bold text-base">{CATEGORY_LABELS[viewDoc.category]} n°{ref}</p>
-                    </div>
-                    <p className="text-justify first-letter:text-3xl first-letter:font-bold first-letter:float-left first-letter:mr-1 first-letter:mt-1">
-                      {viewDoc.title}
-                    </p>
-                    <p className="text-justify text-muted-foreground">
-                      Conformément aux dispositions constitutionnelles et aux textes réglementaires en vigueur en République de Guinée, le présent document est émis pour pleine et entière application par l&apos;institution susvisée et tous les services concernés.
-                    </p>
-                    <p className="text-justify text-muted-foreground">
-                      Les mesures prévues par le présent {CATEGORY_LABELS[viewDoc.category].toLowerCase()} entrent en vigueur à compter de la date de sa signature. Tous les ministères, institutions et organismes concernés sont tenus de veiller à sa stricte application dans les meilleurs délais.
-                    </p>
-                  </div>
-
-                  {/* Signature area */}
-                  <div className="mt-8 flex justify-end">
-                    <div className="text-center space-y-1">
-                      <p className="text-xs text-muted-foreground">Fait à Conakry, le {viewDoc.createdAt.slice(0, 10)}</p>
-                      <p className="text-sm font-semibold">{getInstitutionLabel(viewDoc)}</p>
-                      <div className="w-32 border-b border-dashed border-muted-foreground/30 mx-auto mt-4" />
-                      <p className="text-[10px] text-muted-foreground">Signature & Cachet</p>
-                    </div>
+                {/* Signature area */}
+                <div className="mt-8 flex justify-end">
+                  <div className="text-center space-y-1">
+                    <p className="text-xs text-muted-foreground">Fait à Conakry, le {viewDoc.date}</p>
+                    <p className="text-sm font-semibold">{viewDoc.institution}</p>
+                    <div className="w-32 border-b border-dashed border-muted-foreground/30 mx-auto mt-4" />
+                    <p className="text-[10px] text-muted-foreground">Signature & Cachet</p>
                   </div>
                 </div>
               </div>
-            )
-          })()}
+            </div>
+          )}
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setViewDoc(null)}>Fermer</Button>
             {viewDoc && viewDoc.fileName && viewDoc.fileData && (
@@ -1366,14 +1199,14 @@ export function GedPage() {
 
       {/* Reclassify Dialog */}
       <Dialog open={!!reclassifyDoc} onOpenChange={(open) => { if (!open) setReclassifyDoc(null) }}>
-        <DialogContent className="max-w-[95vw] sm:max-w-[450px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[450px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Tag className="h-5 w-5 text-gold" />
               Reclassifier le document
             </DialogTitle>
             <DialogDescription>
-              {reclassifyDoc && `Modifier la classification de ${getDocReference(reclassifyDoc)}`}
+              {reclassifyDoc && `Modifier la classification de ${reclassifyDoc.reference}`}
             </DialogDescription>
           </DialogHeader>
           {reclassifyDoc && (
@@ -1382,20 +1215,20 @@ export function GedPage() {
                 <Label>Classification actuelle</Label>
                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${CLASSIFICATION_CONFIG[reclassifyDoc.classification].color}`}>
                   {(() => { const Ic = CLASSIFICATION_CONFIG[reclassifyDoc.classification].icon; return <Ic className="h-3 w-3" /> })()}
-                  {CLASSIFICATION_LABELS[reclassifyDoc.classification]}
+                  {reclassifyDoc.classification}
                 </span>
               </div>
               <div className="space-y-2">
                 <Label>Nouvelle classification</Label>
-                <Select value={reclassifyValue} onValueChange={(v) => setReclassifyValue(v as DocumentClassification)}>
+                <Select value={reclassifyValue} onValueChange={(v) => setReclassifyValue(v as DocClassification)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="public">PUBLIC</SelectItem>
-                    <SelectItem value="interne">DIFFUSION LIMITÉE</SelectItem>
-                    <SelectItem value="confidentiel">CONFIDENTIEL</SelectItem>
-                    <SelectItem value="secret">SECRET</SelectItem>
+                    <SelectItem value="PUBLIC">PUBLIC</SelectItem>
+                    <SelectItem value="DIFFUSION LIMITÉE">DIFFUSION LIMITÉE</SelectItem>
+                    <SelectItem value="CONFIDENTIEL">CONFIDENTIEL</SelectItem>
+                    <SelectItem value="SECRET">SECRET</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1411,57 +1244,9 @@ export function GedPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Add Tag Dialog */}
-      <Dialog open={!!newTagDoc} onOpenChange={(open) => { if (!open) setNewTagDoc(null) }}>
-        <DialogContent className="max-w-[95vw] sm:max-w-[400px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Tag className="h-5 w-5 text-brand dark:text-primary" />
-              Ajouter une étiquette
-            </DialogTitle>
-            <DialogDescription>
-              {newTagDoc && `Ajouter une étiquette au document ${getDocReference(newTagDoc)}`}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Input
-              placeholder="Nouvelle étiquette..."
-              value={newTagValue}
-              onChange={e => setNewTagValue(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && newTagValue.trim() && newTagDoc) {
-                  addTag(newTagDoc.id, newTagValue.trim())
-                  setViewDoc(prev => prev && prev.id === newTagDoc.id ? { ...prev, tags: [...prev.tags, newTagValue.trim()] } : prev)
-                  setNewTagValue('')
-                  setNewTagDoc(null)
-                }
-              }}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setNewTagDoc(null)}>Annuler</Button>
-            <Button
-              className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2"
-              disabled={!newTagValue.trim()}
-              onClick={() => {
-                if (newTagValue.trim() && newTagDoc) {
-                  addTag(newTagDoc.id, newTagValue.trim())
-                  setViewDoc(prev => prev && prev.id === newTagDoc.id ? { ...prev, tags: [...prev.tags, newTagValue.trim()] } : prev)
-                  setNewTagValue('')
-                  setNewTagDoc(null)
-                }
-              }}
-            >
-              <Plus className="h-4 w-4" />
-              Ajouter
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deleteDoc} onOpenChange={(open) => { if (!open) setDeleteDoc(null) }}>
-        <DialogContent className="max-w-[95vw] sm:max-w-[450px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[450px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
               <AlertTriangle className="h-5 w-5" />
@@ -1476,10 +1261,10 @@ export function GedPage() {
               <div className="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/10 p-4 space-y-2">
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-red-600" />
-                  <span className="font-mono text-sm font-semibold text-red-700 dark:text-red-400">{getDocReference(deleteDoc)}</span>
+                  <span className="font-mono text-sm font-semibold text-red-700 dark:text-red-400">{deleteDoc.reference}</span>
                 </div>
-                <p className="text-sm text-red-700/80 dark:text-red-300/80">{deleteDoc.title}</p>
-                <p className="text-xs text-red-600/60 dark:text-red-400/60">{CATEGORY_LABELS[deleteDoc.category]} — {getInstitutionLabel(deleteDoc)} — {deleteDoc.createdAt.slice(0, 10)}</p>
+                <p className="text-sm text-red-700/80 dark:text-red-300/80">{deleteDoc.objet}</p>
+                <p className="text-xs text-red-600/60 dark:text-red-400/60">{deleteDoc.type} — {deleteDoc.institution} — {deleteDoc.date}</p>
               </div>
             </div>
           )}
@@ -1495,7 +1280,7 @@ export function GedPage() {
 
       {/* Export to National Archives Dialog */}
       <Dialog open={exportDialog} onOpenChange={setExportDialog}>
-        <DialogContent className="max-w-[95vw] sm:max-w-[450px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[450px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Archive className="h-5 w-5 text-brand dark:text-primary" />

@@ -604,7 +604,7 @@ export default function DashboardPage() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <CardContent className="grid grid-cols-3 gap-3">
               {quickActions.map((action) => (
                 <button
                   key={action.label}
@@ -652,7 +652,7 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+            <div className="overflow-x-auto">
               <div className="min-w-[480px]">
                 {/* Hour labels */}
                 <div className="mb-1 flex gap-0.5 pl-10">

@@ -59,8 +59,16 @@ export function MairieDashboardPage() {
   const user = useAppStore((s) => s.user)
   const { requests, updateRequestStatus, addProcessingNote, advanceTimeline, assignRequest, completeRequest, verifyDocument, setGeneratedDocument, addUploadedDocument } = useCitizenRequestsStore()
 
-  // Filter requests for mairie categories (etat-civil and residence)
-  const mairieRequests = requests.filter(r => r.categoryId === 'etat-civil' || r.categoryId === 'residence')
+  // Filter requests for mairie categories (etat-civil and residence) for THIS specific mairie
+  const mairieRequests = requests.filter(r => {
+    // Only show etat-civil and residence requests for mairies
+    if (r.categoryId !== 'etat-civil' && r.categoryId !== 'residence') return false
+    // If user has a mairie, only show requests for that mairie
+    if (user?.mairie) {
+      return r.mairie === user.mairie || (!r.mairie && r.assignedService === 'Mairie / Commune')
+    }
+    return true
+  })
 
   const [activeTab, setActiveTab] = useState('pipeline')
   const [searchQuery, setSearchQuery] = useState('')
@@ -943,7 +951,7 @@ export function MairieDashboardPage() {
 
       {/* Generate Document Dialog */}
       <Dialog open={generateDocDialogOpen} onOpenChange={setGenerateDocDialogOpen}>
-        <DialogContent className="glass-premium max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="glass-premium">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="size-5 text-gradient-gold" />
@@ -977,7 +985,7 @@ export function MairieDashboardPage() {
 
       {/* Note Dialog */}
       <Dialog open={noteDialogOpen} onOpenChange={setNoteDialogOpen}>
-        <DialogContent className="glass-premium max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="glass-premium">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MessageSquare className="size-5 text-[#C8A45C]" />
@@ -999,7 +1007,7 @@ export function MairieDashboardPage() {
 
       {/* Delivery Dialog */}
       <Dialog open={deliveryDialogOpen} onOpenChange={setDeliveryDialogOpen}>
-        <DialogContent className="glass-premium max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="glass-premium">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Download className="size-5 text-emerald-600" />

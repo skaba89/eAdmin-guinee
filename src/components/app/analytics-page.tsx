@@ -13,7 +13,6 @@ import {
   Target,
   CheckCircle2,
   Loader2,
-  Users,
 } from 'lucide-react'
 import {
   Card,
@@ -50,15 +49,6 @@ import {
   Legend,
 } from 'recharts'
 import { useAppStore } from '@/store/app-store'
-import { useCitizenRequestsStore } from '@/store/citizen-requests-store'
-import { useGedStore } from '@/store/ged-store'
-import { useCourriersStore } from '@/store/courriers-store'
-import { useNotificationsStore } from '@/store/notifications-store'
-import { useAuditLogsStore } from '@/store/audit-logs-store'
-import { useUsersStore } from '@/store/users-store'
-import { useBirthCertificateStore } from '@/store/birth-certificate-store'
-
-// ─── CONSTANTS ──────────────────────────────────────────────────────────────
 
 const CHART_COLORS = ['#0B2E58', '#3B7DD8', '#C8A45C', '#10B981', '#EF4444']
 
@@ -69,116 +59,182 @@ const periods = [
   { label: '1 an', value: '1y' },
 ] as const
 
-const FRENCH_MONTHS_SHORT = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
-const FRENCH_DAYS_SHORT = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
-
-// GED category id → display name
-const GED_CATEGORY_LABELS: Record<string, string> = {
-  etat_civil: 'État Civil',
-  justice: 'Justice',
-  identification: 'Identification',
-  urbanisme: 'Urbanisme',
-  entreprise: 'Entreprise',
-  education: 'Éducation',
-  sante: 'Santé',
-  residence: 'Résidence',
-  administratif: 'Administratif',
-  financier: 'Finance',
+// Period-dependent summary data
+const periodSummaryData: Record<string, { label: string; value: string; change: string; trend: 'up' | 'down' }[][]> = {
+  '7d': [
+    [
+      { label: 'Total courriers', value: '647', change: '+5.2%', trend: 'up' as const },
+      { label: 'Délai moyen', value: '1.9 j', change: '-8.1%', trend: 'down' as const },
+      { label: 'Taux conformité', value: '99.1%', change: '+0.4%', trend: 'up' as const },
+      { label: 'Score performance', value: '96.8', change: '+1.2', trend: 'up' as const },
+    ],
+  ],
+  '30d': [
+    [
+      { label: 'Total courriers', value: '2 847', change: '+12.5%', trend: 'up' as const },
+      { label: 'Délai moyen', value: '2.4 j', change: '-15.2%', trend: 'down' as const },
+      { label: 'Taux conformité', value: '98.7%', change: '+1.2%', trend: 'up' as const },
+      { label: 'Score performance', value: '94.2', change: '+3.8', trend: 'up' as const },
+    ],
+  ],
+  '90d': [
+    [
+      { label: 'Total courriers', value: '8 234', change: '+18.7%', trend: 'up' as const },
+      { label: 'Délai moyen', value: '2.8 j', change: '-22.3%', trend: 'down' as const },
+      { label: 'Taux conformité', value: '97.9%', change: '+2.5%', trend: 'up' as const },
+      { label: 'Score performance', value: '91.5', change: '+5.1', trend: 'up' as const },
+    ],
+  ],
+  '1y': [
+    [
+      { label: 'Total courriers', value: '34 560', change: '+24.1%', trend: 'up' as const },
+      { label: 'Délai moyen', value: '3.1 j', change: '-35.8%', trend: 'down' as const },
+      { label: 'Taux conformité', value: '96.4%', change: '+4.8%', trend: 'up' as const },
+      { label: 'Score performance', value: '88.7', change: '+9.3', trend: 'up' as const },
+    ],
+  ],
 }
 
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
-
-function getPeriodMs(period: string): number {
-  switch (period) {
-    case '7d': return 7 * 86400000
-    case '30d': return 30 * 86400000
-    case '90d': return 90 * 86400000
-    case '1y': return 365 * 86400000
-    default: return 30 * 86400000
-  }
+// Period-dependent monthly chart data
+const periodChartData: Record<string, { month: string; courriers: number; documents: number; workflows: number }[]> = {
+  '7d': [
+    { month: 'Lun', courriers: 45, documents: 120, workflows: 8 },
+    { month: 'Mar', courriers: 52, documents: 145, workflows: 12 },
+    { month: 'Mer', courriers: 38, documents: 98, workflows: 6 },
+    { month: 'Jeu', courriers: 61, documents: 167, workflows: 15 },
+    { month: 'Ven', courriers: 55, documents: 134, workflows: 11 },
+    { month: 'Sam', courriers: 12, documents: 23, workflows: 2 },
+    { month: 'Dim', courriers: 8, documents: 15, workflows: 1 },
+  ],
+  '30d': [
+    { month: 'S1', courriers: 245, documents: 890, workflows: 34 },
+    { month: 'S2', courriers: 312, documents: 1023, workflows: 41 },
+    { month: 'S3', courriers: 287, documents: 945, workflows: 38 },
+    { month: 'S4', courriers: 356, documents: 1134, workflows: 45 },
+  ],
+  '90d': [
+    { month: 'Oct', courriers: 456, documents: 1423, workflows: 55 },
+    { month: 'Nov', courriers: 489, documents: 1567, workflows: 58 },
+    { month: 'Déc', courriers: 467, documents: 1478, workflows: 53 },
+  ],
+  '1y': [
+    { month: 'Jan', courriers: 245, documents: 890, workflows: 34 },
+    { month: 'Fév', courriers: 312, documents: 1023, workflows: 41 },
+    { month: 'Mar', courriers: 287, documents: 945, workflows: 38 },
+    { month: 'Avr', courriers: 356, documents: 1134, workflows: 45 },
+    { month: 'Mai', courriers: 398, documents: 1256, workflows: 52 },
+    { month: 'Jun', courriers: 421, documents: 1345, workflows: 48 },
+    { month: 'Jul', courriers: 378, documents: 1198, workflows: 43 },
+    { month: 'Aoû', courriers: 334, documents: 1067, workflows: 39 },
+    { month: 'Sep', courriers: 412, documents: 1289, workflows: 51 },
+    { month: 'Oct', courriers: 456, documents: 1423, workflows: 55 },
+    { month: 'Nov', courriers: 489, documents: 1567, workflows: 58 },
+    { month: 'Déc', courriers: 467, documents: 1478, workflows: 53 },
+  ],
 }
 
-function filterByDate<T>(items: T[], getDate: (item: T) => string | undefined, cutoff: Date): T[] {
-  return items.filter(item => {
-    const d = getDate(item)
-    if (!d) return false
-    return new Date(d) >= cutoff
-  })
+// Period-dependent service data
+const periodServiceData: Record<string, { service: string; courriers: number; documents: number; workflows: number }[]> = {
+  '7d': [
+    { service: 'Cabinet', courriers: 12, documents: 34, workflows: 5 },
+    { service: 'Ressources Humaines', courriers: 9, documents: 28, workflows: 7 },
+    { service: 'Finance', courriers: 15, documents: 42, workflows: 4 },
+    { service: 'Technique', courriers: 8, documents: 22, workflows: 9 },
+    { service: 'Juridique', courriers: 6, documents: 18, workflows: 3 },
+    { service: 'Communication', courriers: 4, documents: 12, workflows: 2 },
+  ],
+  '30d': [
+    { service: 'Cabinet', courriers: 45, documents: 120, workflows: 18 },
+    { service: 'Ressources Humaines', courriers: 38, documents: 95, workflows: 22 },
+    { service: 'Finance', courriers: 52, documents: 140, workflows: 15 },
+    { service: 'Technique', courriers: 30, documents: 85, workflows: 28 },
+    { service: 'Juridique', courriers: 25, documents: 70, workflows: 12 },
+    { service: 'Communication', courriers: 18, documents: 55, workflows: 8 },
+  ],
+  '90d': [
+    { service: 'Cabinet', courriers: 128, documents: 356, workflows: 52 },
+    { service: 'Ressources Humaines', courriers: 105, documents: 287, workflows: 64 },
+    { service: 'Finance', courriers: 148, documents: 412, workflows: 43 },
+    { service: 'Technique', courriers: 89, documents: 245, workflows: 78 },
+    { service: 'Juridique', courriers: 72, documents: 198, workflows: 35 },
+    { service: 'Communication', courriers: 48, documents: 156, workflows: 22 },
+  ],
+  '1y': [
+    { service: 'Cabinet', courriers: 456, documents: 1340, workflows: 195 },
+    { service: 'Ressources Humaines', courriers: 378, documents: 1089, workflows: 242 },
+    { service: 'Finance', courriers: 520, documents: 1567, workflows: 167 },
+    { service: 'Technique', courriers: 312, documents: 923, workflows: 298 },
+    { service: 'Juridique', courriers: 245, documents: 756, workflows: 128 },
+    { service: 'Communication', courriers: 198, documents: 534, workflows: 87 },
+  ],
 }
 
-function computeChange(current: number, previous: number): { change: string; trend: 'up' | 'down' } {
-  if (previous === 0) {
-    return { change: current > 0 ? '+Nouveau' : '0%', trend: current > 0 ? 'up' : 'down' }
-  }
-  const pct = ((current - previous) / previous) * 100
-  const sign = pct >= 0 ? '+' : ''
-  return { change: `${sign}${pct.toFixed(1)}%`, trend: pct >= 0 ? 'up' : 'down' }
+// Radar data per period
+const periodRadarData: Record<string, { dimension: string; score: number }[]> = {
+  '7d': [
+    { dimension: 'Réactivité', score: 92 },
+    { dimension: 'Conformité', score: 99 },
+    { dimension: 'Efficacité', score: 85 },
+    { dimension: 'Innovation', score: 72 },
+    { dimension: 'Satisfaction', score: 94 },
+  ],
+  '30d': [
+    { dimension: 'Réactivité', score: 85 },
+    { dimension: 'Conformité', score: 92 },
+    { dimension: 'Efficacité', score: 78 },
+    { dimension: 'Innovation', score: 65 },
+    { dimension: 'Satisfaction', score: 88 },
+  ],
+  '90d': [
+    { dimension: 'Réactivité', score: 78 },
+    { dimension: 'Conformité', score: 88 },
+    { dimension: 'Efficacité', score: 72 },
+    { dimension: 'Innovation', score: 58 },
+    { dimension: 'Satisfaction', score: 82 },
+  ],
+  '1y': [
+    { dimension: 'Réactivité', score: 70 },
+    { dimension: 'Conformité', score: 82 },
+    { dimension: 'Efficacité', score: 65 },
+    { dimension: 'Innovation', score: 50 },
+    { dimension: 'Satisfaction', score: 75 },
+  ],
 }
 
-function fmtNum(n: number): string {
-  return n.toLocaleString('fr-FR')
+const summaryIcons = [Mail, Clock, ShieldCheck, TrendingUp]
+
+// Top services ranking
+const topServices = [
+  { rank: 1, name: 'Cabinet du Ministre', courriers: 456, conformite: 99.2, delai: '1.8j' },
+  { rank: 2, name: 'Direction Générale', courriers: 389, conformite: 98.7, delai: '2.1j' },
+  { rank: 3, name: 'Ressources Humaines', courriers: 334, conformite: 97.9, delai: '2.4j' },
+  { rank: 4, name: 'Service Financier', courriers: 298, conformite: 97.1, delai: '2.7j' },
+  { rank: 5, name: 'Direction Technique', courriers: 267, conformite: 96.5, delai: '2.9j' },
+  { rank: 6, name: 'Service Juridique', courriers: 245, conformite: 99.8, delai: '3.1j' },
+  { rank: 7, name: 'Communication', courriers: 198, conformite: 95.3, delai: '3.4j' },
+]
+
+// SLA compliance data
+const slaData = [
+  { type: 'Courriers entrants', total: 1523, dansDelai: 1489, horsDelai: 34, taux: '97.8%' },
+  { type: 'Courriers sortants', total: 1324, dansDelai: 1278, horsDelai: 46, taux: '96.5%' },
+  { type: 'Documents archivés', total: 8320, dansDelai: 8198, horsDelai: 122, taux: '98.5%' },
+  { type: 'Workflows complétés', total: 312, dansDelai: 298, horsDelai: 14, taux: '95.5%' },
+  { type: 'Signatures électroniques', total: 187, dansDelai: 184, horsDelai: 3, taux: '98.4%' },
+]
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.06 },
+  },
 }
 
-// ─── TIME SERIES AGGREGATION ────────────────────────────────────────────────
-
-interface TimeBucket {
-  label: string
-  start: Date
-  end: Date
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' as const } },
 }
-
-function generateTimeBuckets(period: string): TimeBucket[] {
-  const now = new Date()
-  const buckets: TimeBucket[] = []
-
-  if (period === '7d') {
-    for (let i = 6; i >= 0; i--) {
-      const dayStart = new Date(now)
-      dayStart.setDate(now.getDate() - i)
-      dayStart.setHours(0, 0, 0, 0)
-      const dayEnd = new Date(dayStart)
-      dayEnd.setDate(dayEnd.getDate() + 1)
-      buckets.push({ label: FRENCH_DAYS_SHORT[dayStart.getDay()], start: dayStart, end: dayEnd })
-    }
-  } else if (period === '30d') {
-    for (let i = 3; i >= 0; i--) {
-      const weekEnd = new Date(now)
-      weekEnd.setDate(now.getDate() - i * 7)
-      weekEnd.setHours(23, 59, 59, 999)
-      const weekStart = new Date(weekEnd)
-      weekStart.setDate(weekEnd.getDate() - 6)
-      weekStart.setHours(0, 0, 0, 0)
-      buckets.push({ label: `S${4 - i}`, start: weekStart, end: weekEnd })
-    }
-  } else if (period === '90d') {
-    for (let i = 2; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59)
-      buckets.push({ label: FRENCH_MONTHS_SHORT[d.getMonth()], start: d, end })
-    }
-  } else {
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59)
-      buckets.push({ label: FRENCH_MONTHS_SHORT[d.getMonth()], start: d, end })
-    }
-  }
-
-  return buckets
-}
-
-function countInBuckets<T>(items: T[], getDate: (item: T) => string | undefined, buckets: TimeBucket[]): number[] {
-  return buckets.map(bucket =>
-    items.filter(item => {
-      const d = getDate(item)
-      if (!d) return false
-      const date = new Date(d)
-      return date >= bucket.start && date < bucket.end
-    }).length
-  )
-}
-
-// ─── EXPORT HELPERS ─────────────────────────────────────────────────────────
 
 function exportCSV(data: Record<string, string | number>[], filename: string) {
   if (!data.length) return
@@ -193,13 +249,7 @@ function exportCSV(data: Record<string, string | number>[], filename: string) {
   URL.revokeObjectURL(url)
 }
 
-function exportPDFReport(
-  period: string,
-  summary: { label: string; value: string; change: string }[],
-  chartData: { periode: string; demandes: number; documents: number; courriers: number }[],
-  serviceDataRows: { service: string; demandes: number; documents: number; courriers: number }[],
-  slaRows: { type: string; total: number; dansDelai: number; horsDelai: number; taux: string }[]
-) {
+function exportPDFReport(period: string, summary: { label: string; value: string; change: string }[], chartData: { month: string; courriers: number; documents: number; workflows: number }[], serviceDataRows: { service: string; courriers: number; documents: number; workflows: number }[]) {
   const periodLabel = periods.find(p => p.value === period)?.label || period
   const lines = [
     '═══════════════════════════════════════════════════════════',
@@ -219,17 +269,17 @@ function exportPDFReport(
     '  TENDANCES',
     '───────────────────────────────────────────────────────────',
     '',
-    '  ' + ['Période', 'Demandes', 'Documents', 'Courriers'].map(h => h.padEnd(14)).join(''),
+    '  ' + ['Période', 'Courriers', 'Documents', 'Workflows'].map(h => h.padEnd(14)).join(''),
     '  ' + '─'.repeat(56),
-    ...chartData.map(r => '  ' + [r.periode, String(r.demandes), String(r.documents), String(r.courriers)].map(v => v.padEnd(14)).join('')),
+    ...chartData.map(r => '  ' + [r.month, String(r.courriers), String(r.documents), String(r.workflows)].map(v => v.padEnd(14)).join('')),
     '',
     '───────────────────────────────────────────────────────────',
     '  VOLUME PAR SERVICE',
     '───────────────────────────────────────────────────────────',
     '',
-    '  ' + ['Service', 'Demandes', 'Documents', 'Courriers'].map(h => h.padEnd(20)).join(''),
+    '  ' + ['Service', 'Courriers', 'Documents', 'Workflows'].map(h => h.padEnd(20)).join(''),
     '  ' + '─'.repeat(80),
-    ...serviceDataRows.map(r => '  ' + [r.service, String(r.demandes), String(r.documents), String(r.courriers)].map(v => v.padEnd(20)).join('')),
+    ...serviceDataRows.map(r => '  ' + [r.service, String(r.courriers), String(r.documents), String(r.workflows)].map(v => v.padEnd(20)).join('')),
     '',
     '───────────────────────────────────────────────────────────',
     '  CONFORMITÉ SLA',
@@ -237,7 +287,7 @@ function exportPDFReport(
     '',
     '  ' + ['Type', 'Total', 'Dans délai', 'Hors délai', 'Taux'].map(h => h.padEnd(18)).join(''),
     '  ' + '─'.repeat(90),
-    ...slaRows.map(r => '  ' + [r.type, String(r.total), String(r.dansDelai), String(r.horsDelai), r.taux].map(v => v.padEnd(18)).join('')),
+    ...slaData.map(r => '  ' + [r.type, String(r.total), String(r.dansDelai), String(r.horsDelai), r.taux].map(v => v.padEnd(18)).join('')),
     '',
     '═══════════════════════════════════════════════════════════',
     '  Fin du rapport — eAdministration Suite Guinea',
@@ -253,22 +303,6 @@ function exportPDFReport(
   URL.revokeObjectURL(url)
 }
 
-// ─── ANIMATION VARIANTS ─────────────────────────────────────────────────────
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.06 } },
-}
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' as const } },
-}
-
-const summaryIcons = [Mail, Clock, ShieldCheck, Users]
-
-// ─── MAIN COMPONENT ─────────────────────────────────────────────────────────
-
 export default function AnalyticsPage() {
   const navigate = useAppStore((s) => s.navigate)
   const [selectedPeriod, setSelectedPeriod] = useState<string>('30d')
@@ -276,310 +310,11 @@ export default function AnalyticsPage() {
   const [exportingPdf, setExportingPdf] = useState(false)
   const [exportingCsv, setExportingCsv] = useState(false)
 
-  // ── Store subscriptions ──────────────────────────────────────────────────
-  const requests = useCitizenRequestsStore((s) => s.requests)
-  const gedDocuments = useGedStore((s) => s.documents)
-  const courriers = useCourriersStore((s) => s.courriers)
-  const notifications = useNotificationsStore((s) => s.notifications)
-  const auditLogs = useAuditLogsStore((s) => s.logs)
-  const users = useUsersStore((s) => s.users)
-  const birthRecords = useBirthCertificateStore((s) => s.records)
+  const currentSummary = periodSummaryData[selectedPeriod]?.[0] || periodSummaryData['30d'][0]
+  const currentChartData = periodChartData[selectedPeriod] || periodChartData['30d']
+  const currentServiceData = periodServiceData[selectedPeriod] || periodServiceData['30d']
+  const currentRadarData = periodRadarData[selectedPeriod] || periodRadarData['30d']
 
-  // ── Period-based filtering ───────────────────────────────────────────────
-  const periodCutoff = useMemo(() => {
-    const now = new Date()
-    return new Date(now.getTime() - getPeriodMs(selectedPeriod))
-  }, [selectedPeriod])
-
-  const prevPeriodCutoff = useMemo(() => {
-    const now = new Date()
-    return new Date(now.getTime() - 2 * getPeriodMs(selectedPeriod))
-  }, [selectedPeriod])
-
-  // Current period data
-  const periodRequests = useMemo(() => filterByDate(requests, r => r.createdAt, periodCutoff), [requests, periodCutoff])
-  const periodDocs = useMemo(() => filterByDate(gedDocuments, d => d.createdAt, periodCutoff), [gedDocuments, periodCutoff])
-  const periodCourriers = useMemo(() => filterByDate(courriers, c => c.createdAt, periodCutoff), [courriers, periodCutoff])
-  const periodNotifs = useMemo(() => filterByDate(notifications, n => n.date, periodCutoff), [notifications, periodCutoff])
-  const periodLogs = useMemo(() => filterByDate(auditLogs, l => l.timestamp, periodCutoff), [auditLogs, periodCutoff])
-
-  // Derived notification & audit stats
-  const unreadNotifs = useMemo(() => periodNotifs.filter(n => !n.read).length, [periodNotifs])
-  const criticalLogs = useMemo(() => periodLogs.filter(l => l.severity === 'critical').length, [periodLogs])
-
-  // Previous period data (for change computation)
-  const prevPeriodRequests = useMemo(() =>
-    requests.filter(r => {
-      const d = new Date(r.createdAt)
-      return d >= prevPeriodCutoff && d < periodCutoff
-    }), [requests, prevPeriodCutoff, periodCutoff])
-
-  const prevPeriodDocs = useMemo(() =>
-    gedDocuments.filter(d => {
-      const date = new Date(d.createdAt)
-      return date >= prevPeriodCutoff && date < periodCutoff
-    }), [gedDocuments, prevPeriodCutoff, periodCutoff])
-
-  const prevPeriodCourriers = useMemo(() =>
-    courriers.filter(c => {
-      const d = new Date(c.createdAt)
-      return d >= prevPeriodCutoff && d < periodCutoff
-    }), [courriers, prevPeriodCutoff, periodCutoff])
-
-  // ── Summary cards ────────────────────────────────────────────────────────
-  const summaryCards = useMemo(() => {
-    const totalRequests = periodRequests.length
-    const prevTotalRequests = prevPeriodRequests.length
-    const reqChange = computeChange(totalRequests, prevTotalRequests)
-
-    // Average processing delay for completed requests
-    const completedReqs = periodRequests.filter(r => r.completedAt)
-    const avgDelay = completedReqs.length > 0
-      ? completedReqs.reduce((sum, r) =>
-          sum + (new Date(r.completedAt!).getTime() - new Date(r.createdAt).getTime()) / 86400000, 0
-        ) / completedReqs.length
-      : 0
-
-    const prevCompletedReqs = prevPeriodRequests.filter(r => r.completedAt)
-    const prevAvgDelay = prevCompletedReqs.length > 0
-      ? prevCompletedReqs.reduce((sum, r) =>
-          sum + (new Date(r.completedAt!).getTime() - new Date(r.createdAt).getTime()) / 86400000, 0
-        ) / prevCompletedReqs.length
-      : 0
-
-    // Delay change: lower is better, so invert the direction for display
-    const delayDiff = prevAvgDelay - avgDelay // positive = improvement
-    const delayChangeStr = prevAvgDelay > 0
-      ? `${delayDiff >= 0 ? '+' : ''}${delayDiff.toFixed(1)} j`
-      : '—'
-    const delayTrend: 'up' | 'down' = delayDiff >= 0 ? 'up' : 'down'
-
-    // Conformity rate (% of valid/archived GED documents)
-    const conformDocs = periodDocs.filter(d => d.status === 'valide' || d.status === 'archive').length
-    const conformRate = periodDocs.length > 0 ? (conformDocs / periodDocs.length) * 100 : 100
-
-    const prevConformDocs = prevPeriodDocs.filter(d => d.status === 'valide' || d.status === 'archive').length
-    const prevConformRate = prevPeriodDocs.length > 0 ? (prevConformDocs / prevPeriodDocs.length) * 100 : 100
-    const conformChange = computeChange(conformRate, prevConformRate)
-
-    // Active users
-    const activeUsers = users.filter(u => u.status === 'actif').length
-    const recentlyActive = users.filter(u => u.lastLogin && new Date(u.lastLogin) >= periodCutoff && u.status === 'actif').length
-    const prevRecentlyActive = users.filter(u =>
-      u.lastLogin && new Date(u.lastLogin) >= prevPeriodCutoff && new Date(u.lastLogin) < periodCutoff
-    ).length
-    const usersChange = computeChange(recentlyActive, prevRecentlyActive)
-
-    return [
-      { label: 'Total demandes', value: fmtNum(totalRequests), change: reqChange.change, trend: reqChange.trend as 'up' | 'down' },
-      { label: 'Délai moyen', value: `${avgDelay.toFixed(1)} j`, change: delayChangeStr, trend: delayTrend },
-      { label: 'Taux conformité', value: `${conformRate.toFixed(1)}%`, change: conformChange.change, trend: conformChange.trend as 'up' | 'down' },
-      { label: 'Utilisateurs actifs', value: fmtNum(activeUsers), change: usersChange.change, trend: usersChange.trend as 'up' | 'down' },
-    ]
-  }, [periodRequests, prevPeriodRequests, periodDocs, prevPeriodDocs, users, periodCutoff, prevPeriodCutoff])
-
-  // ── Line chart data ──────────────────────────────────────────────────────
-  const chartData = useMemo(() => {
-    const buckets = generateTimeBuckets(selectedPeriod)
-    const demandesCounts = countInBuckets(periodRequests, r => r.createdAt, buckets)
-    const docsCounts = countInBuckets(periodDocs, d => d.createdAt, buckets)
-    const courriersCounts = countInBuckets(periodCourriers, c => c.createdAt, buckets)
-
-    return buckets.map((b, i) => ({
-      month: b.label,
-      demandes: demandesCounts[i],
-      documents: docsCounts[i],
-      courriers: courriersCounts[i],
-    }))
-  }, [selectedPeriod, periodRequests, periodDocs, periodCourriers])
-
-  // ── Stacked bar chart data (by service) ──────────────────────────────────
-  const serviceData = useMemo(() => {
-    const serviceMap = new Map<string, { demandes: number; documents: number; courriers: number }>()
-
-    // From citizen requests — group by assignedService
-    for (const req of periodRequests) {
-      const svc = req.assignedService || req.category
-      const existing = serviceMap.get(svc) || { demandes: 0, documents: 0, courriers: 0 }
-      existing.demandes++
-      serviceMap.set(svc, existing)
-    }
-
-    // From GED documents — group by category label
-    for (const doc of periodDocs) {
-      const svc = GED_CATEGORY_LABELS[doc.category] || doc.category
-      const existing = serviceMap.get(svc) || { demandes: 0, documents: 0, courriers: 0 }
-      existing.documents++
-      serviceMap.set(svc, existing)
-    }
-
-    // From courriers — group by from field (abbreviated)
-    for (const c of periodCourriers) {
-      const svc = c.from.length > 25 ? c.from.substring(0, 22) + '…' : c.from
-      const existing = serviceMap.get(svc) || { demandes: 0, documents: 0, courriers: 0 }
-      existing.courriers++
-      serviceMap.set(svc, existing)
-    }
-
-    return Array.from(serviceMap.entries())
-      .map(([service, counts]) => ({ service, ...counts }))
-      .sort((a, b) => (b.demandes + b.documents + b.courriers) - (a.demandes + a.documents + a.courriers))
-      .slice(0, 8)
-  }, [periodRequests, periodDocs, periodCourriers])
-
-  // ── Radar chart data ─────────────────────────────────────────────────────
-  const radarData = useMemo(() => {
-    // Réactivité: % of requests that have progressed beyond initial status
-    const progressedReqs = periodRequests.filter(r => r.status !== 'soumise').length
-    const reactivite = periodRequests.length > 0 ? (progressedReqs / periodRequests.length) * 100 : 0
-
-    // Conformité: % of valid/archived GED documents
-    const conformDocs = periodDocs.filter(d => d.status === 'valide' || d.status === 'archive').length
-    const conformite = periodDocs.length > 0 ? (conformDocs / periodDocs.length) * 100 : 100
-
-    // Efficacité: % of completed/delivered citizen requests
-    const completedReqs = periodRequests.filter(r => ['validee', 'prete', 'livree'].includes(r.status)).length
-    const efficacite = periodRequests.length > 0 ? (completedReqs / periodRequests.length) * 100 : 0
-
-    // Innovation: % of requests with online delivery
-    const onlineDeliveries = periodRequests.filter(r => r.deliveryMode === 'en_ligne').length
-    const innovation = periodRequests.length > 0 ? (onlineDeliveries / periodRequests.length) * 100 : 0
-
-    // Satisfaction: composite score based on completion rate and low rejection
-    const rejectedReqs = periodRequests.filter(r => r.status === 'rejetee').length
-    const satisfaction = periodRequests.length > 0
-      ? Math.min(100, ((completedReqs + 0.5 * (periodRequests.length - completedReqs - rejectedReqs)) / periodRequests.length) * 100)
-      : 0
-
-    return [
-      { dimension: 'Réactivité', score: Math.round(reactivite) },
-      { dimension: 'Conformité', score: Math.round(conformite) },
-      { dimension: 'Efficacité', score: Math.round(efficacite) },
-      { dimension: 'Innovation', score: Math.round(innovation) },
-      { dimension: 'Satisfaction', score: Math.round(satisfaction) },
-    ]
-  }, [periodRequests, periodDocs])
-
-  // ── Top services ranking ─────────────────────────────────────────────────
-  const topServices = useMemo(() => {
-    const svcMap = new Map<string, { count: number; completed: number; totalDelayDays: number; delayCount: number }>()
-
-    for (const req of periodRequests) {
-      const svc = req.assignedService || req.category
-      const existing = svcMap.get(svc) || { count: 0, completed: 0, totalDelayDays: 0, delayCount: 0 }
-      existing.count++
-      if (['validee', 'prete', 'livree'].includes(req.status)) existing.completed++
-      if (req.completedAt) {
-        existing.totalDelayDays += (new Date(req.completedAt).getTime() - new Date(req.createdAt).getTime()) / 86400000
-        existing.delayCount++
-      }
-      svcMap.set(svc, existing)
-    }
-
-    return Array.from(svcMap.entries())
-      .map(([name, data]) => ({
-        name,
-        courriers: data.count,
-        conformite: data.count > 0 ? +((data.completed / data.count) * 100).toFixed(1) : 0,
-        delai: data.delayCount > 0 ? `${(data.totalDelayDays / data.delayCount).toFixed(1)}j` : '—',
-      }))
-      .sort((a, b) => b.courriers - a.courriers)
-      .slice(0, 7)
-      .map((item, idx) => ({ rank: idx + 1, ...item }))
-  }, [periodRequests])
-
-  // ── SLA compliance data ──────────────────────────────────────────────────
-  const slaData = useMemo(() => {
-    const SLA_DAYS = 5
-
-    // Courriers entrants
-    const entrants = periodCourriers.filter(c => c.direction === 'entrant')
-    const entrantsDansDelai = entrants.filter(c => {
-      if (!c.deadline) return true
-      if (['traite', 'vise', 'archive'].includes(c.status)) return new Date(c.updatedAt) <= new Date(c.deadline)
-      return new Date(c.deadline) >= new Date()
-    }).length
-
-    // Courriers sortants
-    const sortants = periodCourriers.filter(c => c.direction === 'sortant')
-    const sortantsDansDelai = sortants.filter(c => {
-      if (!c.deadline) return true
-      if (['traite', 'vise', 'archive'].includes(c.status)) return new Date(c.updatedAt) <= new Date(c.deadline)
-      return new Date(c.deadline) >= new Date()
-    }).length
-
-    // Documents GED
-    const docsDansDelai = periodDocs.filter(d => {
-      if (d.status === 'valide' || d.status === 'archive') return true
-      const daysSince = (Date.now() - new Date(d.createdAt).getTime()) / 86400000
-      return daysSince < SLA_DAYS
-    }).length
-
-    // Demandes traitées (with completedAt)
-    const completedRequests = periodRequests.filter(r => r.completedAt)
-    const reqsDansDelai = completedRequests.filter(r => {
-      const days = (new Date(r.completedAt!).getTime() - new Date(r.createdAt).getTime()) / 86400000
-      return days <= SLA_DAYS
-    }).length
-
-    // Actes d'état civil (from birth certificate store)
-    const totalBirth = birthRecords.length
-    const activeBirth = birthRecords.filter(r => r.status === 'active').length
-
-    return [
-      {
-        type: 'Courriers entrants',
-        total: entrants.length,
-        dansDelai: entrantsDansDelai,
-        horsDelai: Math.max(0, entrants.length - entrantsDansDelai),
-        taux: entrants.length > 0 ? `${((entrantsDansDelai / entrants.length) * 100).toFixed(1)}%` : '—',
-      },
-      {
-        type: 'Courriers sortants',
-        total: sortants.length,
-        dansDelai: sortantsDansDelai,
-        horsDelai: Math.max(0, sortants.length - sortantsDansDelai),
-        taux: sortants.length > 0 ? `${((sortantsDansDelai / sortants.length) * 100).toFixed(1)}%` : '—',
-      },
-      {
-        type: 'Documents archivés',
-        total: periodDocs.length,
-        dansDelai: docsDansDelai,
-        horsDelai: Math.max(0, periodDocs.length - docsDansDelai),
-        taux: periodDocs.length > 0 ? `${((docsDansDelai / periodDocs.length) * 100).toFixed(1)}%` : '—',
-      },
-      {
-        type: 'Demandes traitées',
-        total: completedRequests.length,
-        dansDelai: reqsDansDelai,
-        horsDelai: Math.max(0, completedRequests.length - reqsDansDelai),
-        taux: completedRequests.length > 0 ? `${((reqsDansDelai / completedRequests.length) * 100).toFixed(1)}%` : '—',
-      },
-      {
-        type: 'Actes état civil',
-        total: totalBirth,
-        dansDelai: activeBirth,
-        horsDelai: Math.max(0, totalBirth - activeBirth),
-        taux: totalBirth > 0 ? `${((activeBirth / totalBirth) * 100).toFixed(1)}%` : '—',
-      },
-      {
-        type: 'Notifications lues',
-        total: periodNotifs.length,
-        dansDelai: periodNotifs.filter(n => n.read).length,
-        horsDelai: unreadNotifs,
-        taux: periodNotifs.length > 0 ? `${(((periodNotifs.length - unreadNotifs) / periodNotifs.length) * 100).toFixed(1)}%` : '—',
-      },
-      {
-        type: 'Événements critique',
-        total: periodLogs.length,
-        dansDelai: periodLogs.length - criticalLogs,
-        horsDelai: criticalLogs,
-        taux: periodLogs.length > 0 ? `${(((periodLogs.length - criticalLogs) / periodLogs.length) * 100).toFixed(1)}%` : '—',
-      },
-    ]
-  }, [periodCourriers, periodDocs, periodRequests, birthRecords, periodNotifs, unreadNotifs, periodLogs, criticalLogs])
-
-  // ── Toast auto-dismiss ───────────────────────────────────────────────────
   useEffect(() => {
     if (successToast) {
       const timer = setTimeout(() => setSuccessToast(''), 4000)
@@ -587,38 +322,31 @@ export default function AnalyticsPage() {
     }
   }, [successToast])
 
-  // ── Export handlers ──────────────────────────────────────────────────────
   const handleExportPDF = useCallback(async () => {
     setExportingPdf(true)
     setSuccessToast('Rapport PDF en cours de génération...')
+    // Simulate a brief delay for UX
     await new Promise(r => setTimeout(r, 1200))
-    exportPDFReport(
-      selectedPeriod,
-      summaryCards,
-      chartData.map(d => ({ periode: d.month, demandes: d.demandes, documents: d.documents, courriers: d.courriers })),
-      serviceData,
-      slaData,
-    )
+    exportPDFReport(selectedPeriod, currentSummary, currentChartData, currentServiceData)
     setSuccessToast('Rapport PDF téléchargé avec succès !')
     setExportingPdf(false)
-  }, [selectedPeriod, summaryCards, chartData, serviceData, slaData])
+  }, [selectedPeriod, currentSummary, currentChartData, currentServiceData])
 
   const handleExportCSV = useCallback(async () => {
     setExportingCsv(true)
     setSuccessToast('Export CSV en cours de génération...')
     await new Promise(r => setTimeout(r, 800))
-    const allData = chartData.map(row => ({
+    // Combine all data into one CSV export
+    const allData = currentChartData.map(row => ({
       Période: row.month,
-      Demandes: row.demandes,
-      Documents: row.documents,
       Courriers: row.courriers,
+      Documents: row.documents,
+      Workflows: row.workflows,
     }))
     exportCSV(allData, `analytics-${selectedPeriod}-${new Date().toISOString().slice(0, 10)}.csv`)
     setSuccessToast('Export CSV téléchargé avec succès !')
     setExportingCsv(false)
-  }, [selectedPeriod, chartData])
-
-  // ── RENDER ───────────────────────────────────────────────────────────────
+  }, [selectedPeriod, currentChartData])
 
   return (
     <motion.div
@@ -697,7 +425,7 @@ export default function AnalyticsPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
-        {summaryCards.map((card, idx) => {
+        {currentSummary.map((card, idx) => {
           const Icon = summaryIcons[idx]
           const isPositive = card.trend === 'up'
           return (
@@ -740,12 +468,12 @@ export default function AnalyticsPage() {
               Tendances — {periods.find(p => p.value === selectedPeriod)?.label || '30 jours'}
             </CardTitle>
             <CardDescription className="text-xs">
-              Évolution comparée des demandes, documents et courriers
+              Évolution comparée des courriers, documents et workflows
             </CardDescription>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+              <LineChart data={currentChartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} className="text-muted-foreground" />
                 <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" />
@@ -760,8 +488,8 @@ export default function AnalyticsPage() {
                 <Legend iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
                 <Line
                   type="monotone"
-                  dataKey="demandes"
-                  name="Demandes"
+                  dataKey="courriers"
+                  name="Courriers"
                   stroke="#0B2E58"
                   strokeWidth={2.5}
                   dot={{ r: 3, fill: '#0B2E58' }}
@@ -778,8 +506,8 @@ export default function AnalyticsPage() {
                 />
                 <Line
                   type="monotone"
-                  dataKey="courriers"
-                  name="Courriers"
+                  dataKey="workflows"
+                  name="Workflows"
                   stroke="#C8A45C"
                   strokeWidth={2.5}
                   dot={{ r: 3, fill: '#C8A45C' }}
@@ -803,7 +531,7 @@ export default function AnalyticsPage() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={serviceData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                <BarChart data={currentServiceData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
                   <XAxis
                     dataKey="service"
@@ -824,9 +552,9 @@ export default function AnalyticsPage() {
                     }}
                   />
                   <Legend iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
-                  <Bar dataKey="demandes" name="Demandes" stackId="a" fill="#0B2E58" radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="courriers" name="Courriers" stackId="a" fill="#0B2E58" radius={[0, 0, 0, 0]} />
                   <Bar dataKey="documents" name="Documents" stackId="a" fill="#3B7DD8" radius={[0, 0, 0, 0]} />
-                  <Bar dataKey="courriers" name="Courriers" stackId="a" fill="#C8A45C" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="workflows" name="Workflows" stackId="a" fill="#C8A45C" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -843,7 +571,7 @@ export default function AnalyticsPage() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="70%">
+                <RadarChart data={currentRadarData} cx="50%" cy="50%" outerRadius="70%">
                   <PolarGrid className="stroke-border" />
                   <PolarAngleAxis dataKey="dimension" tick={{ fontSize: 11 }} className="text-muted-foreground" />
                   <PolarRadiusAxis tick={{ fontSize: 10 }} domain={[0, 100]} />
@@ -881,63 +609,57 @@ export default function AnalyticsPage() {
                   <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
                     Classement des services
                   </CardTitle>
-                  <CardDescription className="text-xs">Top services par volume de demandes</CardDescription>
+                  <CardDescription className="text-xs">Top services par volume de courriers</CardDescription>
                 </div>
                 <BarChart3 className="size-4 text-muted-foreground" />
               </div>
             </CardHeader>
             <CardContent className="px-3">
-              <div className="overflow-x-auto">
-              {topServices.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10 text-center">#</TableHead>
-                      <TableHead>Service</TableHead>
-                      <TableHead className="text-right">Demandes</TableHead>
-                      <TableHead className="text-right">Conformité</TableHead>
-                      <TableHead className="text-right">Délai</TableHead>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10 text-center">#</TableHead>
+                    <TableHead>Service</TableHead>
+                    <TableHead className="text-right">Courriers</TableHead>
+                    <TableHead className="text-right">Conformité</TableHead>
+                    <TableHead className="text-right">Délai</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {topServices.map((service) => (
+                    <TableRow key={service.rank}>
+                      <TableCell className="text-center">
+                        <Badge
+                          variant={service.rank <= 3 ? 'default' : 'outline'}
+                          className={`size-6 items-center justify-center p-0 text-[10px] ${
+                            service.rank <= 3
+                              ? 'bg-[#0B2E58] text-white'
+                              : ''
+                          }`}
+                        >
+                          {service.rank}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs font-medium">{service.name}</TableCell>
+                      <TableCell className="text-right text-xs">{service.courriers}</TableCell>
+                      <TableCell className="text-right">
+                        <span
+                          className={`text-xs font-semibold ${
+                            service.conformite >= 98
+                              ? 'text-emerald-600'
+                              : service.conformite >= 96
+                                ? 'text-amber-600'
+                                : 'text-red-500'
+                          }`}
+                        >
+                          {service.conformite}%
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right text-xs text-muted-foreground">{service.delai}</TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {topServices.map((service) => (
-                      <TableRow key={service.rank}>
-                        <TableCell className="text-center">
-                          <Badge
-                            variant={service.rank <= 3 ? 'default' : 'outline'}
-                            className={`size-6 items-center justify-center p-0 text-[10px] ${
-                              service.rank <= 3
-                                ? 'bg-[#0B2E58] text-white'
-                                : ''
-                            }`}
-                          >
-                            {service.rank}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-xs font-medium">{service.name}</TableCell>
-                        <TableCell className="text-right text-xs">{service.courriers}</TableCell>
-                        <TableCell className="text-right">
-                          <span
-                            className={`text-xs font-semibold ${
-                              service.conformite >= 98
-                                ? 'text-emerald-600'
-                                : service.conformite >= 96
-                                  ? 'text-amber-600'
-                                  : 'text-red-500'
-                            }`}
-                          >
-                            {service.conformite}%
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right text-xs text-muted-foreground">{service.delai}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              ) : (
-                <p className="py-8 text-center text-xs text-muted-foreground">Aucune donnée pour cette période</p>
-              )}
-              </div>
+                  ))}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </motion.div>
@@ -957,7 +679,6 @@ export default function AnalyticsPage() {
               </div>
             </CardHeader>
             <CardContent className="px-3">
-              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -979,9 +700,9 @@ export default function AnalyticsPage() {
                         <Badge
                           variant="outline"
                           className={`text-[10px] font-semibold ${
-                            row.taux !== '—' && parseFloat(row.taux) >= 98
+                            parseFloat(row.taux) >= 98
                               ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
-                              : row.taux !== '—' && parseFloat(row.taux) >= 96
+                              : parseFloat(row.taux) >= 96
                                 ? 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
                                 : 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400'
                           }`}
@@ -993,7 +714,6 @@ export default function AnalyticsPage() {
                   ))}
                 </TableBody>
               </Table>
-              </div>
             </CardContent>
           </Card>
         </motion.div>

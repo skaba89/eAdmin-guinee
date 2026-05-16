@@ -1,7 +1,8 @@
 'use client'
 
+import { useEffect } from 'react'
 import dynamic from 'next/dynamic'
-import { useAppStore } from '@/store/app-store'
+import { useAppStore, ROLE_DEFAULT_PAGE, type AppPage, type UserRole } from '@/store/app-store'
 
 // Lazy load all page components to reduce initial bundle size
 const LandingPage = dynamic(() => import('@/components/landing/landing-page').then(m => ({ default: m.LandingPage })), { ssr: false })
@@ -16,7 +17,6 @@ const DemoPage = dynamic(() => import('@/components/landing/demo-page').then(m =
 const LoginPage = dynamic(() => import('@/components/auth/login-page').then(m => ({ default: m.LoginPage })), { ssr: false })
 const RegisterPage = dynamic(() => import('@/components/auth/register-page').then(m => ({ default: m.RegisterPage })), { ssr: false })
 const AppSidebar = dynamic(() => import('@/components/layout/app-sidebar').then(m => ({ default: m.AppSidebar })), { ssr: false })
-const MobileSidebar = dynamic(() => import('@/components/layout/app-sidebar').then(m => ({ default: m.MobileSidebar })), { ssr: false })
 const AppHeader = dynamic(() => import('@/components/layout/app-header').then(m => ({ default: m.AppHeader })), { ssr: false })
 const DashboardPage = dynamic(() => import('@/components/app/dashboard-page'), { ssr: false })
 const AnalyticsPage = dynamic(() => import('@/components/app/analytics-page'), { ssr: false })
@@ -77,8 +77,17 @@ const appPages: Record<string, React.ComponentType> = {
   'ai-assistant': AiAssistantPage,
 }
 
+const ROLE_PAGE_ACCESS: Record<UserRole, AppPage[]> = {
+  citizen: ['citizen-portal', 'public-citizen-portal', 'ai-assistant', 'settings'],
+  mairie: ['mairie-dashboard', 'service-requests', 'ged', 'courriers', 'ai-assistant', 'settings', 'birth-certificate-db'],
+  admin_general: ['dashboard', 'service-requests', 'ged', 'courriers', 'workflow', 'signatures', 'analytics', 'citizen-portal', 'ai-assistant', 'admin', 'users', 'notifications', 'audit-logs', 'settings', 'birth-certificate-db'],
+  agence: ['agence-dashboard', 'service-requests', 'ged', 'ai-assistant', 'settings'],
+  ministere: ['dashboard', 'service-requests', 'ged', 'courriers', 'workflow', 'signatures', 'ai-assistant', 'settings', 'birth-certificate-db'],
+  super_admin: Object.keys(appPages) as AppPage[],
+}
+
 export default function Home() {
-  const { currentPage, isAuth, user } = useAppStore()
+  const { currentPage, isAuth, user, navigate } = useAppStore()
 
   // Auth pages (login, register, etc.)
   if (!isAuth && currentPage in authPages) {
@@ -88,8 +97,21 @@ export default function Home() {
 
   // Authenticated app pages
   if (isAuth) {
-    // Determine the default page based on role
-    const AppComponent = appPages[currentPage] || DashboardPage
+    const userRole = (user?.role || 'citizen') as UserRole
+    const allowedPages = ROLE_PAGE_ACCESS[userRole] || []
+    const defaultPage = ROLE_DEFAULT_PAGE[userRole] || 'dashboard'
+
+    // If user tries to access a page they don't have access to, redirect to default
+    const hasAccess = allowedPages.includes(currentPage as AppPage)
+    const effectivePage = hasAccess ? currentPage : defaultPage
+
+    // Redirect if user is on a page they can't access
+    if (!hasAccess) {
+      // Use microtask to avoid setState during render
+      Promise.resolve().then(() => navigate(defaultPage))
+    }
+
+    const AppComponent = appPages[effectivePage] || DashboardPage
     return (
       <div className="min-h-screen flex bg-background">
         <AppSidebar />
@@ -100,7 +122,6 @@ export default function Home() {
           </main>
         </div>
         <AiChatbotWidget />
-        <MobileSidebar />
       </div>
     )
   }

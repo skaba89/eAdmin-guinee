@@ -3,11 +3,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  ScrollText, Search, Download, Filter, Clock,
-  Activity, Globe, ChevronDown, RefreshCw, CheckCircle2,
-  Trash2, RotateCcw
+  ScrollText, Search, Download, Filter, Clock, User,
+  Activity, Globe, ChevronDown, RefreshCw, AlertTriangle, CheckCircle2
 } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -16,125 +15,71 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import {
-  useAuditLogsStore,
-  type AuditAction,
-  type AuditResource,
-  type AuditSeverity,
-  type AuditLog,
-} from '@/store/audit-logs-store'
 
-// ─── LABELS & CONFIG ──────────────────────────────────────────────────────────
-
-const ACTION_CONFIG: Record<AuditAction, { label: string; color: string; bgColor: string }> = {
-  create:        { label: 'Création',              color: 'text-emerald-700 dark:text-emerald-400', bgColor: 'bg-emerald-100 dark:bg-emerald-900/30' },
-  read:          { label: 'Lecture',               color: 'text-sky-700 dark:text-sky-400',          bgColor: 'bg-sky-100 dark:bg-sky-900/30' },
-  update:        { label: 'Modification',          color: 'text-sky-700 dark:text-sky-400',          bgColor: 'bg-sky-100 dark:bg-sky-900/30' },
-  delete:        { label: 'Suppression',           color: 'text-red-700 dark:text-red-400',          bgColor: 'bg-red-100 dark:bg-red-900/30' },
-  login:         { label: 'Connexion',             color: 'text-gray-700 dark:text-gray-400',        bgColor: 'bg-gray-100 dark:bg-gray-800' },
-  logout:        { label: 'Déconnexion',           color: 'text-gray-700 dark:text-gray-400',        bgColor: 'bg-gray-100 dark:bg-gray-800' },
-  approve:       { label: 'Approbation',           color: 'text-emerald-700 dark:text-emerald-400',  bgColor: 'bg-emerald-100 dark:bg-emerald-900/30' },
-  reject:        { label: 'Rejet',                 color: 'text-red-700 dark:text-red-400',          bgColor: 'bg-red-100 dark:bg-red-900/30' },
-  archive:       { label: 'Archivage',             color: 'text-amber-700 dark:text-amber-400',      bgColor: 'bg-amber-100 dark:bg-amber-900/30' },
-  export:        { label: 'Export',                color: 'text-purple-700 dark:text-purple-400',    bgColor: 'bg-purple-100 dark:bg-purple-900/30' },
-  download:      { label: 'Téléchargement',        color: 'text-purple-700 dark:text-purple-400',    bgColor: 'bg-purple-100 dark:bg-purple-900/30' },
-  upload:        { label: 'Téléversement',         color: 'text-indigo-700 dark:text-indigo-400',    bgColor: 'bg-indigo-100 dark:bg-indigo-900/30' },
-  sign:          { label: 'Signature',             color: 'text-indigo-700 dark:text-indigo-400',    bgColor: 'bg-indigo-100 dark:bg-indigo-900/30' },
-  verify:        { label: 'Vérification',          color: 'text-teal-700 dark:text-teal-400',        bgColor: 'bg-teal-100 dark:bg-teal-900/30' },
-  transfer:      { label: 'Transfert',             color: 'text-orange-700 dark:text-orange-400',    bgColor: 'bg-orange-100 dark:bg-orange-900/30' },
-  assign:        { label: 'Assignation',           color: 'text-cyan-700 dark:text-cyan-400',        bgColor: 'bg-cyan-100 dark:bg-cyan-900/30' },
-  status_change: { label: 'Changement de statut',  color: 'text-amber-700 dark:text-amber-400',      bgColor: 'bg-amber-100 dark:bg-amber-900/30' },
+interface AuditLog {
+  id: string
+  timestamp: string
+  user: string
+  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT' | 'EXPORT' | 'APPROVE' | 'REJECT'
+  resource: string
+  resourceType: string
+  ipAddress: string
+  details: string
 }
 
-const SEVERITY_CONFIG: Record<AuditSeverity, { label: string; dotColor: string }> = {
-  info:     { label: 'Info',         dotColor: 'bg-sky-500' },
-  warning:  { label: 'Avertissement', dotColor: 'bg-amber-500' },
-  critical: { label: 'Critique',     dotColor: 'bg-red-500' },
+const FAKE_LOGS: AuditLog[] = [
+  { id: '1', timestamp: '2024-12-15 14:32:15', user: 'Amadou Diallo', action: 'LOGIN', resource: 'Session', resourceType: 'auth', ipAddress: '196.125.43.21', details: 'Connexion réussie depuis Conakry' },
+  { id: '2', timestamp: '2024-12-15 14:28:03', user: 'Aissatou Baldé', action: 'CREATE', resource: 'Courrier CE-2024-1852', resourceType: 'courriers', ipAddress: '196.125.43.22', details: 'Nouveau courrier entrant créé' },
+  { id: '3', timestamp: '2024-12-15 14:15:47', user: 'Ibrahima Sow', action: 'UPDATE', resource: 'Workflow WF-2024-045', resourceType: 'workflows', ipAddress: '196.125.43.25', details: 'Transition d\'étape: Validation → Approbation' },
+  { id: '4', timestamp: '2024-12-15 13:55:21', user: 'Fatoumata Camara', action: 'APPROVE', resource: 'Demande de congé DC-2024-089', resourceType: 'workflows', ipAddress: '196.125.43.30', details: 'Approbation DRH - Congé validé' },
+  { id: '5', timestamp: '2024-12-15 13:42:08', user: 'Alpha Condé', action: 'CREATE', resource: 'Arrêté n°2024-312', resourceType: 'ged', ipAddress: '196.125.43.10', details: 'Nouveau document GED créé et classé' },
+  { id: '6', timestamp: '2024-12-15 12:30:55', user: 'Mariama Condé', action: 'UPDATE', resource: 'Paramètres sécurité', resourceType: 'admin', ipAddress: '196.125.43.15', details: 'Activation de la MFA pour tous les utilisateurs' },
+  { id: '7', timestamp: '2024-12-15 11:18:33', user: 'Kadiatou Sylla', action: 'EXPORT', resource: 'Rapport mensuel Nov-2024', resourceType: 'ged', ipAddress: '196.125.43.35', details: 'Export PDF du rapport mensuel' },
+  { id: '8', timestamp: '2024-12-15 10:45:12', user: 'Mamadou Keïta', action: 'DELETE', resource: 'Brouillon circulaire C-2024-046', resourceType: 'ged', ipAddress: '196.125.43.40', details: 'Suppression d\'un brouillon obsolète' },
+  { id: '9', timestamp: '2024-12-15 09:55:44', user: 'Abdoulaye Bah', action: 'UPDATE', resource: 'Budget prévisionnel 2025', resourceType: 'ged', ipAddress: '196.125.43.45', details: 'Mise à jour chapitre 3 - Dépenses d\'investissement' },
+  { id: '10', timestamp: '2024-12-15 09:30:00', user: 'Sékou Touré', action: 'REJECT', resource: 'Demande subvention DS-2024-023', resourceType: 'workflows', ipAddress: '196.125.43.50', details: 'Rejet - Dossier incomplet' },
+  { id: '11', timestamp: '2024-12-15 08:22:18', user: 'Djenabou Diallo', action: 'LOGIN', resource: 'Session', resourceType: 'auth', ipAddress: '196.125.43.55', details: 'Connexion depuis Kindia' },
+  { id: '12', timestamp: '2024-12-15 08:10:05', user: 'Aminata Touré', action: 'CREATE', resource: 'Dossier citoyen DOSS-2024-4521', resourceType: 'citoyen', ipAddress: '196.125.43.60', details: 'Nouvelle demande d\'acte de naissance' },
+  { id: '13', timestamp: '2024-12-14 17:45:33', user: 'Amadou Diallo', action: 'LOGOUT', resource: 'Session', resourceType: 'auth', ipAddress: '196.125.43.21', details: 'Déconnexion de fin de journée' },
+  { id: '14', timestamp: '2024-12-14 16:30:12', user: 'Système', action: 'UPDATE', resource: 'Service WhatsApp API', resourceType: 'système', ipAddress: '10.0.0.1', details: 'Tentative de reconnexion automatique - Échec' },
+  { id: '15', timestamp: '2024-12-14 15:15:48', user: 'Ibrahima Sow', action: 'APPROVE', resource: 'Marché public MP-2024-567', resourceType: 'workflows', ipAddress: '196.125.43.25', details: 'Validation commission d\'appel d\'offres' },
+]
+
+const ACTION_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
+  CREATE: { label: 'Création', color: 'text-emerald-700 dark:text-emerald-400', bgColor: 'bg-emerald-100 dark:bg-emerald-900/30' },
+  UPDATE: { label: 'Modification', color: 'text-sky-700 dark:text-sky-400', bgColor: 'bg-sky-100 dark:bg-sky-900/30' },
+  DELETE: { label: 'Suppression', color: 'text-red-700 dark:text-red-400', bgColor: 'bg-red-100 dark:bg-red-900/30' },
+  LOGIN: { label: 'Connexion', color: 'text-gray-700 dark:text-gray-400', bgColor: 'bg-gray-100 dark:bg-gray-800' },
+  LOGOUT: { label: 'Déconnexion', color: 'text-gray-700 dark:text-gray-400', bgColor: 'bg-gray-100 dark:bg-gray-800' },
+  EXPORT: { label: 'Export', color: 'text-purple-700 dark:text-purple-400', bgColor: 'bg-purple-100 dark:bg-purple-900/30' },
+  APPROVE: { label: 'Approbation', color: 'text-emerald-700 dark:text-emerald-400', bgColor: 'bg-emerald-100 dark:bg-emerald-900/30' },
+  REJECT: { label: 'Rejet', color: 'text-red-700 dark:text-red-400', bgColor: 'bg-red-100 dark:bg-red-900/30' },
 }
 
-const RESOURCE_LABELS: Record<AuditResource, string> = {
-  demande:     'Demande',
-  document:    'Document',
-  courrier:    'Courrier',
-  utilisateur: 'Utilisateur',
-  workflow:    'Workflow',
-  signature:   'Signature',
-  parametre:   'Paramètre',
-  systeme:     'Système',
+const RESOURCE_TYPES = ['Tous', 'auth', 'courriers', 'workflows', 'ged', 'admin', 'citoyen', 'système']
+const ACTION_TYPES = ['Tous', 'CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGOUT', 'EXPORT', 'APPROVE', 'REJECT']
+
+// Random data generators for live mode
+const LIVE_USERS = ['Amadou Diallo', 'Aissatou Baldé', 'Ibrahima Sow', 'Fatoumata Camara', 'Alpha Condé', 'Mariama Condé', 'Kadiatou Sylla', 'Mamadou Keïta']
+const LIVE_ACTIONS: AuditLog['action'][] = ['CREATE', 'UPDATE', 'APPROVE', 'LOGIN', 'EXPORT']
+const LIVE_RESOURCES = ['Courrier CE-2024-', 'Workflow WF-2024-', 'Arrêté n°2024-', 'Dossier DOSS-2024-', 'Rapport R-2024-']
+const LIVE_RESOURCE_TYPES = ['courriers', 'workflows', 'ged', 'citoyen', 'auth']
+const LIVE_DETAILS: Record<string, string[]> = {
+  CREATE: ['Nouveau courrier entrant créé', 'Nouveau document GED créé', 'Nouvelle demande citoyenne enregistrée', 'Nouveau workflow initié'],
+  UPDATE: ['Mise à jour des métadonnées', 'Modification du statut', 'Transition d\'étape validée', 'Correction apportée'],
+  APPROVE: ['Approbation DRH', 'Validation direction générale', 'Visa conforme', 'Autorisation accordée'],
+  LOGIN: ['Connexion réussie depuis Conakry', 'Connexion depuis Kindia', 'Reconnexion automatique', 'Connexion mobile'],
+  EXPORT: ['Export PDF du rapport', 'Export CSV des données', 'Export du journal', 'Génération du bordereau'],
 }
-
-const RESOURCE_FILTER_OPTIONS: { value: AuditResource | 'all'; label: string }[] = [
-  { value: 'all', label: 'Toutes les ressources' },
-  ...Object.entries(RESOURCE_LABELS).map(([value, label]) => ({ value: value as AuditResource, label })),
-]
-
-const ACTION_FILTER_OPTIONS: { value: AuditAction | 'all'; label: string }[] = [
-  { value: 'all', label: 'Toutes les actions' },
-  ...Object.entries(ACTION_CONFIG).map(([value, { label }]) => ({ value: value as AuditAction, label })),
-]
-
-const SEVERITY_FILTER_OPTIONS: { value: AuditSeverity | 'all'; label: string }[] = [
-  { value: 'all', label: 'Toutes les sévérités' },
-  { value: 'info', label: 'Info' },
-  { value: 'warning', label: 'Avertissement' },
-  { value: 'critical', label: 'Critique' },
-]
-
-// ─── LIVE MODE RANDOM GENERATORS ──────────────────────────────────────────────
-
-const LIVE_USERS = [
-  { userName: 'Amadou Diallo',    userRole: 'admin_general', userId: 'live-1' },
-  { userName: 'Aissatou Baldé',   userRole: 'mairie',        userId: 'live-2' },
-  { userName: 'Ibrahima Sow',     userRole: 'agence',        userId: 'live-3' },
-  { userName: 'Fatoumata Camara', userRole: 'citizen',       userId: 'live-4' },
-  { userName: 'Alpha Condé',      userRole: 'ministere',     userId: 'live-5' },
-  { userName: 'Mariama Condé',    userRole: 'mairie',        userId: 'live-6' },
-  { userName: 'Kadiatou Sylla',   userRole: 'admin_general', userId: 'live-7' },
-  { userName: 'Mamadou Keïta',    userRole: 'agence',        userId: 'live-8' },
-]
-
-const LIVE_SCENARIOS: { action: AuditAction; resource: AuditResource; descriptions: string[] }[] = [
-  { action: 'create',  resource: 'courrier',    descriptions: ['Nouveau courrier entrant enregistré', 'Courrier présidentiel créé', 'Circulaire interne créée'] },
-  { action: 'create',  resource: 'demande',     descriptions: ['Nouvelle demande citoyenne soumise', 'Demande de certificat créée', 'Nouvelle demande d\'acte enregistrée'] },
-  { action: 'update',  resource: 'workflow',    descriptions: ['Transition d\'étape validée', 'Workflow mis à jour', 'Étape de traitement modifiée'] },
-  { action: 'update',  resource: 'document',    descriptions: ['Métadonnées du document mises à jour', 'Document révisé', 'Statut du document modifié'] },
-  { action: 'approve', resource: 'demande',     descriptions: ['Approbation DRH — Demande validée', 'Validation direction générale', 'Visa conforme accordé'] },
-  { action: 'login',   resource: 'utilisateur', descriptions: ['Connexion réussie depuis Conakry', 'Connexion depuis Kindia', 'Connexion mobile authentifiée'] },
-  { action: 'export',  resource: 'demande',     descriptions: ['Export CSV des demandes', 'Export PDF du rapport mensuel', 'Génération du bordereau d\'export'] },
-  { action: 'download', resource: 'document',   descriptions: ['Téléchargement du décret présidentiel', 'Document GED téléchargé', 'Rapport trimestriel récupéré'] },
-  { action: 'sign',    resource: 'signature',   descriptions: ['Signature électronique apposée', 'Convention signée numériquement', 'Arrêté contresigné'] },
-  { action: 'transfer', resource: 'courrier',   descriptions: ['Courrier transféré à la direction', 'Transfert au service compétent', 'Réaffectation du courrier'] },
-  { action: 'reject',  resource: 'demande',     descriptions: ['Rejet — Dossier incomplet', 'Demande refusée — Non conforme', 'Réclamation rejetée'] },
-  { action: 'archive', resource: 'courrier',    descriptions: ['Courrier archivé aux Archives Nationales', 'Dossier classé et archivé', 'Archivage automatique du courrier traité'] },
-]
-
-const LIVE_IPS = ['196.125.43.21', '196.125.43.22', '196.125.34.12', '196.125.50.8', '10.0.0.1']
-const LIVE_SEVERITIES: AuditSeverity[] = ['info', 'info', 'info', 'warning', 'info', 'info', 'info', 'critical']
-
-// ─── HELPERS ───────────────────────────────────────────────────────────────────
-
-function formatTimestamp(iso: string): string {
-  const d = new Date(iso)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-}
+const LIVE_IPS = ['196.125.43.21', '196.125.43.22', '196.125.43.25', '196.125.43.30', '10.0.0.1']
 
 function exportCSV(data: AuditLog[], filename: string) {
   if (!data.length) return
-  const headers = ['Horodatage', 'Utilisateur', 'Action', 'Ressource', 'ID Ressource', 'Sévérité', 'Adresse IP', 'Description']
+  const headers = ['Horodatage', 'Utilisateur', 'Action', 'Ressource', 'Type', 'Adresse IP', 'Détails']
   const csv = [
     headers.join(','),
     ...data.map(row =>
-      [
-        formatTimestamp(row.timestamp),
-        row.userName || '',
-        ACTION_CONFIG[row.action]?.label || row.action,
-        RESOURCE_LABELS[row.resource] || row.resource,
-        row.resourceId || '',
-        SEVERITY_CONFIG[row.severity]?.label || row.severity,
-        row.ipAddress || '',
-        row.description,
-      ]
+      [row.timestamp, row.user, row.action, row.resource, row.resourceType, row.ipAddress, row.details]
         .map(v => `"${v}"`)
         .join(',')
     ),
@@ -148,45 +93,42 @@ function exportCSV(data: AuditLog[], filename: string) {
   URL.revokeObjectURL(url)
 }
 
-function pickRandom<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)]
-}
-
-// ─── COMPONENT ─────────────────────────────────────────────────────────────────
-
 export function AuditLogsPage() {
-  const { logs, addLog, clearLogs, getFiltered, getStats, resetToDemoData } = useAuditLogsStore()
-
   const [search, setSearch] = useState('')
-  const [actionFilter, setActionFilter] = useState<AuditAction | 'all'>('all')
-  const [resourceFilter, setResourceFilter] = useState<AuditResource | 'all'>('all')
-  const [severityFilter, setSeverityFilter] = useState<AuditSeverity | 'all'>('all')
+  const [actionFilter, setActionFilter] = useState('Tous')
+  const [resourceFilter, setResourceFilter] = useState('Tous')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [isLive, setIsLive] = useState(true)
   const [successToast, setSuccessToast] = useState('')
+  const [logs, setLogs] = useState(FAKE_LOGS)
   const [lastActivity, setLastActivity] = useState('Il y a 5 minutes')
   const liveIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const logIdCounter = useRef(FAKE_LOGS.length)
 
-  // ── Live mode: add realistic random logs every 5 seconds ───────────────────
-
+  // Live mode: add fake entries every 5 seconds
   useEffect(() => {
     if (isLive) {
       liveIntervalRef.current = setInterval(() => {
-        const scenario = pickRandom(LIVE_SCENARIOS)
-        const user = pickRandom(LIVE_USERS)
-        const severity = pickRandom(LIVE_SEVERITIES)
+        const action = LIVE_ACTIONS[Math.floor(Math.random() * LIVE_ACTIONS.length)]
+        const user = LIVE_USERS[Math.floor(Math.random() * LIVE_USERS.length)]
+        const resourcePrefix = LIVE_RESOURCES[Math.floor(Math.random() * LIVE_RESOURCES.length)]
+        const resourceType = LIVE_RESOURCE_TYPES[Math.floor(Math.random() * LIVE_RESOURCE_TYPES.length)]
+        const details = LIVE_DETAILS[action][Math.floor(Math.random() * LIVE_DETAILS[action].length)]
+        const ip = LIVE_IPS[Math.floor(Math.random() * LIVE_IPS.length)]
 
-        addLog({
-          action: scenario.action,
-          resource: scenario.resource,
-          description: pickRandom(scenario.descriptions),
-          severity,
-          userId: user.userId,
-          userName: user.userName,
-          userRole: user.userRole,
-          ipAddress: pickRandom(LIVE_IPS),
-        })
+        logIdCounter.current += 1
+        const newLog: AuditLog = {
+          id: String(logIdCounter.current),
+          timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+          user,
+          action,
+          resource: `${resourcePrefix}${Math.floor(Math.random() * 2000) + 1000}`,
+          resourceType,
+          ipAddress: ip,
+          details,
+        }
+        setLogs(prev => [newLog, ...prev])
         setLastActivity('À l\'instant')
       }, 5000)
     } else {
@@ -200,10 +142,9 @@ export function AuditLogsPage() {
         clearInterval(liveIntervalRef.current)
       }
     }
-  }, [isLive, addLog])
+  }, [isLive])
 
-  // ── Update "last activity" text periodically ──────────────────────────────
-
+  // Update "last activity" text periodically
   useEffect(() => {
     const timer = setInterval(() => {
       setLastActivity(prev => {
@@ -215,20 +156,25 @@ export function AuditLogsPage() {
     return () => clearInterval(timer)
   }, [])
 
-  // ── Derived data from store ───────────────────────────────────────────────
-
-  const filtered = getFiltered({
-    action: actionFilter,
-    resource: resourceFilter,
-    severity: severityFilter,
-    search,
-    dateFrom: dateFrom || undefined,
-    dateTo: dateTo || undefined,
+  const filtered = logs.filter(log => {
+    const matchSearch = log.user.toLowerCase().includes(search.toLowerCase()) ||
+      log.resource.toLowerCase().includes(search.toLowerCase()) ||
+      log.details.toLowerCase().includes(search.toLowerCase())
+    const matchAction = actionFilter === 'Tous' || log.action === actionFilter
+    const matchResource = resourceFilter === 'Tous' || log.resourceType === resourceFilter
+    // Date filtering
+    const logDate = log.timestamp.slice(0, 10) // YYYY-MM-DD
+    const matchDateFrom = !dateFrom || logDate >= dateFrom
+    const matchDateTo = !dateTo || logDate <= dateTo
+    return matchSearch && matchAction && matchResource && matchDateFrom && matchDateTo
   })
 
-  const stats = getStats()
-
-  // ── Handlers ──────────────────────────────────────────────────────────────
+  const actionCounts = {
+    CREATE: logs.filter(l => l.action === 'CREATE').length,
+    UPDATE: logs.filter(l => l.action === 'UPDATE').length,
+    DELETE: logs.filter(l => l.action === 'DELETE').length,
+    LOGIN: logs.filter(l => l.action === 'LOGIN').length,
+  }
 
   const handleExportCSV = useCallback(() => {
     setSuccessToast('Export CSV en cours de génération...')
@@ -239,45 +185,15 @@ export function AuditLogsPage() {
     }, 600)
   }, [filtered])
 
-  const handleRefresh = useCallback(() => {
-    const scenario = pickRandom(LIVE_SCENARIOS)
-    addLog({
-      action: scenario.action,
-      resource: scenario.resource,
-      description: pickRandom(scenario.descriptions),
-      severity: 'info',
-      userName: 'Utilisateur actuel',
-      userRole: 'admin_general',
-      ipAddress: '196.125.43.1',
-    })
-    setLastActivity('À l\'instant')
-    setSuccessToast('Journal actualisé avec succès')
-    setTimeout(() => setSuccessToast(''), 4000)
-  }, [addLog])
-
-  const handleClear = useCallback(() => {
-    clearLogs()
-    setSuccessToast('Journal d\'audit effacé avec succès')
-    setTimeout(() => setSuccessToast(''), 4000)
-  }, [clearLogs])
-
-  const handleReset = useCallback(() => {
-    resetToDemoData()
-    setSuccessToast('Données de démonstration restaurées')
-    setTimeout(() => setSuccessToast(''), 4000)
-  }, [resetToDemoData])
-
-  // ── Render ────────────────────────────────────────────────────────────────
-
   return (
     <div className="space-y-6">
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Total événements', value: stats.total, icon: ScrollText, color: 'text-brand dark:text-primary', bg: 'bg-brand/5 dark:bg-primary/10' },
-          { label: 'Créations', value: stats.byAction['create'] || 0, icon: Activity, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
-          { label: 'Modifications', value: stats.byAction['update'] || 0, icon: Activity, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-900/20' },
-          { label: 'Suppressions', value: stats.byAction['delete'] || 0, icon: Activity, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/20' },
+          { label: 'Total événements', value: logs.length, icon: ScrollText, color: 'text-brand dark:text-primary', bg: 'bg-brand/5 dark:bg-primary/10' },
+          { label: 'Créations', value: actionCounts.CREATE, icon: Activity, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
+          { label: 'Modifications', value: actionCounts.UPDATE, icon: Activity, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-900/20' },
+          { label: 'Suppressions', value: actionCounts.DELETE, icon: Activity, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/20' },
         ].map((stat, i) => (
           <motion.div key={stat.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}>
             <Card className="glass-card hover:shadow-lg transition-shadow">
@@ -309,57 +225,30 @@ export function AuditLogsPage() {
                   className="pl-10"
                 />
               </div>
-              <Select value={actionFilter} onValueChange={v => setActionFilter(v as AuditAction | 'all')}>
-                <SelectTrigger className="w-full sm:w-[180px]">
+              <Select value={actionFilter} onValueChange={setActionFilter}>
+                <SelectTrigger className="w-[160px]">
                   <SelectValue placeholder="Action" />
                 </SelectTrigger>
                 <SelectContent>
-                  {ACTION_FILTER_OPTIONS.map(a => <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>)}
+                  {ACTION_TYPES.map(a => <SelectItem key={a} value={a}>{a === 'Tous' ? 'Toutes les actions' : a}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <Select value={resourceFilter} onValueChange={v => setResourceFilter(v as AuditResource | 'all')}>
-                <SelectTrigger className="w-full sm:w-[180px]">
+              <Select value={resourceFilter} onValueChange={setResourceFilter}>
+                <SelectTrigger className="w-[160px]">
                   <SelectValue placeholder="Ressource" />
                 </SelectTrigger>
                 <SelectContent>
-                  {RESOURCE_FILTER_OPTIONS.map(r => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+                  {RESOURCE_TYPES.map(r => <SelectItem key={r} value={r}>{r === 'Tous' ? 'Toutes les ressources' : r}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <Select value={severityFilter} onValueChange={v => setSeverityFilter(v as AuditSeverity | 'all')}>
-                <SelectTrigger className="w-full sm:w-[170px]">
-                  <SelectValue placeholder="Sévérité" />
-                </SelectTrigger>
-                <SelectContent>
-                  {SEVERITY_FILTER_OPTIONS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Input type="date" className="w-full sm:w-[150px]" placeholder="Date début" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-              <Input type="date" className="w-full sm:w-[150px]" placeholder="Date fin" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+              <Input type="date" className="w-[150px]" placeholder="Date début" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+              <Input type="date" className="w-[150px]" placeholder="Date fin" value={dateTo} onChange={e => setDateTo(e.target.value)} />
             </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" className="gap-1.5" onClick={handleExportCSV}>
                 <Download className="h-3.5 w-3.5" />
                 Export CSV
               </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-1.5">
-                    <Filter className="h-3.5 w-3.5" />
-                    Gestion
-                    <ChevronDown className="h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleClear} className="gap-2 text-red-600 focus:text-red-600">
-                    <Trash2 className="h-4 w-4" />
-                    Effacer tous les logs
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleReset} className="gap-2">
-                    <RotateCcw className="h-4 w-4" />
-                    Restaurer données de démonstration
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
             </div>
           </div>
 
@@ -379,7 +268,24 @@ export function AuditLogsPage() {
                 Dernière activité: {lastActivity}
               </span>
             </div>
-            <Button variant="ghost" size="sm" className="gap-1.5" onClick={handleRefresh}>
+            <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => {
+              const action = LIVE_ACTIONS[Math.floor(Math.random() * LIVE_ACTIONS.length)]
+              logIdCounter.current += 1
+              const newLog: AuditLog = {
+                id: String(logIdCounter.current),
+                timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+                user: 'Utilisateur actuel',
+                action,
+                resource: 'Actualisation manuelle',
+                resourceType: 'système',
+                ipAddress: '196.125.43.1',
+                details: 'Actualisation du journal d\'audit',
+              }
+              setLogs(prev => [newLog, ...prev])
+              setLastActivity('À l\'instant')
+              setSuccessToast('Journal actualisé avec succès')
+              setTimeout(() => setSuccessToast(''), 4000)
+            }}>
               <RefreshCw className="h-3.5 w-3.5" />
               Actualiser
             </Button>
@@ -390,7 +296,6 @@ export function AuditLogsPage() {
       {/* Logs Table */}
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -405,8 +310,6 @@ export function AuditLogsPage() {
             <TableBody>
               {filtered.map((log, i) => {
                 const aConfig = ACTION_CONFIG[log.action]
-                const sConfig = SEVERITY_CONFIG[log.severity]
-                const userName = log.userName || 'Système'
                 return (
                   <motion.tr
                     key={log.id}
@@ -417,21 +320,18 @@ export function AuditLogsPage() {
                   >
                     <TableCell>
                       <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground">
-                        {log.severity !== 'info' && (
-                          <div className={`h-1.5 w-1.5 rounded-full ${sConfig.dotColor}`} title={sConfig.label} />
-                        )}
                         <Clock className="h-3 w-3 shrink-0" />
-                        {formatTimestamp(log.timestamp)}
+                        {log.timestamp}
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div className="h-6 w-6 rounded-full bg-brand/10 dark:bg-primary/10 flex items-center justify-center shrink-0">
                           <span className="text-[10px] font-bold text-brand dark:text-primary">
-                            {userName.split(' ').map(n => n[0]).join('')}
+                            {log.user.split(' ').map(n => n[0]).join('')}
                           </span>
                         </div>
-                        <span className="text-sm">{userName}</span>
+                        <span className="text-sm">{log.user}</span>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -441,27 +341,24 @@ export function AuditLogsPage() {
                     </TableCell>
                     <TableCell>
                       <div>
-                        <p className="text-sm truncate max-w-[200px]">
-                          {log.resourceId || RESOURCE_LABELS[log.resource]}
-                        </p>
-                        <Badge variant="outline" className="text-[10px] mt-0.5">{RESOURCE_LABELS[log.resource]}</Badge>
+                        <p className="text-sm truncate max-w-[200px]">{log.resource}</p>
+                        <Badge variant="outline" className="text-[10px] mt-0.5">{log.resourceType}</Badge>
                       </div>
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">
                       <span className="text-xs font-mono text-muted-foreground flex items-center gap-1">
                         <Globe className="h-3 w-3" />
-                        {log.ipAddress || '—'}
+                        {log.ipAddress}
                       </span>
                     </TableCell>
                     <TableCell className="hidden xl:table-cell">
-                      <p className="text-xs text-muted-foreground truncate max-w-[250px]">{log.description}</p>
+                      <p className="text-xs text-muted-foreground truncate max-w-[250px]">{log.details}</p>
                     </TableCell>
                   </motion.tr>
                 )
               })}
             </TableBody>
           </Table>
-          </div>
         </CardContent>
       </Card>
 

@@ -8,8 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { useAppStore, type UserInfo } from '@/store/app-store'
-import { useUsersStore } from '@/store/users-store'
+import { useAppStore, DEMO_ACCOUNTS, type UserInfo } from '@/store/app-store'
 
 // Guinea tricolor
 const GUINEA_RED = '#CE1126'
@@ -96,27 +95,23 @@ export function RegisterPage() {
     // Simulate account creation
     await new Promise(resolve => setTimeout(resolve, 800))
 
-    // Check if email already exists in users store
-    const usersStore = useUsersStore.getState()
-    const existingUser = usersStore.getUserByEmail(form.email)
-    if (existingUser) {
-      setErrors(prev => ({ ...prev, email: 'Cet email est déjà utilisé' }))
-      setIsSubmitting(false)
-      return
-    }
-
-    // Create account in users store (persisted)
-    usersStore.addUser({
-      email: form.email,
+    // Create a citizen account and auto-login
+    const newUser: UserInfo = {
+      id: `citizen-${Date.now()}`,
       name: `${form.lastName} ${form.firstName}`,
-      firstName: form.firstName,
+      email: form.email,
       role: 'citizen',
-      status: 'actif',
+      institution: form.institution || 'Citoyen',
+      fonction: 'Citoyenne guinéenne',
       phone: form.phone,
       nin: form.nin,
-      institution: form.institution || 'Citoyen',
+    }
+
+    // Store in DEMO_ACCOUNTS temporarily for login
+    DEMO_ACCOUNTS[form.email] = {
       password: form.password,
-    })
+      user: newUser,
+    }
 
     setSuccess(true)
     setIsSubmitting(false)
@@ -177,15 +172,11 @@ export function RegisterPage() {
           </div>
 
           <div className="flex items-center gap-3 justify-center mb-2">
-            <div className="h-12 w-12 rounded-2xl bg-white/10 backdrop-blur-lg flex items-center justify-center border border-white/20 overflow-hidden">
-              <img src="/images/coat-of-arms-official.svg" alt="Armories de la République de Guinée" className="h-10 w-10 object-contain" />
+            <div className="h-12 w-12 rounded-2xl bg-white/10 backdrop-blur-lg flex items-center justify-center border border-white/20">
+              <Sparkles className="h-6 w-6 text-[#C8A45C]" />
             </div>
           </div>
-          <div className="flex items-center justify-center gap-2 mb-1">
-            <img src="/images/flag-guinea.svg" alt="Drapeau de la Guinée" className="h-4 w-6 object-contain" />
-            <h1 className="text-xl font-bold text-white">Créer un compte citoyen</h1>
-            <img src="/images/flag-guinea.svg" alt="Drapeau de la Guinée" className="h-4 w-6 object-contain" />
-          </div>
+          <h1 className="text-xl font-bold text-white">Créer un compte citoyen</h1>
           <p className="text-xs text-white/50 mt-1">Rejoignez la plateforme eAdministration — République de Guinée</p>
         </div>
 
@@ -205,7 +196,7 @@ export function RegisterPage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Name row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-white/80 text-xs">Nom *</Label>
                   <div className="relative">
@@ -310,7 +301,7 @@ export function RegisterPage() {
               </div>
 
               {/* Password row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-white/80 text-xs">Mot de passe *</Label>
                   <div className="relative">

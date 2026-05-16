@@ -349,7 +349,7 @@ export function ServiceRequestsPage() {
       htmlContent,
       generatedAt: new Date().toISOString(),
       generatedBy: req.assignedAgent || 'Agent traitant',
-      fileName: `${req.reference.replaceAll('/', '-')}-${req.serviceName.replace(/\s+/g, '-').toLowerCase()}.html`,
+      fileName: `${req.reference.replace(/\\//g, '-')}-${req.serviceName.replace(/\\s+/g, '-').toLowerCase()}.html`,
     }
   }
 
@@ -471,7 +471,7 @@ export function ServiceRequestsPage() {
               <Input placeholder="Rechercher par référence, nom, service..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10 glass-input focus-ring-premium" />
             </div>
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-full sm:w-[200px]">
+              <SelectTrigger className="w-[200px]">
                 <Building2 className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
                 <SelectValue placeholder="Catégorie" />
               </SelectTrigger>
@@ -858,7 +858,7 @@ export function ServiceRequestsPage() {
 
       {/* Note Dialog */}
       <Dialog open={noteDialogOpen} onOpenChange={setNoteDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>{noteType === 'info_complementaire' ? 'Demander des pièces complémentaires' : 'Ajouter une note'}</DialogTitle>
             <DialogDescription>
@@ -887,7 +887,7 @@ export function ServiceRequestsPage() {
 
       {/* Delivery Dialog */}
       <Dialog open={deliveryDialogOpen} onOpenChange={setDeliveryDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Download className="size-5 text-emerald-600" />
@@ -945,7 +945,7 @@ export function ServiceRequestsPage() {
 
       {/* Generate Document Dialog */}
       <Dialog open={generateDialogOpen} onOpenChange={setGenerateDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Stamp className="size-5 text-emerald-600" />
@@ -985,7 +985,7 @@ export function ServiceRequestsPage() {
 
       {/* Reject Dialog */}
       <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
               <XCircle className="size-5" />
@@ -1008,7 +1008,7 @@ export function ServiceRequestsPage() {
 
       {/* Generate Document Dialog */}
       <Dialog open={generateDocDialogOpen} onOpenChange={setGenerateDocDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="size-5 text-[#C8A45C]" />

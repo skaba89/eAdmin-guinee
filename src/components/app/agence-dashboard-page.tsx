@@ -68,8 +68,8 @@ export function AgenceDashboardPage() {
   const user = useAppStore((s) => s.user)
   const { requests, updateRequestStatus, addProcessingNote, advanceTimeline, assignRequest, completeRequest, verifyDocument, setGeneratedDocument, addUploadedDocument } = useCitizenRequestsStore()
 
-  // Filter requests for identification category
-  const agenceRequests = requests.filter(r => r.categoryId === 'identification')
+  // Show ALL requests — agence sees everything
+  const agenceRequests = requests
 
   const [activeTab, setActiveTab] = useState('pipeline')
   const [searchQuery, setSearchQuery] = useState('')
@@ -245,7 +245,7 @@ export function AgenceDashboardPage() {
                 <p className="text-xs uppercase tracking-[0.2em] text-[#C8A45C]/80 font-semibold">République de Guinée</p>
                 <h2 className="text-2xl font-bold mt-0.5 text-gradient-gold">{user?.institution || "Agence Nationale d'Identification (ANIP)"}</h2>
                 <p className="text-sm text-white/70 mt-1">
-                  Tableau de bord — Identification & Passeports • {user?.name || 'Agent ANIP'}
+                  Tableau de bord — Toutes les demandes • {user?.name || 'Agent ANIP'}
                 </p>
               </div>
               <div className="flex flex-col gap-2">
@@ -255,7 +255,7 @@ export function AgenceDashboardPage() {
                 </Badge>
                 <Badge className="badge-premium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs gap-1.5">
                   <CheckCircle2 className="size-3" />
-                  {agenceRequests.length} demande(s) identification
+                  {agenceRequests.length} demande(s) au total
                 </Badge>
               </div>
             </div>
@@ -386,9 +386,9 @@ export function AgenceDashboardPage() {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white flex items-center gap-2">
               <ClipboardCheck className="size-4 text-[#C8A45C]" />
-              Pipeline de traitement — Identification
+              Pipeline de traitement — Toutes les demandes
             </CardTitle>
-            <CardDescription className="text-xs">Vue d&apos;ensemble du flux de demandes d&apos;identification</CardDescription>
+            <CardDescription className="text-xs">Vue d&apos;ensemble du flux de toutes les demandes</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-1 overflow-x-auto pb-2">
@@ -443,7 +443,7 @@ export function AgenceDashboardPage() {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white flex items-center gap-2">
             <Fingerprint className="size-4 text-[#C8A45C]" />
-            Demandes d&apos;identification
+            Toutes les demandes
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -467,8 +467,8 @@ export function AgenceDashboardPage() {
                     <Card className="glass-premium">
                       <CardContent className="flex flex-col items-center justify-center py-16 text-center">
                         <IdCard className="size-12 text-muted-foreground/30 mb-3" />
-                        <p className="text-muted-foreground font-medium">Aucune demande d&apos;identification</p>
-                        <p className="text-xs text-muted-foreground mt-1">Les nouvelles demandes de CNI, passeports et permis apparaîtront ici</p>
+                        <p className="text-muted-foreground font-medium">Aucune demande</p>
+                        <p className="text-xs text-muted-foreground mt-1">Les nouvelles demandes de tous les services apparaîtront ici</p>
                       </CardContent>
                     </Card>
                   </motion.div>
@@ -778,7 +778,7 @@ export function AgenceDashboardPage() {
 
       {/* Generate Document Dialog */}
       <Dialog open={generateDocDialogOpen} onOpenChange={setGenerateDocDialogOpen}>
-        <DialogContent className="glass-premium max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="glass-premium">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="size-5 text-gradient-gold" />
@@ -812,7 +812,7 @@ export function AgenceDashboardPage() {
 
       {/* Note Dialog */}
       <Dialog open={noteDialogOpen} onOpenChange={setNoteDialogOpen}>
-        <DialogContent className="glass-premium max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="glass-premium">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MessageSquare className="size-5 text-[#C8A45C]" />
@@ -834,7 +834,7 @@ export function AgenceDashboardPage() {
 
       {/* Delivery Dialog */}
       <Dialog open={deliveryDialogOpen} onOpenChange={setDeliveryDialogOpen}>
-        <DialogContent className="glass-premium max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="glass-premium">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Download className="size-5 text-emerald-600" />

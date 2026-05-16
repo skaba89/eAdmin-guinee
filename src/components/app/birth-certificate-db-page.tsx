@@ -887,7 +887,7 @@ export function BirthCertificateDbPage() {
           DETAIL DIALOG
       ═════════════════════════════════════════════════════════════════════ */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
-        <DialogContent className="max-w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           {detailRecord && (
             <>
               <DialogHeader>

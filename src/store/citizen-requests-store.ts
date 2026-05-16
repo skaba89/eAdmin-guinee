@@ -54,6 +54,8 @@ export interface CitizenRequest {
   createdAt: string
   updatedAt: string
   completedAt?: string
+  // Mairie
+  mairie?: string  // Specific mairie name (e.g., "Mairie de Kaloum") for etat-civil/residence requests
   // Livraison
   deliveryMode: 'en_ligne' | 'guichet' | 'courrier'
   deliveryLocation?: string
@@ -126,6 +128,7 @@ const DEMO_REQUESTS: CitizenRequest[] = [
     citizenPhone: '+224 622 34 56 78',
     citizenEmail: 'citoyen@eadmin.gn',
     citizenAddress: 'Conakry, Commune de Kaloum',
+    mairie: 'Mairie de Kaloum',
     motif: "Demande d'extrait d'acte de naissance pour dossier d'emploi",
     documents: ["Carte d'identité", 'Acte de naissance original ou numéro d\'acte'],
     uploadedDocuments: [
@@ -282,6 +285,7 @@ const DEMO_REQUESTS: CitizenRequest[] = [
     citizenPhone: '+224 622 34 56 78',
     citizenEmail: 'citoyen@eadmin.gn',
     citizenAddress: 'Kankan, Préfecture de Kankan',
+    mairie: 'Mairie de Kankan',
     motif: 'Certificat de nationalité pour inscription sur les listes électorales',
     documents: ["Carte d'identité nationale", "Extrait d'acte de naissance", "2 photos d'identité", 'Certificat de résidence'],
     uploadedDocuments: [],
@@ -568,8 +572,20 @@ export const useCitizenRequestsStore = create<CitizenRequestsState>()(
         const nowIso = new Date().toISOString()
         const assignedService = SERVICE_ENTITY_MAP[req.categoryId] || 'Administration Générale'
 
+        // Auto-set mairie for etat-civil and residence requests
+        let mairie = req.mairie
+        if ((req.categoryId === 'etat-civil' || req.categoryId === 'residence') && !mairie) {
+          const communeMatch = req.citizenAddress.match(/Commune de\s+(.+)/i)
+          if (communeMatch) {
+            mairie = `Mairie de ${communeMatch[1].trim()}`
+          } else {
+            mairie = 'Mairie de Kaloum'
+          }
+        }
+
         const newRequest: CitizenRequest = {
           ...req,
+          mairie,
           id,
           reference,
           status: 'soumise',
@@ -761,10 +777,10 @@ export const useCitizenRequestsStore = create<CitizenRequestsState>()(
     }),
     {
       name: 'citizen-requests-storage',
-      version: 4,
+      version: 5,
       migrate: (persistedState: any, version: number) => {
-        if (version < 4) {
-          // Force reset to demo data on upgrade (includes uploadedDocuments and generatedDocument)
+        if (version < 5) {
+          // Force reset to demo data on upgrade (includes mairie field)
           return { requests: DEMO_REQUESTS }
         }
         return persistedState

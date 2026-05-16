@@ -542,7 +542,7 @@ export function SettingsPage() {
                 <div className="space-y-2">
                   <Label>Langue de l&apos;interface</Label>
                   <Select value={language} onValueChange={setLanguage}>
-                    <SelectTrigger className="w-full sm:w-[240px]">
+                    <SelectTrigger className="w-[240px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -591,7 +591,7 @@ export function SettingsPage() {
 
       {/* Integration Configuration Dialog */}
       <Dialog open={integrationDialogOpen} onOpenChange={setIntegrationDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{selectedIntegration}</DialogTitle>
             <DialogDescription>

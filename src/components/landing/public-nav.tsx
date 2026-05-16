@@ -68,7 +68,7 @@ export function PublicNav() {
             {/* Logo container with gold ring on hover */}
             <div className="relative flex h-10 w-10 items-center justify-center rounded-xl overflow-hidden bg-white/15 shadow-md transition-all duration-300 group-hover:shadow-[0_0_16px_rgba(200,164,92,0.3)] group-hover:scale-105 group-hover:bg-white/20">
               <img
-                src="/images/coat-of-arms-official.svg"
+                src="/logo-128.png"
                 alt="Armories de la République de Guinée"
                 className="h-8 w-8 object-contain"
               />

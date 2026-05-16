@@ -187,8 +187,6 @@ export function AiChatbotWidget() {
               "glass-premium shadow-premium-lg",
               // Desktop: fixed panel bottom-right
               "bottom-6 right-6 w-[420px] h-[540px]",
-              // Tablet: smaller panel
-              "max-md:w-[340px] max-md:h-[480px]",
               // Mobile: full width at bottom
               "max-sm:bottom-0 max-sm:right-0 max-sm:left-0 max-sm:w-full max-sm:h-[75vh] max-sm:rounded-b-none max-sm:rounded-t-3xl"
             )}

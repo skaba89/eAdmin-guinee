@@ -292,7 +292,7 @@ export function LandingPage() {
         {/* Background image - Conakry skyline */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "url('/guinea-hero-conakry.jpg')" }}
+          style={{ backgroundImage: "url('/guinea-hero-conakry.png')" }}
         />
         {/* Sophisticated mesh gradient overlay — dark enough for text contrast */}
         <div className="absolute inset-0 hero-mesh-gradient/95" />
@@ -315,7 +315,7 @@ export function LandingPage() {
         {/* Animated orbs */}
         <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-[#C8A45C]/20 rounded-full blur-[120px] animate-pulse-soft" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#3B7DD8]/20 rounded-full blur-[120px] animate-pulse-soft delay-500" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] sm:w-[500px] sm:h-[500px] bg-[#C8A45C]/10 rounded-full blur-[150px]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-[#C8A45C]/10 rounded-full blur-[150px]" />
         <div className="absolute bottom-1/3 left-1/3 w-64 h-64 bg-[#009460]/10 rounded-full blur-[100px] animate-pulse-soft delay-300" />
 
         {/* Guinea tricolor accent line */}
@@ -338,13 +338,8 @@ export function LandingPage() {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="mb-4"
             >
-              <div className="flex items-center justify-center gap-3">
-                <img src="/images/flag-guinea.svg" alt="Drapeau de la Guinée" className="h-6 w-8 sm:h-7 sm:w-9 object-contain drop-shadow-lg" />
-                <img src="/images/coat-of-arms-official.svg" alt="Armories de la République de Guinée" className="h-10 w-10 sm:h-12 sm:w-12 object-contain drop-shadow-lg" />
-                <img src="/images/flag-guinea.svg" alt="Drapeau de la Guinée" className="h-6 w-8 sm:h-7 sm:w-9 object-contain drop-shadow-lg" />
-              </div>
-              <p className="text-[#C8A45C] text-sm sm:text-base font-semibold tracking-wider uppercase mt-3">
-                République de Guinée — Travail · Justice · Solidarité
+              <p className="text-[#C8A45C] text-sm sm:text-base font-semibold tracking-wider uppercase">
+                🇬🇳 République de Guinée — Travail · Justice · Solidarité
               </p>
             </motion.div>
 
@@ -452,10 +447,10 @@ export function LandingPage() {
 
       {/* ─── INSTITUTIONS DE LA RÉPUBLIQUE ────────────────── */}
       <AnimatedSection className="py-20 relative overflow-hidden">
-        {/* Background image - Palais du Peuple (Assemblée Nationale) */}
+        {/* Background image - Grand Mosque of Conakry */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "url('/images/palais-du-peuple-full.jpg')" }}
+          style={{ backgroundImage: "url('/guinea-mosque-conakry.png')" }}
         />
         <div className="absolute inset-0 bg-background/95" />
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -506,34 +501,34 @@ export function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
               {
-                img: '/images/palais-du-peuple.jpg',
-                title: 'Palais du Peuple',
-                desc: 'Siège de l\'Assemblée Nationale, symbole de la démocratie et de la souveraineté de la République de Guinée.',
-              },
-              {
-                img: '/conakry-capital.jpg',
+                img: '/guinea-hero-conakry.png',
                 title: 'Conakry, la capitale',
                 desc: 'Métropole dynamique bordée par l\'Atlantique, carrefour économique et culturel de l\'Afrique de l\'Ouest.',
               },
               {
-                img: '/guinea-nimba-mountains.jpg',
+                img: '/guinea-nimba-mountains.png',
                 title: 'Mont Nimba',
                 desc: 'Patrimoine mondial de l\'UNESCO, massif montagneux aux écosystèmes uniques et à la biodiversité exceptionnelle.',
               },
               {
-                img: '/guinea-niger-river.jpg',
+                img: '/guinea-niger-river.png',
                 title: 'Fleuve Niger',
                 desc: 'Prend sa source en Guinée, le fleuve nourrit des millions de personnes à travers l\'Afrique de l\'Ouest.',
               },
               {
-                img: '/guinea-fouta-djallon.jpg',
+                img: '/guinea-fouta-djallon.png',
                 title: 'Fouta Djallon',
                 desc: 'Hauts plateaux aux cascades majestueuses, le « château d\'eau » de l\'Afrique de l\'Ouest.',
               },
               {
-                img: '/guinea-mosque-conakry.jpg',
+                img: '/guinea-mosque-conakry.png',
                 title: 'Grande Mosquée de Conakry',
                 desc: 'L\'un des plus grands édifices religieux d\'Afrique, symbole de la ferveur spirituelle guinéenne.',
+              },
+              {
+                img: '/guinea-culture-dance.png',
+                title: 'Culture et traditions',
+                desc: 'Danses traditionnelles, djembé et griots perpétuent l\'héritage culturel riche et diversifié de la Guinée.',
               },
             ].map((item) => (
               <motion.div key={item.title} variants={fadeUp}>
@@ -705,7 +700,7 @@ export function LandingPage() {
         {/* Background image - Fouta Djallon highlands */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "url('/guinea-fouta-djallon.jpg')" }}
+          style={{ backgroundImage: "url('/guinea-fouta-djallon.png')" }}
         />
         <div className="absolute inset-0 bg-background/95" />
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -746,7 +741,7 @@ export function LandingPage() {
         {/* Background image - Mount Nimba */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "url('/guinea-nimba-mountains.jpg')" }}
+          style={{ backgroundImage: "url('/guinea-nimba-mountains.png')" }}
         />
         <div className="absolute inset-0 bg-[#0B2E58]/95 dark:bg-primary/95" />
         {/* Mesh gradient overlay */}
@@ -767,13 +762,9 @@ export function LandingPage() {
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <AnimatedSection>
             <motion.div variants={fadeUp} className="text-center mb-16">
-              <div className="flex items-center justify-center gap-2 mb-2">
-                <img src="/images/flag-guinea.svg" alt="Drapeau de la Guinée" className="h-5 w-7 object-contain" />
-                <p className="text-[#C8A45C] text-sm font-semibold tracking-wider uppercase">
-                  République de Guinée
-                </p>
-                <img src="/images/flag-guinea.svg" alt="Drapeau de la Guinée" className="h-5 w-7 object-contain" />
-              </div>
+              <p className="text-[#C8A45C] text-sm font-semibold tracking-wider uppercase mb-2">
+                🇬🇳 République de Guinée
+              </p>
               <h2 className="text-3xl sm:text-4xl font-bold text-white">
                 Des résultats au service de l&apos;État
               </h2>
@@ -809,7 +800,7 @@ export function LandingPage() {
         {/* Background image - Niger River */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "url('/guinea-niger-river.jpg')" }}
+          style={{ backgroundImage: "url('/guinea-niger-river.png')" }}
         />
         <div className="absolute inset-0 bg-background/95" />
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -861,7 +852,7 @@ export function LandingPage() {
         {/* Background image - Guinean culture & dance */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "url('/guinea-culture-dance.jpg')" }}
+          style={{ backgroundImage: "url('/guinea-culture-dance.png')" }}
         />
         <div className="absolute inset-0 bg-muted/90" />
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -912,7 +903,7 @@ export function LandingPage() {
         {/* Background image - Fouta Djallon waterfalls */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "url('/guinea-fouta-djallon.jpg')" }}
+          style={{ backgroundImage: "url('/guinea-fouta-djallon.png')" }}
         />
         {/* Premium gradient background with mesh effect */}
         <div className="absolute inset-0 hero-mesh-gradient/95" />
@@ -934,13 +925,9 @@ export function LandingPage() {
         </div>
 
         <div className="relative z-10 mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 text-center">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <img src="/images/coat-of-arms-official.svg" alt="Armories de la République de Guinée" className="h-8 w-8 object-contain" />
-            <p className="text-[#C8A45C] text-sm font-semibold tracking-wider uppercase">
-              République de Guinée
-            </p>
-            <img src="/images/flag-guinea.svg" alt="Drapeau de la Guinée" className="h-5 w-7 object-contain" />
-          </div>
+          <p className="text-[#C8A45C] text-sm font-semibold tracking-wider uppercase mb-4">
+            🇬🇳 République de Guinée
+          </p>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight">
             Rejoignez la transformation numérique de{' '}
             <span className="text-gradient-gold">l&apos;administration guinéenne</span>
@@ -1095,7 +1082,7 @@ export function LandingPage() {
             <div className="flex flex-col items-center gap-4">
               <div className="flex items-center gap-2">
                 <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-[#0B2E58] to-[#134A8E] dark:from-primary dark:to-primary/80 flex items-center justify-center overflow-hidden shadow-navy">
-                  <img src="/images/coat-of-arms-official.svg" alt="Armories de la République de Guinée" className="h-8 w-8 object-contain" />
+                  <img src="/logo-128.png" alt="Armories de la République de Guinée" className="h-8 w-8 object-contain" />
                 </div>
                 <span className="text-sm font-semibold text-white dark:text-foreground">
                   eAdministration Suite

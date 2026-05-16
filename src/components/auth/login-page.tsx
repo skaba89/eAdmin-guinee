@@ -47,7 +47,7 @@ const itemSlideUp = {
     opacity: 1,
     y: 0,
     filter: 'blur(0px)',
-    transition: { duration: 0.55, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] },
+    transition: { duration: 0.55, ease: [0.16, 1, 0.3, 1] },
   },
 }
 
@@ -56,7 +56,7 @@ const itemFadeScale = {
   visible: {
     opacity: 1,
     scale: 1,
-    transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] },
+    transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] },
   },
 }
 
@@ -163,10 +163,10 @@ export function LoginPage() {
           `,
         }}
       >
-        {/* Background image — Palais du Peuple, Conakry */}
+        {/* Background image of Guinea — Conakry */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-15"
-          style={{ backgroundImage: "url('/images/palais-du-peuple-full.jpg')" }}
+          style={{ backgroundImage: "url('/guinea-hero-conakry.png')" }}
         />
         {/* Decorative tricolor vertical stripes */}
         <div className="absolute left-0 top-0 bottom-0 w-1.5 flex flex-col z-20">
@@ -182,9 +182,9 @@ export function LoginPage() {
         <DotGridOverlay />
 
         {/* Subtle radial glow accents */}
-        <div className="absolute top-0 right-0 w-[300px] h-[300px] sm:w-[500px] sm:h-[500px] pointer-events-none hidden sm:block"
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] pointer-events-none"
           style={{ background: 'radial-gradient(circle, rgba(200,164,92,0.06) 0%, transparent 70%)' }} />
-        <div className="absolute bottom-0 left-0 w-[250px] h-[250px] sm:w-[400px] sm:h-[400px] pointer-events-none hidden sm:block"
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] pointer-events-none"
           style={{ background: 'radial-gradient(circle, rgba(0,148,96,0.05) 0%, transparent 70%)' }} />
 
         <div className="relative z-10 text-center space-y-8 max-w-md">
@@ -222,7 +222,7 @@ export function LoginPage() {
                 }}
               />
               <img
-                src="/images/coat-of-arms-official.svg"
+                src="/logo-256.png"
                 alt="Armories de la République de Guinée"
                 className="w-28 h-28 relative z-10 drop-shadow-2xl object-contain"
               />
@@ -238,13 +238,9 @@ export function LoginPage() {
             <h1 className="text-3xl font-bold mb-2.5 text-gradient-gold tracking-tight">
               eAdministration Suite
             </h1>
-            <div className="flex items-center justify-center gap-2">
-              <img src="/images/flag-guinea.svg" alt="Drapeau de la Guinée" className="h-5 w-7 object-contain" />
-              <p className="text-lg font-semibold tracking-widest uppercase" style={{ color: `${GUINEA_YELLOW}CC` }}>
-                République de Guinée
-              </p>
-              <img src="/images/flag-guinea.svg" alt="Drapeau de la Guinée" className="h-5 w-7 object-contain" />
-            </div>
+            <p className="text-lg font-semibold tracking-widest uppercase" style={{ color: `${GUINEA_YELLOW}CC` }}>
+              République de Guinée
+            </p>
           </motion.div>
 
           {/* Guinea motto */}
@@ -391,7 +387,7 @@ export function LoginPage() {
           <div className="relative">
             <div className="absolute inset-0 rounded-full blur-lg opacity-25 animate-glow-pulse" style={{ backgroundColor: GUINEA_YELLOW }} />
             <div className="absolute -inset-1 rounded-full" style={{ border: `1.5px solid ${GUINEA_YELLOW}30` }} />
-            <img src="/images/coat-of-arms-official.svg" alt="Armories de la République de Guinée" className="w-16 h-16 relative z-10 object-contain" />
+            <img src="/logo-128.png" alt="Armories de la République de Guinée" className="w-16 h-16 relative z-10 object-contain" />
           </div>
           <div className="text-center">
             <h1 className="text-xl font-bold text-gradient-navy">eAdministration Suite</h1>

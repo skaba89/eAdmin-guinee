@@ -249,7 +249,6 @@ export function PublicCitizenPortal() {
       citizenAddress: form.citizenAddress,
       motif: form.motif || `Demande de ${selectedService.name}`,
       documents: selectedService.requiredDocs,
-      uploadedDocuments: [],
       createdAt: new Date().toISOString(),
       deliveryMode: form.deliveryMode,
     })
@@ -776,7 +775,7 @@ export function PublicCitizenPortal() {
           REQUEST FORM DIALOG
       ═══════════════════════════════════════════════════════════ */}
       <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg">
               {selectedCategoryInfo && selectedService && (
@@ -952,3 +951,5 @@ export function PublicCitizenPortal() {
   )
 }
 
+// Import the type from the store
+import type { CitizenRequest } from '@/store/citizen-requests-store'

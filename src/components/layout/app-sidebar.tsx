@@ -11,7 +11,6 @@ import {
   Home, Briefcase, BookOpen,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 
 // ─── NAV ITEM DEFINITION ─────────────────────────────────────────────────────
 interface NavItem {
@@ -24,8 +23,9 @@ interface NavItem {
 const ROLE_NAV: Record<UserRole, { main: NavItem[]; admin?: NavItem[] }> = {
   citizen: {
     main: [
-      { page: 'citizen-portal', label: 'Mes Demandes', icon: 'Home' },
-      { page: 'public-citizen-portal', label: 'Nouvelle Demande', icon: 'Briefcase' },
+      { page: 'citizen-portal', label: 'Mon Portail', icon: 'Home' },
+      { page: 'public-citizen-portal', label: 'Services publics', icon: 'Briefcase' },
+      { page: 'ai-assistant', label: 'Assistant IA', icon: 'Sparkles' },
       { page: 'settings', label: 'Paramètres', icon: 'Settings' },
     ],
   },
@@ -71,6 +71,7 @@ const ROLE_NAV: Record<UserRole, { main: NavItem[]; admin?: NavItem[] }> = {
   ministere: {
     main: [
       { page: 'dashboard', label: 'Tableau de bord', icon: 'LayoutDashboard' },
+      { page: 'service-requests', label: 'Toutes les demandes', icon: 'ClipboardCheck' },
       { page: 'ged', label: 'GED', icon: 'FileText' },
       { page: 'courriers', label: 'Courriers', icon: 'Mail' },
       { page: 'workflow', label: 'Workflows', icon: 'GitBranch' },
@@ -271,7 +272,7 @@ export function AppSidebar() {
       animate={{ width: sidebarCollapsed ? 72 : 260 }}
       transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
       className={cn(
-        'hidden md:flex h-screen sticky top-0 flex-col z-40 overflow-hidden',
+        'h-screen sticky top-0 flex flex-col z-40 overflow-hidden',
         'border-r border-white/[0.06] dark:border-white/[0.04]'
       )}
       style={{
@@ -300,7 +301,7 @@ export function AppSidebar() {
           )}
         >
           <img
-            src="/images/coat-of-arms-official.svg"
+            src="/logo-128.png"
             alt="Armories de la République de Guinée"
             className="h-10 w-10 object-contain"
           />
@@ -502,242 +503,5 @@ export function AppSidebar() {
         )}
       </motion.button>
     </motion.aside>
-  )
-}
-
-// ─── MOBILE SIDEBAR (Sheet/Drawer) ──────────────────────────────────────────
-export function MobileSidebar() {
-  const { currentPage, navigate, sidebarOpen, toggleSidebar, logout, user } = useAppStore()
-
-  const userRole = (user?.role || 'citizen') as UserRole
-  const navConfig = ROLE_NAV[userRole] || ROLE_NAV.citizen
-  const extraNav = ROLE_EXTRA_NAV[userRole] || []
-
-  const handleNavigate = (page: AppPage) => {
-    navigate(page)
-    toggleSidebar() // close the sheet
-  }
-
-  return (
-    <Sheet open={sidebarOpen} onOpenChange={(open) => { if (!open) toggleSidebar() }}>
-      <SheetContent
-        side="left"
-        className="w-[280px] p-0 border-0 overflow-y-auto"
-        style={{
-          background: 'linear-gradient(180deg, #071d38 0%, #0a2744 25%, #0d3258 60%, #0f3a66 100%)',
-        }}
-      >
-        <SheetTitle className="sr-only">Navigation</SheetTitle>
-
-        {/* Glass overlay */}
-        <div
-          className="absolute inset-0 pointer-events-none z-0"
-          style={{
-            background: 'linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 40%, rgba(0,0,0,0.05) 100%)',
-          }}
-        />
-
-        {/* Top Guinea Tricolor */}
-        <GuineaTricolor />
-
-        {/* Logo Section */}
-        <div className="relative z-10 flex items-center gap-3 px-4 h-[68px] border-b border-white/[0.06] shrink-0">
-          <div
-            className={cn(
-              'h-10 w-10 rounded-xl overflow-hidden flex items-center justify-center shrink-0',
-              'ring-[1.5px] ring-[#C8A45C]/40',
-              'shadow-[0_0_12px_rgba(200,164,92,0.15),0_2px_8px_rgba(0,0,0,0.3)]'
-            )}
-          >
-            <img
-              src="/images/coat-of-arms-official.svg"
-              alt="Armories de la République de Guinée"
-              className="h-10 w-10 object-contain"
-            />
-          </div>
-          <div className="overflow-hidden">
-            <div className="font-bold text-[13px] leading-tight text-white tracking-wide">
-              eAdmin Suite
-            </div>
-            <div className="text-[10px] text-[#C8A45C]/80 tracking-wider font-medium mt-0.5">
-              République de Guinée
-            </div>
-          </div>
-        </div>
-
-        {/* Navigation */}
-        <div className="relative z-10 flex-1 overflow-y-auto py-5 px-3 space-y-6">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C8A45C]/80 px-4 mb-2 select-none">Modules</p>
-            <div className="space-y-0.5">
-              {navConfig.main.map((item) => (
-                <MobileNavItem
-                  key={item.page}
-                  page={item.page}
-                  label={item.label}
-                  icon={item.icon}
-                  isActive={currentPage === item.page}
-                  onClick={() => handleNavigate(item.page)}
-                />
-              ))}
-            </div>
-          </div>
-
-          {extraNav.length > 0 && (
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C8A45C]/80 px-4 mb-2 select-none">Accès rapide</p>
-              <div className="space-y-0.5">
-                {extraNav.map((item) => (
-                  <MobileNavItem
-                    key={item.page}
-                    page={item.page}
-                    label={item.label}
-                    icon={item.icon}
-                    isActive={currentPage === item.page}
-                    onClick={() => handleNavigate(item.page)}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {navConfig.admin && navConfig.admin.length > 0 && (
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#C8A45C]/80 px-4 mb-2 select-none">Administration</p>
-              <div className="space-y-0.5">
-                {navConfig.admin.map((item) => (
-                  <MobileNavItem
-                    key={item.page}
-                    page={item.page}
-                    label={item.label}
-                    icon={item.icon}
-                    isActive={currentPage === item.page}
-                    onClick={() => handleNavigate(item.page)}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Bottom Tricolor */}
-        <div className="relative z-10">
-          <GuineaTricolor />
-        </div>
-
-        {/* User Section */}
-        <div className="relative z-10 border-t border-white/[0.06] p-3 shrink-0">
-          <div className="flex items-center gap-3">
-            <div
-              className={cn(
-                'h-9 w-9 rounded-full flex items-center justify-center shrink-0',
-                'ring-[1.5px] ring-[#C8A45C]/30',
-                'shadow-[0_2px_8px_rgba(0,0,0,0.3)]'
-              )}
-              style={{
-                background: 'linear-gradient(135deg, #0B2E58 0%, #1a4a82 60%, #2a5a94 100%)',
-              }}
-            >
-              <span className="text-[11px] font-bold text-[#C8A45C]">
-                {user?.name?.charAt(0) || 'A'}
-              </span>
-            </div>
-            <div className="flex-1 min-w-0 overflow-hidden">
-              <p className="text-xs font-semibold text-white/90 truncate">
-                {user?.name || 'Utilisateur'}
-              </p>
-              <div className="flex items-center gap-1.5 mt-1">
-                <span
-                  className={cn(
-                    'inline-flex items-center px-1.5 py-[1px] rounded text-[8px] font-bold uppercase tracking-wider',
-                    'bg-[#C8A45C]/15 text-[#C8A45C]',
-                    'border border-[#C8A45C]/20'
-                  )}
-                >
-                  {ROLE_LABELS[userRole]}
-                </span>
-              </div>
-            </div>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={logout}
-            className={cn(
-              'w-full mt-3 justify-start gap-2 h-8 text-xs rounded-lg',
-              'text-white/40 hover:text-red-400 hover:bg-red-500/10',
-              'transition-all duration-300'
-            )}
-          >
-            <LogOut className="h-3.5 w-3.5" />
-            Déconnexion
-          </Button>
-        </div>
-      </SheetContent>
-    </Sheet>
-  )
-}
-
-// ─── MOBILE NAV ITEM (simpler, no collapse mode) ────────────────────────────
-function MobileNavItem({
-  page,
-  label,
-  icon,
-  isActive,
-  onClick,
-}: {
-  page: AppPage
-  label: string
-  icon?: string
-  isActive: boolean
-  onClick: () => void
-}) {
-  const IconComponent = icon ? ICON_MAP[icon] : null
-
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'group relative flex items-center w-full rounded-lg text-sm font-medium transition-all duration-300 ease-out',
-        'gap-3 px-3 py-2.5',
-        isActive
-          ? 'text-white'
-          : 'text-white/75 hover:text-white/95'
-      )}
-    >
-      {isActive && (
-        <div
-          className="absolute inset-0 rounded-lg"
-          style={{
-            background: 'linear-gradient(135deg, #0B2E58 0%, #153d6e 50%, #1a4a82 100%)',
-            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08), 0 2px 8px rgba(11,46,88,0.35)',
-          }}
-        />
-      )}
-      {!isActive && (
-        <div className="absolute inset-0 rounded-lg bg-white/[0.04] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-      )}
-      {isActive && (
-        <div
-          className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[60%] rounded-r-full"
-          style={{ background: 'linear-gradient(180deg, #D4B878, #C8A45C, #D4B878)' }}
-        />
-      )}
-      <span className="relative z-10 shrink-0">
-        {IconComponent && (
-          <IconComponent
-            className={cn(
-              'h-[18px] w-[18px] transition-all duration-300',
-              isActive
-                ? 'text-[#C8A45C]'
-                : 'text-white/65 group-hover:text-white/90'
-            )}
-          />
-        )}
-      </span>
-      <span className={cn('relative z-10 whitespace-nowrap', isActive && 'font-semibold')}>
-        {label}
-      </span>
-    </button>
   )
 }
