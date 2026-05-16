@@ -292,7 +292,7 @@ export function LandingPage() {
         {/* Background image - Conakry skyline */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "url('/guinea-hero-conakry.png')" }}
+          style={{ backgroundImage: "url('/guinea-hero-conakry.jpg')" }}
         />
         {/* Sophisticated mesh gradient overlay — dark enough for text contrast */}
         <div className="absolute inset-0 hero-mesh-gradient/95" />
@@ -511,27 +511,27 @@ export function LandingPage() {
                 desc: 'Siège de l\'Assemblée Nationale, symbole de la démocratie et de la souveraineté de la République de Guinée.',
               },
               {
-                img: '/guinea-hero-conakry.png',
+                img: '/conakry-capital.jpg',
                 title: 'Conakry, la capitale',
                 desc: 'Métropole dynamique bordée par l\'Atlantique, carrefour économique et culturel de l\'Afrique de l\'Ouest.',
               },
               {
-                img: '/guinea-nimba-mountains.png',
+                img: '/guinea-nimba-mountains.jpg',
                 title: 'Mont Nimba',
                 desc: 'Patrimoine mondial de l\'UNESCO, massif montagneux aux écosystèmes uniques et à la biodiversité exceptionnelle.',
               },
               {
-                img: '/guinea-niger-river.png',
+                img: '/guinea-niger-river.jpg',
                 title: 'Fleuve Niger',
                 desc: 'Prend sa source en Guinée, le fleuve nourrit des millions de personnes à travers l\'Afrique de l\'Ouest.',
               },
               {
-                img: '/guinea-fouta-djallon.png',
+                img: '/guinea-fouta-djallon.jpg',
                 title: 'Fouta Djallon',
                 desc: 'Hauts plateaux aux cascades majestueuses, le « château d\'eau » de l\'Afrique de l\'Ouest.',
               },
               {
-                img: '/guinea-mosque-conakry.png',
+                img: '/guinea-mosque-conakry.jpg',
                 title: 'Grande Mosquée de Conakry',
                 desc: 'L\'un des plus grands édifices religieux d\'Afrique, symbole de la ferveur spirituelle guinéenne.',
               },
@@ -705,7 +705,7 @@ export function LandingPage() {
         {/* Background image - Fouta Djallon highlands */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "url('/guinea-fouta-djallon.png')" }}
+          style={{ backgroundImage: "url('/guinea-fouta-djallon.jpg')" }}
         />
         <div className="absolute inset-0 bg-background/95" />
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -746,7 +746,7 @@ export function LandingPage() {
         {/* Background image - Mount Nimba */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "url('/guinea-nimba-mountains.png')" }}
+          style={{ backgroundImage: "url('/guinea-nimba-mountains.jpg')" }}
         />
         <div className="absolute inset-0 bg-[#0B2E58]/95 dark:bg-primary/95" />
         {/* Mesh gradient overlay */}
@@ -809,7 +809,7 @@ export function LandingPage() {
         {/* Background image - Niger River */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "url('/guinea-niger-river.png')" }}
+          style={{ backgroundImage: "url('/guinea-niger-river.jpg')" }}
         />
         <div className="absolute inset-0 bg-background/95" />
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -861,7 +861,7 @@ export function LandingPage() {
         {/* Background image - Guinean culture & dance */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "url('/guinea-culture-dance.png')" }}
+          style={{ backgroundImage: "url('/guinea-culture-dance.jpg')" }}
         />
         <div className="absolute inset-0 bg-muted/90" />
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -912,7 +912,7 @@ export function LandingPage() {
         {/* Background image - Fouta Djallon waterfalls */}
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "url('/guinea-fouta-djallon.png')" }}
+          style={{ backgroundImage: "url('/guinea-fouta-djallon.jpg')" }}
         />
         {/* Premium gradient background with mesh effect */}
         <div className="absolute inset-0 hero-mesh-gradient/95" />

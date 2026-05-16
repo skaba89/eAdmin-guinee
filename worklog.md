@@ -103,3 +103,34 @@ Stage Summary:
 - Register page now shows official coat-of-arms + flag
 - All favicons regenerated from real coat-of-arms
 - 0 TypeScript errors, build succeeds
+---
+Task ID: real-guinea-photos
+Agent: Main Agent
+Task: Replace AI-generated/fake images with REAL photographs of Republic of Guinea (Conakry)
+
+Work Log:
+- User confirmed previous images were NOT real Guinea photos - they were AI-generated
+- Downloaded 31 real photographs from Wikimedia Commons (all with Creative Commons licenses, verified via EXIF data)
+- Optimized all photos for web use (max 1600px wide for backgrounds, 800px for gallery cards)
+- Replaced all 6 background images in landing-page.tsx with real JPG photos
+- Replaced all 6 gallery card images with real JPG photos
+- Updated institutions section to use real Palais du Peuple photo
+- Updated login page background to use real Palais du Peuple photo
+- Cleaned up all old fake PNG files from public/ directory
+- Build passes with 0 errors
+
+Real photos now used:
+- Hero: Conakry skyline (real photo from Wikimedia, Xiaomi camera)
+- Palais du Peuple: Real entrance photo and wide building photo
+- Grand Mosque: Real Mosquée Fayçal photo
+- Mont Nimba: Real photo (Wiki Loves Earth 2021 winner, Canon EOS)
+- Niger River: Real photo of women fishing on Niger River in Guinea
+- Fouta Djallon: Real highlands landscape photo
+- Conakry capital: Real skyline photo
+- Culture section: Real CDC photo of Conakry
+
+Stage Summary:
+- All AI-generated fake images replaced with real photographs from Wikimedia Commons
+- 31 real photos downloaded, 12 optimized and deployed to public/
+- Old fake PNG files deleted
+- 0 TypeScript errors, build succeeds
