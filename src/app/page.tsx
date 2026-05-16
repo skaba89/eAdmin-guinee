@@ -16,6 +16,7 @@ const DemoPage = dynamic(() => import('@/components/landing/demo-page').then(m =
 const LoginPage = dynamic(() => import('@/components/auth/login-page').then(m => ({ default: m.LoginPage })), { ssr: false })
 const RegisterPage = dynamic(() => import('@/components/auth/register-page').then(m => ({ default: m.RegisterPage })), { ssr: false })
 const AppSidebar = dynamic(() => import('@/components/layout/app-sidebar').then(m => ({ default: m.AppSidebar })), { ssr: false })
+const MobileSidebar = dynamic(() => import('@/components/layout/app-sidebar').then(m => ({ default: m.MobileSidebar })), { ssr: false })
 const AppHeader = dynamic(() => import('@/components/layout/app-header').then(m => ({ default: m.AppHeader })), { ssr: false })
 const DashboardPage = dynamic(() => import('@/components/app/dashboard-page'), { ssr: false })
 const AnalyticsPage = dynamic(() => import('@/components/app/analytics-page'), { ssr: false })
@@ -99,6 +100,7 @@ export default function Home() {
           </main>
         </div>
         <AiChatbotWidget />
+        <MobileSidebar />
       </div>
     )
   }

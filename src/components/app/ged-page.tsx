@@ -748,7 +748,7 @@ export function GedPage() {
                 >
                   <div className="flex flex-wrap gap-3 pt-3 mt-3 border-t">
                     <Select value={filterClassification === 'all' ? 'tous' : filterClassification} onValueChange={handleClassificationFilterChange}>
-                      <SelectTrigger className="w-[220px]">
+                      <SelectTrigger className="w-full sm:w-[220px]">
                         <Shield className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
                         <SelectValue placeholder="Classification" />
                       </SelectTrigger>
@@ -762,7 +762,7 @@ export function GedPage() {
                     </Select>
 
                     <Select value={institutionFilter} onValueChange={handleFilterChange(setInstitutionFilter)}>
-                      <SelectTrigger className="w-[220px]">
+                      <SelectTrigger className="w-full sm:w-[220px]">
                         <Building2 className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
                         <SelectValue placeholder="Institution" />
                       </SelectTrigger>
@@ -775,7 +775,7 @@ export function GedPage() {
                     </Select>
 
                     <Select value={regionFilter} onValueChange={handleFilterChange(setRegionFilter)}>
-                      <SelectTrigger className="w-[160px]">
+                      <SelectTrigger className="w-full sm:w-[160px]">
                         <MapPin className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
                         <SelectValue placeholder="Région" />
                       </SelectTrigger>
@@ -786,8 +786,8 @@ export function GedPage() {
                       </SelectContent>
                     </Select>
 
-                    <Input type="date" className="w-[160px]" placeholder="Date début" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setCurrentPage(1) }} />
-                    <Input type="date" className="w-[160px]" placeholder="Date fin" value={dateTo} onChange={e => { setDateTo(e.target.value); setCurrentPage(1) }} />
+                    <Input type="date" className="w-full sm:w-[160px]" placeholder="Date début" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setCurrentPage(1) }} />
+                    <Input type="date" className="w-full sm:w-[160px]" placeholder="Date fin" value={dateTo} onChange={e => { setDateTo(e.target.value); setCurrentPage(1) }} />
 
                     {hasActiveFilters && (
                       <Button variant="ghost" size="sm" onClick={resetFilters}>
@@ -1044,7 +1044,7 @@ export function GedPage() {
 
       {/* Upload Document Dialog */}
       <Dialog open={uploadDialog} onOpenChange={(open) => { setUploadDialog(open); if (!open) { setUploadFile(null); setUploadProgress(0); setIsUploading(false) } }}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Upload className="h-5 w-5 text-brand dark:text-primary" />
@@ -1183,7 +1183,7 @@ export function GedPage() {
 
       {/* Document Consultation Dialog */}
       <Dialog open={!!viewDoc} onOpenChange={(open) => { if (!open) setViewDoc(null) }}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Eye className="h-5 w-5 text-brand dark:text-primary" />
@@ -1366,7 +1366,7 @@ export function GedPage() {
 
       {/* Reclassify Dialog */}
       <Dialog open={!!reclassifyDoc} onOpenChange={(open) => { if (!open) setReclassifyDoc(null) }}>
-        <DialogContent className="sm:max-w-[450px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[450px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Tag className="h-5 w-5 text-gold" />
@@ -1413,7 +1413,7 @@ export function GedPage() {
 
       {/* Add Tag Dialog */}
       <Dialog open={!!newTagDoc} onOpenChange={(open) => { if (!open) setNewTagDoc(null) }}>
-        <DialogContent className="sm:max-w-[400px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[400px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Tag className="h-5 w-5 text-brand dark:text-primary" />
@@ -1461,7 +1461,7 @@ export function GedPage() {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deleteDoc} onOpenChange={(open) => { if (!open) setDeleteDoc(null) }}>
-        <DialogContent className="sm:max-w-[450px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[450px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
               <AlertTriangle className="h-5 w-5" />
@@ -1495,7 +1495,7 @@ export function GedPage() {
 
       {/* Export to National Archives Dialog */}
       <Dialog open={exportDialog} onOpenChange={setExportDialog}>
-        <DialogContent className="sm:max-w-[450px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[450px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Archive className="h-5 w-5 text-brand dark:text-primary" />

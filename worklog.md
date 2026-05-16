@@ -134,3 +134,33 @@ Stage Summary:
 - 31 real photos downloaded, 12 optimized and deployed to public/
 - Old fake PNG files deleted
 - 0 TypeScript errors, build succeeds
+---
+Task ID: responsive-fixes
+Agent: Main Agent + Full-Stack Developer Subagent
+Task: Make the entire eAdministration Suite responsive for all screen sizes (mobile, tablet, desktop)
+
+Work Log:
+- Analyzed user screenshot showing modal cut off on mobile (casier judiciaire dialog)
+- Performed comprehensive audit of all 30+ component files for responsiveness issues
+- Identified 8 critical, 12 high, 10 medium, and 6 low responsiveness issues
+- Fixed mobile sidebar: desktop sidebar hidden on mobile (hidden md:flex), added MobileSidebar with Sheet/Drawer component
+- Added hamburger menu button in AppHeader (md:hidden) to toggle mobile sidebar
+- Fixed register-page: grid-cols-2 → grid-cols-1 sm:grid-cols-2 for name/password fields
+- Fixed dashboard quick actions: grid-cols-3 → grid-cols-2 sm:grid-cols-3
+- Fixed dashboard heatmap: added mobile scroll padding with -mx-4 px-4
+- Fixed all filter selects across 6 files: w-[Xpx] → w-full sm:w-[Xpx]
+- Fixed ALL dialogs/modals (30+ across 14 files): added max-w-[95vw] sm:max-w-[Xpx] max-h-[90vh] overflow-y-auto
+- Fixed login-page decorative elements: hidden sm:block + responsive sizing
+- Fixed courriers-page SLA section: flex-col sm:flex-row stacking
+- Fixed AI chatbot tablet sizing: max-md:w-[340px] max-md:h-[480px]
+- Added overflow-x-auto to tables in analytics, users, audit-logs pages
+- Fixed landing page decorative elements: responsive sizing on mobile
+- Build passes with 0 errors
+
+Stage Summary:
+- All 8 critical + 12 high + 10 medium responsiveness issues fixed
+- Mobile sidebar with Sheet/Drawer fully functional
+- All dialogs/modals properly sized for mobile with scroll
+- All filter bars responsive with flex-wrap
+- All grid layouts use proper responsive breakpoints
+- 0 TypeScript errors, build succeeds

@@ -310,7 +310,7 @@ export function AuditLogsPage() {
                 />
               </div>
               <Select value={actionFilter} onValueChange={v => setActionFilter(v as AuditAction | 'all')}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="Action" />
                 </SelectTrigger>
                 <SelectContent>
@@ -318,7 +318,7 @@ export function AuditLogsPage() {
                 </SelectContent>
               </Select>
               <Select value={resourceFilter} onValueChange={v => setResourceFilter(v as AuditResource | 'all')}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="Ressource" />
                 </SelectTrigger>
                 <SelectContent>
@@ -326,15 +326,15 @@ export function AuditLogsPage() {
                 </SelectContent>
               </Select>
               <Select value={severityFilter} onValueChange={v => setSeverityFilter(v as AuditSeverity | 'all')}>
-                <SelectTrigger className="w-[170px]">
+                <SelectTrigger className="w-full sm:w-[170px]">
                   <SelectValue placeholder="Sévérité" />
                 </SelectTrigger>
                 <SelectContent>
                   {SEVERITY_FILTER_OPTIONS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <Input type="date" className="w-[150px]" placeholder="Date début" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-              <Input type="date" className="w-[150px]" placeholder="Date fin" value={dateTo} onChange={e => setDateTo(e.target.value)} />
+              <Input type="date" className="w-full sm:w-[150px]" placeholder="Date début" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+              <Input type="date" className="w-full sm:w-[150px]" placeholder="Date fin" value={dateTo} onChange={e => setDateTo(e.target.value)} />
             </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" className="gap-1.5" onClick={handleExportCSV}>
@@ -390,6 +390,7 @@ export function AuditLogsPage() {
       {/* Logs Table */}
       <Card>
         <CardContent className="p-0">
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -460,6 +461,7 @@ export function AuditLogsPage() {
               })}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 

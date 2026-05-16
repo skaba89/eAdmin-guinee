@@ -182,9 +182,9 @@ export function LoginPage() {
         <DotGridOverlay />
 
         {/* Subtle radial glow accents */}
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] pointer-events-none"
+        <div className="absolute top-0 right-0 w-[300px] h-[300px] sm:w-[500px] sm:h-[500px] pointer-events-none hidden sm:block"
           style={{ background: 'radial-gradient(circle, rgba(200,164,92,0.06) 0%, transparent 70%)' }} />
-        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] pointer-events-none"
+        <div className="absolute bottom-0 left-0 w-[250px] h-[250px] sm:w-[400px] sm:h-[400px] pointer-events-none hidden sm:block"
           style={{ background: 'radial-gradient(circle, rgba(0,148,96,0.05) 0%, transparent 70%)' }} />
 
         <div className="relative z-10 text-center space-y-8 max-w-md">

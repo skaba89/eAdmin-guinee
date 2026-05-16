@@ -384,7 +384,7 @@ export function UsersPage() {
                 />
               </div>
               <Select value={roleFilter} onValueChange={v => setRoleFilter(v as StoreRole | 'all')}>
-                <SelectTrigger className="w-[170px]">
+                <SelectTrigger className="w-full sm:w-[170px]">
                   <SelectValue placeholder="Rôle" />
                 </SelectTrigger>
                 <SelectContent>
@@ -393,7 +393,7 @@ export function UsersPage() {
                 </SelectContent>
               </Select>
               <Select value={statusFilter} onValueChange={v => setStatusFilter(v as UserAccountStatus | 'all')}>
-                <SelectTrigger className="w-[140px]">
+                <SelectTrigger className="w-full sm:w-[140px]">
                   <SelectValue placeholder="Statut" />
                 </SelectTrigger>
                 <SelectContent>
@@ -405,7 +405,7 @@ export function UsersPage() {
                 </SelectContent>
               </Select>
               <Select value={institutionFilter} onValueChange={setInstitutionFilter}>
-                <SelectTrigger className="w-[200px] hidden lg:flex">
+                <SelectTrigger className="w-full sm:w-[200px] hidden lg:flex">
                   <SelectValue placeholder="Institution" />
                 </SelectTrigger>
                 <SelectContent>
@@ -430,7 +430,7 @@ export function UsersPage() {
                     Ajouter
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[525px]">
+                <DialogContent className="max-w-[95vw] sm:max-w-[525px] max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Ajouter un utilisateur</DialogTitle>
                     <DialogDescription>Créer un nouveau compte utilisateur</DialogDescription>
@@ -521,6 +521,7 @@ export function UsersPage() {
       {/* Users Table */}
       <Card>
         <CardContent className="p-0">
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -617,6 +618,7 @@ export function UsersPage() {
               })}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -628,7 +630,7 @@ export function UsersPage() {
 
       {/* View Profile Dialog */}
       <Dialog open={profileDialog} onOpenChange={setProfileDialog}>
-        <DialogContent className="sm:max-w-[525px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[525px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Eye className="h-5 w-5 text-brand dark:text-primary" />
@@ -708,7 +710,7 @@ export function UsersPage() {
 
       {/* Edit User Dialog */}
       <Dialog open={editDialog} onOpenChange={setEditDialog}>
-        <DialogContent className="sm:max-w-[525px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[525px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="h-5 w-5 text-brand dark:text-primary" />
@@ -826,7 +828,7 @@ export function UsersPage() {
 
       {/* Bulk Change Role Dialog */}
       <Dialog open={bulkRoleDialog} onOpenChange={setBulkRoleDialog}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5 text-brand dark:text-primary" />

@@ -315,7 +315,7 @@ export function LandingPage() {
         {/* Animated orbs */}
         <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-[#C8A45C]/20 rounded-full blur-[120px] animate-pulse-soft" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#3B7DD8]/20 rounded-full blur-[120px] animate-pulse-soft delay-500" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-[#C8A45C]/10 rounded-full blur-[150px]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] sm:w-[500px] sm:h-[500px] bg-[#C8A45C]/10 rounded-full blur-[150px]" />
         <div className="absolute bottom-1/3 left-1/3 w-64 h-64 bg-[#009460]/10 rounded-full blur-[100px] animate-pulse-soft delay-300" />
 
         {/* Guinea tricolor accent line */}

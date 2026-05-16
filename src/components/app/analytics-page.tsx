@@ -887,6 +887,7 @@ export default function AnalyticsPage() {
               </div>
             </CardHeader>
             <CardContent className="px-3">
+              <div className="overflow-x-auto">
               {topServices.length > 0 ? (
                 <Table>
                   <TableHeader>
@@ -936,6 +937,7 @@ export default function AnalyticsPage() {
               ) : (
                 <p className="py-8 text-center text-xs text-muted-foreground">Aucune donnée pour cette période</p>
               )}
+              </div>
             </CardContent>
           </Card>
         </motion.div>
@@ -955,6 +957,7 @@ export default function AnalyticsPage() {
               </div>
             </CardHeader>
             <CardContent className="px-3">
+              <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -990,6 +993,7 @@ export default function AnalyticsPage() {
                   ))}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </motion.div>

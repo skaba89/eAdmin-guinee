@@ -537,7 +537,7 @@ export function WorkflowPage() {
       </div>
       {/* Comment Dialog */}
       <Dialog open={commentDialogOpen} onOpenChange={setCommentDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Ajouter un commentaire officiel</DialogTitle>
             <DialogDescription>

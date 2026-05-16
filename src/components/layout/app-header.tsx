@@ -187,7 +187,7 @@ export function AppHeader() {
         <Button
           variant="ghost"
           size="icon"
-          className="lg:hidden h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-muted/60 rounded-lg"
+          className="md:hidden h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-muted/60 rounded-lg"
           onClick={toggleSidebar}
         >
           <Menu className="h-5 w-5" />
@@ -487,7 +487,7 @@ export function AppHeader() {
 
       {/* Profile Dialog */}
       <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
-        <DialogContent className="sm:max-w-md rounded-xl border-border/60 shadow-2xl">
+        <DialogContent className="max-w-[95vw] sm:max-w-md rounded-xl border-border/60 shadow-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-lg font-semibold">Mon profil</DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">Informations de votre compte utilisateur</DialogDescription>

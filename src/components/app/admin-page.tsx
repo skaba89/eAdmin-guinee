@@ -413,7 +413,7 @@ export function AdminPage() {
 
       {/* New API Key Dialog */}
       <Dialog open={newKeyDialog} onOpenChange={setNewKeyDialog}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Générer une nouvelle clé API</DialogTitle>
             <DialogDescription>Entrez un nom pour identifier cette clé</DialogDescription>

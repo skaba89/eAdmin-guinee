@@ -205,7 +205,7 @@ export function RegisterPage() {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Name row */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-white/80 text-xs">Nom *</Label>
                   <div className="relative">
@@ -310,7 +310,7 @@ export function RegisterPage() {
               </div>
 
               {/* Password row */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-white/80 text-xs">Mot de passe *</Label>
                   <div className="relative">

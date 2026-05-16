@@ -540,7 +540,7 @@ export function CourriersPage() {
               <Gauge className="h-4 w-4 text-gold" />
               <span className="text-sm font-semibold text-brand dark:text-primary">Délais réglementaires SLA</span>
             </div>
-            <div className="flex items-center gap-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-brand dark:bg-primary" />
                 <span className="text-xs text-muted-foreground">Présidentiel : <strong className="text-brand dark:text-primary">4h</strong></span>
@@ -647,7 +647,7 @@ export function CourriersPage() {
               >
                 <div className="flex flex-wrap gap-3 pt-3 border-t">
                   <Select value={store.filterPriority} onValueChange={(v) => { store.setFilterPriority(v as CourrierPriority | 'all'); setCurrentPage(1) }}>
-                    <SelectTrigger className="w-[160px]">
+                    <SelectTrigger className="w-full sm:w-[160px]">
                       <SelectValue placeholder="Priorité" />
                     </SelectTrigger>
                     <SelectContent>
@@ -659,7 +659,7 @@ export function CourriersPage() {
                     </SelectContent>
                   </Select>
                   <Select value={store.filterStatus} onValueChange={(v) => { store.setFilterStatus(v as CourrierStatus | 'all'); setCurrentPage(1) }}>
-                    <SelectTrigger className="w-[170px]">
+                    <SelectTrigger className="w-full sm:w-[170px]">
                       <SelectValue placeholder="Statut" />
                     </SelectTrigger>
                     <SelectContent>
@@ -673,7 +673,7 @@ export function CourriersPage() {
                     </SelectContent>
                   </Select>
                   <Select value={store.filterDirection} onValueChange={(v) => { store.setFilterDirection(v as CourrierDirection | 'all'); setCurrentPage(1) }}>
-                    <SelectTrigger className="w-[150px]">
+                    <SelectTrigger className="w-full sm:w-[150px]">
                       <SelectValue placeholder="Direction" />
                     </SelectTrigger>
                     <SelectContent>
@@ -718,7 +718,7 @@ export function CourriersPage() {
 
       {/* New Courrier Dialog */}
       <Dialog open={newCourrierDialog} onOpenChange={(open) => { setNewCourrierDialog(open); if (!open) setCourrierFiles([]) }}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5 text-brand dark:text-primary" />
@@ -867,7 +867,7 @@ export function CourriersPage() {
 
       {/* Courrier Detail Dialog */}
       <Dialog open={detailDialog} onOpenChange={setDetailDialog}>
-        <DialogContent className="sm:max-w-[650px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Eye className="h-5 w-5 text-brand dark:text-primary" />
@@ -1041,7 +1041,7 @@ export function CourriersPage() {
 
       {/* Transfer Dialog */}
       <Dialog open={transferDialog} onOpenChange={setTransferDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ArrowRight className="h-5 w-5 text-brand dark:text-primary" />
@@ -1087,7 +1087,7 @@ export function CourriersPage() {
 
       {/* Reject Dialog */}
       <Dialog open={rejectDialog} onOpenChange={setRejectDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <X className="h-5 w-5 text-red-600" />
@@ -1120,7 +1120,7 @@ export function CourriersPage() {
 
       {/* Add Note Dialog */}
       <Dialog open={addNoteDialog} onOpenChange={setAddNoteDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="max-w-[95vw] sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-brand dark:text-primary" />
