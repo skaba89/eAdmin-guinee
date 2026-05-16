@@ -148,13 +148,9 @@ const STATUS_CONFIG: Record<RequestStatus, { label: string; color: string; icon:
   rejetee: { label: 'Rejetée', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', icon: XCircle },
 }
 
-// ─── STATS BANNER DATA ───────────────────────────────────────────────────────
-const STATS_BANNER = [
-  { value: '124 500', label: 'citoyens inscrits', icon: Users },
-  { value: '8 730', label: 'demandes traitées', icon: CheckCircle2 },
-  { value: '94%', label: 'taux de satisfaction', icon: Heart },
-  { value: '48h', label: 'délai moyen', icon: Clock },
-]
+// ─── ACTIVE STATUSES vs COMPLETED ────────────────────────────────────────────
+const ACTIVE_STATUSES: RequestStatus[] = ['soumise', 'en_cours', 'pieces_complementaires', 'validee', 'prete']
+const COMPLETED_STATUSES: RequestStatus[] = ['livree', 'rejetee']
 
 // ─── ANIMATION VARIANTS ─────────────────────────────────────────────────────
 const containerVariants = {
@@ -167,6 +163,12 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' as const } },
 }
 
+// ─── PROGRESS CALCULATOR ─────────────────────────────────────────────────────
+function getProgressValue(req: CitizenRequest): number {
+  if (req.timeline.length === 0) return 0
+  return Math.round((req.timeline.filter(s => s.status === 'completed').length / req.timeline.length) * 100)
+}
+
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 export function CitizenPortalPage() {
   const navigate = useAppStore((s) => s.navigate)
@@ -176,6 +178,7 @@ export function CitizenPortalPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [successToast, setSuccessToast] = useState('')
+  const [demandSubTab, setDemandSubTab] = useState<'active' | 'history'>('active')
 
   // Request dialog
   const [requestDialogOpen, setRequestDialogOpen] = useState(false)
@@ -196,17 +199,9 @@ export function CitizenPortalPage() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [acceptedTerms, setAcceptedTerms] = useState(false)
 
-  // Tracking
-  const [trackingNumber, setTrackingNumber] = useState('')
-  const [trackedRequest, setTrackedRequest] = useState<CitizenRequest | null>(null)
-  const [trackingError, setTrackingError] = useState(false)
-
   // Detail view
   const [selectedRequest, setSelectedRequest] = useState<CitizenRequest | null>(null)
   const [detailDialogOpen, setDetailDialogOpen] = useState(false)
-
-  // Notification preferences
-  const [notifPrefs, setNotifPrefs] = useState({ whatsapp: true, sms: false, email: true, ussd: false })
 
   // File upload state
   const [uploadedFiles, setUploadedFiles] = useState<Map<string, UploadedDocument>>(new Map())
@@ -223,7 +218,6 @@ export function CitizenPortalPage() {
   const handleOpenRequestDialog = (service: ServiceItem, category: ServiceCategory) => {
     setSelectedService(service)
     setSelectedCategoryInfo(category)
-    // Pre-fill from logged-in user info
     const nameParts = (user?.name || '').split(' ')
     setForm({
       citizenName: nameParts.length > 1 ? nameParts.slice(1).join(' ') : nameParts[0] || '',
@@ -281,18 +275,11 @@ export function CitizenPortalPage() {
     setActiveTab('mes-demandes')
   }
 
-  const handleTrack = () => {
-    const found = getRequestByReference(trackingNumber)
-    setTrackedRequest(found || null)
-    setTrackingError(!!trackingNumber && !found)
-  }
-
   const handleViewDetail = (req: CitizenRequest) => {
     setSelectedRequest(req)
     setDetailDialogOpen(true)
   }
 
-  // Download citizen document
   const handleDownloadCitizenDocument = (req: CitizenRequest) => {
     downloadCitizenDocument(req, req.assignedAgent)
     setSuccessToast(`Document ${req.reference} téléchargé avec succès`)
@@ -320,13 +307,6 @@ export function CitizenPortalPage() {
     })
   }
 
-  const handleDrop = async (e: React.DragEvent, requiredDocName: string) => {
-    e.preventDefault()
-    e.stopPropagation()
-    const file = e.dataTransfer.files[0]
-    if (file) await handleFileUpload(file, requiredDocName)
-  }
-
   // Filter services by search
   const filteredCategories = SERVICE_CATEGORIES
     .filter(cat => selectedCategory === 'all' || cat.id === selectedCategory)
@@ -349,13 +329,122 @@ export function CitizenPortalPage() {
       )
     : requests
 
+  // Split requests into active and completed
+  const activeRequests = myRequests.filter(r => ACTIVE_STATUSES.includes(r.status))
+  const completedRequests = myRequests.filter(r => COMPLETED_STATUSES.includes(r.status))
+
   // Stats from actual user requests
   const myStats = [
-    { label: 'Demandes soumises', value: myRequests.filter(r => r.status === 'soumise').length, icon: Send, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-900/20', gradientBg: 'bg-gradient-to-br from-sky-100 to-sky-50 dark:from-sky-900/30 dark:to-sky-800/10' },
-    { label: 'En traitement', value: myRequests.filter(r => ['en_cours', 'pieces_complementaires'].includes(r.status)).length, icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20', gradientBg: 'bg-gradient-to-br from-amber-100 to-amber-50 dark:from-amber-900/30 dark:to-amber-800/10' },
-    { label: 'Documents prêts', value: myRequests.filter(r => r.status === 'prete').length, icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20', gradientBg: 'bg-gradient-to-br from-emerald-100 to-emerald-50 dark:from-emerald-900/30 dark:to-emerald-800/10' },
-    { label: 'Livrées', value: myRequests.filter(r => r.status === 'livree').length, icon: Download, color: 'text-[#0B2E58] dark:text-[#3B7DD8]', bg: 'bg-[#0B2E58]/5 dark:bg-[#3B7DD8]/10', gradientBg: 'bg-gradient-to-br from-[#0B2E58]/10 to-[#3B7DD8]/5 dark:from-[#3B7DD8]/20 dark:to-[#0B2E58]/10' },
+    { label: 'En cours', value: myRequests.filter(r => r.status === 'soumise' || r.status === 'en_cours').length, icon: Send, color: 'text-sky-600 dark:text-sky-400', gradientBg: 'bg-gradient-to-br from-sky-100 to-sky-50 dark:from-sky-900/30 dark:to-sky-800/10' },
+    { label: 'En traitement', value: myRequests.filter(r => ['en_cours', 'pieces_complementaires', 'validee'].includes(r.status)).length, icon: Clock, color: 'text-amber-600 dark:text-amber-400', gradientBg: 'bg-gradient-to-br from-amber-100 to-amber-50 dark:from-amber-900/30 dark:to-amber-800/10' },
+    { label: 'Documents prêts', value: myRequests.filter(r => r.status === 'prete').length, icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', gradientBg: 'bg-gradient-to-br from-emerald-100 to-emerald-50 dark:from-emerald-900/30 dark:to-emerald-800/10' },
+    { label: 'Livrées', value: myRequests.filter(r => r.status === 'livree').length, icon: Download, color: 'text-[#0B2E58] dark:text-[#3B7DD8]', gradientBg: 'bg-gradient-to-br from-[#0B2E58]/10 to-[#3B7DD8]/5 dark:from-[#3B7DD8]/20 dark:to-[#0B2E58]/10' },
   ]
+
+  // ─── REQUEST CARD COMPONENT ────────────────────────────────────────────────
+  const RequestCard = ({ req, index }: { req: CitizenRequest; index: number }) => {
+    const sConfig = STATUS_CONFIG[req.status]
+    const SIcon = sConfig.icon
+    const progress = getProgressValue(req)
+    const isReadyOrDelivered = req.status === 'prete' || req.status === 'livree'
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ delay: index * 0.03 }}
+        layout
+      >
+        <Card className="card-interactive cursor-pointer group" onClick={() => handleViewDetail(req)}>
+          <CardContent className="p-4">
+            {/* Top row: service info + status badge */}
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className={`p-2 rounded-xl backdrop-blur-sm shrink-0 ${sConfig.color}`}>
+                  <SIcon className="size-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold text-sm truncate">{req.serviceName}</p>
+                  <p className="text-xs text-muted-foreground font-mono tracking-wide">{req.reference}</p>
+                </div>
+              </div>
+              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium backdrop-blur-sm border border-white/10 dark:border-white/5 shrink-0 ${sConfig.color}`}>
+                {sConfig.label}
+              </span>
+            </div>
+
+            {/* Meta info */}
+            <div className="space-y-1 mb-3">
+              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1"><Building2 className="size-3" />{req.assignedService}</span>
+                <span className="flex items-center gap-1"><Calendar className="size-3" />{new Date(req.createdAt).toLocaleDateString('fr-FR')}</span>
+              </div>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <MapPin className="size-3" />
+                {req.deliveryMode === 'en_ligne' ? 'Livraison en ligne' : req.deliveryMode === 'guichet' ? 'Retrait au guichet' : 'Envoi par courrier'}
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            <div className="mb-3">
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
+                <span>Avancement</span>
+                <span>{progress}%</span>
+              </div>
+              <div className="h-1.5 w-full rounded-full bg-muted/50 overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    isReadyOrDelivered
+                      ? 'bg-gradient-to-r from-emerald-500 to-emerald-400'
+                      : 'bg-gradient-to-r from-[#0B2E58] via-[#3B7DD8] to-[#C8A45C] dark:from-[#3B7DD8] dark:via-[#5A96E6] dark:to-[#D4B878]'
+                  }`}
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1 h-7 text-xs"
+                onClick={(e) => { e.stopPropagation(); handleViewDetail(req) }}
+              >
+                <Eye className="size-3" />
+                Détails
+              </Button>
+              {isReadyOrDelivered && (
+                <Button
+                  size="sm"
+                  className="btn-gold gap-1 h-7 text-xs"
+                  onClick={(e) => { e.stopPropagation(); handleDownloadCitizenDocument(req) }}
+                >
+                  <Download className="size-3" />
+                  Télécharger
+                </Button>
+              )}
+            </div>
+
+            {/* Delivery info for ready/delivered */}
+            {isReadyOrDelivered && (
+              <div className="mt-2 p-2 rounded-lg bg-gradient-to-r from-emerald-50 to-emerald-100/50 dark:from-emerald-900/20 dark:to-emerald-800/10 border border-emerald-200 dark:border-emerald-800/40">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="size-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                    {req.status === 'livree' ? 'Document livré' : 'Document prêt'}
+                    {req.deliveryMode === 'guichet' && req.deliveryLocation && ` — ${req.deliveryLocation}`}
+                    {req.deliveryMode === 'en_ligne' && ' — Disponible en ligne'}
+                  </p>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+    )
+  }
 
   return (
     <motion.div
@@ -365,12 +454,12 @@ export function CitizenPortalPage() {
       className="space-y-6 p-4 md:p-6"
     >
       {/* ═══════════════════════════════════════════════════════════════════════
-          HEADER — GUINÉE SERVICES PUBLICS
+          HERO HEADER — GUINÉE SERVICES PUBLICS
       ═══════════════════════════════════════════════════════════════════════ */}
       <motion.div variants={itemVariants}>
         <Card className="glass-premium overflow-hidden bg-gradient-to-br from-[#0B2E58] via-[#0B2E58]/95 to-[#134A8E] dark:from-[#0B2E58] dark:via-[#071D3A] dark:to-[#0B2E58] border-0">
           <CardContent className="p-6 md:p-8 text-white relative">
-            {/* Guinea tricolor accent — taller with gradient fade at edges */}
+            {/* Guinea tricolor accent */}
             <div className="flex gap-0 mb-5 -mx-6 md:-mx-8 -mt-6 md:-mt-8">
               <div className="flex-1 h-2" style={{ background: `linear-gradient(to right, transparent, ${GUINEA_RED})` }} />
               <div className="flex-1 h-2" style={{ backgroundColor: GUINEA_RED }} />
@@ -382,7 +471,6 @@ export function CitizenPortalPage() {
             </div>
 
             <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-              {/* Icon container with gold ring + glow */}
               <div className="relative">
                 <div className="flex size-14 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm shadow-xl border-2 border-[#C8A45C]/40 animate-glow-pulse">
                   <Landmark className="size-7 text-white" />
@@ -391,9 +479,11 @@ export function CitizenPortalPage() {
               </div>
               <div className="flex-1">
                 <p className="text-xs uppercase tracking-[0.2em] text-[#C8A45C]/70 font-medium">République de Guinée</p>
-                <h2 className="text-2xl font-bold mt-0.5 tracking-tight">Guinée Services Publics</h2>
+                <h2 className="text-2xl font-bold mt-0.5 tracking-tight">
+                  Bienvenue, {user?.name || 'Citoyen'}
+                </h2>
                 <p className="text-sm text-white/60 mt-1 max-w-xl leading-relaxed">
-                  Portail officiel des démarches administratives — Soumettez vos demandes, suivez l&apos;avancement et recevez vos documents
+                  Suivez vos demandes, consultez l&apos;avancement et téléchargez vos documents administratifs
                 </p>
               </div>
               <div className="flex flex-col gap-2">
@@ -403,7 +493,7 @@ export function CitizenPortalPage() {
                 </Badge>
                 <Badge className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs gap-1.5 backdrop-blur-sm">
                   <CheckCircle2 className="size-3" />
-                  {myRequests.length} demande(s) en cours
+                  {activeRequests.length} demande(s) active(s)
                 </Badge>
               </div>
             </div>
@@ -412,37 +502,7 @@ export function CitizenPortalPage() {
       </motion.div>
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          QUICK ACTIONS
-      ═══════════════════════════════════════════════════════════════════════ */}
-      <motion.div variants={itemVariants}>
-        <Card className="card-interactive border-[#C8A45C]/15 dark:border-[#D4B878]/10 bg-gradient-to-r from-[#0B2E58]/[0.02] to-[#C8A45C]/[0.02] dark:from-[#3B7DD8]/[0.05] dark:to-[#D4B878]/[0.03]">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white flex items-center gap-2">
-              <span className="text-gradient-gold">⚡</span>
-              Actions rapides
-            </CardTitle>
-            <CardDescription className="text-xs">Raccourcis vers les modules liés</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {[
-                { label: 'Mes demandes', icon: FileText, color: 'bg-gradient-to-br from-[#0B2E58] to-[#134A8E] hover:from-[#0B2E58]/90 hover:to-[#134A8E]/90 text-white shadow-navy', onClick: () => setActiveTab('mes-demandes') },
-                { label: 'Suivi dossier', icon: Search, color: 'bg-gradient-to-br from-[#3B7DD8] to-[#2A6BC7] hover:from-[#3B7DD8]/90 hover:to-[#2A6BC7]/90 text-white shadow-navy', onClick: () => setActiveTab('suivi') },
-                { label: 'Nouvelle demande', icon: Plus, color: 'bg-gradient-to-br from-[#C8A45C] to-[#A88A3C] hover:from-[#C8A45C]/90 hover:to-[#A88A3C]/90 text-[#0B2E58] shadow-gold', onClick: () => setActiveTab('services') },
-                { label: 'Traitement demandes', icon: CheckCircle2, color: 'bg-gradient-to-br from-emerald-600 to-emerald-700 hover:from-emerald-600/90 hover:to-emerald-700/90 text-white shadow-sm', onClick: () => navigate('service-requests') },
-              ].map(action => (
-                <Button key={action.label} className={`${action.color} h-auto flex-col gap-2 rounded-xl py-3.5 text-xs font-semibold transition-all duration-300 hover:scale-[1.03] active:scale-[0.98]`} onClick={action.onClick}>
-                  <action.icon className="size-5" />
-                  {action.label}
-                </Button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* ═══════════════════════════════════════════════════════════════════════
-          STATS FROM ACTUAL REQUESTS
+          STATS ROW
       ═══════════════════════════════════════════════════════════════════════ */}
       <motion.div variants={itemVariants}>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -463,32 +523,110 @@ export function CitizenPortalPage() {
       </motion.div>
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          TABS NAVIGATION
+          MAIN TABS — MES DEMANDES + NOUVELLE DEMANDE
       ═══════════════════════════════════════════════════════════════════════ */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="w-full sm:w-auto h-auto flex-wrap gap-1 bg-muted/40 p-1.5 rounded-xl border border-[#C8A45C]/10 dark:border-[#D4B878]/5">
-          <TabsTrigger value="services" className="gap-1.5 text-sm rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0B2E58] data-[state=active]:to-[#134A8E] data-[state=active]:text-white data-[state=active]:shadow-navy dark:data-[state=active]:from-[#3B7DD8] dark:data-[state=active]:to-[#2A6BC7] transition-all duration-300">
-            <Globe className="size-4" />
-            Services
-          </TabsTrigger>
           <TabsTrigger value="mes-demandes" className="gap-1.5 text-sm rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0B2E58] data-[state=active]:to-[#134A8E] data-[state=active]:text-white data-[state=active]:shadow-navy dark:data-[state=active]:from-[#3B7DD8] dark:data-[state=active]:to-[#2A6BC7] transition-all duration-300">
             <FileText className="size-4" />
-            Mes demandes ({myRequests.length})
+            Mes Demandes ({myRequests.length})
           </TabsTrigger>
-          <TabsTrigger value="suivi" className="gap-1.5 text-sm rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0B2E58] data-[state=active]:to-[#134A8E] data-[state=active]:text-white data-[state=active]:shadow-navy dark:data-[state=active]:from-[#3B7DD8] dark:data-[state=active]:to-[#2A6BC7] transition-all duration-300">
-            <Search className="size-4" />
-            Suivi
-          </TabsTrigger>
-          <TabsTrigger value="notifications" className="gap-1.5 text-sm rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0B2E58] data-[state=active]:to-[#134A8E] data-[state=active]:text-white data-[state=active]:shadow-navy dark:data-[state=active]:from-[#3B7DD8] dark:data-[state=active]:to-[#2A6BC7] transition-all duration-300">
-            <Bell className="size-4" />
-            Notifications
+          <TabsTrigger value="nouvelle-demande" className="gap-1.5 text-sm rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0B2E58] data-[state=active]:to-[#134A8E] data-[state=active]:text-white data-[state=active]:shadow-navy dark:data-[state=active]:from-[#3B7DD8] dark:data-[state=active]:to-[#2A6BC7] transition-all duration-300">
+            <Plus className="size-4" />
+            Nouvelle Demande
           </TabsTrigger>
         </TabsList>
 
         {/* ═══════════════════════════════════════════════════════════════════
-            SERVICES CATALOG
+            MES DEMANDES — WITH SUB-TABS (EN COURS / HISTORIQUE)
         ═════════════════════════════════════════════════════════════════════ */}
-        <TabsContent value="services">
+        <TabsContent value="mes-demandes">
+          <div className="space-y-4 mt-4">
+            {myRequests.length === 0 ? (
+              <Card className="glass-premium">
+                <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+                  <FileText className="size-16 text-muted-foreground/20 mb-4" />
+                  <h3 className="text-lg font-semibold text-muted-foreground mb-1">Aucune demande</h3>
+                  <p className="text-sm text-muted-foreground mb-4">Vous n&apos;avez pas encore soumis de demande. Créez votre première demande administrative.</p>
+                  <Button className="btn-premium gap-2" onClick={() => setActiveTab('nouvelle-demande')}>
+                    <Plus className="size-4" />
+                    Nouvelle demande
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                {/* Sub-tabs for active/history */}
+                <div className="flex gap-2">
+                  <Button
+                    variant={demandSubTab === 'active' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setDemandSubTab('active')}
+                    className={demandSubTab === 'active' ? 'bg-gradient-to-r from-[#0B2E58] to-[#134A8E] text-white hover:from-[#0B2E58]/90 hover:to-[#134A8E]/90 shadow-navy gap-1.5' : 'gap-1.5'}
+                  >
+                    <Clock className="size-3.5" />
+                    En cours ({activeRequests.length})
+                  </Button>
+                  <Button
+                    variant={demandSubTab === 'history' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setDemandSubTab('history')}
+                    className={demandSubTab === 'history' ? 'bg-gradient-to-r from-[#0B2E58] to-[#134A8E] text-white hover:from-[#0B2E58]/90 hover:to-[#134A8E]/90 shadow-navy gap-1.5' : 'gap-1.5'}
+                  >
+                    <CheckCircle2 className="size-3.5" />
+                    Historique ({completedRequests.length})
+                  </Button>
+                </div>
+
+                <AnimatePresence mode="popLayout">
+                  {demandSubTab === 'active' ? (
+                    activeRequests.length === 0 ? (
+                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                        <Card className="glass-premium">
+                          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                            <Clock className="size-12 text-muted-foreground/20 mb-3" />
+                            <p className="text-sm text-muted-foreground">Aucune demande en cours</p>
+                            <Button variant="link" className="text-xs mt-1" onClick={() => setActiveTab('nouvelle-demande')}>
+                              Soumettre une nouvelle demande
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    ) : (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        {activeRequests.map((req, i) => (
+                          <RequestCard key={req.id} req={req} index={i} />
+                        ))}
+                      </div>
+                    )
+                  ) : (
+                    completedRequests.length === 0 ? (
+                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                        <Card className="glass-premium">
+                          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                            <CheckCircle2 className="size-12 text-muted-foreground/20 mb-3" />
+                            <p className="text-sm text-muted-foreground">Aucune demande dans l&apos;historique</p>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    ) : (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        {completedRequests.map((req, i) => (
+                          <RequestCard key={req.id} req={req} index={i} />
+                        ))}
+                      </div>
+                    )
+                  )}
+                </AnimatePresence>
+              </>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* ═══════════════════════════════════════════════════════════════════
+            NOUVELLE DEMANDE — SERVICE CATALOG
+        ═════════════════════════════════════════════════════════════════════ */}
+        <TabsContent value="nouvelle-demande">
           <div className="space-y-6 mt-4">
             {/* Search + filter */}
             <div className="flex flex-col sm:flex-row gap-3">
@@ -591,403 +729,6 @@ export function CitizenPortalPage() {
             )}
           </div>
         </TabsContent>
-
-        {/* ═══════════════════════════════════════════════════════════════════
-            MES DEMANDES — LIST OF ALL SUBMITTED REQUESTS
-        ═════════════════════════════════════════════════════════════════════ */}
-        <TabsContent value="mes-demandes">
-          <div className="space-y-4 mt-4">
-            {myRequests.length === 0 ? (
-              <Card className="glass-premium">
-                <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-                  <FileText className="size-16 text-muted-foreground/20 mb-4" />
-                  <h3 className="text-lg font-semibold text-muted-foreground mb-1">Aucune demande</h3>
-                  <p className="text-sm text-muted-foreground mb-4">Vous n&apos;avez pas encore soumis de demande. Explorez nos services pour commencer.</p>
-                  <Button className="btn-premium gap-2" onClick={() => setActiveTab('services')}>
-                    <Plus className="size-4" />
-                    Nouvelle demande
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <>
-                {/* Request cards */}
-                <AnimatePresence mode="popLayout">
-                  {myRequests.map((req, i) => {
-                    const sConfig = STATUS_CONFIG[req.status]
-                    const SIcon = sConfig.icon
-                    return (
-                      <motion.div
-                        key={req.id}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ delay: i * 0.03 }}
-                        layout
-                      >
-                        <Card className="card-interactive" onClick={() => handleViewDetail(req)}>
-                          <CardContent className="p-4">
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex items-center gap-3">
-                                <div className={`p-2 rounded-xl backdrop-blur-sm ${sConfig.color}`}>
-                                  <SIcon className="size-4" />
-                                </div>
-                                <div>
-                                  <p className="font-semibold text-sm">{req.serviceName}</p>
-                                  <p className="text-xs text-muted-foreground font-mono tracking-wide">{req.reference}</p>
-                                </div>
-                              </div>
-                              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium backdrop-blur-sm border border-white/10 dark:border-white/5 ${sConfig.color}`}>
-                                {sConfig.label}
-                              </span>
-                            </div>
-                            <div className="ml-13 pl-13 space-y-1">
-                              <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                <span className="flex items-center gap-1"><Building2 className="size-3" />{req.assignedService}</span>
-                                <span className="flex items-center gap-1"><Calendar className="size-3" />{new Date(req.createdAt).toLocaleDateString('fr-FR')}</span>
-                                {req.assignedAgent && <span className="flex items-center gap-1"><Users className="size-3" />{req.assignedAgent}</span>}
-                              </div>
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <MapPin className="size-3" />
-                                {req.deliveryMode === 'en_ligne' ? 'Livraison en ligne' : req.deliveryMode === 'guichet' ? 'Retrait au guichet' : 'Envoi par courrier'}
-                              </div>
-                            </div>
-                            {(req.status === 'prete' || req.status === 'livree') && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="btn-premium gap-1 h-7 text-xs mt-2 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
-                                onClick={(e) => { e.stopPropagation(); downloadCitizenDocument(req, req.assignedAgent) }}
-                              >
-                                <Download className="size-3" />
-                                Télécharger
-                              </Button>
-                            )}
-                            {(req.uploadedDocuments?.length ?? 0) > 0 && (
-                              <span className="flex items-center gap-1 text-[10px] text-muted-foreground mt-1">
-                                <Paperclip className="size-3" />
-                                {req.uploadedDocuments?.length ?? 0} document(s) chargé(s)
-                                {(req.uploadedDocuments ?? []).filter(d => d.verified).length > 0 && (
-                                  <span className="text-emerald-500">({(req.uploadedDocuments ?? []).filter(d => d.verified).length} vérifié(s))</span>
-                                )}
-                              </span>
-                            )}
-                            {/* Progress bar with gradient fill */}
-                            <div className="mt-3">
-                              <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
-                                <span>Avancement</span>
-                                <span>{req.timeline.filter(s => s.status === 'completed').length}/{req.timeline.length} étapes</span>
-                              </div>
-                              <div className="h-1.5 w-full rounded-full bg-muted/50 overflow-hidden">
-                                <div
-                                  className="h-full rounded-full bg-gradient-to-r from-[#0B2E58] via-[#3B7DD8] to-[#C8A45C] dark:from-[#3B7DD8] dark:via-[#5A96E6] dark:to-[#D4B878] transition-all duration-500"
-                                  style={{ width: `${(req.timeline.filter(s => s.status === 'completed').length / req.timeline.length) * 100}%` }}
-                                />
-                              </div>
-                            </div>
-                            {/* Delivery info for ready/delivered */}
-                            {(req.status === 'prete' || req.status === 'livree') && (
-                              <div className="mt-2 p-2 rounded-lg bg-gradient-to-r from-emerald-50 to-emerald-100/50 dark:from-emerald-900/20 dark:to-emerald-800/10 border border-emerald-200 dark:border-emerald-800/40">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-2">
-                                    <CheckCircle2 className="size-3.5 text-emerald-600 dark:text-emerald-400" />
-                                    <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                                      {req.status === 'livree' ? 'Document livré' : 'Document prêt'}
-                                      {req.deliveryMode === 'guichet' && req.deliveryLocation && ` — Retrait au : ${req.deliveryLocation}`}
-                                      {req.deliveryMode === 'en_ligne' && ' — Disponible en ligne'}
-                                      {req.deliveryMode === 'courrier' && ' — Envoyé par courrier'}
-                                    </p>
-                                  </div>
-                                  <Button size="sm" className="btn-gold gap-1.5 h-7 text-xs" onClick={(e) => { e.stopPropagation(); handleDownloadCitizenDocument(req) }}>
-                                    <Download className="h-3 w-3" />
-                                    Télécharger
-                                  </Button>
-                                </div>
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      </motion.div>
-                    )
-                  })}
-                </AnimatePresence>
-              </>
-            )}
-          </div>
-        </TabsContent>
-
-        {/* ═══════════════════════════════════════════════════════════════════
-            SUIVI DE DOSSIER — TRACKING BY REFERENCE
-        ═════════════════════════════════════════════════════════════════════ */}
-        <TabsContent value="suivi">
-          <Card className="card-gradient mt-4">
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Search className="size-5 text-gradient-gold" />
-                Suivi de dossier
-              </CardTitle>
-              <CardDescription>Entrez votre numéro de référence pour suivre l&apos;avancement de votre démarche</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex gap-3">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Ex: GN-2026-012345"
-                    value={trackingNumber}
-                    onChange={e => { setTrackingNumber(e.target.value); setTrackingError(false) }}
-                    className="pl-10 glass-input focus-ring-premium"
-                    onKeyDown={e => e.key === 'Enter' && handleTrack()}
-                  />
-                </div>
-                <Button onClick={handleTrack} className="btn-premium gap-2">
-                  <Search className="h-4 w-4" />
-                  Rechercher
-                </Button>
-              </div>
-
-              <AnimatePresence mode="wait">
-                {trackedRequest ? (
-                  <motion.div
-                    key={trackedRequest.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                  >
-                    <Card className="glass-premium border-2 border-[#0B2E58]/10 dark:border-[#3B7DD8]/20">
-                      <CardContent className="p-6 space-y-5">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h3 className="font-bold text-lg">{trackedRequest.serviceName}</h3>
-                            <p className="text-sm text-muted-foreground font-mono tracking-wide">{trackedRequest.reference}</p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Service compétent : <span className="font-medium">{trackedRequest.assignedService}</span>
-                            </p>
-                          </div>
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur-sm border border-white/10 dark:border-white/5 ${STATUS_CONFIG[trackedRequest.status].color}`}>
-                            {(() => { const Icon = STATUS_CONFIG[trackedRequest.status].icon; return <Icon className="size-3.5" /> })()}
-                            {STATUS_CONFIG[trackedRequest.status].label}
-                          </span>
-                        </div>
-
-                        <div className="divider-premium" />
-
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                          <div>
-                            <p className="text-xs text-muted-foreground">Demandeur</p>
-                            <p className="font-medium">{trackedRequest.citizenFirstName} {trackedRequest.citizenName}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Date de soumission</p>
-                            <p className="font-medium">{new Date(trackedRequest.createdAt).toLocaleDateString('fr-FR')}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground">Mode de livraison</p>
-                            <p className="font-medium">{trackedRequest.deliveryMode === 'en_ligne' ? 'En ligne' : trackedRequest.deliveryMode === 'guichet' ? 'Au guichet' : 'Par courrier'}</p>
-                          </div>
-                        </div>
-
-                        <div className="divider-premium" />
-
-                        {/* Timeline with refined step indicators */}
-                        <div>
-                          <h4 className="text-sm font-semibold mb-4 flex items-center gap-2">
-                            <span className="text-gradient-gold">→</span>
-                            Avancement de votre demande
-                          </h4>
-                          <div className="relative">
-                            <div className="absolute left-3.5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-[#0B2E58] via-[#3B7DD8] to-muted dark:from-[#3B7DD8] dark:via-[#5A96E6] dark:to-muted" />
-                            <div className="space-y-5">
-                              {trackedRequest.timeline.map((step, i) => (
-                                <div key={i} className="flex gap-4 relative">
-                                  <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 z-10 border-2 ${
-                                    step.status === 'completed' ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 border-emerald-400 text-white shadow-sm shadow-emerald-500/20' :
-                                    step.status === 'current' ? 'bg-gradient-to-br from-[#0B2E58] to-[#134A8E] border-[#3B7DD8] text-white dark:from-[#3B7DD8] dark:to-[#2A6BC7] dark:border-[#5A96E6] shadow-sm shadow-[#3B7DD8]/20' :
-                                    'bg-background border-muted-foreground/30 text-muted-foreground'
-                                  }`}>
-                                    {step.status === 'completed' ? (
-                                      <Check className="h-4 w-4" />
-                                    ) : step.status === 'current' ? (
-                                      <Clock className="h-3.5 w-3.5" />
-                                    ) : (
-                                      <div className="h-2 w-2 rounded-full bg-muted-foreground/40" />
-                                    )}
-                                  </div>
-                                  <div>
-                                    <p className={`text-sm font-medium ${step.status === 'pending' ? 'text-muted-foreground' : ''}`}>
-                                      {step.label}
-                                    </p>
-                                    {step.date && (
-                                      <p className="text-xs text-muted-foreground">{new Date(step.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
-                                    )}
-                                    {step.agent && (
-                                      <p className="text-xs text-[#0B2E58] dark:text-[#3B7DD8]">{step.agent}</p>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Notifications from processing */}
-                        {trackedRequest.processingNotes.filter(n => n.type === 'notification' || n.type === 'info_complementaire').length > 0 && (
-                          <>
-                            <div className="divider-premium" />
-                            <div>
-                              <h4 className="text-sm font-semibold mb-3">Notifications</h4>
-                              <div className="space-y-2">
-                                {trackedRequest.processingNotes
-                                  .filter(n => n.type === 'notification' || n.type === 'info_complementaire')
-                                  .map((note, i) => (
-                                    <div key={i} className={`p-3 rounded-lg text-sm backdrop-blur-sm ${
-                                      note.type === 'info_complementaire'
-                                        ? 'bg-orange-50/80 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800/40'
-                                        : 'bg-muted/30 border border-muted'
-                                    }`}>
-                                      <div className="flex items-center gap-2 mb-1">
-                                        {note.type === 'info_complementaire' ? (
-                                          <AlertCircle className="size-3.5 text-orange-500" />
-                                        ) : (
-                                          <Bell className="size-3.5 text-muted-foreground" />
-                                        )}
-                                        <span className="font-medium text-xs">{note.author}</span>
-                                        <span className="text-[10px] text-muted-foreground">{new Date(note.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
-                                      </div>
-                                      <p className="text-xs text-muted-foreground">{note.text}</p>
-                                    </div>
-                                  ))}
-                              </div>
-                            </div>
-                          </>
-                        )}
-
-                        {/* Delivery info */}
-                        {(trackedRequest.status === 'prete' || trackedRequest.status === 'livree') && (
-                          <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/50 dark:from-emerald-900/20 dark:to-emerald-800/10 border border-emerald-200 dark:border-emerald-800/40">
-                            <div className="flex items-center gap-3 mb-2">
-                              <CheckCircle2 className="size-5 text-emerald-600 dark:text-emerald-400" />
-                              <h4 className="font-semibold text-emerald-700 dark:text-emerald-400">
-                                {trackedRequest.status === 'livree' ? 'Document livré' : 'Document prêt'}
-                              </h4>
-                            </div>
-                            {trackedRequest.deliveryMode === 'guichet' && trackedRequest.deliveryLocation && (
-                              <p className="text-sm text-muted-foreground">
-                                Retirez votre document au : <span className="font-medium text-emerald-700 dark:text-emerald-400">{trackedRequest.deliveryLocation}</span>
-                              </p>
-                            )}
-                            {trackedRequest.deliveryMode === 'en_ligne' && (
-                              <p className="text-sm text-muted-foreground">Votre document est disponible en ligne dans votre espace personnel.</p>
-                            )}
-                            {trackedRequest.deliveryMode === 'courrier' && (
-                              <p className="text-sm text-muted-foreground">Votre document a été envoyé par courrier à votre adresse.</p>
-                            )}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                ) : trackingError ? (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-12">
-                    <AlertCircle className="size-12 text-red-400 mx-auto mb-3" />
-                    <p className="font-medium text-red-600 dark:text-red-400">Aucune demande trouvée</p>
-                    <p className="text-sm text-muted-foreground mt-1">Vérifiez votre numéro de référence (format : GN-2026-XXXXXX)</p>
-                  </motion.div>
-                ) : (
-                  <div className="text-center py-8">
-                    <p className="text-muted-foreground">Entrez votre numéro de référence pour suivre votre demande</p>
-                  </div>
-                )}
-              </AnimatePresence>
-
-              {/* Quick access to recent requests */}
-              {myRequests.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                    <span className="text-gradient-gold">📋</span>
-                    Vos demandes récentes
-                  </h4>
-                  <div className="space-y-2">
-                    {myRequests.slice(0, 5).map(req => {
-                      const sConfig = STATUS_CONFIG[req.status]
-                      return (
-                        <div
-                          key={req.id}
-                          className="card-interactive flex items-center justify-between p-3 rounded-lg"
-                          onClick={() => { setTrackingNumber(req.reference); setTrackedRequest(req) }}
-                        >
-                          <div className="flex items-center gap-3">
-                            <FileText className="h-4 w-4 text-[#0B2E58] dark:text-[#3B7DD8]" />
-                            <div>
-                              <p className="text-sm font-medium">{req.serviceName}</p>
-                              <p className="text-xs text-muted-foreground font-mono tracking-wide">{req.reference}</p>
-                            </div>
-                          </div>
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium backdrop-blur-sm border border-white/10 dark:border-white/5 ${sConfig.color}`}>
-                            {sConfig.label}
-                          </span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ═══════════════════════════════════════════════════════════════════
-            NOTIFICATION PREFERENCES
-        ═════════════════════════════════════════════════════════════════════ */}
-        <TabsContent value="notifications">
-          <Card className="card-gradient mt-4">
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Bell className="size-5 text-gradient-gold" />
-                Préférences de notification
-              </CardTitle>
-              <CardDescription>Choisissez comment recevoir les mises à jour de vos démarches</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <h4 className="text-sm font-semibold">Canaux de notification</h4>
-                {[
-                  { key: 'whatsapp' as const, label: 'WhatsApp', desc: 'Recevez vos notifications via WhatsApp — canal principal en Guinée', icon: MessageSquare, color: 'text-green-600 dark:text-green-400', badge: 'Recommandé' },
-                  { key: 'sms' as const, label: 'SMS Orange/MTN/Cellcom', desc: 'Recevez des SMS sur votre téléphone mobile', icon: Phone, color: 'text-sky-600 dark:text-sky-400', badge: null },
-                  { key: 'email' as const, label: 'Email', desc: 'Recevez des notifications par courrier électronique', icon: Mail, color: 'text-amber-600 dark:text-amber-400', badge: null },
-                  { key: 'ussd' as const, label: 'USSD (*144#)', desc: 'Consultez vos démarches via le code USSD *144#', icon: Hash, color: 'text-purple-600 dark:text-purple-400', badge: 'Nouveau' },
-                ].map(channel => (
-                  <div key={channel.key} className="card-interactive flex items-center justify-between p-4 rounded-xl">
-                    <div className="flex items-center gap-3">
-                      <channel.icon className={`h-5 w-5 ${channel.color}`} />
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium">{channel.label}</p>
-                          {channel.badge && (
-                            <Badge className={`text-[9px] h-4 px-1.5 border-0 ${
-                              channel.badge === 'Recommandé' ? 'badge-premium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' :
-                              'badge-premium'
-                            }`}>
-                              {channel.badge}
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">{channel.desc}</p>
-                      </div>
-                    </div>
-                    <Checkbox
-                      checked={notifPrefs[channel.key]}
-                      onCheckedChange={(checked) => setNotifPrefs(prev => ({ ...prev, [channel.key]: !!checked }))}
-                    />
-                  </div>
-                ))}
-              </div>
-              <Button className="btn-premium" onClick={() => setSuccessToast('Préférences de notification enregistrées')}>
-                Enregistrer les préférences
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
 
       {/* ═══════════════════════════════════════════════════════════════════════
@@ -1089,91 +830,89 @@ export function CitizenPortalPage() {
               </div>
 
               {/* File Upload Section */}
-              {selectedService && selectedCategoryInfo && (
-                <div className="space-y-3">
-                  <div className="divider-premium" />
-                  <h4 className="text-sm font-semibold flex items-center gap-2">
-                    <Upload className="size-4 text-[#C8A45C] dark:text-[#D4B878]" />
-                    Pièces justificatives à charger
-                  </h4>
-                  <p className="text-xs text-muted-foreground">
-                    Chargez vos documents justificatifs. Formats acceptés : PDF, DOC, DOCX, JPG, PNG. Taille max : 10 Mo par fichier.
-                  </p>
-                  <div className="space-y-2">
-                    {selectedService.requiredDocs.map((docName) => {
-                      const uploaded = uploadedFiles.get(docName)
-                      const error = uploadErrors[docName]
-                      const typeInfo = uploaded ? getFileTypeIcon(uploaded.type) : null
-                      return (
-                        <div key={docName} className={`p-3 rounded-xl transition-all duration-200 ${error ? 'border border-red-300 bg-red-50/50 dark:border-red-800/40 dark:bg-red-900/10' : uploaded ? 'border border-emerald-300 bg-emerald-50/50 dark:border-emerald-800/40 dark:bg-emerald-900/10' : 'border border-dashed border-[#C8A45C]/30 dark:border-[#D4B878]/20 hover:border-[#C8A45C]/50 hover:bg-[#C8A45C]/5 dark:hover:bg-[#D4B878]/5'}`}>
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 min-w-0">
-                              {uploaded ? (
-                                <>
-                                  <span className={`text-[9px] font-bold ${typeInfo?.color}`}>{typeInfo?.icon}</span>
-                                  <div className="min-w-0">
-                                    <p className="text-xs font-medium truncate">{docName}</p>
-                                    <p className="text-[10px] text-muted-foreground">{uploaded.name} ({formatFileSize(uploaded.size)})</p>
-                                  </div>
-                                  <CheckCircle2 className="size-4 text-emerald-500 shrink-0" />
-                                </>
-                              ) : (
-                                <>
-                                  <Paperclip className="size-3.5 text-[#C8A45C] dark:text-[#D4B878] shrink-0" />
-                                  <p className="text-xs text-muted-foreground">{docName}</p>
-                                </>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                              {uploaded ? (
-                                <>
-                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => downloadUploadedFile(uploaded)}>
-                                    <Download className="size-3" />
-                                  </Button>
-                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500 hover:text-red-600" onClick={() => handleRemoveFile(docName)}>
-                                    <Trash2 className="size-3" />
-                                  </Button>
-                                </>
-                              ) : (
-                                <>
-                                  <input
-                                    type="file"
-                                    accept={ACCEPTED_FILE_TYPES}
-                                    className="hidden"
-                                    id={`file-upload-${docName.replace(/[^a-zA-Z0-9]/g, '-')}`}
-                                    onChange={async (e) => {
-                                      if (e.target.files?.[0]) {
-                                        await handleFileUpload(e.target.files[0], docName)
-                                        e.target.value = ''
-                                      }
-                                    }}
-                                  />
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-6 text-[10px] gap-1 border-[#C8A45C]/30 dark:border-[#D4B878]/20 text-[#0B2E58] dark:text-[#3B7DD8] hover:bg-[#C8A45C]/10 dark:hover:bg-[#D4B878]/10"
-                                    onClick={() => document.getElementById(`file-upload-${docName.replace(/[^a-zA-Z0-9]/g, '-')}`)?.click()}
-                                    disabled={isUploading}
-                                  >
-                                    <Upload className="size-3" />
-                                    Charger
-                                  </Button>
-                                </>
-                              )}
-                            </div>
+              <div className="space-y-3">
+                <div className="divider-premium" />
+                <h4 className="text-sm font-semibold flex items-center gap-2">
+                  <Upload className="size-4 text-[#C8A45C] dark:text-[#D4B878]" />
+                  Pièces justificatives à charger
+                </h4>
+                <p className="text-xs text-muted-foreground">
+                  Chargez vos documents justificatifs. Formats acceptés : PDF, DOC, DOCX, JPG, PNG. Taille max : 10 Mo par fichier.
+                </p>
+                <div className="space-y-2">
+                  {selectedService.requiredDocs.map((docName) => {
+                    const uploaded = uploadedFiles.get(docName)
+                    const error = uploadErrors[docName]
+                    const typeInfo = uploaded ? getFileTypeIcon(uploaded.type) : null
+                    return (
+                      <div key={docName} className={`p-3 rounded-xl transition-all duration-200 ${error ? 'border border-red-300 bg-red-50/50 dark:border-red-800/40 dark:bg-red-900/10' : uploaded ? 'border border-emerald-300 bg-emerald-50/50 dark:border-emerald-800/40 dark:bg-emerald-900/10' : 'border border-dashed border-[#C8A45C]/30 dark:border-[#D4B878]/20 hover:border-[#C8A45C]/50 hover:bg-[#C8A45C]/5 dark:hover:bg-[#D4B878]/5'}`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            {uploaded ? (
+                              <>
+                                <span className={`text-[9px] font-bold ${typeInfo?.color}`}>{typeInfo?.icon}</span>
+                                <div className="min-w-0">
+                                  <p className="text-xs font-medium truncate">{docName}</p>
+                                  <p className="text-[10px] text-muted-foreground">{uploaded.name} ({formatFileSize(uploaded.size)})</p>
+                                </div>
+                                <CheckCircle2 className="size-4 text-emerald-500 shrink-0" />
+                              </>
+                            ) : (
+                              <>
+                                <Paperclip className="size-3.5 text-[#C8A45C] dark:text-[#D4B878] shrink-0" />
+                                <p className="text-xs text-muted-foreground">{docName}</p>
+                              </>
+                            )}
                           </div>
-                          {error && <p className="text-[10px] text-red-500 mt-1">{error}</p>}
+                          <div className="flex items-center gap-1 shrink-0">
+                            {uploaded ? (
+                              <>
+                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => downloadUploadedFile(uploaded)}>
+                                  <Download className="size-3" />
+                                </Button>
+                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-red-500 hover:text-red-600" onClick={() => handleRemoveFile(docName)}>
+                                  <Trash2 className="size-3" />
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <input
+                                  type="file"
+                                  accept={ACCEPTED_FILE_TYPES}
+                                  className="hidden"
+                                  id={`file-upload-${docName.replace(/[^a-zA-Z0-9]/g, '-')}`}
+                                  onChange={async (e) => {
+                                    if (e.target.files?.[0]) {
+                                      await handleFileUpload(e.target.files[0], docName)
+                                      e.target.value = ''
+                                    }
+                                  }}
+                                />
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-6 text-[10px] gap-1 border-[#C8A45C]/30 dark:border-[#D4B878]/20 text-[#0B2E58] dark:text-[#3B7DD8] hover:bg-[#C8A45C]/10 dark:hover:bg-[#D4B878]/10"
+                                  onClick={() => document.getElementById(`file-upload-${docName.replace(/[^a-zA-Z0-9]/g, '-')}`)?.click()}
+                                  disabled={isUploading}
+                                >
+                                  <Upload className="size-3" />
+                                  Charger
+                                </Button>
+                              </>
+                            )}
+                          </div>
                         </div>
-                      )
-                    })}
-                  </div>
-                  {uploadedFiles.size > 0 && (
-                    <p className="text-[10px] text-emerald-600 dark:text-emerald-400">
-                      {uploadedFiles.size} fichier(s) chargé(s) sur {selectedService.requiredDocs.length} pièce(s) requise(s)
-                    </p>
-                  )}
+                        {error && <p className="text-[10px] text-red-500 mt-1">{error}</p>}
+                      </div>
+                    )
+                  })}
                 </div>
-              )}
+                {uploadedFiles.size > 0 && (
+                  <p className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                    {uploadedFiles.size} fichier(s) chargé(s) sur {selectedService.requiredDocs.length} pièce(s) requise(s)
+                  </p>
+                )}
+              </div>
 
               {/* Terms */}
               <div className="flex items-start gap-3 p-3 rounded-xl border border-[#C8A45C]/15 dark:border-[#D4B878]/10 bg-gradient-to-r from-[#0B2E58]/[0.02] to-[#C8A45C]/[0.02] dark:from-[#3B7DD8]/[0.03] dark:to-[#D4B878]/[0.02]">
@@ -1247,9 +986,18 @@ export function CitizenPortalPage() {
                   )}
                 </div>
 
-                {/* Timeline with refined step indicators */}
+                {/* Progress overview */}
                 <div>
-                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Avancement</h4>
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Avancement global</h4>
+                  <div className="flex items-center gap-3">
+                    <Progress value={getProgressValue(selectedRequest)} className="flex-1 h-2" />
+                    <span className="text-sm font-semibold text-[#0B2E58] dark:text-[#3B7DD8] tabular-nums">{getProgressValue(selectedRequest)}%</span>
+                  </div>
+                </div>
+
+                {/* Timeline */}
+                <div>
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Étapes du traitement</h4>
                   <div className="space-y-0">
                     {selectedRequest.timeline.map((step, i) => (
                       <div key={i} className="flex gap-3">
@@ -1268,6 +1016,7 @@ export function CitizenPortalPage() {
                         <div className="pb-2">
                           <p className={`text-xs font-medium ${step.status === 'pending' ? 'text-muted-foreground' : ''}`}>{step.label}</p>
                           {step.date && <p className="text-[10px] text-muted-foreground">{new Date(step.date).toLocaleDateString('fr-FR')}</p>}
+                          {step.agent && <p className="text-[10px] text-[#0B2E58] dark:text-[#3B7DD8]">{step.agent}</p>}
                         </div>
                       </div>
                     ))}

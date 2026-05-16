@@ -24,10 +24,8 @@ interface NavItem {
 const ROLE_NAV: Record<UserRole, { main: NavItem[]; admin?: NavItem[] }> = {
   citizen: {
     main: [
-      { page: 'citizen-portal', label: 'Mon Portail', icon: 'Home' },
-      { page: 'service-requests', label: 'Mes demandes', icon: 'ClipboardCheck' },
-      { page: 'public-citizen-portal', label: 'Services publics', icon: 'Briefcase' },
-      { page: 'ai-assistant', label: 'Assistant IA', icon: 'Sparkles' },
+      { page: 'citizen-portal', label: 'Mes Demandes', icon: 'Home' },
+      { page: 'public-citizen-portal', label: 'Nouvelle Demande', icon: 'Briefcase' },
       { page: 'settings', label: 'Paramètres', icon: 'Settings' },
     ],
   },

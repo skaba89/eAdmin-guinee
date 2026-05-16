@@ -164,3 +164,26 @@ Stage Summary:
 - All filter bars responsive with flex-wrap
 - All grid layouts use proper responsive breakpoints
 - 0 TypeScript errors, build succeeds
+---
+Task ID: citizen-simplification
+Agent: Main Agent + Full-Stack Developer Subagent
+Task: Simplify citizen portal - citizen can only see their demands, status, and history
+
+Work Log:
+- Audited current citizen portal: 4 tabs (Services, Mes demandes, Suivi, Notifications), 1383 lines
+- Rewrote citizen-portal-page.tsx: removed Suivi tab, Notifications tab, Quick Actions section
+- New structure: 2 tabs only (Mes Demandes + Nouvelle Demande)
+- Mes Demandes has sub-sections: "En cours" (active) and "Historique" (completed/rejected)
+- Each demand card shows: status badge, progress bar, timeline, action buttons (Details, Download)
+- Kept service catalog + submission form in "Nouvelle Demande" tab
+- Kept request detail dialog with full timeline and documents
+- Updated citizen sidebar navigation: 5 items → 3 items (Mes Demandes, Nouvelle Demande, Paramètres)
+- Removed: service-requests page link, AI assistant link from citizen nav
+- Build passes with 0 errors
+
+Stage Summary:
+- Citizen portal simplified from 4 tabs to 2 tabs
+- Citizen navigation reduced from 5 items to 3 items
+- Citizen can only see: their demands, status tracking, demand history, and submit new demands
+- No more access to agent-level features (service-requests page, AI assistant)
+- 0 TypeScript errors, build succeeds
