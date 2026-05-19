@@ -31,6 +31,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useCitizenRequestsStore, type CitizenRequest, type RequestStatus, type UploadedDocument, type GeneratedDocument } from '@/store/citizen-requests-store'
 import { formatFileSize, getFileTypeIcon, downloadUploadedFile, downloadCitizenDocument, createGeneratedDocument, downloadGeneratedDocument, ACCEPTED_FILE_TYPES, processFile } from '@/lib/document-utils'
+import { filterRequestsByRLS, canProcessRequest, getRLSScopeDescription } from '@/lib/rbac'
+import { useAppStore } from '@/store/app-store'
 
 const STATUS_CONFIG: Record<RequestStatus, { label: string; color: string; icon: React.ElementType; description: string }> = {
   soumise: { label: 'Soumise', color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400', icon: Send, description: 'Demande reçue, en attente de traitement' },
@@ -58,6 +60,8 @@ export function ServiceRequestsPage() {
     assignRequest, completeRequest, verifyDocument, setGeneratedDocument, addUploadedDocument,
   } = useCitizenRequestsStore()
 
+  const user = useAppStore((s) => s.user)
+
   const [activeTab, setActiveTab] = useState('soumises')
   const [searchQuery, setSearchQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
@@ -83,8 +87,11 @@ export function ServiceRequestsPage() {
     }
   }, [successToast])
 
-  // Filter requests by tab
-  const filteredRequests = requests.filter(r => {
+  // Apply RLS filtering first
+  const rlsFilteredRequests = filterRequestsByRLS(requests, user)
+
+  // Filter requests by tab (on the RLS-filtered set)
+  const filteredRequests = rlsFilteredRequests.filter(r => {
     const matchTab = activeTab === 'toutes' ||
       (activeTab === 'soumises' && r.status === 'soumise') ||
       (activeTab === 'en_cours' && (r.status === 'en_cours' || r.status === 'pieces_complementaires')) ||
@@ -105,12 +112,12 @@ export function ServiceRequestsPage() {
     return matchTab && matchSearch && matchCategory
   })
 
-  // Stats
+  // Stats (using RLS-filtered data)
   const stats = [
-    { label: 'Demandes reçues', value: requests.filter(r => r.status === 'soumise').length, icon: Send, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-900/20' },
-    { label: 'En traitement', value: requests.filter(r => ['en_cours', 'pieces_complementaires'].includes(r.status)).length, icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
-    { label: 'Documents prêts', value: requests.filter(r => r.status === 'prete').length, icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
-    { label: 'Livrées ce mois', value: requests.filter(r => r.status === 'livree').length, icon: Download, color: 'text-[#0B2E58] dark:text-[#3B7DD8]', bg: 'bg-[#0B2E58]/5 dark:bg-[#3B7DD8]/10' },
+    { label: 'Demandes reçues', value: rlsFilteredRequests.filter(r => r.status === 'soumise').length, icon: Send, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-900/20' },
+    { label: 'En traitement', value: rlsFilteredRequests.filter(r => ['en_cours', 'pieces_complementaires'].includes(r.status)).length, icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+    { label: 'Documents prêts', value: rlsFilteredRequests.filter(r => r.status === 'prete').length, icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
+    { label: 'Livrées ce mois', value: rlsFilteredRequests.filter(r => r.status === 'livree').length, icon: Download, color: 'text-[#0B2E58] dark:text-[#3B7DD8]', bg: 'bg-[#0B2E58]/5 dark:bg-[#3B7DD8]/10' },
   ]
 
   const handleTakeCharge = (req: CitizenRequest) => {
@@ -384,7 +391,7 @@ export function ServiceRequestsPage() {
     setSuccessToast(`Document ${req.reference} téléchargé`)
   }
 
-  const categories = [...new Set(requests.map(r => r.category))]
+  const categories = [...new Set(rlsFilteredRequests.map(r => r.category))]
 
   return (
     <div className="space-y-6 dashboard-bg-v2 min-h-screen">
@@ -407,6 +414,12 @@ export function ServiceRequestsPage() {
             </div>
           </CardContent>
         </Card>
+        {user && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
+            <Shield className="size-3.5" />
+            <span>Portée de données : {getRLSScopeDescription(user)}</span>
+          </div>
+        )}
       </motion.div>
 
       {/* Stats */}
@@ -436,30 +449,30 @@ export function ServiceRequestsPage() {
               <TabsList className="flex-wrap h-auto gap-1 bg-muted/50 p-1">
                 <TabsTrigger value="soumises" className="gap-1 text-xs data-[state=active]:bg-[#0B2E58] data-[state=active]:text-white">
                   <Send className="h-3 w-3" />
-                  Soumises ({requests.filter(r => r.status === 'soumise').length})
+                  Soumises ({rlsFilteredRequests.filter(r => r.status === 'soumise').length})
                 </TabsTrigger>
                 <TabsTrigger value="en_cours" className="gap-1 text-xs data-[state=active]:bg-[#0B2E58] data-[state=active]:text-white">
                   <Clock className="h-3 w-3" />
-                  En cours ({requests.filter(r => ['en_cours', 'pieces_complementaires'].includes(r.status)).length})
+                  En cours ({rlsFilteredRequests.filter(r => ['en_cours', 'pieces_complementaires'].includes(r.status)).length})
                 </TabsTrigger>
                 <TabsTrigger value="validees" className="gap-1 text-xs data-[state=active]:bg-[#0B2E58] data-[state=active]:text-white">
                   <Check className="h-3 w-3" />
-                  Validées ({requests.filter(r => r.status === 'validee').length})
+                  Validées ({rlsFilteredRequests.filter(r => r.status === 'validee').length})
                 </TabsTrigger>
                 <TabsTrigger value="pretes" className="gap-1 text-xs data-[state=active]:bg-[#0B2E58] data-[state=active]:text-white">
                   <CheckCircle2 className="h-3 w-3" />
-                  Prêtes ({requests.filter(r => r.status === 'prete').length})
+                  Prêtes ({rlsFilteredRequests.filter(r => r.status === 'prete').length})
                 </TabsTrigger>
                 <TabsTrigger value="livrees" className="gap-1 text-xs data-[state=active]:bg-[#0B2E58] data-[state=active]:text-white">
                   <Download className="h-3 w-3" />
-                  Livrées ({requests.filter(r => r.status === 'livree').length})
+                  Livrées ({rlsFilteredRequests.filter(r => r.status === 'livree').length})
                 </TabsTrigger>
                 <TabsTrigger value="rejetees" className="gap-1 text-xs data-[state=active]:bg-[#0B2E58] data-[state=active]:text-white">
                   <XCircle className="h-3 w-3" />
-                  Rejetées ({requests.filter(r => r.status === 'rejetee').length})
+                  Rejetées ({rlsFilteredRequests.filter(r => r.status === 'rejetee').length})
                 </TabsTrigger>
                 <TabsTrigger value="toutes" className="text-xs data-[state=active]:bg-[#0B2E58] data-[state=active]:text-white">
-                  Toutes ({requests.length})
+                  Toutes ({rlsFilteredRequests.length})
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -550,8 +563,8 @@ export function ServiceRequestsPage() {
                             </div>
                           )}
                         </div>
-                        {/* Quick action for soumises */}
-                        {req.status === 'soumise' && (
+                        {/* Quick action for soumises — only if user can process this request */}
+                        {req.status === 'soumise' && canProcessRequest(user, req) && (
                           <div className="mt-3 flex gap-2">
                             <Button size="sm" className="btn-premium gap-1 h-7 text-xs" onClick={(e) => { e.stopPropagation(); handleTakeCharge(req) }}>
                               <Play className="size-3" />

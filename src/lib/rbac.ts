@@ -8,6 +8,37 @@ import type { UserInfo } from '@/store/app-store'
 import type { AppPage } from '@/store/app-store'
 import type { CitizenRequest } from '@/store/citizen-requests-store'
 
+// ─── ROLE MAPPING (app-store → rbac) ────────────────────────────────────────
+// The app-store uses different role names than the rbac/demo-accounts system.
+// This mapping ensures RBAC functions work correctly regardless of which role
+// naming convention the logged-in user's data uses.
+//
+// app-store roles:  'citizen' | 'mairie' | 'admin_general' | 'agence' | 'ministere' | 'super_admin'
+// rbac roles:       'citoyen' | 'mairie' | 'admin'         | 'agence' | 'ministere' | 'superadmin'
+
+const ROLE_MAP: Record<string, UserRole> = {
+  'citizen': 'citoyen',
+  'mairie': 'mairie',
+  'admin_general': 'admin',
+  'agence': 'agence',
+  'ministere': 'ministere',
+  'super_admin': 'superadmin',
+  // Identity mappings for rbac role names (in case of direct usage)
+  'citoyen': 'citoyen',
+  'admin': 'admin',
+  'superadmin': 'superadmin',
+}
+
+function mapUserRole(user: UserInfo | null): UserRole {
+  if (!user) return 'citoyen'
+  return ROLE_MAP[user.role] || (user.role as UserRole)
+}
+
+/** Map a raw role string (from either naming convention) to the rbac UserRole */
+export function mapRole(role: string): UserRole {
+  return ROLE_MAP[role] || (role as UserRole)
+}
+
 // ─── PERMISSION DEFINITIONS ──────────────────────────────────────────────────
 
 export type Permission =
@@ -306,7 +337,8 @@ const ASSIGNED_SERVICE_TO_CATEGORIES: Record<string, string[]> = {
  */
 export function hasPermission(user: UserInfo | null, permission: Permission): boolean {
   if (!user) return false
-  const rolePerms = ROLE_PERMISSIONS[user.role]
+  const mappedRole = mapUserRole(user)
+  const rolePerms = ROLE_PERMISSIONS[mappedRole]
   if (!rolePerms) return false
   return rolePerms.includes(permission)
 }
@@ -334,7 +366,7 @@ export function canAccessPage(user: UserInfo | null, page: AppPage): boolean {
   if (!user) return false
 
   // SuperAdmin can access everything
-  if (user.role === 'superadmin') return true
+  if (mapUserRole(user) === 'superadmin') return true
 
   const rule = PAGE_ACCESS_RULES.find(r => r.page === page)
   if (!rule) return true // Pages without rules are accessible to all authenticated users
@@ -379,7 +411,7 @@ export function getDefaultPage(user: UserInfo | null): AppPage {
     superadmin: 'dashboard',
   }
 
-  const defaultPage = roleDefaultPage[user.role]
+  const defaultPage = roleDefaultPage[mapUserRole(user)]
   if (accessiblePages.includes(defaultPage)) return defaultPage
   return accessiblePages[0]
 }
@@ -399,7 +431,9 @@ export function filterRequestsByRLS(
 ): CitizenRequest[] {
   if (!user) return []
 
-  switch (user.role) {
+  const role = mapUserRole(user)
+
+  switch (role) {
     case 'citoyen': {
       // Citizen sees ONLY their own requests
       return requests.filter(r => r.citizenEmail === user.email)
@@ -522,13 +556,14 @@ export function filterAssignedRequests(
  */
 export function canViewRequest(user: UserInfo | null, request: CitizenRequest): boolean {
   if (!user) return false
-  if (user.role === 'superadmin' || user.role === 'admin' || user.role === 'ministere') return true
+  const role = mapUserRole(user)
+  if (role === 'superadmin' || role === 'admin' || role === 'ministere') return true
 
-  if (user.role === 'citoyen') {
+  if (role === 'citoyen') {
     return request.citizenEmail === user.email
   }
 
-  if (user.role === 'mairie' || user.role === 'agence') {
+  if (role === 'mairie' || role === 'agence') {
     const allowedCategories = getInstitutionCategories(user.institution)
     return allowedCategories.includes(request.categoryId)
   }
@@ -541,11 +576,12 @@ export function canViewRequest(user: UserInfo | null, request: CitizenRequest): 
  */
 export function canProcessRequest(user: UserInfo | null, request: CitizenRequest): boolean {
   if (!user) return false
-  if (user.role === 'superadmin' || user.role === 'admin') return true
-  if (user.role === 'citoyen') return false // Citizens cannot process requests
-  if (user.role === 'ministere') return true // Oversight role can process
+  const role = mapUserRole(user)
+  if (role === 'superadmin' || role === 'admin') return true
+  if (role === 'citoyen') return false // Citizens cannot process requests
+  if (role === 'ministere') return true // Oversight role can process
 
-  if (user.role === 'mairie' || user.role === 'agence') {
+  if (role === 'mairie' || role === 'agence') {
     const allowedCategories = getInstitutionCategories(user.institution)
     return allowedCategories.includes(request.categoryId)
   }
@@ -598,7 +634,8 @@ export function filterDocumentsByRLS<T extends GedDocument>(
     secret: 3,
   }
 
-  const userClearance = clearanceLevel[user.role] ?? 0
+  const mappedRole = mapUserRole(user)
+  const userClearance = clearanceLevel[mappedRole] ?? 0
 
   return documents.filter(doc => {
     const docLevel = classificationLevel[doc.classification] ?? 0
@@ -607,7 +644,7 @@ export function filterDocumentsByRLS<T extends GedDocument>(
     if (docLevel > userClearance) return false
 
     // Institution check for non-public docs
-    if (docLevel >= 1 && user.role !== 'superadmin' && user.role !== 'admin' && user.role !== 'ministere') {
+    if (docLevel >= 1 && mappedRole !== 'superadmin' && mappedRole !== 'admin' && mappedRole !== 'ministere') {
       // Must match institution
       const allowedCategories = getInstitutionCategories(user.institution)
       if (doc.categoryId && !allowedCategories.includes(doc.categoryId)) return false
@@ -636,16 +673,17 @@ export function filterCourriersByRLS<T extends CourrierItem>(
 ): T[] {
   if (!user) return []
 
-  if (user.role === 'superadmin' || user.role === 'admin') return courriers
-  if (user.role === 'ministere') return courriers // Oversight
+  const role = mapUserRole(user)
+  if (role === 'superadmin' || role === 'admin') return courriers
+  if (role === 'ministere') return courriers // Oversight
 
   // Confidential courriers only for admin+ and ministere
-  if (user.role === 'mairie' || user.role === 'agence') {
+  if (role === 'mairie' || role === 'agence') {
     return courriers.filter(c => !c.confidential)
   }
 
   // Citizens don't see courriers
-  if (user.role === 'citoyen') return []
+  if (role === 'citoyen') return []
 
   return courriers
 }
@@ -677,7 +715,8 @@ function getInstitutionCategories(institution: string): string[] {
 export function getRLSScopeDescription(user: UserInfo | null): string {
   if (!user) return 'Aucun accès'
 
-  switch (user.role) {
+  const role = mapUserRole(user)
+  switch (role) {
     case 'citoyen':
       return 'Vos demandes uniquement'
     case 'mairie':
@@ -698,20 +737,21 @@ export function getRLSScopeDescription(user: UserInfo | null): string {
 /**
  * Get the permission summary for a role
  */
-export function getRolePermissionSummary(role: UserRole): {
+export function getRolePermissionSummary(role: string): {
   totalPermissions: number
   permissions: Permission[]
   scope: string
   dataAccess: string
 } {
-  const permissions = ROLE_PERMISSIONS[role] || []
+  const mappedRole = mapRole(role)
+  const permissions = ROLE_PERMISSIONS[mappedRole] || []
   return {
     totalPermissions: permissions.length,
     permissions,
-    scope: getRLSScopeDescription({ name: '', firstName: '', email: '', role, institution: '', fonction: '' }),
-    dataAccess: role === 'citoyen' ? 'Données propres uniquement'
-      : role === 'mairie' || role === 'agence' ? 'Données du service assigné'
-      : role === 'ministere' ? 'Toutes les données (lecture + traitement)'
+    scope: getRLSScopeDescription({ name: '', firstName: '', email: '', role: mappedRole as any, institution: '', fonction: '' }),
+    dataAccess: mappedRole === 'citoyen' ? 'Données propres uniquement'
+      : mappedRole === 'mairie' || mappedRole === 'agence' ? 'Données du service assigné'
+      : mappedRole === 'ministere' ? 'Toutes les données (lecture + traitement)'
       : 'Accès complet',
   }
 }
@@ -932,7 +972,7 @@ export function getMaxClassificationLevel(role: UserRole): DocClassificationLeve
 export function canAccessClassification(user: UserInfo | null, classification: DocClassificationLevel): boolean {
   if (!user) return false
 
-  const userMaxLevel = CLASSIFICATION_LEVEL_MAP[getMaxClassificationLevel(user.role)]
+  const userMaxLevel = CLASSIFICATION_LEVEL_MAP[getMaxClassificationLevel(mapUserRole(user))]
   const docLevel = CLASSIFICATION_LEVEL_MAP[classification]
 
   return docLevel <= userMaxLevel
@@ -1119,17 +1159,19 @@ const SERVICE_TO_CATEGORY: Record<string, string> = {
 export function canAccessService(user: UserInfo | null, serviceId: string): boolean {
   if (!user) return false
 
+  const role = mapUserRole(user)
+
   // Citizens can access all services (they submit requests)
-  if (user.role === 'citoyen') return true
+  if (role === 'citoyen') return true
 
   // Admin and superadmin can access everything
-  if (user.role === 'superadmin' || user.role === 'admin') return true
+  if (role === 'superadmin' || role === 'admin') return true
 
   // Ministere has oversight — can access all services
-  if (user.role === 'ministere') return true
+  if (role === 'ministere') return true
 
   // For mairie and agence, check institution → category mapping
-  if (user.role === 'mairie' || user.role === 'agence') {
+  if (role === 'mairie' || role === 'agence') {
     const serviceCategory = SERVICE_TO_CATEGORY[serviceId]
     if (!serviceCategory) return true // Unknown services are accessible by default
 
@@ -1146,18 +1188,20 @@ export function canAccessService(user: UserInfo | null, serviceId: string): bool
 export function getAccessibleServiceIds(user: UserInfo | null): string[] {
   if (!user) return []
 
+  const role = mapUserRole(user)
+
   // Citizens can access all services
-  if (user.role === 'citoyen') {
+  if (role === 'citoyen') {
     return Object.keys(SERVICE_TO_CATEGORY)
   }
 
   // Admin, superadmin, ministere can access everything
-  if (user.role === 'superadmin' || user.role === 'admin' || user.role === 'ministere') {
+  if (role === 'superadmin' || role === 'admin' || role === 'ministere') {
     return Object.keys(SERVICE_TO_CATEGORY)
   }
 
   // For mairie and agence, filter by institution categories
-  if (user.role === 'mairie' || user.role === 'agence') {
+  if (role === 'mairie' || role === 'agence') {
     const allowedCategories = getInstitutionCategories(user.institution)
     return Object.entries(SERVICE_TO_CATEGORY)
       .filter(([_, categoryId]) => allowedCategories.includes(categoryId))
@@ -1173,12 +1217,14 @@ export function getAccessibleServiceIds(user: UserInfo | null): string[] {
 export function getServiceHabilitationLevel(user: UserInfo | null, serviceId: string): string {
   if (!user) return 'Aucun accès'
 
-  if (user.role === 'superadmin') return 'Administration complète'
-  if (user.role === 'admin') return 'Administration'
-  if (user.role === 'ministere') return 'Supervision'
-  if (user.role === 'citoyen') return 'Demande (citoyen)'
+  const role = mapUserRole(user)
 
-  if (user.role === 'mairie' || user.role === 'agence') {
+  if (role === 'superadmin') return 'Administration complète'
+  if (role === 'admin') return 'Administration'
+  if (role === 'ministere') return 'Supervision'
+  if (role === 'citoyen') return 'Demande (citoyen)'
+
+  if (role === 'mairie' || role === 'agence') {
     if (canAccessService(user, serviceId)) {
       return 'Traitement & Validation'
     }
@@ -1202,7 +1248,7 @@ export function filterRequestsByHabilitation(
   const rlsFiltered = filterRequestsByRLS(requests, user)
 
   // For mairie/agence, also filter by service habilitation
-  if (user.role === 'mairie' || user.role === 'agence') {
+  if (mapUserRole(user) === 'mairie' || mapUserRole(user) === 'agence') {
     const accessibleServiceIds = getAccessibleServiceIds(user)
     return rlsFiltered.filter(r =>
       accessibleServiceIds.includes(r.serviceId)
