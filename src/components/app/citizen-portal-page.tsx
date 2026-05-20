@@ -28,7 +28,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
 } from '@/components/ui/dialog'
 import { useAppStore } from '@/store/app-store'
-import { useCitizenRequestsStore, type CitizenRequest, type RequestStatus, type UploadedDocument, type GeneratedDocument } from '@/store/citizen-requests-store'
+import { useCitizenRequestsStore, type CitizenRequest, type RequestStatus, type UploadedDocument, type GeneratedDocument, type SatisfactionRating } from '@/store/citizen-requests-store'
 import { processFile, formatFileSize, getFileTypeIcon, downloadUploadedFile, downloadCitizenDocument, ACCEPTED_FILE_TYPES, MAX_FILE_SIZE, createGeneratedDocument } from '@/lib/document-utils'
 
 // ─── GUINEA BRAND COLORS ─────────────────────────────────────────────────────
@@ -171,7 +171,7 @@ const itemVariants = {
 export function CitizenPortalPage() {
   const navigate = useAppStore((s) => s.navigate)
   const user = useAppStore((s) => s.user)
-  const { requests, addRequest, getRequestByReference } = useCitizenRequestsStore()
+  const { requests, addRequest, getRequestByReference, rateRequest } = useCitizenRequestsStore()
   const [activeTab, setActiveTab] = useState('mes-demandes')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
@@ -204,6 +204,10 @@ export function CitizenPortalPage() {
   // Detail view
   const [selectedRequest, setSelectedRequest] = useState<CitizenRequest | null>(null)
   const [detailDialogOpen, setDetailDialogOpen] = useState(false)
+
+  // Satisfaction rating
+  const [ratingValue, setRatingValue] = useState<1|2|3|4|5>(5)
+  const [ratingComment, setRatingComment] = useState('')
 
   // Notification preferences
   const [notifPrefs, setNotifPrefs] = useState({ whatsapp: true, sms: false, email: true, ussd: false })
@@ -298,6 +302,26 @@ export function CitizenPortalPage() {
     setSuccessToast(`Document ${req.reference} téléchargé avec succès`)
   }
 
+  // Refresh selected request from store
+  const refreshSelected = (id: string) => {
+    const updated = requests.find(r => r.id === id)
+    if (updated) setSelectedRequest(updated)
+  }
+
+  // Handle satisfaction rating
+  const handleSubmitRating = () => {
+    if (!selectedRequest) return
+    rateRequest(selectedRequest.id, {
+      rating: ratingValue,
+      comment: ratingComment,
+      ratedAt: new Date().toISOString(),
+    })
+    setRatingComment('')
+    setRatingValue(5)
+    setSuccessToast('Merci pour votre avis ! Votre évaluation nous aide à améliorer nos services.')
+    refreshSelected(selectedRequest.id)
+  }
+
   // File upload handlers
   const handleFileUpload = async (file: File, requiredDocName: string) => {
     try {
@@ -356,6 +380,34 @@ export function CitizenPortalPage() {
     { label: 'Documents prêts', value: myRequests.filter(r => r.status === 'prete').length, icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20', gradientBg: 'bg-gradient-to-br from-emerald-100 to-emerald-50 dark:from-emerald-900/30 dark:to-emerald-800/10' },
     { label: 'Livrées', value: myRequests.filter(r => r.status === 'livree').length, icon: Download, color: 'text-[#0B2E58] dark:text-[#3B7DD8]', bg: 'bg-[#0B2E58]/5 dark:bg-[#3B7DD8]/10', gradientBg: 'bg-gradient-to-br from-[#0B2E58]/10 to-[#3B7DD8]/5 dark:from-[#3B7DD8]/20 dark:to-[#0B2E58]/10' },
   ]
+
+  // Calculate estimated delivery date based on service SLA
+  const getServiceSLA = (categoryId: string): number => {
+    const slaDays: Record<string, number> = {
+      'etat-civil': 2,
+      'justice': 5,
+      'identification': 7,
+      'urbanisme': 15,
+      'entreprise': 3,
+      'education': 5,
+      'sante': 2,
+      'residence': 1,
+    }
+    return slaDays[categoryId] || 5
+  }
+
+  const getEstimatedDate = (req: CitizenRequest): Date | null => {
+    if (['livree', 'rejetee'].includes(req.status)) return null
+    const sla = getServiceSLA(req.categoryId)
+    return new Date(new Date(req.createdAt).getTime() + sla * 86400000)
+  }
+
+  const getDaysRemaining = (req: CitizenRequest): number | null => {
+    const est = getEstimatedDate(req)
+    if (!est) return null
+    const diff = est.getTime() - Date.now()
+    return Math.ceil(diff / 86400000)
+  }
 
   return (
     <motion.div
@@ -481,6 +533,10 @@ export function CitizenPortalPage() {
           <TabsTrigger value="notifications" className="gap-1.5 text-sm rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0B2E58] data-[state=active]:to-[#134A8E] data-[state=active]:text-white data-[state=active]:shadow-navy dark:data-[state=active]:from-[#3B7DD8] dark:data-[state=active]:to-[#2A6BC7] transition-all duration-300">
             <Bell className="size-4" />
             Notifications
+          </TabsTrigger>
+          <TabsTrigger value="transparence" className="gap-1.5 text-sm rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0B2E58] data-[state=active]:to-[#134A8E] data-[state=active]:text-white data-[state=active]:shadow-navy dark:data-[state=active]:from-[#3B7DD8] dark:data-[state=active]:to-[#2A6BC7] transition-all duration-300">
+            <Shield className="size-4" />
+            Transparence
           </TabsTrigger>
         </TabsList>
 
@@ -650,6 +706,18 @@ export function CitizenPortalPage() {
                                 <MapPin className="size-3" />
                                 {req.deliveryMode === 'en_ligne' ? 'Livraison en ligne' : req.deliveryMode === 'guichet' ? 'Retrait au guichet' : 'Envoi par courrier'}
                               </div>
+                              {/* SLA & Estimated delivery date — inspired by Minwon24 (South Korea) */}
+                              {!['livree', 'rejetee'].includes(req.status) && getDaysRemaining(req) !== null && (
+                                <div className={`flex items-center gap-1 text-xs mt-1 ${getDaysRemaining(req)! < 0 ? 'text-red-600 dark:text-red-400 font-semibold' : getDaysRemaining(req)! <= 1 ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-muted-foreground'}`}>
+                                  <Clock className="size-3" />
+                                  {getDaysRemaining(req)! < 0 
+                                    ? `En retard de ${Math.abs(getDaysRemaining(req)!)} jour(s)`
+                                    : getDaysRemaining(req)! === 0 
+                                      ? "Livraison prévue aujourd'hui"
+                                      : `Livraison prévue dans ${getDaysRemaining(req)} jour(s)`
+                                  }
+                                </div>
+                              )}
                             </div>
                             {(req.status === 'prete' || req.status === 'livree') && (
                               <Button
@@ -939,39 +1007,107 @@ export function CitizenPortalPage() {
             NOTIFICATION PREFERENCES
         ═════════════════════════════════════════════════════════════════════ */}
         <TabsContent value="notifications">
-          <Card className="card-gradient mt-4">
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Bell className="size-5 text-gradient-gold" />
-                Préférences de notification
-              </CardTitle>
-              <CardDescription>Choisissez comment recevoir les mises à jour de vos démarches</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <h4 className="text-sm font-semibold">Canaux de notification</h4>
+          <div className="space-y-4 mt-4">
+            {/* Real-time Activity Feed — inspired by e-Estonia notifications */}
+            <Card className="glass-premium overflow-hidden border-[#0B2E58]/10 dark:border-[#3B7DD8]/20">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-lg bg-gradient-to-br from-[#0B2E58] to-[#3B7DD8] text-white shadow-sm">
+                      <Bell className="size-4" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
+                        Activit&eacute; de vos demandes
+                      </CardTitle>
+                      <CardDescription className="text-xs">Derni&egrave;res mises &agrave; jour de vos dossiers</CardDescription>
+                    </div>
+                  </div>
+                  <Badge className="badge-premium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-0 text-[10px] gap-1">
+                    <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    En direct
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {myRequests.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Bell className="size-10 text-muted-foreground/20 mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">Aucune activit&eacute; &agrave; afficher</p>
+                    <p className="text-xs text-muted-foreground">Soumettez une demande pour voir les mises &agrave; jour ici</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1 max-h-80 overflow-y-auto">
+                    {myRequests
+                      .flatMap(r => r.processingNotes.map(note => ({ ...note, requestRef: r.reference, serviceName: r.serviceName, requestId: r.id, requestStatus: r.status })))
+                      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                      .slice(0, 15)
+                      .map((note, i) => {
+                        const isInfo = note.type === 'info_complementaire'
+                        const isDecision = note.type === 'decision'
+                        const isNotification = note.type === 'notification'
+                        return (
+                          <div key={`${note.id}-${i}`} className={`flex items-start gap-3 p-3 rounded-lg transition-all hover:bg-muted/30 ${isInfo ? 'border-l-2 border-l-orange-400' : isDecision ? 'border-l-2 border-l-blue-400' : isNotification ? 'border-l-2 border-l-emerald-400' : 'border-l-2 border-l-muted'}`}>
+                            <div className={`mt-0.5 p-1.5 rounded-lg shrink-0 ${
+                              isInfo ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400' :
+                              isDecision ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' :
+                              isNotification ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400' :
+                              'bg-muted text-muted-foreground'
+                            }`}>
+                              {isInfo ? <AlertCircle className="size-3" /> : isDecision ? <Check className="size-3" /> : isNotification ? <Bell className="size-3" /> : <MessageSquare className="size-3" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <span className="text-xs font-mono text-muted-foreground">{note.requestRef}</span>
+                                <span className="text-[10px] text-muted-foreground">&bull;</span>
+                                <span className="text-[10px] text-muted-foreground truncate">{note.serviceName}</span>
+                              </div>
+                              <p className="text-xs text-foreground">{note.text}</p>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">
+                                {new Date(note.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            </div>
+                          </div>
+                        )
+                      })
+                    }
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Notification Preferences */}
+            <Card className="card-interactive">
+              <CardHeader>
+                <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white flex items-center gap-2">
+                  <Smartphone className="size-4 text-[#C8A45C]" />
+                  Pr&eacute;f&eacute;rences de notification
+                </CardTitle>
+                <CardDescription className="text-xs">Choisissez comment recevoir les mises &agrave; jour de vos d&eacute;marches</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 {[
-                  { key: 'whatsapp' as const, label: 'WhatsApp', desc: 'Recevez vos notifications via WhatsApp — canal principal en Guinée', icon: MessageSquare, color: 'text-green-600 dark:text-green-400', badge: 'Recommandé' },
-                  { key: 'sms' as const, label: 'SMS Orange/MTN/Cellcom', desc: 'Recevez des SMS sur votre téléphone mobile', icon: Phone, color: 'text-sky-600 dark:text-sky-400', badge: null },
-                  { key: 'email' as const, label: 'Email', desc: 'Recevez des notifications par courrier électronique', icon: Mail, color: 'text-amber-600 dark:text-amber-400', badge: null },
-                  { key: 'ussd' as const, label: 'USSD (*144#)', desc: 'Consultez vos démarches via le code USSD *144#', icon: Hash, color: 'text-purple-600 dark:text-purple-400', badge: 'Nouveau' },
+                  { key: 'whatsapp' as const, label: 'WhatsApp', desc: 'Recevez vos notifications via WhatsApp — canal principal en Guin&eacute;e', icon: MessageSquare, color: 'text-green-600 dark:text-green-400', badge: 'Recommand&eacute;' },
+                  { key: 'sms' as const, label: 'SMS Orange/MTN/Cellcom', desc: 'Recevez des SMS sur votre t&eacute;l&eacute;phone mobile', icon: Phone, color: 'text-sky-600 dark:text-sky-400', badge: null },
+                  { key: 'email' as const, label: 'Email', desc: 'Recevez des notifications par courrier &eacute;lectronique', icon: Mail, color: 'text-amber-600 dark:text-amber-400', badge: null },
+                  { key: 'ussd' as const, label: 'USSD (*144#)', desc: 'Consultez vos d&eacute;marches via le code USSD *144#', icon: Hash, color: 'text-purple-600 dark:text-purple-400', badge: 'Nouveau' },
                 ].map(channel => (
-                  <div key={channel.key} className="card-interactive flex items-center justify-between p-4 rounded-xl">
+                  <div key={channel.key} className="card-interactive flex items-center justify-between p-3 rounded-xl">
                     <div className="flex items-center gap-3">
-                      <channel.icon className={`h-5 w-5 ${channel.color}`} />
+                      <channel.icon className={`size-4 ${channel.color}`} />
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-medium">{channel.label}</p>
                           {channel.badge && (
-                            <Badge className={`text-[9px] h-4 px-1.5 border-0 ${
-                              channel.badge === 'Recommandé' ? 'badge-premium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' :
+                            <Badge className={`text-[8px] h-4 px-1.5 border-0 ${
+                              channel.badge === 'Recommand\u00e9' ? 'badge-premium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400' :
                               'badge-premium'
                             }`}>
                               {channel.badge}
                             </Badge>
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground">{channel.desc}</p>
+                        <p className="text-[11px] text-muted-foreground">{channel.desc}</p>
                       </div>
                     </div>
                     <Checkbox
@@ -980,12 +1116,120 @@ export function CitizenPortalPage() {
                     />
                   </div>
                 ))}
-              </div>
-              <Button className="btn-premium" onClick={() => setSuccessToast('Préférences de notification enregistrées')}>
-                Enregistrer les préférences
-              </Button>
-            </CardContent>
-          </Card>
+                <Button className="btn-premium text-xs h-8" onClick={() => setSuccessToast('Pr&eacute;f&eacute;rences de notification enregistr&eacute;es')}>
+                  Enregistrer les pr&eacute;f&eacute;rences
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="transparence">
+          <div className="space-y-6 mt-4">
+            <motion.div variants={itemVariants} initial="hidden" animate="visible">
+              <Card className="glass-premium overflow-hidden border-[#0B2E58]/10 dark:border-[#3B7DD8]/20">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-gradient-to-br from-[#0B2E58] to-[#3B7DD8] text-white shadow-sm">
+                      <Shield className="size-5" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
+                        Tableau de Bord Transparence — Inspired by UK Gov & Estonia
+                      </CardTitle>
+                      <CardDescription className="text-xs">Performance des services publics guinéens en temps réel</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Service Performance Table */}
+                  <div>
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Performance par service</h4>
+                    <div className="space-y-2">
+                      {[
+                        { name: "Extrait d'acte de naissance", category: 'etat-civil', target: '48h', avg: '36h', compliance: 94, trend: '+5%' },
+                        { name: 'Casier judiciaire', category: 'justice', target: '5 jours', avg: '4.2 jours', compliance: 87, trend: '+3%' },
+                        { name: "Carte d'identité biométrique", category: 'identification', target: '7 jours', avg: '6.5 jours', compliance: 82, trend: '+8%' },
+                        { name: 'Passeport biométrique', category: 'identification', target: '10 jours', avg: '9.1 jours', compliance: 79, trend: '+12%' },
+                        { name: 'Certificat de résidence', category: 'residence', target: '24h', avg: '18h', compliance: 96, trend: '+2%' },
+                        { name: "Enregistrement entreprise", category: 'entreprise', target: '3 jours', avg: '2.8 jours', compliance: 91, trend: '+7%' },
+                        { name: 'Certificat de vaccination', category: 'sante', target: '24h', avg: '20h', compliance: 95, trend: '+4%' },
+                        { name: 'Attestation de scolarité', category: 'education', target: '48h', avg: '42h', compliance: 88, trend: '+6%' },
+                      ].map((service) => (
+                        <div key={service.name} className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-muted/30 to-transparent border border-muted/40">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{service.name}</p>
+                            <div className="flex items-center gap-3 text-[10px] text-muted-foreground mt-0.5">
+                              <span>Objectif : {service.target}</span>
+                              <span>Moyenne : {service.avg}</span>
+                              <span className="text-emerald-600 font-medium">{service.trend}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="w-20">
+                              <div className="flex items-center justify-between text-[9px] mb-0.5">
+                                <span className="text-muted-foreground">Conformité</span>
+                                <span className={`font-bold ${service.compliance >= 90 ? 'text-emerald-600' : service.compliance >= 80 ? 'text-amber-600' : 'text-red-600'}`}>{service.compliance}%</span>
+                              </div>
+                              <div className="h-1.5 rounded-full bg-muted/50 overflow-hidden">
+                                <div className={`h-full rounded-full ${service.compliance >= 90 ? 'bg-emerald-500' : service.compliance >= 80 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${service.compliance}%` }} />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Open Data Stats */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {[
+                      { label: 'Demandes totales (2026)', value: '8 730', icon: FileText, color: 'from-[#0B2E58] to-[#3B7DD8]' },
+                      { label: 'Taux de conformité SLA', value: '89%', icon: CheckCircle2, color: 'from-emerald-500 to-emerald-700' },
+                      { label: 'Satisfaction moyenne', value: '4.2/5', icon: Heart, color: 'from-[#FCD116] to-[#CE1126]' },
+                      { label: 'Délai moyen global', value: '3.2 jours', icon: Clock, color: 'from-[#C8A45C] to-[#0B2E58]' },
+                    ].map(stat => (
+                      <Card key={stat.label} className="card-interactive overflow-hidden">
+                        <CardContent className="p-3 text-center">
+                          <div className={`inline-flex p-2 rounded-lg bg-gradient-to-br ${stat.color} text-white mb-2`}>
+                            <stat.icon className="size-4" />
+                          </div>
+                          <p className="text-lg font-bold text-[#0B2E58] dark:text-white">{stat.value}</p>
+                          <p className="text-[10px] text-muted-foreground">{stat.label}</p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+
+                  {/* Your Rights Section */}
+                  <div className="p-4 rounded-lg bg-gradient-to-r from-[#0B2E58]/5 to-[#3B7DD8]/5 dark:from-[#3B7DD8]/10 dark:to-[#0B2E58]/10 border border-[#0B2E58]/10 dark:border-[#3B7DD8]/20">
+                    <h4 className="text-xs font-semibold text-[#0B2E58] dark:text-[#3B7DD8] mb-2 flex items-center gap-1.5">
+                      <Shield className="size-3.5" />
+                      Vos droits — Conformément à la loi guinéenne
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="size-3 text-emerald-500 mt-0.5 shrink-0" />
+                        <span>Droit d'accès à vos données personnelles (Loi L/2016/018/AN)</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="size-3 text-emerald-500 mt-0.5 shrink-0" />
+                        <span>Droit de rectification des informations inexactes</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="size-3 text-emerald-500 mt-0.5 shrink-0" />
+                        <span>Délai maximum de réponse fixé par décret pour chaque service</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="size-3 text-emerald-500 mt-0.5 shrink-0" />
+                        <span>Recours possible auprès du Médiateur de la République</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
         </TabsContent>
       </Tabs>
 
@@ -1246,6 +1490,43 @@ export function CitizenPortalPage() {
                   )}
                 </div>
 
+                {/* SLA Progress — inspired by e-Estonia transparent processing */}
+                {!['livree', 'rejetee'].includes(selectedRequest.status) && (
+                  <div className="p-3 rounded-lg bg-gradient-to-r from-[#0B2E58]/5 to-[#3B7DD8]/5 dark:from-[#3B7DD8]/10 dark:to-[#0B2E58]/10 border border-[#0B2E58]/10 dark:border-[#3B7DD8]/20">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-medium text-[#0B2E58] dark:text-[#3B7DD8]">Délai de traitement</span>
+                      <span className="text-xs font-semibold">
+                        {getDaysRemaining(selectedRequest) !== null && getDaysRemaining(selectedRequest)! < 0 
+                          ? <span className="text-red-600">En retard de {Math.abs(getDaysRemaining(selectedRequest)!)}j</span>
+                          : getDaysRemaining(selectedRequest) === 0 
+                            ? <span className="text-amber-600">Livraison prévue aujourd'hui</span>
+                            : <span className="text-emerald-600">{getDaysRemaining(selectedRequest)}j restants</span>
+                        }
+                      </span>
+                    </div>
+                    <div className="h-2 rounded-full bg-muted/50 overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          getDaysRemaining(selectedRequest) !== null && getDaysRemaining(selectedRequest)! < 0 
+                            ? 'bg-red-500' 
+                            : 'bg-gradient-to-r from-[#0B2E58] to-[#3B7DD8]'
+                        }`}
+                        style={{ 
+                          width: `${Math.min(100, Math.max(0, (() => {
+                            const sla = getServiceSLA(selectedRequest.categoryId)
+                            const elapsed = (Date.now() - new Date(selectedRequest.createdAt).getTime()) / 86400000
+                            return (elapsed / sla) * 100
+                          })()))}%` 
+                        }}
+                      />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Délai standard : {getServiceSLA(selectedRequest.categoryId)} jour(s) • Soumis le {new Date(selectedRequest.createdAt).toLocaleDateString('fr-FR')}
+                      {getEstimatedDate(selectedRequest) && ` • Prévu le ${getEstimatedDate(selectedRequest)!.toLocaleDateString('fr-FR')}`}
+                    </p>
+                  </div>
+                )}
+
                 {/* Timeline with refined step indicators */}
                 <div>
                   <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Avancement</h4>
@@ -1353,6 +1634,51 @@ export function CitizenPortalPage() {
                     {selectedRequest.deliveryMode === 'en_ligne' && (
                       <p className="text-xs text-muted-foreground text-center">Document disponible en ligne dans votre espace personnel</p>
                     )}
+                  </div>
+                )}
+
+                {/* Citizen Satisfaction Rating — inspired by Singpass (Singapore) */}
+                {selectedRequest.status === 'livree' && !selectedRequest.satisfaction && (
+                  <div className="p-3 rounded-lg bg-gradient-to-r from-emerald-50/80 to-emerald-100/50 dark:from-emerald-900/20 dark:to-emerald-800/10 border border-emerald-200 dark:border-emerald-800/40">
+                    <h4 className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-2">Comment s'est passée votre démarche ?</h4>
+                    <p className="text-[11px] text-muted-foreground mb-3">Votre avis compte ! Aidez-nous à améliorer le service public en Guinée.</p>
+                    <div className="flex gap-1 mb-2">
+                      {[1, 2, 3, 4, 5].map(star => (
+                        <button
+                          key={star}
+                          className={`text-lg transition-all duration-200 hover:scale-125 ${star <= ratingValue ? 'text-[#FCD116]' : 'text-muted-foreground/30'}`}
+                          onClick={() => setRatingValue(star as 1|2|3|4|5)}
+                        >
+                          ★
+                        </button>
+                      ))}
+                    </div>
+                    <Textarea 
+                      placeholder="Partagez votre expérience (optionnel)..."
+                      value={ratingComment}
+                      onChange={e => setRatingComment(e.target.value)}
+                      className="text-xs h-16 mb-2"
+                    />
+                    <Button size="sm" className="bg-gradient-to-r from-emerald-600 to-emerald-500 text-white gap-1 h-7 text-xs" onClick={handleSubmitRating}>
+                      <CheckCircle2 className="size-3" />
+                      Envoyer mon avis
+                    </Button>
+                  </div>
+                )}
+                {selectedRequest.satisfaction && (
+                  <div className="p-3 rounded-lg bg-emerald-50/50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800/30">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">Votre évaluation</span>
+                      <div className="flex gap-0.5">
+                        {[1,2,3,4,5].map(s => (
+                          <span key={s} className={`text-sm ${s <= selectedRequest.satisfaction!.rating ? 'text-[#FCD116]' : 'text-muted-foreground/20'}`}>★</span>
+                        ))}
+                      </div>
+                    </div>
+                    {selectedRequest.satisfaction.comment && (
+                      <p className="text-xs text-muted-foreground italic">"{selectedRequest.satisfaction.comment}"</p>
+                    )}
+                    <p className="text-[10px] text-muted-foreground mt-1">Évalué le {new Date(selectedRequest.satisfaction.ratedAt).toLocaleDateString('fr-FR')}</p>
                   </div>
                 )}
               </div>

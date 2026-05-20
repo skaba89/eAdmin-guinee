@@ -68,8 +68,12 @@ export function AgenceDashboardPage() {
   const user = useAppStore((s) => s.user)
   const { requests, updateRequestStatus, addProcessingNote, advanceTimeline, assignRequest, completeRequest, verifyDocument, setGeneratedDocument, addUploadedDocument } = useCitizenRequestsStore()
 
-  // Show ALL requests — agence sees everything
-  const agenceRequests = requests
+  // Filter requests for agence — ANIP only sees identification requests
+  const agenceRequests = requests.filter(r => {
+    // ANIP only processes identification-related requests (CNI, Passeport, Permis)
+    if (r.categoryId !== 'identification') return false
+    return true
+  })
 
   const [activeTab, setActiveTab] = useState('pipeline')
   const [searchQuery, setSearchQuery] = useState('')
@@ -245,7 +249,7 @@ export function AgenceDashboardPage() {
                 <p className="text-xs uppercase tracking-[0.2em] text-[#C8A45C]/80 font-semibold">République de Guinée</p>
                 <h2 className="text-2xl font-bold mt-0.5 text-gradient-gold">{user?.institution || "Agence Nationale d'Identification (ANIP)"}</h2>
                 <p className="text-sm text-white/70 mt-1">
-                  Tableau de bord — Toutes les demandes • {user?.name || 'Agent ANIP'}
+                  Tableau de bord — Identification (CNI, Passeport, Permis) • {user?.name || 'Agent ANIP'}
                 </p>
               </div>
               <div className="flex flex-col gap-2">
@@ -386,9 +390,9 @@ export function AgenceDashboardPage() {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white flex items-center gap-2">
               <ClipboardCheck className="size-4 text-[#C8A45C]" />
-              Pipeline de traitement — Toutes les demandes
+              Pipeline de traitement — Identification (CNI, Passeport, Permis)
             </CardTitle>
-            <CardDescription className="text-xs">Vue d&apos;ensemble du flux de toutes les demandes</CardDescription>
+            <CardDescription className="text-xs">Vue d&apos;ensemble du flux des demandes d&apos;identification</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-1 overflow-x-auto pb-2">
