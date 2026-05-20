@@ -186,6 +186,12 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+  /* Hide Next.js dev indicator */
+  [data-nextjs-dialog-overlay],
+  [data-nextjs-toast],
+  nextjs-portal {
+    display: none !important;
+  }
 }
 
 /* ================================================================
