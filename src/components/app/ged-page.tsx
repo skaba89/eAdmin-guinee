@@ -572,7 +572,7 @@ export function GedPage() {
             <CardDescription className="text-xs">Raccourcis vers les modules liés</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
               {[
                 { label: 'Nouveau courrier', icon: Mail, color: 'bg-[#0B2E58] hover:bg-[#0B2E58]/90 text-white', onClick: () => navigate('courriers') },
                 { label: 'Lancer un workflow', icon: GitBranch, color: 'bg-[#C8A45C] hover:bg-[#C8A45C]/90 text-[#0B2E58]', onClick: () => navigate('workflow') },
@@ -717,7 +717,7 @@ export function GedPage() {
                   <TableHeader>
                     <TableRow className="bg-muted/30">
                       <TableHead className="text-xs font-semibold">Référence</TableHead>
-                      <TableHead className="text-xs font-semibold min-w-[300px]">Objet</TableHead>
+                      <TableHead className="text-xs font-semibold min-w-[180px] sm:min-w-[300px]">Objet</TableHead>
                       <TableHead className="text-xs font-semibold">Type</TableHead>
                       <TableHead className="text-xs font-semibold hidden lg:table-cell">Institution</TableHead>
                       <TableHead className="text-xs font-semibold hidden md:table-cell">Taille</TableHead>
@@ -763,7 +763,7 @@ export function GedPage() {
                             <TableCell className="hidden lg:table-cell">
                               <div className="flex items-center gap-1.5">
                                 <Building2 className="h-3 w-3 text-muted-foreground shrink-0" />
-                                <span className="text-xs text-muted-foreground truncate max-w-[150px]">{doc.institution}</span>
+                                <span className="text-xs text-muted-foreground truncate max-w-[120px] sm:max-w-[150px]">{doc.institution}</span>
                               </div>
                             </TableCell>
                             <TableCell className="hidden md:table-cell">
@@ -940,7 +940,7 @@ export function GedPage() {
 
       {/* Upload Document Dialog */}
       <Dialog open={uploadDialog} onOpenChange={(open) => { setUploadDialog(open); if (!open) { setUploadFile(null); setUploadProgress(0); setIsUploading(false) } }}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Upload className="h-5 w-5 text-brand dark:text-primary" />
@@ -1022,7 +1022,7 @@ export function GedPage() {
                 onChange={e => setNewDoc(prev => ({ ...prev, objet: e.target.value }))}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Type de document</Label>
                 <Select value={newDoc.type} onValueChange={(v) => setNewDoc(prev => ({ ...prev, type: v as DocType }))}>
@@ -1071,7 +1071,7 @@ export function GedPage() {
 
       {/* Document Consultation Dialog */}
       <Dialog open={!!viewDoc} onOpenChange={(open) => { if (!open) setViewDoc(null) }}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Eye className="h-5 w-5 text-brand dark:text-primary" />
@@ -1082,7 +1082,7 @@ export function GedPage() {
           {viewDoc && (
             <div className="space-y-4">
               {/* Document metadata */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Référence</Label>
                   <p className="text-sm font-mono font-semibold text-brand dark:text-primary">{viewDoc.reference}</p>
@@ -1199,7 +1199,7 @@ export function GedPage() {
 
       {/* Reclassify Dialog */}
       <Dialog open={!!reclassifyDoc} onOpenChange={(open) => { if (!open) setReclassifyDoc(null) }}>
-        <DialogContent className="sm:max-w-[450px]">
+        <DialogContent className="sm:max-w-[450px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Tag className="h-5 w-5 text-gold" />
@@ -1246,7 +1246,7 @@ export function GedPage() {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deleteDoc} onOpenChange={(open) => { if (!open) setDeleteDoc(null) }}>
-        <DialogContent className="sm:max-w-[450px]">
+        <DialogContent className="sm:max-w-[450px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
               <AlertTriangle className="h-5 w-5" />
@@ -1280,7 +1280,7 @@ export function GedPage() {
 
       {/* Export to National Archives Dialog */}
       <Dialog open={exportDialog} onOpenChange={setExportDialog}>
-        <DialogContent className="sm:max-w-[450px]">
+        <DialogContent className="sm:max-w-[450px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Archive className="h-5 w-5 text-brand dark:text-primary" />

@@ -476,7 +476,7 @@ export function CitizenPortalPage() {
             <CardDescription className="text-xs">Raccourcis vers les modules liés</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {[
                 { label: 'Mes demandes', icon: FileText, color: 'bg-gradient-to-br from-[#0B2E58] to-[#134A8E] hover:from-[#0B2E58]/90 hover:to-[#134A8E]/90 text-white shadow-navy', onClick: () => setActiveTab('mes-demandes') },
                 { label: 'Suivi dossier', icon: Search, color: 'bg-gradient-to-br from-[#3B7DD8] to-[#2A6BC7] hover:from-[#3B7DD8]/90 hover:to-[#2A6BC7]/90 text-white shadow-navy', onClick: () => setActiveTab('suivi') },
@@ -839,7 +839,7 @@ export function CitizenPortalPage() {
 
                         <div className="divider-premium" />
 
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm">
                           <div>
                             <p className="text-xs text-muted-foreground">Demandeur</p>
                             <p className="font-medium">{trackedRequest.citizenFirstName} {trackedRequest.citizenName}</p>
@@ -1308,7 +1308,7 @@ export function CitizenPortalPage() {
               {/* Delivery mode */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Mode de livraison</Label>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {[
                     { value: 'guichet' as const, label: 'Au guichet', icon: Building2, desc: 'Retrait au service' },
                     { value: 'en_ligne' as const, label: 'En ligne', icon: Download, desc: 'Espace personnel' },
@@ -1468,7 +1468,7 @@ export function CitizenPortalPage() {
                 {/* Citizen info */}
                 <div className="p-3 rounded-xl bg-gradient-to-r from-muted/50 to-muted/30 backdrop-blur-sm space-y-2 border border-[#C8A45C]/10 dark:border-[#D4B878]/5">
                   <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Informations du citoyen</h4>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                     <div><span className="text-muted-foreground">Nom :</span> <span className="font-medium">{selectedRequest.citizenFirstName} {selectedRequest.citizenName}</span></div>
                     <div><span className="text-muted-foreground">NIN :</span> <span className="font-mono tracking-wide">{selectedRequest.citizenNIN}</span></div>
                     <div><span className="text-muted-foreground">Tél :</span> <span className="font-medium">{selectedRequest.citizenPhone}</span></div>

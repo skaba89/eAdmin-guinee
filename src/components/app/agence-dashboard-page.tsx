@@ -782,7 +782,7 @@ export function AgenceDashboardPage() {
 
       {/* Generate Document Dialog */}
       <Dialog open={generateDocDialogOpen} onOpenChange={setGenerateDocDialogOpen}>
-        <DialogContent className="glass-premium">
+        <DialogContent className="glass-premium max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="size-5 text-gradient-gold" />
@@ -816,7 +816,7 @@ export function AgenceDashboardPage() {
 
       {/* Note Dialog */}
       <Dialog open={noteDialogOpen} onOpenChange={setNoteDialogOpen}>
-        <DialogContent className="glass-premium">
+        <DialogContent className="glass-premium max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MessageSquare className="size-5 text-[#C8A45C]" />
@@ -838,7 +838,7 @@ export function AgenceDashboardPage() {
 
       {/* Delivery Dialog */}
       <Dialog open={deliveryDialogOpen} onOpenChange={setDeliveryDialogOpen}>
-        <DialogContent className="glass-premium">
+        <DialogContent className="glass-premium max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Download className="size-5 text-emerald-600" />
@@ -855,7 +855,7 @@ export function AgenceDashboardPage() {
               </div>
               <div className="space-y-3">
                 <Label className="text-sm font-medium">Mode de livraison</Label>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {[
                     { value: 'guichet' as const, label: 'Au guichet', icon: Building2 },
                     { value: 'en_ligne' as const, label: 'En ligne', icon: Download },

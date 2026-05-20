@@ -871,7 +871,7 @@ export function ServiceRequestsPage() {
 
       {/* Note Dialog */}
       <Dialog open={noteDialogOpen} onOpenChange={setNoteDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{noteType === 'info_complementaire' ? 'Demander des pièces complémentaires' : 'Ajouter une note'}</DialogTitle>
             <DialogDescription>
@@ -900,7 +900,7 @@ export function ServiceRequestsPage() {
 
       {/* Delivery Dialog */}
       <Dialog open={deliveryDialogOpen} onOpenChange={setDeliveryDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Download className="size-5 text-emerald-600" />
@@ -918,7 +918,7 @@ export function ServiceRequestsPage() {
 
               <div className="space-y-3">
                 <Label className="text-sm font-medium">Mode de livraison</Label>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {[
                     { value: 'guichet' as const, label: 'Au guichet', icon: Building2 },
                     { value: 'en_ligne' as const, label: 'En ligne', icon: Download },
@@ -958,7 +958,7 @@ export function ServiceRequestsPage() {
 
       {/* Generate Document Dialog */}
       <Dialog open={generateDialogOpen} onOpenChange={setGenerateDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Stamp className="size-5 text-emerald-600" />
@@ -998,7 +998,7 @@ export function ServiceRequestsPage() {
 
       {/* Reject Dialog */}
       <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
               <XCircle className="size-5" />
@@ -1021,7 +1021,7 @@ export function ServiceRequestsPage() {
 
       {/* Generate Document Dialog */}
       <Dialog open={generateDocDialogOpen} onOpenChange={setGenerateDocDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="size-5 text-[#C8A45C]" />

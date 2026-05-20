@@ -285,7 +285,7 @@ export function WorkflowPage() {
             <CardDescription className="text-xs">Raccourcis vers les modules liés</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
               {[
                 { label: 'Nouveau courrier', icon: Mail, color: 'bg-[#0B2E58] hover:bg-[#0B2E58]/90 text-white', onClick: () => navigate('courriers') },
                 { label: 'Upload document', icon: Upload, color: 'bg-[#3B7DD8] hover:bg-[#3B7DD8]/90 text-white', onClick: () => navigate('ged') },
@@ -364,7 +364,7 @@ export function WorkflowPage() {
                       <div className="flex items-center gap-0 overflow-x-auto pb-2">
                         {wf.steps.map((step, si) => (
                           <div key={si} className="flex items-center shrink-0">
-                            <div className="flex flex-col items-center gap-1 min-w-[80px]">
+                            <div className="flex flex-col items-center gap-1 min-w-[60px] sm:min-w-[80px]">
                               <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all ${
                                 step.status === 'completed' ? 'bg-emerald-500 border-emerald-500 text-white' :
                                 step.status === 'current' ? 'bg-brand border-brand text-white dark:bg-primary dark:border-primary' :
@@ -537,7 +537,7 @@ export function WorkflowPage() {
       </div>
       {/* Comment Dialog */}
       <Dialog open={commentDialogOpen} onOpenChange={setCommentDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Ajouter un commentaire officiel</DialogTitle>
             <DialogDescription>

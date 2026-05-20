@@ -296,6 +296,7 @@ export function AuditLogsPage() {
       {/* Logs Table */}
       <Card>
         <CardContent className="p-0">
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -359,6 +360,7 @@ export function AuditLogsPage() {
               })}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 

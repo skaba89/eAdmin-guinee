@@ -131,7 +131,7 @@ export function DatabaseQueryPage() {
               </Badge>
             </div>
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-muted-foreground">
             <div className="flex items-center gap-1.5"><Calendar className="h-3 w-3" />{r.childBirthDate}</div>
             <div className="flex items-center gap-1.5"><MapPin className="h-3 w-3" />{r.childBirthPlace}</div>
             <div className="flex items-center gap-1.5"><Hash className="h-3 w-3" />{r.acteNumber}</div>
@@ -168,7 +168,7 @@ export function DatabaseQueryPage() {
               {r.status === 'active' ? '✓ Valide' : r.status === 'expired' ? 'Expirée' : r.status === 'suspended' ? 'Suspendue' : 'Perdue'}
             </Badge>
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-muted-foreground">
             <div className="flex items-center gap-1.5"><Calendar className="h-3 w-3" />Né(e) : {r.birthDate}</div>
             <div className="flex items-center gap-1.5"><MapPin className="h-3 w-3" />{r.birthPlace}</div>
             <div className="flex items-center gap-1.5"><Fingerprint className="h-3 w-3" />Biométrique : {r.biometricVerified ? '✓' : '✗'}</div>
@@ -235,7 +235,7 @@ export function DatabaseQueryPage() {
               {r.status === 'active' ? 'Actif' : r.status === 'divorced' ? 'Divorcé' : 'Annulé'}
             </Badge>
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-muted-foreground">
             <div className="flex items-center gap-1.5"><Calendar className="h-3 w-3" />{r.marriageDate}</div>
             <div className="flex items-center gap-1.5"><MapPin className="h-3 w-3" />{r.marriagePlace}</div>
           </div>
@@ -259,7 +259,7 @@ export function DatabaseQueryPage() {
               </div>
             </div>
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-muted-foreground">
             <div className="flex items-center gap-1.5"><Calendar className="h-3 w-3" />Décès : {r.deathDate}</div>
             <div className="flex items-center gap-1.5"><MapPin className="h-3 w-3" />{r.deathPlace}</div>
           </div>
@@ -286,7 +286,7 @@ export function DatabaseQueryPage() {
               {r.status === 'valid' ? '✓ Valide' : 'Expiré'}
             </Badge>
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-muted-foreground">
             <div className="flex items-center gap-1.5"><MapPin className="h-3 w-3" />{r.address}</div>
             <div className="flex items-center gap-1.5"><Building2 className="h-3 w-3" />{r.commune}, {r.prefecture}</div>
           </div>
@@ -314,7 +314,7 @@ export function DatabaseQueryPage() {
                 <p className="text-sm text-muted-foreground">Acte de naissance n°{r.acteNumber}</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div><span className="text-muted-foreground">NIN :</span> <span className="font-mono">{r.childNIN}</span></div>
               <div><span className="text-muted-foreground">Sexe :</span> {r.childGender === 'M' ? 'Masculin' : 'Féminin'}</div>
               <div><span className="text-muted-foreground">Date de naissance :</span> {r.childBirthDate}</div>
@@ -324,7 +324,7 @@ export function DatabaseQueryPage() {
 
           <div>
             <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Parents</h4>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="p-3 rounded-lg bg-muted/50">
                 <p className="text-xs font-medium">Père</p>
                 <p className="text-sm">{r.fatherFirstName} {r.fatherLastName}</p>
@@ -340,7 +340,7 @@ export function DatabaseQueryPage() {
 
           <div>
             <h4 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Enregistrement</h4>
-            <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div><span className="text-muted-foreground">Date :</span> {r.registrationDate}</div>
               <div><span className="text-muted-foreground">Lieu :</span> {r.registrationPlace}</div>
               <div className="col-span-2"><span className="text-muted-foreground">Office :</span> {r.registryOffice}</div>
@@ -382,7 +382,7 @@ export function DatabaseQueryPage() {
                 <p className="text-sm text-muted-foreground">NIN : {r.nin}</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div><span className="text-muted-foreground">Date de naissance :</span> {r.birthDate}</div>
               <div><span className="text-muted-foreground">Lieu de naissance :</span> {r.birthPlace}</div>
               <div><span className="text-muted-foreground">Sexe :</span> {r.gender === 'M' ? 'Masculin' : 'Féminin'}</div>
@@ -392,7 +392,7 @@ export function DatabaseQueryPage() {
               <div><span className="text-muted-foreground">Expire le :</span> {r.expiryDate}</div>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className={`p-3 rounded-lg flex items-center gap-2 ${r.photoVerified ? 'bg-emerald-50 dark:bg-emerald-900/10' : 'bg-red-50 dark:bg-red-900/10'}`}>
               {r.photoVerified ? <CheckCircle2 className="h-5 w-5 text-emerald-600" /> : <XCircle className="h-5 w-5 text-red-600" />}
               <div>

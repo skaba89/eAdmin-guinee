@@ -107,7 +107,7 @@ export function SignaturesPage() {
             <CardDescription className="text-xs">Raccourcis vers les modules liés</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
               {[
                 { label: 'Upload document', icon: FileText, color: 'bg-[#0B2E58] hover:bg-[#0B2E58]/90 text-white', onClick: () => navigate('ged') },
                 { label: 'Nouveau courrier', icon: Mail, color: 'bg-[#3B7DD8] hover:bg-[#3B7DD8]/90 text-white', onClick: () => navigate('courriers') },
@@ -249,7 +249,7 @@ export function SignaturesPage() {
 
       {/* Sign Dialog */}
       <Dialog open={signDialogOpen} onOpenChange={setSignDialogOpen}>
-        <DialogContent className="sm:max-w-[480px]">
+        <DialogContent className="sm:max-w-[480px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <PenTool className="h-5 w-5 text-brand dark:text-primary" />
@@ -272,7 +272,7 @@ export function SignaturesPage() {
 
               <div className="space-y-2">
                 <h4 className="text-sm font-medium">Informations de vérification</h4>
-                <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <Fingerprint className="h-3.5 w-3.5" />
                     Empreinte numérique
@@ -324,7 +324,7 @@ export function SignaturesPage() {
 
       {/* Verify Integrity Dialog */}
       <Dialog open={verifyDialogOpen} onOpenChange={setVerifyDialogOpen}>
-        <DialogContent className="sm:max-w-[480px]">
+        <DialogContent className="sm:max-w-[480px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />

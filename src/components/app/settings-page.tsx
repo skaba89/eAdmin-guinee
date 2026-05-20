@@ -517,7 +517,7 @@ export function SettingsPage() {
               <CardContent className="space-y-6">
                 <div className="space-y-3">
                   <Label>Thème</Label>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {[
                       { value: 'light', label: 'Clair', icon: Sun },
                       { value: 'dark', label: 'Sombre', icon: Moon },
@@ -591,7 +591,7 @@ export function SettingsPage() {
 
       {/* Integration Configuration Dialog */}
       <Dialog open={integrationDialogOpen} onOpenChange={setIntegrationDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{selectedIntegration}</DialogTitle>
             <DialogDescription>

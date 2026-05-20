@@ -604,7 +604,7 @@ export default function DashboardPage() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="grid grid-cols-3 gap-3">
+            <CardContent className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {quickActions.map((action) => (
                 <button
                   key={action.label}
@@ -653,7 +653,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
-              <div className="min-w-[480px]">
+              <div className="min-w-[320px] sm:min-w-[480px]">
                 {/* Hour labels */}
                 <div className="mb-1 flex gap-0.5 pl-10">
                   {heatmapData.hours.map((h) => (

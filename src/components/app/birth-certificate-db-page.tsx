@@ -565,7 +565,7 @@ export function BirthCertificateDbPage() {
                                     {STATUS_BADGE[record.status].label}
                                   </Badge>
                                 </div>
-                                <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-muted-foreground">
                                   <span className="flex items-center gap-1"><Calendar className="size-3" />{formatDate(record.birthDate)}</span>
                                   <span className="flex items-center gap-1"><MapPin className="size-3" />{record.commune}</span>
                                 </div>
@@ -769,7 +769,7 @@ export function BirthCertificateDbPage() {
                               {verifyResult.record.firstName} {verifyResult.record.lastName}
                             </h4>
                           </div>
-                          <div className="grid grid-cols-2 gap-3 text-xs">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                             <div className="space-y-1">
                               <p className="text-muted-foreground">N° Acte</p>
                               <p className="font-mono font-medium">{verifyResult.record.acteNumber}</p>
@@ -818,7 +818,7 @@ export function BirthCertificateDbPage() {
 
                           <div className="space-y-2">
                             <h5 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Enregistrement</h5>
-                            <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                               <div className="space-y-1">
                                 <p className="text-muted-foreground">Date d&apos;enregistrement</p>
                                 <p className="font-medium">{formatDate(verifyResult.record.registrationDate)}</p>
@@ -926,7 +926,7 @@ export function BirthCertificateDbPage() {
                     <Baby className="size-3.5" />
                     Informations de naissance
                   </h4>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                     <div className="space-y-1">
                       <p className="text-xs text-muted-foreground">Prénom</p>
                       <p className="font-medium">{detailRecord.firstName}</p>
@@ -961,7 +961,7 @@ export function BirthCertificateDbPage() {
                   <div className="space-y-3">
                     <div className="p-3 rounded-lg bg-muted/30 space-y-2">
                       <p className="text-xs font-semibold text-[#0B2E58] dark:text-[#3B7DD8]">Père</p>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                         <div className="space-y-0.5">
                           <p className="text-xs text-muted-foreground">Nom complet</p>
                           <p className="font-medium">{detailRecord.fatherName}</p>
@@ -978,7 +978,7 @@ export function BirthCertificateDbPage() {
                     </div>
                     <div className="p-3 rounded-lg bg-muted/30 space-y-2">
                       <p className="text-xs font-semibold text-[#0B2E58] dark:text-[#3B7DD8]">Mère</p>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                         <div className="space-y-0.5">
                           <p className="text-xs text-muted-foreground">Nom complet</p>
                           <p className="font-medium">{detailRecord.motherName}</p>
@@ -1008,7 +1008,7 @@ export function BirthCertificateDbPage() {
                     <Hash className="size-3.5" />
                     Informations d&apos;enregistrement
                   </h4>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                     <div className="space-y-1">
                       <p className="text-xs text-muted-foreground">Commune</p>
                       <p className="font-medium">{detailRecord.commune}</p>

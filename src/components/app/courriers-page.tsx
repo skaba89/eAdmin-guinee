@@ -457,7 +457,7 @@ export function CourriersPage() {
             <CardDescription className="text-xs">Raccourcis vers les modules liés</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
               {[
                 { label: 'Upload document', icon: FileText, color: 'bg-[#0B2E58] hover:bg-[#0B2E58]/90 text-white', onClick: () => navigate('ged') },
                 { label: 'Lancer un workflow', icon: GitBranch, color: 'bg-[#C8A45C] hover:bg-[#C8A45C]/90 text-[#0B2E58]', onClick: () => navigate('workflow') },
@@ -568,7 +568,7 @@ export function CourriersPage() {
 
       {/* New Courrier Dialog */}
       <Dialog open={newCourrierDialog} onOpenChange={(open) => { setNewCourrierDialog(open); if (!open) setCourrierFiles([]) }}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5 text-brand dark:text-primary" />
@@ -585,7 +585,7 @@ export function CourriersPage() {
                 onChange={e => setNewCourrier(prev => ({ ...prev, objet: e.target.value }))}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Expéditeur</Label>
                 <Input
@@ -682,7 +682,7 @@ export function CourriersPage() {
 
       {/* Courrier Detail Dialog */}
       <Dialog open={detailDialog} onOpenChange={setDetailDialog}>
-        <DialogContent className="sm:max-w-[650px]">
+        <DialogContent className="sm:max-w-[650px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Eye className="h-5 w-5 text-brand dark:text-primary" />
@@ -692,7 +692,7 @@ export function CourriersPage() {
           </DialogHeader>
           {detailCourrier && (
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <span className="text-xs text-muted-foreground font-medium">Référence</span>
                   <p className="text-sm font-mono font-medium text-brand dark:text-primary">{detailCourrier.reference}</p>
@@ -707,7 +707,7 @@ export function CourriersPage() {
                 <span className="text-xs text-muted-foreground font-medium">Objet</span>
                 <p className="text-sm font-medium">{detailCourrier.objet}</p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <span className="text-xs text-muted-foreground font-medium">Expéditeur</span>
                   <div className="flex items-center gap-1.5">
@@ -738,7 +738,7 @@ export function CourriersPage() {
                   <p className="text-sm">{detailCourrier.circuit}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <span className="text-xs text-muted-foreground font-medium">Statut</span>
                   <div>
@@ -817,7 +817,7 @@ export function CourriersPage() {
 
       {/* Transfer Dialog */}
       <Dialog open={transferDialog} onOpenChange={setTransferDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <ArrowRight className="h-5 w-5 text-brand dark:text-primary" />
@@ -890,7 +890,7 @@ export function CourriersPage() {
               <TableHeader>
                 <TableRow className="bg-muted/30">
                   <TableHead className="text-xs font-semibold">Référence</TableHead>
-                  <TableHead className="text-xs font-semibold min-w-[280px]">Objet</TableHead>
+                  <TableHead className="text-xs font-semibold min-w-[180px] sm:min-w-[280px]">Objet</TableHead>
                   <TableHead className="text-xs font-semibold">Expéditeur / Destinataire</TableHead>
                   <TableHead className="text-xs font-semibold">Priorité</TableHead>
                   <TableHead className="text-xs font-semibold hidden lg:table-cell">Circuit</TableHead>
@@ -921,7 +921,7 @@ export function CourriersPage() {
                       <TableCell>
                         <div className="flex items-center gap-1.5">
                           <Building2 className="h-3 w-3 text-muted-foreground shrink-0" />
-                          <span className="text-xs text-muted-foreground truncate max-w-[130px]">{c.expediteur}</span>
+                          <span className="text-xs text-muted-foreground truncate max-w-[130px] sm:max-w-[200px]">{c.expediteur}</span>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -931,7 +931,7 @@ export function CourriersPage() {
                         </span>
                       </TableCell>
                       <TableCell className="hidden lg:table-cell">
-                        <div className="flex items-center gap-1 max-w-[200px]">
+                        <div className="flex items-center gap-1 max-w-[150px] sm:max-w-[200px]">
                           <Route className="h-3 w-3 text-muted-foreground shrink-0" />
                           <span className="text-[10px] text-muted-foreground truncate">{c.circuit}</span>
                         </div>

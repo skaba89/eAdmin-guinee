@@ -316,13 +316,13 @@ export function UsersPage() {
                     Ajouter
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[525px]">
+                <DialogContent className="sm:max-w-[525px] max-h-[85vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Ajouter un utilisateur</DialogTitle>
                     <DialogDescription>Créer un nouveau compte utilisateur</DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Prénom</Label>
                         <Input placeholder="Prénom" value={newUser.firstName} onChange={e => setNewUser(prev => ({ ...prev, firstName: e.target.value }))} />
@@ -336,7 +336,7 @@ export function UsersPage() {
                       <Label>Email</Label>
                       <Input type="email" placeholder="prenom.nom@institution.gov.gn" value={newUser.email} onChange={e => setNewUser(prev => ({ ...prev, email: e.target.value }))} />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Rôle</Label>
                         <Select value={newUser.role} onValueChange={v => setNewUser(prev => ({ ...prev, role: v }))}>
@@ -413,6 +413,7 @@ export function UsersPage() {
       {/* Users Table */}
       <Card>
         <CardContent className="p-0">
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -508,6 +509,7 @@ export function UsersPage() {
               })}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -519,7 +521,7 @@ export function UsersPage() {
 
       {/* View Profile Dialog */}
       <Dialog open={profileDialog} onOpenChange={setProfileDialog}>
-        <DialogContent className="sm:max-w-[525px]">
+        <DialogContent className="sm:max-w-[525px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Eye className="h-5 w-5 text-brand dark:text-primary" />
@@ -541,7 +543,7 @@ export function UsersPage() {
                 </div>
               </div>
               <Separator />
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <span className="text-xs text-muted-foreground font-medium">Rôle</span>
                   <div>
@@ -591,7 +593,7 @@ export function UsersPage() {
 
       {/* Edit User Dialog */}
       <Dialog open={editDialog} onOpenChange={setEditDialog}>
-        <DialogContent className="sm:max-w-[525px]">
+        <DialogContent className="sm:max-w-[525px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="h-5 w-5 text-brand dark:text-primary" />
@@ -608,7 +610,7 @@ export function UsersPage() {
               <Label>Email</Label>
               <Input type="email" value={editForm.email} onChange={e => setEditForm(prev => ({ ...prev, email: e.target.value }))} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Rôle</Label>
                 <Select value={editForm.role} onValueChange={v => setEditForm(prev => ({ ...prev, role: v }))}>
@@ -703,7 +705,7 @@ export function UsersPage() {
 
       {/* Bulk Change Role Dialog */}
       <Dialog open={bulkRoleDialog} onOpenChange={setBulkRoleDialog}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5 text-brand dark:text-primary" />

@@ -93,7 +93,7 @@ function BirthCertificatePreview({ citizen }: { citizen: CitizenRecord }) {
           {/* Child info */}
           <div className="bg-blue-50/50 rounded-lg p-3 border border-blue-100">
             <p className="text-[10px] uppercase tracking-wider font-bold text-blue-800 mb-2">Enfant</p>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+            <div className="grid grid-cols-2 gap-x-2 sm:gap-x-4 gap-y-1 text-xs">
               <p><span className="text-slate-500">Nom :</span> <span className="font-semibold">{citizen.name}</span></p>
               <p><span className="text-slate-500">Prénom(s) :</span> <span className="font-semibold">{citizen.firstName}</span></p>
               <p><span className="text-slate-500">Sexe :</span> <span className="font-semibold">{citizen.gender === 'M' ? 'Masculin' : 'Féminin'}</span></p>
@@ -105,7 +105,7 @@ function BirthCertificatePreview({ citizen }: { citizen: CitizenRecord }) {
           {/* Father info */}
           <div className="bg-indigo-50/50 rounded-lg p-3 border border-indigo-100">
             <p className="text-[10px] uppercase tracking-wider font-bold text-indigo-800 mb-2">Père</p>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+            <div className="grid grid-cols-2 gap-x-2 sm:gap-x-4 gap-y-1 text-xs">
               <p><span className="text-slate-500">Nom :</span> <span className="font-semibold">{detail.fatherName}</span></p>
               <p><span className="text-slate-500">Prénom :</span> <span className="font-semibold">{detail.fatherFirstName}</span></p>
               <p><span className="text-slate-500">Né le :</span> <span className="font-semibold">{formatDate(detail.fatherDateOfBirth)}</span></p>
@@ -117,7 +117,7 @@ function BirthCertificatePreview({ citizen }: { citizen: CitizenRecord }) {
           {/* Mother info */}
           <div className="bg-pink-50/50 rounded-lg p-3 border border-pink-100">
             <p className="text-[10px] uppercase tracking-wider font-bold text-pink-800 mb-2">Mère</p>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+            <div className="grid grid-cols-2 gap-x-2 sm:gap-x-4 gap-y-1 text-xs">
               <p><span className="text-slate-500">Nom :</span> <span className="font-semibold">{detail.motherName}</span></p>
               <p><span className="text-slate-500">Prénom :</span> <span className="font-semibold">{detail.motherFirstName}</span></p>
               <p><span className="text-slate-500">Née le :</span> <span className="font-semibold">{formatDate(detail.motherDateOfBirth)}</span></p>
@@ -129,7 +129,7 @@ function BirthCertificatePreview({ citizen }: { citizen: CitizenRecord }) {
           {/* Declarant & Registration */}
           <div className="bg-amber-50/50 rounded-lg p-3 border border-amber-100">
             <p className="text-[10px] uppercase tracking-wider font-bold text-amber-800 mb-2">Déclaration & Enregistrement</p>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+            <div className="grid grid-cols-2 gap-x-2 sm:gap-x-4 gap-y-1 text-xs">
               <p><span className="text-slate-500">Déclarant :</span> <span className="font-semibold">{detail.declarantName}</span></p>
               <p><span className="text-slate-500">Lien :</span> <span className="font-semibold">{detail.declarantRelation}</span></p>
               <p><span className="text-slate-500">Déclaration le :</span> <span className="font-semibold">{formatDate(detail.declarationDate)}</span></p>
@@ -220,7 +220,7 @@ function CitizenDetailDialog({ citizen, open, onClose }: { citizen: CitizenRecor
           {/* Contact & Address */}
           <Card>
             <CardContent className="p-4">
-              <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <div className="flex items-center gap-2"><Phone className="size-3.5 text-muted-foreground" />{citizen.phone}</div>
                 <div className="flex items-center gap-2"><Mail className="size-3.5 text-muted-foreground" />{citizen.email}</div>
                 <div className="flex items-center gap-2 col-span-2"><MapPin className="size-3.5 text-muted-foreground" />{citizen.address}</div>
@@ -296,7 +296,7 @@ function CitizenDetailDialog({ citizen, open, onClose }: { citizen: CitizenRecor
                   <BirthCertificatePreview citizen={citizen} />
                 ) : (
                   <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                       <div>
                         <p className="text-[10px] text-muted-foreground">N° d&apos;acte</p>
                         <p className="font-mono font-semibold">{detail.actNumber}</p>
@@ -315,7 +315,7 @@ function CitizenDetailDialog({ citizen, open, onClose }: { citizen: CitizenRecor
                       </div>
                     </div>
                     <Separator />
-                    <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                       <div>
                         <p className="text-[10px] text-muted-foreground">Père</p>
                         <p className="font-semibold">{detail.fatherFirstName} {detail.fatherName}</p>

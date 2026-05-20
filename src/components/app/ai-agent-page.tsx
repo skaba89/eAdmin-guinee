@@ -367,7 +367,7 @@ export function AIAgentPage() {
                   </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div className="p-2 rounded-lg bg-muted/30 text-center">
                   <p className="text-[10px] text-muted-foreground">Dernier battement</p>
                   <p className="text-xs font-semibold">{lastHeartbeat ? new Date(lastHeartbeat).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}</p>
@@ -525,7 +525,7 @@ export function AIAgentPage() {
                 </div>
 
                 {/* Auto-processing stats row */}
-                <div className="grid grid-cols-3 gap-3 mt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
                   <div className="p-3 rounded-lg bg-muted/30 text-center">
                     <div className="flex items-center justify-center gap-1.5 mb-1">
                       <Zap className="size-3 text-[#009460]" />
