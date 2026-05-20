@@ -124,14 +124,19 @@ export function AppHeader() {
   // Notification count derived from a realistic state
   const [notifCount] = useState(() => Math.floor(Math.random() * 3) + 3) // 3-5
 
+  // Pages that citizens should not see in search
+  const citizenHiddenPages = ['settings', 'admin', 'users', 'audit-logs', 'workflow', 'signatures', 'analytics', 'ged', 'courriers']
+
   // Filter search results
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return []
     const q = searchQuery.toLowerCase()
-    return SEARCH_ITEMS.filter(item =>
-      item.label.toLowerCase().includes(q) || item.category.toLowerCase().includes(q)
-    ).slice(0, 6)
-  }, [searchQuery])
+    return SEARCH_ITEMS.filter(item => {
+      // Hide admin-only pages from citizens
+      if (user?.role === 'citizen' && citizenHiddenPages.includes(item.page)) return false
+      return item.label.toLowerCase().includes(q) || item.category.toLowerCase().includes(q)
+    }).slice(0, 6)
+  }, [searchQuery, user?.role])
 
   // Close search dropdown when clicking outside
   useEffect(() => {
@@ -463,13 +468,15 @@ export function AppHeader() {
                 <User className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm">Mon profil</span>
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => navigate('settings')}
-                className="rounded-lg px-3 py-2 cursor-pointer gap-3"
-              >
-                <Settings className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">Préférences</span>
-              </DropdownMenuItem>
+              {user?.role !== 'citizen' && (
+                <DropdownMenuItem
+                  onClick={() => navigate('settings')}
+                  className="rounded-lg px-3 py-2 cursor-pointer gap-3"
+                >
+                  <Settings className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">Préférences</span>
+                </DropdownMenuItem>
+              )}
             </div>
             <DropdownMenuSeparator className="bg-border/50" />
             <div className="p-1.5">
@@ -525,17 +532,19 @@ export function AppHeader() {
                 </div>
               ))}
             </div>
-            <div className="flex gap-2 justify-end pt-1">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate('settings')}
-                className="rounded-lg border-border/60 hover:bg-muted/60"
-              >
-                <Settings className="mr-1.5 h-3.5 w-3.5" />
-                Modifier les paramètres
-              </Button>
-            </div>
+            {user?.role !== 'citizen' && (
+              <div className="flex gap-2 justify-end pt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate('settings')}
+                  className="rounded-lg border-border/60 hover:bg-muted/60"
+                >
+                  <Settings className="mr-1.5 h-3.5 w-3.5" />
+                  Modifier les paramètres
+                </Button>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

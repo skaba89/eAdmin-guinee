@@ -26,7 +26,6 @@ const ROLE_NAV: Record<UserRole, { main: NavItem[]; admin?: NavItem[] }> = {
       { page: 'citizen-portal', label: 'Mon Portail', icon: 'Home' },
       { page: 'public-citizen-portal', label: 'Services publics', icon: 'Briefcase' },
       { page: 'ai-assistant', label: 'Assistant IA', icon: 'Sparkles' },
-      { page: 'settings', label: 'Paramètres', icon: 'Settings' },
     ],
   },
   mairie: {

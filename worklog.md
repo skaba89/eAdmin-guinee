@@ -52,3 +52,22 @@ Stage Summary:
 - Activity feed sorted by date (most recent first), showing up to 15 items
 - Each item shows reference, service name, note text, and timestamp
 - Preserved notification channel preferences section below
+
+---
+Task ID: 1
+Agent: Main
+Task: Hide settings/parameters from citizen view
+
+Work Log:
+- Identified all locations where "Paramètres" was visible to citizens: sidebar nav, header dropdown, profile dialog, search results, page access control
+- Removed "Paramètres" from citizen sidebar navigation in app-sidebar.tsx
+- Hidden "Préférences" menu item in header dropdown for citizens (app-header.tsx)
+- Hidden "Modifier les paramètres" button in profile dialog for citizens (app-header.tsx)
+- Filtered search results to exclude admin-only pages for citizens (app-header.tsx)
+- Removed 'settings' from citizen ROLE_PAGE_ACCESS in page.tsx
+- Build verified successfully
+
+Stage Summary:
+- Citizens can no longer access Settings page via any navigation method
+- Citizen view now shows only: Mon Portail, Services publics, Assistant IA
+- All changes compile and build successfully
