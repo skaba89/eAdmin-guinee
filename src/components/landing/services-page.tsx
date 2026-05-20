@@ -41,7 +41,7 @@ const services = [
     title: 'GovTech',
     desc: 'Solutions technologiques dédiées à la modernisation de l\'action publique et aux services citoyens.',
     features: [
-      'Plateforme eAdmin Suite complète',
+      'Plateforme eAdmin Guinée complète',
       'Portail citoyen & e-services',
       'Gestion des courriers & documents',
       'Signatures & workflows numériques',

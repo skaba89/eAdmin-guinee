@@ -1,6 +1,6 @@
 export const BRAND = {
-  name: 'eAdministration Suite',
-  fullName: 'eAdministration Suite Guinea',
+  name: 'eAdmin Guinée',
+  fullName: 'eAdmin Guinée',
   company: 'République de Guinée',
   republic: 'République de Guinée',
   motto: 'Travail - Justice - Solidarité',

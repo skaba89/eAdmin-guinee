@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// eAdministration Suite Guinea — Demo & Test Accounts
+// eAdmin Guinée — Demo & Test Accounts
 // 6 main role accounts + 140 citizen test accounts (5 per service × 28 services)
 // ═══════════════════════════════════════════════════════════════════════════════
 

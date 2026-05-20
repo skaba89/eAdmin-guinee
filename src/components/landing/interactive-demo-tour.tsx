@@ -33,7 +33,7 @@ interface TourStep {
 
 const TOUR_STEPS: TourStep[] = [
   {
-    id: 1, chapter: 'Chapitre 01', title: 'Introduction', subtitle: 'eAdministration Suite Guinea — Vision & Mission',
+    id: 1, chapter: 'Chapitre 01', title: 'Introduction', subtitle: 'eAdmin Guinée — Vision & Mission',
     features: [
       { text: 'Plateforme GovTech de nouvelle génération pour la République de Guinée' },
       { text: 'Digitalisation intégrée de l\'administration publique', highlight: true },
@@ -859,7 +859,7 @@ export function InteractiveDemoTour() {
                     <div className="w-2 h-2 rounded-full bg-yellow-400" />
                     <div className="w-2 h-2 rounded-full bg-green-400" />
                   </div>
-                  <span className="text-[10px] text-white/30 font-mono ml-2">eAdministration Suite — {step.title}</span>
+                  <span className="text-[10px] text-white/30 font-mono ml-2">eAdmin Guinée — {step.title}</span>
                 </div>
               </CardHeader>
               <CardContent className="p-4 min-h-[280px] md:min-h-[340px]">

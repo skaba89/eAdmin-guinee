@@ -310,7 +310,7 @@ export function ServiceRequestsPage() {
   </style>
 </head>
 <body>
-  <div class="watermark">eAdministration Suite — République de Guinée</div>
+  <div class="watermark">eAdmin Guinée — République de Guinée</div>
   <div class="tricolor">
     <div class="tricolor-red"></div>
     <div class="tricolor-yellow"></div>
@@ -346,7 +346,7 @@ export function ServiceRequestsPage() {
     <div class="qr-placeholder">QR Code</div>
   </div>
   <div class="footer">
-    Ce document est généré par le système eAdministration Suite de la République de Guinée — ${req.reference} — ${new Date().toLocaleDateString('fr-FR')}
+    Ce document est généré par le système eAdmin Guinée de la République de Guinée — ${req.reference} — ${new Date().toLocaleDateString('fr-FR')}
   </div>
 </body>
 </html>`
@@ -980,7 +980,7 @@ export function ServiceRequestsPage() {
                   <li>En-tête officiel de la République de Guinée</li>
                   <li>Informations du titulaire</li>
                   <li>Référence unique du document</li>
-                  <li>Filigrane de sécurité eAdministration Suite</li>
+                  <li>Filigrane de sécurité eAdmin Guinée</li>
                   <li>Emplacement pour signature et cachet</li>
                 </ul>
               </div>

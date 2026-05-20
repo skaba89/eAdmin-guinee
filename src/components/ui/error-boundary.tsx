@@ -74,7 +74,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
             {/* Error message */}
             <p className="text-sm text-muted-foreground mb-2 leading-relaxed">
-              La plateforme eAdministration a rencontré un problème inattendu.
+              La plateforme eAdmin Guinée a rencontré un problème inattendu.
               Veuillez réessayer ou contacter le support technique.
             </p>
 
@@ -105,7 +105,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
             {/* Branding */}
             <div className="mt-8 pt-4 border-t border-border">
               <p className="text-xs text-muted-foreground">
-                eAdministration Suite — République de Guinée
+                eAdmin Guinée — République de Guinée
               </p>
             </div>
           </div>

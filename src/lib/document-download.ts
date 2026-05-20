@@ -121,7 +121,7 @@ ${request.attachedFiles.length > 0
   Agent compétent
 
 ═══════════════════════════════════════════════════════════════════════════════
-  eAdministration Suite Guinea — Système de Gestion Électronique
+  eAdmin Guinée — Système de Gestion Électronique
   Document généré automatiquement le ${dateFormatted} à ${timeFormatted}
   Référence technique : ${request.reference}
 ═══════════════════════════════════════════════════════════════════════════════
@@ -180,7 +180,7 @@ Statut      : ${STATUS_CONFIG_LABELS[request.status]}
   réel scanné ou téléversé par le citoyen ou l'agent traitant.
 
 ═══════════════════════════════════════════════════════════════════════════════
-  eAdministration Suite Guinea
+  eAdmin Guinée
   Extrait le ${dateFormatted} à ${timeFormatted}
 ═══════════════════════════════════════════════════════════════════════════════
 `.trimStart()

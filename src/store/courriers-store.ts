@@ -323,7 +323,7 @@ const DEMO_COURRIERS: Courrier[] = [
   {
     id: 'c-demo-010',
     reference: 'COURR-2026-0010',
-    object: 'Circulaire — Mise en œuvre du système eAdministration dans les administrations publiques',
+    object: 'Circulaire — Mise en œuvre du système eAdmin dans les administrations publiques',
     type: 'primature',
     status: 'en_cours',
     priority: 'haute',

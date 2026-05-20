@@ -181,7 +181,7 @@ export function generateOfficialDocumentHtml(req: CitizenRequest, agentName: str
   </style>
 </head>
 <body>
-  <div class="watermark">eAdministration Suite — République de Guinée</div>
+  <div class="watermark">eAdmin Guinée — République de Guinée</div>
   <div class="tricolor">
     <div class="tricolor-red"></div>
     <div class="tricolor-yellow"></div>
@@ -217,7 +217,7 @@ export function generateOfficialDocumentHtml(req: CitizenRequest, agentName: str
     <div class="label-sign">Signature & Cachet officiel</div>
   </div>
   <div class="footer">
-    Ce document est généré par le système eAdministration Suite de la République de Guinée — ${req.reference} — ${new Date().toLocaleDateString('fr-FR')}
+    Ce document est généré par le système eAdmin Guinée de la République de Guinée — ${req.reference} — ${new Date().toLocaleDateString('fr-FR')}
   </div>
 </body>
 </html>`

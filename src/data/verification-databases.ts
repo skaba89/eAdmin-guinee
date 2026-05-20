@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// eAdministration Suite Guinea — Verification Databases
+// eAdmin Guinée — Verification Databases
 // Simulated verification databases for AI agent and service processing
 // Covers: marriage, death, criminal, land, enterprise, education,
 //         vaccination, tax, social security, construction, and driving records
@@ -2694,7 +2694,7 @@ export function verifyByServiceId(
       found: false,
       confidence: 10,
       message: `Service "${serviceId}" non reconnu — aucune base de vérification associée`,
-      source: 'Système de vérification — eAdministration Suite',
+      source: 'Système de vérification — eAdmin Guinée',
     }
   }
 

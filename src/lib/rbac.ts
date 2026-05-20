@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// eAdministration Suite Guinea — RBAC & RLS System
+// eAdmin Guinée — RBAC & RLS System
 // Strict Role-Based Access Control + Row-Level Security
 // ═══════════════════════════════════════════════════════════════════════════════
 

@@ -90,7 +90,7 @@ export function SolutionsPage() {
               Des solutions pour chaque <span className="gradient-text">secteur</span>
             </h1>
             <p className="mt-4 text-lg text-muted-foreground max-w-3xl mx-auto">
-              eAdmin Suite s&apos;adapte aux besoins spécifiques de chaque type d&apos;institution
+              eAdmin Guinée s&apos;adapte aux besoins spécifiques de chaque type d&apos;institution
               avec des modules et workflows sur mesure.
             </p>
           </motion.div>
@@ -172,7 +172,7 @@ export function SolutionsPage() {
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl sm:text-4xl font-bold text-white">
-              Pourquoi choisir eAdmin Suite ?
+              Pourquoi choisir eAdmin Guinée ?
             </h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -202,7 +202,7 @@ export function SolutionsPage() {
             Votre institution mérite le meilleur
           </h2>
           <p className="mt-4 text-muted-foreground text-lg">
-            Découvrez comment eAdmin Suite peut transformer votre administration.
+            Découvrez comment eAdmin Guinée peut transformer votre administration.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button

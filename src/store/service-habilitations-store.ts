@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// eAdministration Suite Guinea — Service Habilitations Store
+// eAdmin Guinée — Service Habilitations Store
 // Manages which services each agent/organism can access based on habilitations
 // ═══════════════════════════════════════════════════════════════════════════════
 

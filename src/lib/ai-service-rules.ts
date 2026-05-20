@@ -1,5 +1,5 @@
 /**
- * AI Service Rules Engine — eAdministration Suite Guinea
+ * AI Service Rules Engine — eAdmin Guinée
  * Règles métier pour le traitement automatique des 28 services publics guinéens
  * Chaque service a des critères de validation, documents requis, motifs de rejet,
  * niveaux de complexité et conditions d'auto-approbation

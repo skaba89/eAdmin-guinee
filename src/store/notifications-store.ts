@@ -83,7 +83,7 @@ const DEMO_NOTIFICATIONS: AppNotification[] = [
   {
     id: 'notif-demo-005',
     title: 'Mise à jour système disponible',
-    message: 'La version 2.4.1 de la plateforme eAdministration est disponible. Mise à jour planifiée ce week-end de 02h à 06h.',
+    message: 'La version 2.4.1 de la plateforme eAdmin est disponible. Mise à jour planifiée ce week-end de 02h à 06h.',
     type: 'info',
     category: 'systeme',
     read: true,

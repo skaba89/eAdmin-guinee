@@ -414,7 +414,7 @@ export function AIChatbotWidget() {
                       En ligne
                     </Badge>
                   </h3>
-                  <p className="text-[10px] text-white/60">eAdministration Suite Guinea</p>
+                  <p className="text-[10px] text-white/60">eAdmin Guinée</p>
                 </div>
               </div>
               <div className="flex items-center gap-1">

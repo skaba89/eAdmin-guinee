@@ -367,7 +367,7 @@ Prends ta décision en te basant sur les règles du service et l'exhaustivité d
         const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
           {
             role: 'system',
-            content: `Tu es l'assistant virtuel de la plateforme eAdministration Suite de la République de Guinée. Tu aides les citoyens et les agents administratifs avec leurs questions sur les démarches administratives, les services publics, et l'utilisation de la plateforme.
+            content: `Tu es l'assistant virtuel de la plateforme eAdmin Guinée de la République de Guinée. Tu aides les citoyens et les agents administratifs avec leurs questions sur les démarches administratives, les services publics, et l'utilisation de la plateforme.
 
 Tu es professionnel, courtois, et précis. Tu réponds en français. Tu connais les 28 services publics guinéens répartis en 10 catégories:
 

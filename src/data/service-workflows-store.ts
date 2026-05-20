@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// eAdministration Suite Guinea — Service Workflows Store
+// eAdmin Guinée — Service Workflows Store
 // Zustand store for managing service-specific workflows, validations,
 // verification, and status transitions integrated with service configs
 // and verification databases.

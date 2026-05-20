@@ -34,7 +34,7 @@ const WALKTHROUGH_STEPS: WalkthroughStep[] = [
   {
     id: 0,
     chapter: 'Introduction',
-    title: 'Bienvenue dans eAdministration Suite Guinea',
+    title: 'Bienvenue dans eAdmin Guinée',
     subtitle: 'Guide complet de démonstration — 13 étapes pour découvrir toutes les fonctionnalités',
     duration: 8000,
     bg: 'from-[#0B2E58] via-[#134A8E] to-[#0B2E58]',
@@ -256,7 +256,7 @@ const WALKTHROUGH_STEPS: WalkthroughStep[] = [
     id: 12,
     chapter: 'Conclusion',
     title: 'Prêt à digitaliser votre administration',
-    subtitle: 'eAdministration Suite — La plateforme GovTech pour la Guinée et l\'Afrique',
+    subtitle: 'eAdmin Guinée — La plateforme GovTech pour la Guinée et l\'Afrique',
     duration: 10000,
     bg: 'from-[#CE1126]/20 via-[#FCD116]/15 via-[#009460]/20 to-[#0B2E58]',
     contentType: 'onboarding',
@@ -759,7 +759,7 @@ export function FeatureWalkthroughPlayer() {
                         <span className="text-[#0B2E58] font-bold text-lg">eA</span>
                       </div>
                       <div className="text-center">
-                        <p className="text-xs font-bold">eAdministration Suite</p>
+                        <p className="text-xs font-bold">eAdmin Guinée</p>
                         <p className="text-[9px] text-white/40">DataSphere Innovation — Guinée</p>
                       </div>
                       <div className="flex gap-1">
@@ -798,7 +798,7 @@ export function FeatureWalkthroughPlayer() {
               </div>
             </motion.div>
             <div className="absolute bottom-28 text-center z-10">
-              <p className="text-white font-semibold text-lg">Guide pas-à-pas eAdmin Suite</p>
+              <p className="text-white font-semibold text-lg">Guide pas-à-pas eAdmin Guinée</p>
               <p className="text-white/60 text-sm mt-1">
                 13 étapes — {Math.floor(totalDuration / 1000 / 60)} min {Math.floor((totalDuration / 1000) % 60)} s
               </p>

@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// eAdministration Suite Guinea — Recommendations Store
+// eAdmin Guinée — Recommendations Store
 // AI-driven service recommendations for citizens and agents
 // ═══════════════════════════════════════════════════════════════════════════════
 

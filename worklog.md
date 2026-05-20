@@ -111,3 +111,34 @@ Stage Summary:
 - Tables have horizontal scroll wrappers for mobile
 - Fixed widths use progressive breakpoints (e.g., min-w-[180px] sm:min-w-[280px])
 - Build verified successfully
+
+---
+Task ID: 3
+Agent: Main + 4 sub-agents
+Task: Rename platform from "eAdministration Suite" / "eAdmin Suite" to "eAdmin Guinée"
+
+Work Log:
+- Searched entire src/ directory for all occurrences of "eAdministration Suite" and "eAdmin Suite"
+- Found 70+ occurrences across 40+ files
+- Split work across 4 parallel sub-agents for efficiency
+- Replaced all product/platform name references:
+  - "eAdministration Suite Guinea" → "eAdmin Guinée"
+  - "eAdministration Suite" → "eAdmin Guinée"
+  - "eAdmin Suite" → "eAdmin Guinée"
+  - "eAdmin Suite Guinée" → "eAdmin Guinée"
+- Preserved "Plateforme Nationale de eAdministration" (government concept, not product name)
+- Changed API references: "API eAdministration" → "API eAdmin Guinée"
+
+Files Modified (36 total):
+- Core: constants.ts, layout.tsx, ai-config.ts, ai-service-rules.ts, rbac.ts, document-download.ts, document-utils.ts, ai-agent/route.ts
+- Stores: ai-assistant-store.ts, citizen-requests-store.ts, service-habilitations-store.ts, recommendations-store.ts, notifications-store.ts, audit-logs-store.ts, courriers-store.ts
+- Auth: login-page.tsx, register-page.tsx, mfa-page.tsx
+- Layout: app-sidebar.tsx, app-header.tsx, ai-chatbot-widget.tsx
+- Landing: landing-page.tsx, faq-page.tsx, solutions-page.tsx, services-page.tsx, about-page.tsx, cinematic-demo-video.tsx, demo-video-player.tsx, feature-walkthrough-player.tsx, interactive-demo-tour.tsx, demo-page.tsx, public-nav.tsx
+- App: ai-assistant-page.tsx, ai-chatbot-widget.tsx, analytics-page.tsx, service-requests-page.tsx, ged-page.tsx, notifications-page.tsx, admin-page.tsx, settings-page.tsx, error-boundary.tsx
+- Data: verification-databases.ts, service-workflows-store.ts, test-scenarios.ts, services-config.ts, birth-records-database.ts, demo-accounts.ts
+
+Stage Summary:
+- Zero remaining occurrences of "eAdministration Suite" or "eAdmin Suite" in src/
+- All references now use "eAdmin Guinée"
+- Build verified successfully

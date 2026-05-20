@@ -356,7 +356,7 @@ export function MfaPage() {
             <div className="h-6 w-6 rounded-md bg-gradient-to-br from-[#C8A45C] to-[#E0C98A] flex items-center justify-center">
               <Shield className="h-3.5 w-3.5 text-[#0B2E58]" />
             </div>
-            <span className="text-sm font-semibold text-white/30">eAdmin Suite</span>
+            <span className="text-sm font-semibold text-white/30">eAdmin Guinée</span>
           </div>
           <div className="flex justify-center gap-1.5">
             <span className="w-6 h-0.5 bg-[#CE1126]/30 rounded-full" />

@@ -73,7 +73,7 @@ function generateTaskId(): string {
 const WELCOME_MESSAGE: ChatMessage = {
   id: 'welcome',
   role: 'assistant',
-  content: `Bonjour ! Je suis **l'Agent IA de l'eAdministration Suite Guinea** 🇬🇳
+  content: `Bonjour ! Je suis **l'Agent IA d'eAdmin Guinée** 🇬🇳
 
 Je suis votre assistant intelligent pour les démarches administratives. Voici ce que je peux faire pour vous :
 

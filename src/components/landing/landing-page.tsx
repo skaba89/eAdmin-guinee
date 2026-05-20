@@ -217,7 +217,7 @@ const testimonials = [
     name: 'M. Alpha Oumar Diallo',
     role: 'Secrétaire Général',
     org: 'Ministère de l\'Économie et des Finances',
-    text: 'La plateforme eAdministration Suite a transformé la gestion interministérielle de nos courriers. Nous avons réduit les délais de traitement de 60% en moins de 6 mois. La conformité au Décret sur la signature électronique est un atout majeur pour notre ministère.',
+    text: 'La plateforme eAdmin Guinée a transformé la gestion interministérielle de nos courriers. Nous avons réduit les délais de traitement de 60% en moins de 6 mois. La conformité au Décret sur la signature électronique est un atout majeur pour notre ministère.',
   },
   {
     name: 'Mme Mariama Baldé',
@@ -388,7 +388,7 @@ export function LandingPage() {
               transition={{ duration: 0.8, delay: 1.2 }}
               className="mt-6 text-lg sm:text-xl text-white/70 max-w-3xl mx-auto leading-relaxed"
             >
-              Conformément à la Circulaire n°001/PM/CAB, la plateforme eAdministration Suite assure
+              Conformément à la Circulaire n°001/PM/CAB, la plateforme eAdmin Guinée assure
               la digitalisation de l&apos;ensemble des procédures administratives pour les 24 institutions
               de l&apos;État guinéen et les 8 régions administratives.
             </motion.p>
@@ -769,7 +769,7 @@ export function LandingPage() {
                 Des résultats au service de l&apos;État
               </h2>
               <p className="mt-4 text-lg text-white/60 max-w-2xl mx-auto">
-                La plateforme eAdministration Suite accompagne la transformation numérique de l&apos;administration publique guinéenne.
+                La plateforme eAdmin Guinée accompagne la transformation numérique de l&apos;administration publique guinéenne.
               </p>
             </motion.div>
 
@@ -933,7 +933,7 @@ export function LandingPage() {
             <span className="text-gradient-gold">l&apos;administration guinéenne</span>
           </h2>
           <p className="mt-6 text-lg text-white/70 max-w-2xl mx-auto">
-            Conformément à la Circulaire n°001/PM/CAB, toutes les institutions de l&apos;État sont appelées à adopter la plateforme eAdministration Suite.
+            Conformément à la Circulaire n°001/PM/CAB, toutes les institutions de l&apos;État sont appelées à adopter la plateforme eAdmin Guinée.
           </p>
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
             {/* Premium CTA button with gold shimmer */}
@@ -1085,7 +1085,7 @@ export function LandingPage() {
                   <img src="/logo-128.png" alt="Armories de la République de Guinée" className="h-8 w-8 object-contain" />
                 </div>
                 <span className="text-sm font-semibold text-white dark:text-foreground">
-                  eAdministration Suite
+                  eAdmin Guinée
                 </span>
               </div>
               <div className="flex flex-col sm:flex-row items-center gap-4 text-xs text-white/40 dark:text-muted-foreground">

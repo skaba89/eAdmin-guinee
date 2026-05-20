@@ -37,7 +37,7 @@ const FAKE_NOTIFICATIONS: Notification[] = [
   { id: '11', type: 'error', title: 'Erreur d\'import', description: 'L\'import du fichier utilisateurs.csv a échoué : format invalide ligne 23', timestamp: 'Hier à 16:30', read: true, category: 'système' },
   { id: '12', type: 'success', title: 'Convention signée', description: 'La convention de partenariat UNDP a été signée électroniquement', timestamp: 'Hier à 14:00', read: true, category: 'signatures' },
   { id: '13', type: 'warning', title: 'Mot de passe expiré', description: 'Le mot de passe de 3 utilisateurs expire dans les 7 prochains jours', timestamp: 'Hier à 09:00', read: true, category: 'sécurité' },
-  { id: '14', type: 'info', title: 'Mise à jour système', description: 'La plateforme eAdministration sera mise à jour ce weekend (v2.4.1)', timestamp: 'Hier à 08:00', read: true, category: 'système' },
+  { id: '14', type: 'info', title: 'Mise à jour système', description: 'La plateforme eAdmin sera mise à jour ce weekend (v2.4.1)', timestamp: 'Hier à 08:00', read: true, category: 'système' },
   { id: '15', type: 'success', title: 'Dossier citoyen livré', description: 'Le certificat de résidence DOSS-2024-4498 est prêt pour retrait', timestamp: 'Avant-hier', read: true, category: 'citoyen' },
 ]
 

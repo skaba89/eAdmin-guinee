@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// eAdministration Suite Guinea — National Birth Registry Database
+// eAdmin Guinée — National Birth Registry Database
 // Simulates Guinea's national birth registry for AI agent verification
 // 55 realistic Guinean birth records with NIN, parental, and registry data
 // ═══════════════════════════════════════════════════════════════════════════════

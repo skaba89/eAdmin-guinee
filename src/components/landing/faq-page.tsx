@@ -18,16 +18,16 @@ const faqData = [
     category: 'Général',
     items: [
       {
-        q: 'Qu\'est-ce qu\'eAdmin Suite ?',
-        a: 'eAdmin Suite est une plateforme GovTech complète de digitalisation administrative conçue pour les institutions guinéennes et africaines. Elle intègre la GED, la gestion des courriers, les workflows automatisés, les signatures électroniques et le dashboard décisionnel en une seule solution.',
+        q: 'Qu\'est-ce qu\'eAdmin Guinée ?',
+        a: 'eAdmin Guinée est une plateforme GovTech complète de digitalisation administrative conçue pour les institutions guinéennes et africaines. Elle intègre la GED, la gestion des courriers, les workflows automatisés, les signatures électroniques et le dashboard décisionnel en une seule solution.',
       },
       {
-        q: 'À qui s\'adresse eAdmin Suite ?',
+        q: 'À qui s\'adresse eAdmin Guinée ?',
         a: 'Notre plateforme s\'adresse aux ministères, institutions publiques, universités, collectivités territoriales, agences gouvernementales et toute organisation nécessitant une gestion administrative numérique professionnelle et sécurisée.',
       },
       {
-        q: 'Est-ce que eAdmin Suite est conforme aux réglementations guinéennes ?',
-        a: 'Oui, eAdmin Suite est entièrement conforme aux réglementations guinéennes en matière de données, de signatures électroniques et d\'archivage numérique. Nous travaillons en étroite collaboration avec les autorités compétentes pour garantir la conformité permanente.',
+        q: 'Est-ce que eAdmin Guinée est conforme aux réglementations guinéennes ?',
+        a: 'Oui, eAdmin Guinée est entièrement conforme aux réglementations guinéennes en matière de données, de signatures électroniques et d\'archivage numérique. Nous travaillons en étroite collaboration avec les autorités compétentes pour garantir la conformité permanente.',
       },
     ],
   },
@@ -43,11 +43,11 @@ const faqData = [
         a: 'Absolument. Nous utilisons le chiffrement de bout en bout (AES-256), l\'authentification multi-facteurs, le contrôle d\'accès RBAC, et des audit logs complets. Notre infrastructure est hébergée dans des datacenters certifiés avec un SLA de 99.9%.',
       },
       {
-        q: 'Puis-je intégrer eAdmin Suite avec mes systèmes existants ?',
-        a: 'Oui, eAdmin Suite dispose d\'une API REST complète et documentée qui permet l\'intégration avec vos systèmes existants (ERP, CRM, bases de données). Notre équipe technique peut aussi développer des connecteurs sur mesure.',
+        q: 'Puis-je intégrer eAdmin Guinée avec mes systèmes existants ?',
+        a: 'Oui, eAdmin Guinée dispose d\'une API REST complète et documentée qui permet l\'intégration avec vos systèmes existants (ERP, CRM, bases de données). Notre équipe technique peut aussi développer des connecteurs sur mesure.',
       },
       {
-        q: 'Est-il possible de déployer eAdmin Suite on-premise ?',
+        q: 'Est-il possible de déployer eAdmin Guinée on-premise ?',
         a: 'Oui, notre plan Entreprise inclut la possibilité de déploiement on-premise ou hybride. Nous adaptons l\'architecture à votre infrastructure existante tout en maintenant les mêmes fonctionnalités et le même niveau de sécurité.',
       },
     ],
@@ -92,7 +92,7 @@ export function FAQPage() {
               Questions <span className="gradient-text">fréquentes</span>
             </h1>
             <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-              Trouvez les réponses à vos questions sur eAdmin Suite et nos services.
+              Trouvez les réponses à vos questions sur eAdmin Guinée et nos services.
             </p>
           </motion.div>
         </div>

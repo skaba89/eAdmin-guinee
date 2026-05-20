@@ -156,7 +156,7 @@ export function AiAssistantPage() {
                   </div>
                   <div>
                     <h2 className="text-sm font-bold text-brand dark:text-primary">Assistant IA</h2>
-                    <p className="text-[10px] text-muted-foreground">eAdmin Suite</p>
+                    <p className="text-[10px] text-muted-foreground">eAdmin Guinée</p>
                   </div>
                 </div>
                 <Button
@@ -223,7 +223,7 @@ export function AiAssistantPage() {
             {/* Sidebar Footer */}
             <div className="px-4 py-3 border-t border-border shrink-0">
               <p className="text-[10px] text-muted-foreground text-center">
-                République de Guinée · eAdministration Suite
+                République de Guinée · eAdmin Guinée
               </p>
             </div>
           </motion.aside>
@@ -247,7 +247,7 @@ export function AiAssistantPage() {
             )}
             <div>
               <h1 className="text-sm font-bold text-foreground">
-                {activeConv?.title || 'Assistant IA eAdmin'}
+                {activeConv?.title || 'Assistant IA eAdmin Guinée'}
               </h1>
               <p className="text-[10px] text-muted-foreground">
                 {activeConv

@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// eAdministration Suite Guinea — Test Scenarios
+// eAdmin Guinée — Test Scenarios
 // 28 services × 5 scenarios = 140 test cases
 // Each scenario covers a different request status and workflow state
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -18,7 +18,7 @@ const scenes = [
     title: 'Introduction',
     duration: 8000,
     icon: Globe,
-    subtitle: 'Bienvenue sur eAdmin Suite Guinée',
+    subtitle: 'Bienvenue sur eAdmin Guinée',
     description: 'La plateforme GovTech de référence pour la transformation numérique de l\'administration publique guinéenne. Découvrez comment notre suite révolutionne la gestion administrative.',
     bgGradient: 'from-[#CE1126] via-[#8B0A1A] to-[#CE1126]',
     mockup: 'hero',
@@ -107,7 +107,7 @@ const scenes = [
     duration: 8000,
     icon: Star,
     subtitle: 'Prêt à transformer votre administration ?',
-    description: 'Rejoignez les institutions qui modernisent leur administration avec eAdmin Suite. Planifiez votre démonstration personnalisée dès aujourd\'hui.',
+    description: 'Rejoignez les institutions qui modernisent leur administration avec eAdmin Guinée. Planifiez votre démonstration personnalisée dès aujourd\'hui.',
     bgGradient: 'from-[#CE1126] via-[#FCD116] to-[#009460]',
     mockup: 'conclusion',
     features: ['Démo gratuite', 'Déploiement rapide', 'Accompagnement dédié'],
@@ -530,7 +530,7 @@ function SceneMockup({ type, active }: { type: string; active: boolean }) {
             transition={{ duration: 2, repeat: Infinity }}
             className="text-center"
           >
-            <p className="text-white font-bold text-sm mb-1">eAdmin Suite Guinée</p>
+            <p className="text-white font-bold text-sm mb-1">eAdmin Guinée</p>
             <p className="text-white/60 text-xs">Transformons ensemble l'administration</p>
           </motion.div>
           <motion.div

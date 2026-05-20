@@ -77,7 +77,7 @@ export function PublicNav() {
             </div>
             <div className="flex flex-col">
               <span className="text-[15px] font-bold leading-tight text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.7)] tracking-tight">
-                eAdmin Suite
+                eAdmin Guinée
               </span>
               <span className="text-[10px] font-semibold leading-tight text-[#FCD116] drop-shadow-[0_2px_4px_rgba(0,0,0,0.7)] tracking-wide uppercase">
                 République de Guinée

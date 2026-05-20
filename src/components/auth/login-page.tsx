@@ -236,7 +236,7 @@ export function LoginPage() {
             transition={{ delay: 0.25, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           >
             <h1 className="text-3xl font-bold mb-2.5 text-gradient-gold tracking-tight">
-              eAdministration Suite
+              eAdmin Guinée
             </h1>
             <p className="text-lg font-semibold tracking-widest uppercase" style={{ color: `${GUINEA_YELLOW}CC` }}>
               République de Guinée
@@ -390,7 +390,7 @@ export function LoginPage() {
             <img src="/logo-128.png" alt="Armories de la République de Guinée" className="w-16 h-16 relative z-10 object-contain" />
           </div>
           <div className="text-center">
-            <h1 className="text-xl font-bold text-gradient-navy">eAdministration Suite</h1>
+            <h1 className="text-xl font-bold text-gradient-navy">eAdmin Guinée</h1>
             <p className="text-sm font-semibold tracking-widest uppercase" style={{ color: GUINEA_GREEN }}>Guinée</p>
           </div>
         </div>

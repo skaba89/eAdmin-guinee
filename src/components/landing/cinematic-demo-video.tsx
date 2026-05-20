@@ -18,7 +18,7 @@ interface Scene {
 }
 
 const SCENES: Scene[] = [
-  { id: 0, duration: 3000, narration: 'eAdministration Suite Guinea. La plateforme GovTech de nouvelle génération pour la République de Guinée.', type: 'intro' },
+  { id: 0, duration: 3000, narration: 'eAdmin Guinée. La plateforme GovTech de nouvelle génération pour la République de Guinée.', type: 'intro' },
   { id: 1, duration: 3000, narration: 'Notre mission : digitaliser l\'ensemble de l\'administration publique guinéenne.', type: 'vision' },
   { id: 2, duration: 4000, narration: 'Un tableau de bord décisionnel avec des indicateurs clés en temps réel.', type: 'dashboard' },
   { id: 3, duration: 3000, narration: '87 450 documents officiels archivés et classifiés avec intelligence artificielle.', type: 'ged' },
@@ -100,7 +100,7 @@ function SceneIntro({ active }: { active: boolean }) {
           <span className="text-[#0B2E58] font-black text-3xl">eA</span>
         </div>
       </motion.div>
-      <motion.h1 initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8, duration: 0.6 }} className="mt-6 text-3xl sm:text-4xl font-black text-white tracking-tight">eAdministration Suite</motion.h1>
+      <motion.h1 initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8, duration: 0.6 }} className="mt-6 text-3xl sm:text-4xl font-black text-white tracking-tight">eAdmin Guinée</motion.h1>
       <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.2, duration: 0.5 }} className="mt-2 text-white/60 text-sm sm:text-base">Guinée — DataSphere Innovation</motion.p>
       {[...Array(8)].map((_, i) => (
         <motion.div key={i} className="absolute w-1 h-1 rounded-full bg-white/10" style={{ left: `${10 + i * 12}%`, top: `${15 + (i % 3) * 30}%` }} animate={{ y: [0, -30, 0], opacity: [0.1, 0.4, 0.1] }} transition={{ duration: 2 + i * 0.3, repeat: Infinity, delay: i * 0.2 }} />
@@ -415,7 +415,7 @@ function SceneOutro({ active }: { active: boolean }) {
         <span className="text-[#0B2E58] font-black text-2xl">eA</span>
       </motion.div>
       <motion.h2 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="text-2xl sm:text-3xl font-black text-white text-center">Prêt à transformer votre administration ?</motion.h2>
-      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }} className="text-white/50 text-sm mt-2">eAdministration Suite — DataSphere Innovation</motion.p>
+      <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }} className="text-white/50 text-sm mt-2">eAdmin Guinée — République de Guinée</motion.p>
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1 }} className="flex gap-3 mt-6">
         <button onClick={() => navigate('login')} className="px-6 py-3 bg-[#C8A45C] hover:bg-[#C8A45C]/90 text-[#0B2E58] font-bold rounded-xl text-sm transition-colors flex items-center gap-2">
           <Zap className="size-4" /> Essayer la plateforme

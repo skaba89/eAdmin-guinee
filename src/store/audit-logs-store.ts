@@ -259,7 +259,7 @@ const DEMO_LOGS: AuditLog[] = [
     action: 'assign',
     resource: 'courrier',
     resourceId: 'c-demo-010',
-    description: 'Circulaire eAdministration assignée à Mme Hawa Soumah pour suivi du déploiement',
+    description: 'Circulaire eAdmin assignée à Mme Hawa Soumah pour suivi du déploiement',
     severity: 'info',
     userId: 'demo-admin-1',
     userName: 'Sékou Condé',

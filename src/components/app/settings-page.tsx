@@ -31,7 +31,7 @@ interface IntegrationConfig {
 }
 
 const integrations = [
-  { name: 'API eAdministration', status: 'connected', description: 'API principale de la plateforme', lastSync: 'Il y a 5 min', defaults: { apiUrl: 'https://api.eadmin.gn/v2', apiKey: '••••••••••••', syncInterval: '5', enabled: true } },
+  { name: 'API eAdmin Guinée', status: 'connected', description: 'API principale de la plateforme', lastSync: 'Il y a 5 min', defaults: { apiUrl: 'https://api.eadmin.gn/v2', apiKey: '••••••••••••', syncInterval: '5', enabled: true } },
   { name: 'Active Directory / LDAP', status: 'connected', description: 'Authentification centralisée', lastSync: 'Il y a 1h', defaults: { apiUrl: 'ldap://ad.mat.gov.gn:389', apiKey: '••••••••••••', syncInterval: '30', enabled: true } },
   { name: 'Service SMS (Orange)', status: 'connected', description: 'Envoi de notifications SMS', lastSync: 'Il y a 30 min', defaults: { apiUrl: 'https://api.orange.com/sms/v1', apiKey: '••••••••••••', syncInterval: '15', enabled: true } },
   { name: 'WhatsApp Business API', status: 'error', description: 'Notifications WhatsApp', lastSync: 'Échec il y a 2h', defaults: { apiUrl: 'https://graph.facebook.com/v18.0', apiKey: '', syncInterval: '15', enabled: false } },

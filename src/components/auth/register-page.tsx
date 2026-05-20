@@ -142,7 +142,7 @@ export function RegisterPage() {
             </motion.div>
           </div>
           <h2 className="text-2xl font-bold text-white mb-2">Compte créé avec succès !</h2>
-          <p className="text-white/60 mb-4">Bienvenue sur eAdministration Suite, {form.firstName}.</p>
+          <p className="text-white/60 mb-4">Bienvenue sur eAdmin Guinée, {form.firstName}.</p>
           <p className="text-sm text-white/40">Connexion en cours vers votre portail citoyen...</p>
         </motion.div>
       </div>
@@ -177,7 +177,7 @@ export function RegisterPage() {
             </div>
           </div>
           <h1 className="text-xl font-bold text-white">Créer un compte citoyen</h1>
-          <p className="text-xs text-white/50 mt-1">Rejoignez la plateforme eAdministration — République de Guinée</p>
+          <p className="text-xs text-white/50 mt-1">Rejoignez la plateforme eAdmin Guinée — République de Guinée</p>
         </div>
 
         <Card className="glass-card border-white/10 bg-white/5 backdrop-blur-xl">

@@ -30,7 +30,7 @@ const team = [
 
 const milestones = [
   { year: '2019', title: 'Création', desc: 'Lancement du programme national de digitalisation administrative par le gouvernement guinéen.' },
-  { year: '2020', title: 'Premier MVP', desc: 'Lancement de la première version d\'eAdmin Suite avec les modules GED et Courriers.' },
+  { year: '2020', title: 'Premier MVP', desc: 'Lancement de la première version d\'eAdmin Guinée avec les modules GED et Courriers.' },
   { year: '2021', title: 'Premiers clients', desc: 'Signature avec les 3 premiers ministères et traitement des 10 000 premiers documents.' },
   { year: '2022', title: 'Scale-up', desc: 'Lancement des workflows et signatures électroniques. 50+ institutions adoptent la plateforme.' },
   { year: '2023', title: 'IA & Analytics', desc: 'Intégration de l\'OCR intelligent et du dashboard décisionnel. Extension régionale.' },

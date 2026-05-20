@@ -260,7 +260,7 @@ export function AiChatbotWidget() {
                       "drop-shadow-[0_1px_2px_rgba(0,0,0,0.3)]"
                     )}
                   >
-                    Assistant eAdmin
+                    Assistant eAdmin Guinée
                   </h3>
                   <p className="text-[11px] text-white/60 tracking-wide">
                     République de Guinée
@@ -316,7 +316,7 @@ export function AiChatbotWidget() {
 
                   <div>
                     <p className="text-sm font-semibold text-foreground">
-                      Bienvenue sur l&apos;Assistant eAdmin
+                      Bienvenue sur l&apos;Assistant eAdmin Guinée
                     </p>
                     <p className="text-xs text-muted-foreground mt-1.5 max-w-[260px]">
                       Comment puis-je vous aider aujourd&apos;hui?
@@ -576,7 +576,7 @@ export function AiChatbotWidget() {
 
               {/* Subtle branding text */}
               <p className="text-[9px] text-muted-foreground/40 text-center mt-2 tracking-wider">
-                eAdmin IA • République de Guinée
+                eAdmin Guinée • République de Guinée
               </p>
             </div>
           </motion.div>

@@ -176,7 +176,7 @@ export function AppHeader() {
     navigate(page as typeof currentPage)
   }
 
-  const pageTitle = PAGE_TITLES[currentPage] || 'eAdministration Suite'
+  const pageTitle = PAGE_TITLES[currentPage] || 'eAdmin Guinée'
 
   // Detect macOS for shortcut display
   const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform)

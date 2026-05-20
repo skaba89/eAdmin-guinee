@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "eAdministration Suite — République de Guinée",
+  title: "eAdmin Guinée — République de Guinée",
   description: "Plateforme GovTech de nouvelle génération pour la digitalisation de l'administration publique de la République de Guinée. GED, courriers numériques, workflows, signatures électroniques.",
   keywords: ["GovTech", "eAdministration", "Guinée", "République de Guinée", "administration publique", "GED", "courriers numériques", "transformation digitale"],
   authors: [{ name: "République de Guinée" }],
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
   },
   manifest: "/site.webmanifest",
   openGraph: {
-    title: "eAdministration Suite — République de Guinée",
+    title: "eAdmin Guinée — République de Guinée",
     description: "Plateforme GovTech pour la digitalisation de l'administration publique guinéenne",
     images: ["/android-chrome-512x512.png"],
   },

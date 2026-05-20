@@ -413,7 +413,7 @@ const DEMO_REQUESTS: CitizenRequest[] = [
   </style>
 </head>
 <body>
-  <div class="watermark">eAdministration Suite — République de Guinée</div>
+  <div class="watermark">eAdmin Guinée — République de Guinée</div>
   <div class="tricolor">
     <div class="tricolor-red"></div>
     <div class="tricolor-yellow"></div>
@@ -447,7 +447,7 @@ const DEMO_REQUESTS: CitizenRequest[] = [
     <div class="label-sign">Signature & Cachet officiel</div>
   </div>
   <div class="footer">
-    Ce document est généré par le système eAdministration Suite de la République de Guinée — GN-2026-101789 — ${new Date().toLocaleDateString('fr-FR')}
+    Ce document est généré par le système eAdmin Guinée de la République de Guinée — GN-2026-101789 — ${new Date().toLocaleDateString('fr-FR')}
   </div>
 </body>
 </html>`,

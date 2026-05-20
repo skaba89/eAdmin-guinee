@@ -244,7 +244,7 @@ export function GedPage() {
     <div class="label-sign">Signature & Cachet officiel</div>
   </div>
   <div class="footer">
-    Ce document est généré par le système eAdministration Suite de la République de Guinée — ${doc.reference} — ${new Date().toLocaleDateString('fr-FR')}
+    Ce document est généré par le système eAdmin Guinée de la République de Guinée — ${doc.reference} — ${new Date().toLocaleDateString('fr-FR')}
   </div>
 </body>
 </html>`

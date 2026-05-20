@@ -310,7 +310,7 @@ export function AdminPage() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-base">Gestion des clés API</CardTitle>
-                <CardDescription>Gérez les clés d&apos;accès à l&apos;API eAdministration</CardDescription>
+                <CardDescription>Gérez les clés d&apos;accès à l&apos;API eAdmin Guinée</CardDescription>
               </div>
               <Button size="sm" className="gap-2 bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90" onClick={() => { setNewKeyDialog(true); setNewKeyName('') }}>
                 <Plus className="h-4 w-4" />

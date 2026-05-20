@@ -253,7 +253,7 @@ function exportPDFReport(period: string, summary: { label: string; value: string
   const periodLabel = periods.find(p => p.value === period)?.label || period
   const lines = [
     '═══════════════════════════════════════════════════════════',
-    '  eAdministration Suite Guinea — Rapport Analytics',
+    '  eAdmin Guinée — Rapport Analytics',
     '═══════════════════════════════════════════════════════════',
     '',
     `  Période : ${periodLabel}`,
@@ -290,7 +290,7 @@ function exportPDFReport(period: string, summary: { label: string; value: string
     ...slaData.map(r => '  ' + [r.type, String(r.total), String(r.dansDelai), String(r.horsDelai), r.taux].map(v => v.padEnd(18)).join('')),
     '',
     '═══════════════════════════════════════════════════════════',
-    '  Fin du rapport — eAdministration Suite Guinea',
+    '  Fin du rapport — eAdmin Guinée',
     '═══════════════════════════════════════════════════════════',
   ]
   const content = lines.join('\n')
@@ -362,7 +362,7 @@ export default function AnalyticsPage() {
             Analytics
           </h1>
           <p className="text-muted-foreground text-sm">
-            Analyses avancées et indicateurs de performance — eAdministration Suite
+            Analyses avancées et indicateurs de performance — eAdmin Guinée
           </p>
         </div>
         <div className="flex gap-2">

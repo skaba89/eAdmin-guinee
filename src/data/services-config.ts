@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// eAdministration Suite Guinea — Complete Services Configuration
+// eAdmin Guinée — Complete Services Configuration
 // 28 administrative services with form fields, workflows, and business rules
 // Drives the entire citizen request processing pipeline
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -315,7 +315,7 @@ export function AppSidebar() {
               className="overflow-hidden"
             >
               <div className="font-bold text-[13px] leading-tight text-white tracking-wide">
-                eAdmin Suite
+                eAdmin Guinée
               </div>
               <div className="text-[10px] text-[#C8A45C]/80 dark:text-[#D4B878]/70 tracking-wider font-medium mt-0.5">
                 République de Guinée

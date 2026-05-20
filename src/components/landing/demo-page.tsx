@@ -54,7 +54,7 @@ export function DemoPage() {
               Démonstration
             </Badge>
             <h1 className="text-4xl sm:text-5xl font-bold text-foreground">
-              Découvrez eAdmin Suite <span className="gradient-text">en action</span>
+              Découvrez eAdmin Guinée <span className="gradient-text">en action</span>
             </h1>
             <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
               Planifiez une démonstration personnalisée et voyez comment notre plateforme
@@ -104,7 +104,7 @@ export function DemoPage() {
                       <div className="h-16 w-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
                         <Play className="h-8 w-8 text-white ml-1" />
                       </div>
-                      <p className="text-white font-medium">Voir la démo eAdmin Suite</p>
+                      <p className="text-white font-medium">Voir la démo eAdmin Guinée</p>
                       <p className="text-white/60 text-sm mt-1">3 min — Aperçu de la plateforme</p>
                     </div>
                   </div>
