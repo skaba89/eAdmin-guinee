@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { useAppStore } from '@/store/app-store'
 import { useRecommendationsStore, type Recommendation, type RecommendationPriority, type RecommendationType } from '@/store/recommendations-store'
 import { useCitizenRequestsStore } from '@/store/citizen-requests-store'
+import { mapRole } from '@/lib/rbac'
 
 const ICON_MAP: Record<string, React.ElementType> = {
   CreditCard, Home, Shield, Syringe, Building2, GraduationCap,
@@ -56,12 +57,12 @@ export function RecommendationsPanel() {
     const existingServiceIds = allRequests
       .filter(r => r.citizenEmail === user.email)
       .map(r => r.serviceId)
-    generatePersonalizedRecommendations(user.role, user.email, existingServiceIds)
+    generatePersonalizedRecommendations(mapRole(user.role), user.email, existingServiceIds)
   }, [user?.email, user?.role])
 
   if (!user) return null
 
-  const activeRecs = getActiveRecommendations(user.role, user.email).slice(0, 6)
+  const activeRecs = getActiveRecommendations(mapRole(user.role), user.email).slice(0, 6)
   const unreadCount = activeRecs.filter(r => !r.isRead).length
 
   if (activeRecs.length === 0) return null

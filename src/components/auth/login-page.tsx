@@ -41,13 +41,15 @@ const containerStagger = {
   },
 }
 
+const easeOutExpo: [number, number, number, number] = [0.16, 1, 0.3, 1]
+
 const itemSlideUp = {
   hidden: { opacity: 0, y: 24, filter: 'blur(4px)' },
   visible: {
     opacity: 1,
     y: 0,
     filter: 'blur(0px)',
-    transition: { duration: 0.55, ease: [0.16, 1, 0.3, 1] },
+    transition: { duration: 0.55, ease: easeOutExpo },
   },
 }
 
@@ -56,7 +58,7 @@ const itemFadeScale = {
   visible: {
     opacity: 1,
     scale: 1,
-    transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] },
+    transition: { duration: 0.5, ease: easeOutExpo },
   },
 }
 

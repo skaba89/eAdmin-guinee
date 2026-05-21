@@ -236,25 +236,10 @@ export function ServiceRequestsPage() {
   }
 
   // Document helpers
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return bytes + ' o'
-    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' Ko'
-    return (bytes / 1048576).toFixed(1) + ' Mo'
-  }
-
   const getDocIcon = (type: string) => {
     if (type === 'application/pdf') return <FileText className="size-4 text-red-500" />
     if (type.startsWith('image/')) return <ImageIcon className="size-4 text-blue-500" />
     return <File className="size-4 text-gray-500" />
-  }
-
-  const downloadUploadedFile = (doc: UploadedDocument) => {
-    const link = document.createElement('a')
-    link.href = doc.data
-    link.download = doc.name
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
   }
 
   const previewUploadedFile = (doc: UploadedDocument) => {
@@ -356,7 +341,7 @@ export function ServiceRequestsPage() {
       htmlContent,
       generatedAt: new Date().toISOString(),
       generatedBy: req.assignedAgent || 'Agent traitant',
-      fileName: `${req.reference.replace(/\\//g, '-')}-${req.serviceName.replace(/\\s+/g, '-').toLowerCase()}.html`,
+      fileName: `${req.reference.replace(/\//g, '-')}-${req.serviceName.replace(/\s+/g, '-').toLowerCase()}.html`,
     }
   }
 

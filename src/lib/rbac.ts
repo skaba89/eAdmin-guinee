@@ -293,7 +293,7 @@ const PAGE_ACCESS_RULES: PageAccessRule[] = [
   { page: 'settings', requiredPermissions: ['settings:view'] },
   { page: 'notifications', requiredPermissions: ['notifications:view'] },
   { page: 'audit-logs', requiredPermissions: ['audit-logs:view'] },
-  { page: 'ai-agent', requiredPermissions: ['ai-agent:view'] },
+  { page: 'ai-assistant', requiredPermissions: ['ai-agent:view'] },
 ]
 
 // ─── INSTITUTION → SERVICE CATEGORY MAPPING (for RLS) ─────────────────────
@@ -386,7 +386,7 @@ export function getAccessiblePages(user: UserInfo | null): AppPage[] {
   const allAppPages: AppPage[] = [
     'dashboard', 'ged', 'courriers', 'workflow', 'signatures',
     'analytics', 'admin', 'users', 'settings', 'notifications',
-    'audit-logs', 'citizen-portal', 'service-requests', 'ai-agent',
+    'audit-logs', 'citizen-portal', 'service-requests', 'ai-assistant',
   ]
 
   return allAppPages.filter(page => canAccessPage(user, page))
@@ -748,7 +748,7 @@ export function getRolePermissionSummary(role: string): {
   return {
     totalPermissions: permissions.length,
     permissions,
-    scope: getRLSScopeDescription({ name: '', firstName: '', email: '', role: mappedRole as any, institution: '', fonction: '' }),
+    scope: getRLSScopeDescription({ id: '', name: '', email: '', role: mappedRole as any, institution: '', fonction: '' }),
     dataAccess: mappedRole === 'citoyen' ? 'Données propres uniquement'
       : mappedRole === 'mairie' || mappedRole === 'agence' ? 'Données du service assigné'
       : mappedRole === 'ministere' ? 'Toutes les données (lecture + traitement)'

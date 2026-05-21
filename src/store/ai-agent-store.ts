@@ -290,9 +290,10 @@ function sendNotification(
       title,
       message,
       type,
-      category: 'ai',
-      relatedPage: 'ai-agent',
+      category: 'systeme',
+      link: '/ai-assistant',
       relatedId,
+      priority: 'normale',
     })
   } catch {
     // Notification store might not be available during SSR
@@ -547,7 +548,7 @@ export const useAIAgentStore = create<AIAgentState>()(
                   citizenNIN: req.citizenNIN,
                   motif: req.motif,
                   documents: req.documents,
-                  attachedFiles: req.attachedFiles,
+                  attachedFiles: req.attachedFiles || [],
                   status: req.status,
                   serviceId: req.serviceId,
                 },
@@ -1445,14 +1446,14 @@ export const useAIAgentStore = create<AIAgentState>()(
         }
 
         // Build decision context
-        const providedDocs = req.attachedFiles.filter(f => f.category === 'justificatif').length
+        const providedDocs = (req.attachedFiles || []).filter(f => f.category === 'justificatif').length
         const ctx: AIDecisionContext = {
           serviceId: req.serviceId,
           serviceName: req.serviceName,
           category: req.category,
           providedDocs,
           requiredDocs: req.documents.length,
-          attachedFiles: req.attachedFiles.length,
+          attachedFiles: (req.attachedFiles || []).length,
           citizenNIN: req.citizenNIN,
           motif: req.motif,
           hasPriority: false,
@@ -1841,7 +1842,7 @@ export const useAIAgentStore = create<AIAgentState>()(
           }
         }
 
-        const providedDocs = req.attachedFiles.filter(f => f.category === 'justificatif').length
+        const providedDocs = (req.attachedFiles || []).filter(f => f.category === 'justificatif').length
         const docRatio = rule.requiredDocuments.length > 0
           ? Math.min(providedDocs / rule.requiredDocuments.length, 1)
           : 1

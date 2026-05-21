@@ -258,7 +258,7 @@ export const useServiceWorkflowsStore = create<ServiceWorkflowsState>()(
       // Determine required documents from the request's documents array
       // (which was populated from the service config at creation time)
       const requiredDocs = request.documents || []
-      const attachedFileNames = request.attachedFiles.map((f) =>
+      const attachedFileNames = (request.attachedFiles || []).map((f) =>
         f.name.replace(/\.pdf$/i, '').replace(/_/g, ' ').toLowerCase()
       )
 

@@ -85,8 +85,8 @@ CATÉGORIE : ${request.category}
   PIÈCES JUSTIFICATIVES FOURNIES
 ───────────────────────────────────────────────────────────────────────────────
 
-${request.attachedFiles.length > 0
-    ? request.attachedFiles.map((f, i) => `  ${i + 1}. ${f.name} (${formatFileSize(f.size)}) — ${f.category === 'justificatif' ? 'Justificatif' : f.category === 'complement' ? 'Complément' : 'Document'} — Téléversé le ${new Date(f.uploadedAt).toLocaleDateString('fr-FR')}`).join('\n')
+${(request.attachedFiles || []).length > 0
+    ? (request.attachedFiles || []).map((f, i) => `  ${i + 1}. ${f.name} (${formatFileSize(f.size)}) — ${f.category === 'justificatif' ? 'Justificatif' : f.category === 'complement' ? 'Complément' : 'Document'} — Téléversé le ${new Date(f.uploadedAt).toLocaleDateString('fr-FR')}`).join('\n')
     : '  Aucune pièce justificative fournie'
   }
 
@@ -191,7 +191,7 @@ Statut      : ${STATUS_CONFIG_LABELS[request.status]}
  */
 export function downloadProducedDocument(request: CitizenRequest) {
   const content = generateProducedDocumentContent(request)
-  const fileName = request.producedDocument?.name || `${request.serviceName.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '_')}_${request.citizenName}_${request.citizenFirstName}.pdf`
+  const fileName = request.generatedDocument?.fileName || `${request.serviceName.replace(/[^a-zA-ZÀ-ÿ0-9]/g, '_')}_${request.citizenName}_${request.citizenFirstName}.pdf`
   triggerDownload(fileName, content)
 }
 

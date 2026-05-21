@@ -249,6 +249,7 @@ export function PublicCitizenPortal() {
       citizenAddress: form.citizenAddress,
       motif: form.motif || `Demande de ${selectedService.name}`,
       documents: selectedService.requiredDocs,
+      uploadedDocuments: [],
       createdAt: new Date().toISOString(),
       deliveryMode: form.deliveryMode,
     })
@@ -950,6 +951,3 @@ export function PublicCitizenPortal() {
     </div>
   )
 }
-
-// Import the type from the store
-import type { CitizenRequest } from '@/store/citizen-requests-store'

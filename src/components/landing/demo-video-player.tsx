@@ -118,11 +118,11 @@ const scenes = [
 function SceneMockup({ type, active }: { type: string; active: boolean }) {
   if (!active) return null
 
-  const fadeProps = {
+  const fadeProps: Record<string, unknown> = {
     initial: { opacity: 0, scale: 0.95 },
     animate: { opacity: 1, scale: 1 },
     exit: { opacity: 0, scale: 0.95 },
-    transition: { duration: 0.6, ease: 'easeOut' },
+    transition: { duration: 0.6, ease: 'easeOut' as const },
   }
 
   switch (type) {

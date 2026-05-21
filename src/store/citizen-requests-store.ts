@@ -31,6 +31,26 @@ export interface SatisfactionRating {
   ratedAt: string
 }
 
+// ─── AI Processing Detail ────────────────────────────────────────────────────
+export interface AIPProcessingDetail {
+  step: string
+  status: 'success' | 'warning' | 'error' | 'info'
+  message: string
+  timestamp: string
+  duration?: number  // ms
+}
+
+// ─── Attached File (for AI agent processing) ─────────────────────────────────
+export interface AttachedFile {
+  id: string
+  name: string
+  size: number
+  type: string
+  category: 'justificatif' | 'complement' | 'photo' | 'autre'
+  uploadedAt: string
+  verified: boolean
+}
+
 export interface CitizenRequest {
   id: string
   reference: string
@@ -67,6 +87,12 @@ export interface CitizenRequest {
   deliveryMode: 'en_ligne' | 'guichet' | 'courrier'
   deliveryLocation?: string
   documentUrl?: string
+  // IA
+  aiProcessingStatus?: 'none' | 'ai_pending' | 'ai_processing' | 'ai_completed' | 'ai_failed' | 'ai_auto_validated' | 'ai_auto_rejected' | 'ai_assisted'
+  aiConfidence?: number
+  aiProcessingDate?: string
+  aiProcessingDetails?: AIPProcessingDetail[]
+  attachedFiles?: AttachedFile[]
 }
 
 export interface ProcessingNote {
@@ -567,6 +593,10 @@ interface CitizenRequestsState {
   setGeneratedDocument: (id: string, doc: GeneratedDocument) => void
   rateRequest: (id: string, rating: SatisfactionRating) => void
   resetToDemoData: () => void
+  // AI Agent methods
+  aiAutoProcess: (id: string) => void
+  aiAutoProcessAll: () => void
+  updateRequestAIFields: (id: string, fields: Partial<Pick<CitizenRequest, 'aiProcessingStatus' | 'aiConfidence' | 'aiProcessingDate' | 'aiProcessingDetails' | 'status' | 'assignedAgent' | 'processingNotes' | 'timeline' | 'updatedAt'>>) => void
 }
 
 export const useCitizenRequestsStore = create<CitizenRequestsState>()(
@@ -788,6 +818,89 @@ export const useCitizenRequestsStore = create<CitizenRequestsState>()(
         set({ requests: DEMO_REQUESTS })
       },
 
+      // AI Agent: Auto-process a single request with simulated AI decision
+      aiAutoProcess: (id) => {
+        const req = get().requests.find(r => r.id === id)
+        if (!req) return
+
+        // Simple simulated AI logic: if documents are complete, validate; otherwise request more info
+        const uploadedCount = req.uploadedDocuments?.length ?? 0
+        const requiredCount = req.documents?.length ?? 0
+        const verifiedCount = (req.uploadedDocuments ?? []).filter(d => d.verified).length
+
+        let aiStatus: CitizenRequest['aiProcessingStatus']
+        let newStatus: RequestStatus = req.status
+        const now = new Date().toISOString()
+        const confidence = Math.min(95, 50 + (verifiedCount * 15) + (uploadedCount >= requiredCount ? 20 : 0))
+
+        if (uploadedCount >= requiredCount && verifiedCount >= requiredCount) {
+          // All docs uploaded and verified -> auto validate
+          aiStatus = 'ai_auto_validated'
+          newStatus = 'validee'
+        } else if (uploadedCount >= requiredCount && verifiedCount < requiredCount) {
+          // Docs uploaded but not all verified -> assisted
+          aiStatus = 'ai_assisted'
+        } else if (uploadedCount === 0) {
+          // No docs -> auto reject
+          aiStatus = 'ai_auto_rejected'
+          newStatus = 'rejetee'
+        } else {
+          // Some docs -> assisted
+          aiStatus = 'ai_assisted'
+        }
+
+        const details: AIPProcessingDetail[] = [
+          { step: 'Vérification IA', status: 'success', message: `Analyse des documents: ${uploadedCount}/${requiredCount} chargés, ${verifiedCount} vérifiés`, timestamp: now, duration: 150 },
+          { step: 'Décision IA', status: aiStatus === 'ai_auto_validated' ? 'success' : aiStatus === 'ai_auto_rejected' ? 'error' : 'warning', message: `Confiance: ${confidence}%. ${aiStatus === 'ai_auto_validated' ? 'Validation automatique' : aiStatus === 'ai_auto_rejected' ? 'Rejet: documents manquants' : 'Escalade: vérification humaine requise'}`, timestamp: now, duration: 200 },
+        ]
+
+        const aiNote: ProcessingNote = {
+          id: `note-ai-${Date.now()}`,
+          author: 'Agent IA',
+          authorRole: 'IA',
+          text: `Traitement IA automatique: Confiance ${confidence}%. ${aiStatus === 'ai_auto_validated' ? 'Demande validée automatiquement.' : aiStatus === 'ai_auto_rejected' ? 'Rejetée: pièces justificatives manquantes.' : 'Escalade vers agent humain pour vérification.'}`,
+          date: now,
+          type: 'decision',
+        }
+
+        set((state) => ({
+          requests: state.requests.map(r =>
+            r.id === id
+              ? {
+                  ...r,
+                  status: newStatus,
+                  aiProcessingStatus: aiStatus,
+                  aiConfidence: confidence,
+                  aiProcessingDate: now,
+                  aiProcessingDetails: details,
+                  assignedAgent: r.assignedAgent || 'Agent IA',
+                  processingNotes: [...r.processingNotes, aiNote],
+                  updatedAt: now,
+                }
+              : r
+          ),
+        }))
+      },
+
+      // AI Agent: Auto-process all pending requests
+      aiAutoProcessAll: () => {
+        const pendingRequests = get().requests.filter(
+          r => r.status === 'soumise' && (!r.aiProcessingStatus || r.aiProcessingStatus === 'none' || r.aiProcessingStatus === 'ai_pending')
+        )
+        pendingRequests.forEach(r => get().aiAutoProcess(r.id))
+      },
+
+      // Update AI fields on a request (used by ai-agent-store for real AI processing)
+      updateRequestAIFields: (id, fields) => {
+        set((state) => ({
+          requests: state.requests.map(r =>
+            r.id === id
+              ? { ...r, ...fields, updatedAt: fields.updatedAt || new Date().toISOString() }
+              : r
+          ),
+        }))
+      },
+
       getRequestById: (id) => get().requests.find(r => r.id === id),
       getRequestByReference: (ref) => get().requests.find(r => r.reference === ref || r.reference.includes(ref)),
       getRequestsByCategory: (categoryId) => get().requests.filter(r => r.categoryId === categoryId),
@@ -795,9 +908,9 @@ export const useCitizenRequestsStore = create<CitizenRequestsState>()(
     }),
     {
       name: 'citizen-requests-storage',
-      version: 6,
+      version: 7,
       migrate: (persistedState: any, version: number) => {
-        if (version < 6) {
+        if (version < 7) {
           return { requests: DEMO_REQUESTS }
         }
         return persistedState

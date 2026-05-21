@@ -782,7 +782,7 @@ export function AIAgentPage() {
                           <span>•</span>
                           <span>{req.documents.length} doc(s) requis</span>
                           <span>•</span>
-                          <span>{req.attachedFiles.length} fichier(s) joint(s)</span>
+                          <span>{(req.attachedFiles || []).length} fichier(s) joint(s)</span>
                         </div>
                       </div>
                       <Button
