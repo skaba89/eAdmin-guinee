@@ -142,3 +142,28 @@ Stage Summary:
 - Zero remaining occurrences of "eAdministration Suite" or "eAdmin Suite" in src/
 - All references now use "eAdmin Guinée"
 - Build verified successfully
+
+---
+Task ID: 1-2-3-5
+Agent: Main Agent
+Task: Fix citizen portal issues, clean up dead code, resolve z-index conflicts
+
+Work Log:
+- Fixed "demande en cours" counter: now shows only active requests (excludes livree/rejetee)
+- Updated stats labels: "Demandes soumises" → "En attente", "En traitement" now includes validee status
+- Fixed citizen portal fallback: if no user, show no requests (was showing ALL requests)
+- Added copy-to-clipboard button for tracking references in request cards
+- Deleted dead AI chatbot widget: /src/components/layout/ai-chatbot-widget.tsx
+- Deleted backup files: page.tsx.bak, page-full.tsx
+- Fixed z-index conflicts: moved all page floating buttons from right-6 z-50 to right-24 z-40
+- Fixed Next.js config: removed invalid devIndicator key (not supported in Next.js 16.1.3)
+- CSS overrides for Next.js dev indicator remain in globals.css
+- Build verified: compiles successfully
+
+Stage Summary:
+- Citizen portal now correctly shows only active requests in "demande en cours" badge
+- No data leakage when user is null
+- Copy-to-clipboard feature for tracking numbers added
+- All z-index conflicts resolved (chatbot z-50 at right-6, page buttons z-40 at right-24)
+- Dead code cleaned up (1 widget file, 2 backup files)
+- RLS system verified as already working correctly for all roles

@@ -384,7 +384,7 @@ export function SignaturesPage() {
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 50 }}
-            className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 rounded-lg bg-emerald-600 text-white shadow-lg"
+            className="fixed bottom-6 right-24 z-40 flex items-center gap-2 px-4 py-3 rounded-lg bg-emerald-600 text-white shadow-lg"
             onAnimationComplete={() => {
               setTimeout(() => setSuccessToast(''), 4000)
             }}

@@ -747,7 +747,7 @@ export default function AnalyticsPage() {
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 50 }}
-            className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-emerald-600 text-white px-4 py-3 rounded-xl shadow-lg"
+            className="fixed bottom-6 right-24 z-40 flex items-center gap-2 bg-emerald-600 text-white px-4 py-3 rounded-xl shadow-lg"
           >
             <CheckCircle2 className="h-5 w-5" />
             <span className="text-sm font-medium">{successToast}</span>

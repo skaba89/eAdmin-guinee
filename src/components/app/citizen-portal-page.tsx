@@ -371,12 +371,13 @@ export function CitizenPortalPage() {
         r.citizenNIN === user.nin ||
         r.citizenPhone === user.phone
       )
-    : requests
+    : []
 
-  // Stats from actual user requests
+  // Stats from actual user requests (only active requests in 'demande en cours' count)
+  const activeRequestsCount = myRequests.filter(r => !['livree', 'rejetee'].includes(r.status)).length
   const myStats = [
-    { label: 'Demandes soumises', value: myRequests.filter(r => r.status === 'soumise').length, icon: Send, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-900/20', gradientBg: 'bg-gradient-to-br from-sky-100 to-sky-50 dark:from-sky-900/30 dark:to-sky-800/10' },
-    { label: 'En traitement', value: myRequests.filter(r => ['en_cours', 'pieces_complementaires'].includes(r.status)).length, icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20', gradientBg: 'bg-gradient-to-br from-amber-100 to-amber-50 dark:from-amber-900/30 dark:to-amber-800/10' },
+    { label: 'En attente', value: myRequests.filter(r => r.status === 'soumise').length, icon: Send, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-900/20', gradientBg: 'bg-gradient-to-br from-sky-100 to-sky-50 dark:from-sky-900/30 dark:to-sky-800/10' },
+    { label: 'En traitement', value: myRequests.filter(r => ['en_cours', 'pieces_complementaires', 'validee'].includes(r.status)).length, icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20', gradientBg: 'bg-gradient-to-br from-amber-100 to-amber-50 dark:from-amber-900/30 dark:to-amber-800/10' },
     { label: 'Documents prêts', value: myRequests.filter(r => r.status === 'prete').length, icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20', gradientBg: 'bg-gradient-to-br from-emerald-100 to-emerald-50 dark:from-emerald-900/30 dark:to-emerald-800/10' },
     { label: 'Livrées', value: myRequests.filter(r => r.status === 'livree').length, icon: Download, color: 'text-[#0B2E58] dark:text-[#3B7DD8]', bg: 'bg-[#0B2E58]/5 dark:bg-[#3B7DD8]/10', gradientBg: 'bg-gradient-to-br from-[#0B2E58]/10 to-[#3B7DD8]/5 dark:from-[#3B7DD8]/20 dark:to-[#0B2E58]/10' },
   ]
@@ -455,7 +456,7 @@ export function CitizenPortalPage() {
                 </Badge>
                 <Badge className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs gap-1.5 backdrop-blur-sm">
                   <CheckCircle2 className="size-3" />
-                  {myRequests.length} demande(s) en cours
+                  {activeRequestsCount} demande(s) en cours
                 </Badge>
               </div>
             </div>
@@ -689,7 +690,22 @@ export function CitizenPortalPage() {
                                 </div>
                                 <div>
                                   <p className="font-semibold text-sm">{req.serviceName}</p>
-                                  <p className="text-xs text-muted-foreground font-mono tracking-wide">{req.reference}</p>
+                                  <div className="flex items-center gap-1.5">
+                                    <p className="text-xs text-muted-foreground font-mono tracking-wide">{req.reference}</p>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-5 w-5 p-0 opacity-60 hover:opacity-100"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        navigator.clipboard.writeText(req.reference)
+                                        setSuccessToast(`Référence ${req.reference} copiée !`)
+                                      }}
+                                      title="Copier la référence"
+                                    >
+                                      <Hash className="size-3" />
+                                    </Button>
+                                  </div>
                                 </div>
                               </div>
                               <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium backdrop-blur-sm border border-white/10 dark:border-white/5 ${sConfig.color}`}>
