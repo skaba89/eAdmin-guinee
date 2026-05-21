@@ -186,11 +186,17 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  /* Hide Next.js dev indicator */
+  /* Hide Next.js dev indicator - comprehensive selectors for Next.js 16 */
   [data-nextjs-dialog-overlay],
   [data-nextjs-toast],
-  nextjs-portal {
+  nextjs-portal,
+  [data-nextjs-toast-errors-parent],
+  [nextjs-portal],
+  [data-nextjs-developer-indicator] {
     display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
   }
 }
 
