@@ -81,6 +81,9 @@ export interface CitizenRequest {
   createdAt: string
   updatedAt: string
   completedAt?: string
+  // Délai légal
+  deadlineDays: number  // 30-45 business days based on service category
+  deadlineDate: string  // ISO date when the request expires (computed at creation)
   // Mairie
   mairie?: string  // Specific mairie name (e.g., "Mairie de Kaloum") for etat-civil/residence requests
   // Livraison
@@ -109,6 +112,60 @@ export interface TimelineStep {
   status: 'completed' | 'current' | 'pending'
   date?: string
   agent?: string
+}
+
+// ─── LEGAL DEADLINE HELPERS ──────────────────────────────────────────────────
+
+/** Add business days to a start date (exclude Saturday & Sunday — Guinea work week Mon-Fri) */
+export function addBusinessDays(startDate: Date, days: number): Date {
+  let date = new Date(startDate)
+  let addedDays = 0
+  while (addedDays < days) {
+    date.setDate(date.getDate() + 1)
+    const dayOfWeek = date.getDay()
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Not Sunday (0) or Saturday (6)
+      addedDays++
+    }
+  }
+  return date
+}
+
+/** Get legal deadline (in business days) per service category */
+export function getDeadlineDays(categoryId: string): number {
+  // Legal deadlines per category (business days)
+  const deadlines: Record<string, number> = {
+    'etat-civil': 30,
+    'justice': 45,
+    'identification': 45,
+    'urbanisme': 45,
+    'entreprise': 30,
+    'education': 30,
+    'sante': 30,
+    'residence': 30,
+  }
+  return deadlines[categoryId] || 45 // Default to max 45 business days
+}
+
+/** Compute whether a request's legal deadline has been exceeded */
+export function isDeadlineExceeded(req: CitizenRequest): boolean {
+  if (req.status === 'livree' || req.status === 'rejetee') return false
+  return new Date(req.deadlineDate) < new Date()
+}
+
+/** Check if a request is approaching its deadline (within 5 business days) */
+export function isDeadlineApproaching(req: CitizenRequest): boolean {
+  if (req.status === 'livree' || req.status === 'rejetee') return false
+  const deadline = new Date(req.deadlineDate)
+  const now = new Date()
+  // Count business days remaining
+  let remaining = 0
+  let d = new Date(now)
+  while (d < deadline) {
+    const dayOfWeek = d.getDay()
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) remaining++
+    d.setDate(d.getDate() + 1)
+  }
+  return remaining > 0 && remaining <= 5
 }
 
 const SERVICE_ENTITY_MAP: Record<string, string> = {
@@ -193,6 +250,8 @@ const DEMO_REQUESTS: CitizenRequest[] = [
     ],
     createdAt: daysAgo(3),
     updatedAt: daysAgo(1),
+    deadlineDays: 30,
+    deadlineDate: addBusinessDays(new Date(now.getTime() - 3 * 86400000), 30).toISOString(),
     deliveryMode: 'guichet',
     deliveryLocation: 'Mairie de Kaloum',
   },
@@ -230,6 +289,8 @@ const DEMO_REQUESTS: CitizenRequest[] = [
     ],
     createdAt: daysAgo(7),
     updatedAt: daysAgo(2),
+    deadlineDays: 45,
+    deadlineDate: addBusinessDays(new Date(now.getTime() - 7 * 86400000), 45).toISOString(),
     deliveryMode: 'guichet',
     deliveryLocation: 'Centre ANIP de Conakry',
   },
@@ -265,6 +326,8 @@ const DEMO_REQUESTS: CitizenRequest[] = [
     ],
     createdAt: hoursAgo(4),
     updatedAt: hoursAgo(4),
+    deadlineDays: 45,
+    deadlineDate: addBusinessDays(new Date(now.getTime() - 4 * 3600000), 45).toISOString(),
     deliveryMode: 'en_ligne',
   },
   {
@@ -302,6 +365,8 @@ const DEMO_REQUESTS: CitizenRequest[] = [
     ],
     createdAt: daysAgo(10),
     updatedAt: daysAgo(1),
+    deadlineDays: 30,
+    deadlineDate: addBusinessDays(new Date(now.getTime() - 10 * 86400000), 30).toISOString(),
     deliveryMode: 'guichet',
     deliveryLocation: 'Guichet APIP, Conakry',
   },
@@ -339,6 +404,8 @@ const DEMO_REQUESTS: CitizenRequest[] = [
     ],
     createdAt: daysAgo(5),
     updatedAt: daysAgo(3),
+    deadlineDays: 30,
+    deadlineDate: addBusinessDays(new Date(now.getTime() - 5 * 86400000), 30).toISOString(),
     deliveryMode: 'courrier',
   },
   {
@@ -501,6 +568,8 @@ const DEMO_REQUESTS: CitizenRequest[] = [
     createdAt: daysAgo(15),
     updatedAt: daysAgo(5),
     completedAt: daysAgo(5),
+    deadlineDays: 45,
+    deadlineDate: addBusinessDays(new Date(now.getTime() - 15 * 86400000), 45).toISOString(),
     deliveryMode: 'guichet',
     deliveryLocation: 'Guichet ANIP, Conakry',
   },
@@ -537,6 +606,8 @@ const DEMO_REQUESTS: CitizenRequest[] = [
     ],
     createdAt: daysAgo(6),
     updatedAt: daysAgo(4),
+    deadlineDays: 30,
+    deadlineDate: addBusinessDays(new Date(now.getTime() - 6 * 86400000), 30).toISOString(),
     deliveryMode: 'guichet',
   },
   {
@@ -571,13 +642,15 @@ const DEMO_REQUESTS: CitizenRequest[] = [
     ],
     createdAt: hoursAgo(2),
     updatedAt: hoursAgo(2),
+    deadlineDays: 30,
+    deadlineDate: addBusinessDays(new Date(now.getTime() - 2 * 3600000), 30).toISOString(),
     deliveryMode: 'en_ligne',
   },
 ]
 
 interface CitizenRequestsState {
   requests: CitizenRequest[]
-  addRequest: (req: Omit<CitizenRequest, 'id' | 'reference' | 'status' | 'timeline' | 'processingNotes' | 'updatedAt' | 'assignedService' | 'assignedAgent'>) => CitizenRequest
+  addRequest: (req: Omit<CitizenRequest, 'id' | 'reference' | 'status' | 'timeline' | 'processingNotes' | 'updatedAt' | 'assignedService' | 'assignedAgent' | 'deadlineDays' | 'deadlineDate'>) => CitizenRequest
   updateRequestStatus: (id: string, status: RequestStatus, note?: string) => void
   addProcessingNote: (id: string, note: Omit<ProcessingNote, 'id' | 'date'>) => void
   advanceTimeline: (id: string) => void
@@ -593,6 +666,8 @@ interface CitizenRequestsState {
   setGeneratedDocument: (id: string, doc: GeneratedDocument) => void
   rateRequest: (id: string, rating: SatisfactionRating) => void
   resetToDemoData: () => void
+  // Legal deadline
+  checkAndRejectExpiredRequests: () => void
   // AI Agent methods
   aiAutoProcess: (id: string) => void
   aiAutoProcessAll: () => void
@@ -621,6 +696,10 @@ export const useCitizenRequestsStore = create<CitizenRequestsState>()(
           }
         }
 
+        // Compute legal deadline
+        const deadlineDays = getDeadlineDays(req.categoryId)
+        const deadlineDate = addBusinessDays(new Date(nowIso), deadlineDays).toISOString()
+
         const newRequest: CitizenRequest = {
           ...req,
           mairie,
@@ -629,12 +708,14 @@ export const useCitizenRequestsStore = create<CitizenRequestsState>()(
           status: 'soumise',
           assignedService,
           assignedAgent: '',
+          deadlineDays,
+          deadlineDate,
           timeline: generateTimeline(req.categoryId),
           processingNotes: [{
             id: `note-${Date.now()}`,
             author: 'Système',
             authorRole: 'Automate',
-            text: `Demande soumise avec succès. Référence: ${reference}. Service compétent: ${assignedService}`,
+            text: `Demande soumise avec succès. Référence: ${reference}. Service compétent: ${assignedService}. Délai légal : ${deadlineDays} jours ouvrés.`,
             date: nowIso,
             type: 'notification',
           }],
@@ -824,6 +905,67 @@ export const useCitizenRequestsStore = create<CitizenRequestsState>()(
         set({ requests: DEMO_REQUESTS })
       },
 
+      // ── Check and auto-reject requests that exceeded legal deadline ──────
+      checkAndRejectExpiredRequests: () => {
+        const nowIso = new Date().toISOString()
+        let rejectedCount = 0
+
+        set((state) => ({
+          requests: state.requests.map(r => {
+            // Only reject if deadline exceeded and not already completed/rejected
+            if (r.status === 'livree' || r.status === 'rejetee') return r
+            if (!isDeadlineExceeded(r)) return r
+
+            rejectedCount++
+            const deadlineDateStr = new Date(r.deadlineDate).toLocaleDateString('fr-FR')
+
+            return {
+              ...r,
+              status: 'rejetee' as const,
+              completedAt: nowIso,
+              updatedAt: nowIso,
+              processingNotes: [...r.processingNotes, {
+                id: `note-deadline-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                author: 'Système',
+                authorRole: 'Automate',
+                text: `Demande rejetée automatiquement : délai légal de ${r.deadlineDays} jours ouvrés dépassé. Date limite : ${deadlineDateStr}.`,
+                date: nowIso,
+                type: 'decision' as const,
+              }],
+            }
+          }),
+        }))
+
+        // Send notifications for each rejected request
+        if (rejectedCount > 0) {
+          try {
+            // Direct import (no circular dependency at runtime since store is already initialized)
+            const { useNotificationsStore } = require('@/store/notifications-store')
+            const notifStore = useNotificationsStore.getState()
+            const rejectedRequests = get().requests.filter(r =>
+              r.status === 'rejetee' &&
+              r.processingNotes.some(n =>
+                n.authorRole === 'Automate' && n.text.includes('délai légal') && n.date === nowIso
+              )
+            )
+            for (const r of rejectedRequests) {
+              const deadlineDateStr = new Date(r.deadlineDate).toLocaleDateString('fr-FR')
+              notifStore.addNotification({
+                title: 'Demande rejetée — Délai dépassé',
+                message: `Votre demande ${r.reference} (${r.serviceName}) a été rejetée automatiquement. Le délai légal de ${r.deadlineDays} jours ouvrés a été dépassé. Date limite : ${deadlineDateStr}.`,
+                type: 'error',
+                category: 'demande',
+                priority: 'haute',
+                link: '/citizen-portal',
+                relatedId: r.id,
+              })
+            }
+          } catch {
+            // Notification store may not be available during SSR
+          }
+        }
+      },
+
       // AI Agent: Auto-process a single request with simulated AI decision
       aiAutoProcess: (id) => {
         const req = get().requests.find(r => r.id === id)
@@ -914,8 +1056,11 @@ export const useCitizenRequestsStore = create<CitizenRequestsState>()(
     }),
     {
       name: 'citizen-requests-storage',
-      version: 7,
+      version: 8,
       migrate: (persistedState: any, version: number) => {
+        if (version < 8) {
+          return { requests: DEMO_REQUESTS }
+        }
         if (version < 7) {
           return { requests: DEMO_REQUESTS }
         }

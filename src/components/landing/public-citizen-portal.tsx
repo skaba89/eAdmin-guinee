@@ -145,7 +145,7 @@ const STATS_BANNER = [
   { value: '124 500', label: 'citoyens inscrits', icon: Users },
   { value: '8 730', label: 'demandes traitées', icon: CheckCircle2 },
   { value: '94%', label: 'taux de satisfaction', icon: Heart },
-  { value: '48h', label: 'délai moyen', icon: Clock },
+  { value: '30-45j', label: 'délai légal (jours ouvrés)', icon: Clock },
 ]
 
 const containerVariants = {
@@ -461,7 +461,7 @@ export function PublicCitizenPortal() {
                             <div className="flex items-center justify-between text-xs mb-3">
                               <span className="text-muted-foreground flex items-center gap-1">
                                 <Clock className="h-3 w-3" />
-                                Délai: {service.delay}
+                                Délai estimé: {service.delay} • Légal: 30-45j ouvrés
                               </span>
                               <span className="font-semibold text-[#0B2E58] dark:text-[#3B7DD8]">{service.price}</span>
                             </div>

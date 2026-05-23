@@ -29,7 +29,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
-import { useCitizenRequestsStore, type CitizenRequest, type RequestStatus, type UploadedDocument, type GeneratedDocument } from '@/store/citizen-requests-store'
+import { useCitizenRequestsStore, type CitizenRequest, type RequestStatus, type UploadedDocument, type GeneratedDocument, getDeadlineDays, isDeadlineExceeded, isDeadlineApproaching } from '@/store/citizen-requests-store'
 import { formatFileSize, getFileTypeIcon, downloadUploadedFile, downloadCitizenDocument, createGeneratedDocument, downloadGeneratedDocument, ACCEPTED_FILE_TYPES, processFile } from '@/lib/document-utils'
 import { filterRequestsByRLS, canProcessRequest, getRLSScopeDescription } from '@/lib/rbac'
 import { useAppStore } from '@/store/app-store'
@@ -58,6 +58,7 @@ export function ServiceRequestsPage() {
   const {
     requests, updateRequestStatus, addProcessingNote, advanceTimeline,
     assignRequest, completeRequest, verifyDocument, setGeneratedDocument, addUploadedDocument,
+    checkAndRejectExpiredRequests,
   } = useCitizenRequestsStore()
 
   const user = useAppStore((s) => s.user)
@@ -86,6 +87,11 @@ export function ServiceRequestsPage() {
       return () => clearTimeout(timer)
     }
   }, [successToast])
+
+  // Check for expired requests on mount
+  useEffect(() => {
+    checkAndRejectExpiredRequests()
+  }, [checkAndRejectExpiredRequests])
 
   // Apply RLS filtering first
   const rlsFilteredRequests = filterRequestsByRLS(requests, user)
@@ -718,6 +724,72 @@ export function ServiceRequestsPage() {
                     )}
                   </div>
 
+                  {/* Legal deadline section */}
+                  <div className={`p-3 rounded-lg border ${
+                    isDeadlineExceeded(selectedRequest)
+                      ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/40'
+                      : isDeadlineApproaching(selectedRequest)
+                        ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/40'
+                        : 'bg-muted/30 border-muted'
+                  }`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Clock className={`size-4 ${
+                          isDeadlineExceeded(selectedRequest) ? 'text-red-600 dark:text-red-400' :
+                          isDeadlineApproaching(selectedRequest) ? 'text-amber-600 dark:text-amber-400' :
+                          'text-[#0B2E58] dark:text-[#3B7DD8]'
+                        }`} />
+                        <span className="text-xs font-semibold">Délai légal</span>
+                      </div>
+                      {isDeadlineExceeded(selectedRequest) && (
+                        <Badge className="text-[9px] bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-0 gap-0.5 px-1.5">
+                          ⚠ Dépassé
+                        </Badge>
+                      )}
+                      {isDeadlineApproaching(selectedRequest) && !isDeadlineExceeded(selectedRequest) && (
+                        <Badge className="text-[9px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-0 gap-0.5 px-1.5">
+                          Approche
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <p className="text-muted-foreground">Délai</p>
+                        <p className="font-semibold">{selectedRequest.deadlineDays} jours ouvrés</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Date limite</p>
+                        <p className={`font-semibold ${
+                          isDeadlineExceeded(selectedRequest) ? 'text-red-600 dark:text-red-400' : ''
+                        }`}>{new Date(selectedRequest.deadlineDate).toLocaleDateString('fr-FR')}</p>
+                      </div>
+                    </div>
+                    {isDeadlineExceeded(selectedRequest) && (
+                      <div className="mt-2 p-2 rounded-md bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700/50">
+                        <p className="text-[10px] text-red-700 dark:text-red-400 font-semibold">
+                          ⚠ Le délai légal a été dépassé. Le système rejettera automatiquement cette demande.
+                        </p>
+                      </div>
+                    )}
+                    {isDeadlineApproaching(selectedRequest) && !isDeadlineExceeded(selectedRequest) && (
+                      <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1 font-medium">
+                        ⚠ La date limite approche. Merci de traiter cette demande en priorité.
+                      </p>
+                    )}
+                    {/* Show rejection reason for deadline-exceeded rejections */}
+                    {selectedRequest.status === 'rejetee' && selectedRequest.processingNotes.some(n => n.authorRole === 'Automate' && n.text.includes('délai légal')) && (
+                      <div className="mt-2 p-2 rounded-md bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700/50">
+                        <div className="flex items-center gap-1 mb-0.5">
+                          <XCircle className="size-3 text-red-600 dark:text-red-400" />
+                          <span className="text-[10px] font-semibold text-red-700 dark:text-red-400">Rejet automatique</span>
+                        </div>
+                        <p className="text-[10px] text-red-600 dark:text-red-400">
+                          {selectedRequest.processingNotes.find(n => n.authorRole === 'Automate' && n.text.includes('délai légal'))?.text}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Timeline */}
                   <div>
                     <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Avancement</h4>
@@ -770,6 +842,13 @@ export function ServiceRequestsPage() {
 
                   {/* Action buttons */}
                   <div className="divider-premium" />
+                  <div className="flex flex-wrap gap-2">
+                    {/* Check deadline button */}
+                    <Button size="sm" variant="outline" className="gap-1 w-full" onClick={() => { checkAndRejectExpiredRequests(); setSuccessToast('Vérification des délais effectuée'); refreshSelected(selectedRequest.id) }}>
+                      <Clock className="size-3.5" />
+                      Vérifier les délais légaux
+                    </Button>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {selectedRequest.status === 'soumise' && (
                       <Button size="sm" className="btn-premium flex-1 gap-1" onClick={() => handleTakeCharge(selectedRequest)}>

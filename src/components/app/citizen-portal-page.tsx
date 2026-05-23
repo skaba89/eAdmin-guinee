@@ -28,7 +28,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
 } from '@/components/ui/dialog'
 import { useAppStore } from '@/store/app-store'
-import { useCitizenRequestsStore, type CitizenRequest, type RequestStatus, type UploadedDocument, type GeneratedDocument, type SatisfactionRating } from '@/store/citizen-requests-store'
+import { useCitizenRequestsStore, type CitizenRequest, type RequestStatus, type UploadedDocument, type GeneratedDocument, type SatisfactionRating, getDeadlineDays, isDeadlineExceeded, isDeadlineApproaching } from '@/store/citizen-requests-store'
 import { processFile, formatFileSize, getFileTypeIcon, downloadUploadedFile, downloadCitizenDocument, ACCEPTED_FILE_TYPES, MAX_FILE_SIZE, createGeneratedDocument } from '@/lib/document-utils'
 
 // ─── GUINEA BRAND COLORS ─────────────────────────────────────────────────────
@@ -171,7 +171,7 @@ const itemVariants = {
 export function CitizenPortalPage() {
   const navigate = useAppStore((s) => s.navigate)
   const user = useAppStore((s) => s.user)
-  const { requests, addRequest, getRequestByReference, rateRequest } = useCitizenRequestsStore()
+  const { requests, addRequest, getRequestByReference, rateRequest, checkAndRejectExpiredRequests } = useCitizenRequestsStore()
   const [activeTab, setActiveTab] = useState('mes-demandes')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
@@ -223,6 +223,11 @@ export function CitizenPortalPage() {
       return () => clearTimeout(timer)
     }
   }, [successToast])
+
+  // Check for expired requests on mount
+  useEffect(() => {
+    checkAndRejectExpiredRequests()
+  }, [checkAndRejectExpiredRequests])
 
   const handleOpenRequestDialog = (service: ServiceItem, category: ServiceCategory) => {
     setSelectedService(service)
@@ -382,32 +387,40 @@ export function CitizenPortalPage() {
     { label: 'Livrées', value: myRequests.filter(r => r.status === 'livree').length, icon: Download, color: 'text-[#0B2E58] dark:text-[#3B7DD8]', bg: 'bg-[#0B2E58]/5 dark:bg-[#3B7DD8]/10', gradientBg: 'bg-gradient-to-br from-[#0B2E58]/10 to-[#3B7DD8]/5 dark:from-[#3B7DD8]/20 dark:to-[#0B2E58]/10' },
   ]
 
-  // Calculate estimated delivery date based on service SLA
+  // Calculate estimated delivery date based on legal deadline
   const getServiceSLA = (categoryId: string): number => {
-    const slaDays: Record<string, number> = {
-      'etat-civil': 2,
-      'justice': 5,
-      'identification': 7,
-      'urbanisme': 15,
-      'entreprise': 3,
-      'education': 5,
-      'sante': 2,
-      'residence': 1,
-    }
-    return slaDays[categoryId] || 5
+    return getDeadlineDays(categoryId)
   }
 
   const getEstimatedDate = (req: CitizenRequest): Date | null => {
     if (['livree', 'rejetee'].includes(req.status)) return null
-    const sla = getServiceSLA(req.categoryId)
-    return new Date(new Date(req.createdAt).getTime() + sla * 86400000)
+    return new Date(req.deadlineDate)
   }
 
   const getDaysRemaining = (req: CitizenRequest): number | null => {
-    const est = getEstimatedDate(req)
-    if (!est) return null
-    const diff = est.getTime() - Date.now()
-    return Math.ceil(diff / 86400000)
+    if (['livree', 'rejetee'].includes(req.status)) return null
+    const deadline = new Date(req.deadlineDate)
+    const now = Date.now()
+    // Count business days remaining
+    let remaining = 0
+    let d = new Date(now)
+    while (d < deadline) {
+      const dayOfWeek = d.getDay()
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) remaining++
+      d.setDate(d.getDate() + 1)
+    }
+    // If past deadline, return negative business days
+    if (remaining === 0 && now > deadline.getTime()) {
+      let exceeded = 0
+      d = new Date(deadline)
+      while (d < new Date(now)) {
+        const dayOfWeek = d.getDay()
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) exceeded++
+        d.setDate(d.getDate() + 1)
+      }
+      return -exceeded
+    }
+    return remaining
   }
 
   return (
@@ -722,16 +735,24 @@ export function CitizenPortalPage() {
                                 <MapPin className="size-3" />
                                 {req.deliveryMode === 'en_ligne' ? 'Livraison en ligne' : req.deliveryMode === 'guichet' ? 'Retrait au guichet' : 'Envoi par courrier'}
                               </div>
-                              {/* SLA & Estimated delivery date — inspired by Minwon24 (South Korea) */}
+                              {/* SLA & Legal deadline display */}
                               {!['livree', 'rejetee'].includes(req.status) && getDaysRemaining(req) !== null && (
-                                <div className={`flex items-center gap-1 text-xs mt-1 ${getDaysRemaining(req)! < 0 ? 'text-red-600 dark:text-red-400 font-semibold' : getDaysRemaining(req)! <= 1 ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-muted-foreground'}`}>
+                                <div className={`flex items-center gap-1 text-xs mt-1 ${isDeadlineExceeded(req) ? 'text-red-600 dark:text-red-400 font-semibold' : isDeadlineApproaching(req) ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-muted-foreground'}`}>
                                   <Clock className="size-3" />
-                                  {getDaysRemaining(req)! < 0 
-                                    ? `En retard de ${Math.abs(getDaysRemaining(req)!)} jour(s)`
-                                    : getDaysRemaining(req)! === 0 
-                                      ? "Livraison prévue aujourd'hui"
-                                      : `Livraison prévue dans ${getDaysRemaining(req)} jour(s)`
+                                  {isDeadlineExceeded(req)
+                                    ? `Délai légal dépassé de ${Math.abs(getDaysRemaining(req)!)} jour(s) ouvré(s)`
+                                    : isDeadlineApproaching(req)
+                                      ? `Délai légal : ${getDaysRemaining(req)} jour(s) ouvré(s) restant(s) — Approche de la date limite !`
+                                      : `Délai légal : ${getDaysRemaining(req)} jour(s) ouvré(s) restant(s)`
                                   }
+                                </div>
+                              )}
+                              {/* Show rejection reason for deadline-exceeded rejections */}
+                              {req.status === 'rejetee' && req.processingNotes.some(n => n.authorRole === 'Automate' && n.text.includes('délai légal')) && (
+                                <div className="mt-1 p-1.5 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40">
+                                  <p className="text-xs text-red-600 dark:text-red-400 font-medium">
+                                    {req.processingNotes.find(n => n.authorRole === 'Automate' && n.text.includes('délai légal'))?.text}
+                                  </p>
                                 </div>
                               )}
                             </div>
@@ -1506,39 +1527,66 @@ export function CitizenPortalPage() {
                   )}
                 </div>
 
-                {/* SLA Progress — inspired by e-Estonia transparent processing */}
+                {/* SLA Progress — Legal Deadline */}
                 {!['livree', 'rejetee'].includes(selectedRequest.status) && (
-                  <div className="p-3 rounded-lg bg-gradient-to-r from-[#0B2E58]/5 to-[#3B7DD8]/5 dark:from-[#3B7DD8]/10 dark:to-[#0B2E58]/10 border border-[#0B2E58]/10 dark:border-[#3B7DD8]/20">
+                  <div className={`p-3 rounded-lg border ${
+                    isDeadlineExceeded(selectedRequest) 
+                      ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/40' 
+                      : isDeadlineApproaching(selectedRequest)
+                        ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/40'
+                        : 'bg-gradient-to-r from-[#0B2E58]/5 to-[#3B7DD8]/5 dark:from-[#3B7DD8]/10 dark:to-[#0B2E58]/10 border-[#0B2E58]/10 dark:border-[#3B7DD8]/20'
+                  }`}>
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs font-medium text-[#0B2E58] dark:text-[#3B7DD8]">Délai de traitement</span>
+                      <span className="text-xs font-medium text-[#0B2E58] dark:text-[#3B7DD8]">Délai légal</span>
                       <span className="text-xs font-semibold">
-                        {getDaysRemaining(selectedRequest) !== null && getDaysRemaining(selectedRequest)! < 0 
-                          ? <span className="text-red-600">En retard de {Math.abs(getDaysRemaining(selectedRequest)!)}j</span>
-                          : getDaysRemaining(selectedRequest) === 0 
-                            ? <span className="text-amber-600">Livraison prévue aujourd'hui</span>
-                            : <span className="text-emerald-600">{getDaysRemaining(selectedRequest)}j restants</span>
+                        {isDeadlineExceeded(selectedRequest)
+                          ? <span className="text-red-600 dark:text-red-400">⚠ Délai dépassé de {Math.abs(getDaysRemaining(selectedRequest)!)}j ouvré(s)</span>
+                          : isDeadlineApproaching(selectedRequest)
+                            ? <span className="text-amber-600 dark:text-amber-400">{getDaysRemaining(selectedRequest)}j ouvré(s) restants — Approche !</span>
+                            : <span className="text-emerald-600 dark:text-emerald-400">{getDaysRemaining(selectedRequest)}j ouvré(s) restants</span>
                         }
                       </span>
                     </div>
                     <div className="h-2 rounded-full bg-muted/50 overflow-hidden">
                       <div 
                         className={`h-full rounded-full transition-all duration-500 ${
-                          getDaysRemaining(selectedRequest) !== null && getDaysRemaining(selectedRequest)! < 0 
-                            ? 'bg-red-500' 
-                            : 'bg-gradient-to-r from-[#0B2E58] to-[#3B7DD8]'
+                          isDeadlineExceeded(selectedRequest)
+                            ? 'bg-red-500'
+                            : isDeadlineApproaching(selectedRequest)
+                              ? 'bg-amber-500'
+                              : 'bg-gradient-to-r from-[#0B2E58] to-[#3B7DD8]'
                         }`}
                         style={{ 
                           width: `${Math.min(100, Math.max(0, (() => {
-                            const sla = getServiceSLA(selectedRequest.categoryId)
+                            const deadline = selectedRequest.deadlineDays
                             const elapsed = (Date.now() - new Date(selectedRequest.createdAt).getTime()) / 86400000
-                            return (elapsed / sla) * 100
+                            return (elapsed / (deadline * 1.4)) * 100 // 1.4x to show progress proportionally
                           })()))}%` 
                         }}
                       />
                     </div>
                     <p className="text-[10px] text-muted-foreground mt-1">
-                      Délai standard : {getServiceSLA(selectedRequest.categoryId)} jour(s) • Soumis le {new Date(selectedRequest.createdAt).toLocaleDateString('fr-FR')}
-                      {getEstimatedDate(selectedRequest) && ` • Prévu le ${getEstimatedDate(selectedRequest)!.toLocaleDateString('fr-FR')}`}
+                      Délai légal : {selectedRequest.deadlineDays} jours ouvrés • Soumis le {new Date(selectedRequest.createdAt).toLocaleDateString('fr-FR')}
+                      {` • Date limite : ${new Date(selectedRequest.deadlineDate).toLocaleDateString('fr-FR')}`}
+                    </p>
+                    {isDeadlineExceeded(selectedRequest) && (
+                      <div className="mt-2 p-2 rounded-md bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700/50">
+                        <p className="text-xs text-red-700 dark:text-red-400 font-semibold">
+                          ⚠ Le délai légal a été dépassé. Cette demande sera rejetée automatiquement.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {/* Rejection reason for deadline-exceeded */}
+                {selectedRequest.status === 'rejetee' && selectedRequest.processingNotes.some(n => n.authorRole === 'Automate' && n.text.includes('délai légal')) && (
+                  <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40">
+                    <div className="flex items-center gap-2 mb-1">
+                      <XCircle className="size-4 text-red-600 dark:text-red-400" />
+                      <span className="text-xs font-semibold text-red-700 dark:text-red-400">Demande rejetée — Délai légal dépassé</span>
+                    </div>
+                    <p className="text-xs text-red-600 dark:text-red-400 ml-6">
+                      {selectedRequest.processingNotes.find(n => n.authorRole === 'Automate' && n.text.includes('délai légal'))?.text}
                     </p>
                   </div>
                 )}

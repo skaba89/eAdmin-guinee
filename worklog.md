@@ -224,3 +224,46 @@ Stage Summary:
 - Cause racine: `glass-premium` CSS class `position: relative` surchargeait `position: fixed` du DialogContent
 - 10 fichiers modifiés, poussé sur https://github.com/skaba89/eAdmin-guinee
 - Les 5 bugs critiques identifiés précédemment étaient déjà corrigés dans le code (AI properties, aiAutoProcess, addActionLog→addLog, MFA page, regex)
+
+---
+Task ID: 1
+Agent: main
+Task: Implement 30-45 business day deadline with auto-rejection
+
+Work Log:
+- Added deadlineDays and deadlineDate fields to CitizenRequest interface
+- Implemented addBusinessDays() helper (excluding weekends Sat-Sun, Guinea work week Mon-Fri)
+- Implemented getDeadlineDays() helper with category-based mapping (30-45 business days)
+- Implemented isDeadlineExceeded() and isDeadlineApproaching() computed helpers
+- Updated all 8 DEMO_REQUESTS with deadlineDays and deadlineDate computed from createdAt
+- Updated addRequest() to compute deadlineDays and deadlineDate at creation time
+- Added checkAndRejectExpiredRequests() method that:
+  - Finds requests where deadline is exceeded and status not livree/rejetee
+  - Sets status to rejetee with processing note
+  - Sends notifications via useNotificationsStore
+- Updated addRequest Omit type to exclude deadlineDays and deadlineDate
+- Bumped persist store version from 7 to 8 with migration
+- Updated citizen-portal-page.tsx:
+  - Replaced short SLA display with legal deadline (30-45 jours ouvrés)
+  - Updated SLA progress bar to use legal deadline
+  - Added deadline exceeded/approaching warnings with red/amber colors
+  - Added rejection reason display for deadline-exceeded requests
+  - Added useEffect to checkAndRejectExpiredRequests on mount
+- Updated service-requests-page.tsx:
+  - Added "Délai légal" section in detail panel with deadline info
+  - Show deadline exceeded warning in red, approaching in amber
+  - Added "Vérifier les délais légaux" button
+  - Show rejection reason for auto-rejected requests
+  - Added useEffect to checkAndRejectExpiredRequests on mount
+- Updated public-citizen-portal.tsx:
+  - Changed stats banner from "48h délai moyen" to "30-45j délai légal (jours ouvrés)"
+  - Updated service card delay display to include "Légal: 30-45j ouvrés"
+
+Stage Summary:
+- Business rule fully implemented: 30-45 business day deadline with auto-rejection
+- Auto-rejection with notification working
+- Legal deadline displayed in citizen space (espace citoyen)
+- Deadline exceeded shows red warning, approaching shows amber warning
+- Version bumped to force store migration
+- Lint passes (only pre-existing database-query-page.tsx error)
+- Dev server compiles successfully
