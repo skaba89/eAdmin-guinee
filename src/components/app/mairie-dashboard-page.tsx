@@ -951,7 +951,7 @@ export function MairieDashboardPage() {
 
       {/* Generate Document Dialog */}
       <Dialog open={generateDocDialogOpen} onOpenChange={setGenerateDocDialogOpen}>
-        <DialogContent className="glass-premium max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="size-5 text-gradient-gold" />
@@ -985,7 +985,7 @@ export function MairieDashboardPage() {
 
       {/* Note Dialog */}
       <Dialog open={noteDialogOpen} onOpenChange={setNoteDialogOpen}>
-        <DialogContent className="glass-premium max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MessageSquare className="size-5 text-[#C8A45C]" />
@@ -1007,7 +1007,7 @@ export function MairieDashboardPage() {
 
       {/* Delivery Dialog */}
       <Dialog open={deliveryDialogOpen} onOpenChange={setDeliveryDialogOpen}>
-        <DialogContent className="glass-premium max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Download className="size-5 text-emerald-600" />
@@ -1068,7 +1068,7 @@ export function MairieDashboardPage() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-3 text-white text-sm font-medium shadow-lg backdrop-blur-sm border border-emerald-500/30"
+            className="fixed top-4 right-4 z-[60] flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-3 text-white text-sm font-medium shadow-lg backdrop-blur-sm border border-emerald-500/30"
           >
             <CheckCircle2 className="size-4" />
             {successToast}

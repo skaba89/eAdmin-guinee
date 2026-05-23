@@ -782,7 +782,7 @@ export function AgenceDashboardPage() {
 
       {/* Generate Document Dialog */}
       <Dialog open={generateDocDialogOpen} onOpenChange={setGenerateDocDialogOpen}>
-        <DialogContent className="glass-premium max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="size-5 text-gradient-gold" />
@@ -816,7 +816,7 @@ export function AgenceDashboardPage() {
 
       {/* Note Dialog */}
       <Dialog open={noteDialogOpen} onOpenChange={setNoteDialogOpen}>
-        <DialogContent className="glass-premium max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MessageSquare className="size-5 text-[#C8A45C]" />
@@ -838,7 +838,7 @@ export function AgenceDashboardPage() {
 
       {/* Delivery Dialog */}
       <Dialog open={deliveryDialogOpen} onOpenChange={setDeliveryDialogOpen}>
-        <DialogContent className="glass-premium max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Download className="size-5 text-emerald-600" />
@@ -899,7 +899,7 @@ export function AgenceDashboardPage() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-3 text-white text-sm font-medium shadow-lg backdrop-blur-sm"
+            className="fixed top-4 right-4 z-[60] flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-3 text-white text-sm font-medium shadow-lg backdrop-blur-sm"
           >
             <CheckCircle2 className="size-4" />
             {successToast}

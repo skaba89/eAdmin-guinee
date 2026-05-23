@@ -1475,3 +1475,45 @@
   color: #D4B878;
   border-color: rgba(200, 164, 92, 0.1);
 }
+
+/* ================================================================
+   DIALOG FIX — Prevent glass-premium from breaking Dialog rendering
+   ================================================================ */
+
+/* glass-premium's `position: relative` overrides DialogContent's `fixed` positioning,
+   and its `::before` pseudo-element with `inset: 0` covers dialog content.
+   This rule neutralizes both issues when glass-premium is applied to dialog content. */
+[data-slot="dialog-content"].glass-premium {
+  position: fixed !important;
+}
+
+[data-slot="dialog-content"].glass-premium::before {
+  display: none;
+}
+
+/* Same fix for AlertDialog */
+[data-slot="alert-dialog-content"].glass-premium {
+  position: fixed !important;
+}
+
+[data-slot="alert-dialog-content"].glass-premium::before {
+  display: none;
+}
+
+/* Also fix glass-card-v2 and card-premium which have position:relative and ::before/::after */
+[data-slot="dialog-content"].glass-card-v2 {
+  position: fixed !important;
+  overflow: auto;
+}
+
+[data-slot="dialog-content"].glass-card-v2::after {
+  display: none;
+}
+
+[data-slot="dialog-content"].card-premium {
+  position: fixed !important;
+}
+
+[data-slot="dialog-content"].card-premium::before {
+  display: none;
+}

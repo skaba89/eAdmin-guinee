@@ -1253,7 +1253,7 @@ export function CitizenPortalPage() {
           REQUEST SUBMISSION DIALOG
       ═══════════════════════════════════════════════════════════════════════ */}
       <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
-        <DialogContent className="glass-premium max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-[#0B2E58] dark:text-[#3B7DD8]">
               {selectedService && <selectedService.icon className="size-5" />}
@@ -1466,7 +1466,7 @@ export function CitizenPortalPage() {
           REQUEST DETAIL DIALOG
       ═══════════════════════════════════════════════════════════════════════ */}
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-        <DialogContent className="glass-premium max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           {selectedRequest && (
             <>
               <DialogHeader>
@@ -1712,7 +1712,7 @@ export function CitizenPortalPage() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="glass-premium fixed top-4 right-4 z-50 flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-5 py-3 text-white text-sm font-medium shadow-premium-lg"
+            className="fixed top-4 right-4 z-[60] flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-5 py-3 text-white text-sm font-medium shadow-premium-lg"
           >
             <CheckCircle2 className="size-4" />
             {successToast}
