@@ -13,6 +13,7 @@ export type AppPage =
   | 'public-citizen-portal' | 'mairie-dashboard' | 'agence-dashboard'
   | 'birth-certificate-db'
   | 'ai-assistant'
+  | 'mfa'
 
 export interface UserInfo {
   id: string
@@ -31,7 +32,7 @@ export interface UserInfo {
 // DEMO ACCOUNTS
 export const DEMO_ACCOUNTS: Record<string, { password: string; user: UserInfo }> = {
   'citoyen@eadmin.gn': {
-    password: 'demo123',
+    password: 'demo2026',
     user: {
       id: 'demo-citizen-1',
       name: 'Aminata Diallo',
@@ -44,7 +45,7 @@ export const DEMO_ACCOUNTS: Record<string, { password: string; user: UserInfo }>
     }
   },
   'mairie@eadmin.gn': {
-    password: 'demo123',
+    password: 'demo2026',
     user: {
       id: 'demo-mairie-1',
       name: 'Mme Fatoumata Bah',
@@ -56,7 +57,7 @@ export const DEMO_ACCOUNTS: Record<string, { password: string; user: UserInfo }>
     }
   },
   'admin@eadmin.gn': {
-    password: 'demo123',
+    password: 'demo2026',
     user: {
       id: 'demo-admin-1',
       name: 'Sékou Condé',
@@ -67,7 +68,7 @@ export const DEMO_ACCOUNTS: Record<string, { password: string; user: UserInfo }>
     }
   },
   'agence@eadmin.gn': {
-    password: 'demo123',
+    password: 'demo2026',
     user: {
       id: 'demo-agence-1',
       name: 'M. Mamadou Soumah',
@@ -79,7 +80,7 @@ export const DEMO_ACCOUNTS: Record<string, { password: string; user: UserInfo }>
     }
   },
   'ministere@eadmin.gn': {
-    password: 'demo123',
+    password: 'demo2026',
     user: {
       id: 'demo-ministere-1',
       name: 'Dr. Alpha Diallo',
@@ -90,7 +91,7 @@ export const DEMO_ACCOUNTS: Record<string, { password: string; user: UserInfo }>
     }
   },
   'superadmin@eadmin.gn': {
-    password: 'admin2026',
+    password: 'demo2026',
     user: {
       id: 'demo-superadmin-1',
       name: 'Amadou Oury Bah',

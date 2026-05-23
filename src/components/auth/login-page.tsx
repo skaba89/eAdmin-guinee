@@ -645,7 +645,7 @@ export function LoginPage() {
             </div>
 
             <motion.p variants={itemSlideUp} className="text-[10px] text-gray-300 dark:text-white/20 text-center pt-1 font-medium">
-              Mot de passe : <span className="font-mono text-gray-400 dark:text-white/40">demo123</span> • Super Admin : <span className="font-mono text-gray-400 dark:text-white/40">admin2026</span>
+              Mot de passe : <span className="font-mono text-gray-400 dark:text-white/40">demo2026</span>
             </motion.p>
           </motion.div>
 

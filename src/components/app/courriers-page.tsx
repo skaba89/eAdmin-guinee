@@ -29,6 +29,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { BRAND } from '@/lib/constants'
+import { formatFileSize } from '@/lib/document-utils'
 import { useAppStore } from '@/store/app-store'
 
 type CourrierPriority = 'URGENT' | 'IMPORTANT' | 'NORMAL' | 'CONFIDENTIEL'
@@ -137,12 +138,7 @@ export function CourriersPage() {
   const [courrierDragActive, setCourrierDragActive] = useState(false)
   const courrierFileInputRef = useRef<HTMLInputElement>(null)
 
-  // Format file size
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  }
+  // formatFileSize imported from @/lib/document-utils
 
   // Get file icon
   const getFileIcon = (fileName: string) => {

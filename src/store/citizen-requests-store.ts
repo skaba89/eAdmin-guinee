@@ -747,12 +747,18 @@ export const useCitizenRequestsStore = create<CitizenRequestsState>()(
       },
 
       addUploadedDocument: (id, doc) => {
+        // localStorage protection: trim base64 data if total stored size would exceed ~4MB
+        const MAX_LOCALSTORAGE_PER_DOC = 2 * 1024 * 1024 // 2MB per document
+        const safeDoc = doc.data.length > MAX_LOCALSTORAGE_PER_DOC
+          ? { ...doc, data: doc.data.slice(0, MAX_LOCALSTORAGE_PER_DOC), _truncated: true as any }
+          : doc
+
         set((state) => ({
           requests: state.requests.map(r =>
             r.id === id
               ? {
                   ...r,
-                  uploadedDocuments: [...r.uploadedDocuments, doc],
+                  uploadedDocuments: [...r.uploadedDocuments, safeDoc],
                   updatedAt: new Date().toISOString(),
                 }
               : r

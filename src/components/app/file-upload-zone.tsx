@@ -5,6 +5,7 @@ import { Upload, FileText, X, AlertCircle, Image, File, CheckCircle2, Loader2 } 
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
+import { formatFileSize } from '@/lib/document-utils'
 
 // ─── GUINEA BRAND COLORS ─────────────────────────────────────────────────────
 const GUINEA_RED = '#CE1126'
@@ -68,11 +69,7 @@ export interface FileUploadZoneProps {
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} o`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} Ko`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`
-}
+// formatFileSize imported from @/lib/document-utils
 
 function getFileTypeIcon(type: string) {
   if (type.startsWith('image/')) return Image

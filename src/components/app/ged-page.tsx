@@ -25,6 +25,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { BRAND } from '@/lib/constants'
+import { formatFileSize } from '@/lib/document-utils'
 import { useAppStore } from '@/store/app-store'
 
 type DocClassification = 'PUBLIC' | 'DIFFUSION LIMITÉE' | 'CONFIDENTIEL' | 'SECRET'
@@ -162,12 +163,7 @@ export function GedPage() {
     return FileText
   }
 
-  // Format file size
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  }
+  // formatFileSize imported from @/lib/document-utils
 
   // Generate official Republic of Guinea HTML document
   const generateOfficialDocument = (doc: Document): string => {

@@ -11,7 +11,7 @@ import { motion } from 'framer-motion'
 import * as rbacModule from '@/lib/rbac'
 
 // Roles that require MFA verification
-const MFA_REQUIRED_ROLES = ['admin', 'ministere', 'superadmin']
+const MFA_REQUIRED_ROLES = ['admin_general', 'ministere', 'super_admin']
 
 // Session timeout: 8 hours in milliseconds
 const SESSION_TIMEOUT_MS = 8 * 60 * 60 * 1000
@@ -113,8 +113,7 @@ export function AccessGuard({ page, children }: { page: AppPage; children: React
 
   useEffect(() => {
     if (guardState === 'mfa') {
-      // MFA page not yet implemented — skip MFA verification for now
-      // navigate('mfa')
+      navigate('mfa')
     }
   }, [guardState, navigate])
 
@@ -129,8 +128,7 @@ export function AccessGuard({ page, children }: { page: AppPage; children: React
   }
 
   if (guardState === 'mfa') {
-    // MFA not yet implemented — allow access for now
-    return <>{children}</>
+    return null // Will navigate to MFA page via useEffect
   }
 
   if (guardState === 'expired') {

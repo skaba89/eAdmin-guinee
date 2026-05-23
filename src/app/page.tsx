@@ -38,6 +38,7 @@ const AgenceDashboardPage = dynamic(() => import('@/components/app/agence-dashbo
 const BirthCertificateDbPage = dynamic(() => import('@/components/app/birth-certificate-db-page').then(m => ({ default: m.BirthCertificateDbPage })), { ssr: false })
 const AiAssistantPage = dynamic(() => import('@/components/app/ai-assistant-page').then(m => ({ default: m.AiAssistantPage })), { ssr: false })
 const AiChatbotWidget = dynamic(() => import('@/components/app/ai-chatbot-widget').then(m => ({ default: m.AiChatbotWidget })), { ssr: false })
+const MfaPage = dynamic(() => import('@/components/auth/mfa-page').then(m => ({ default: m.MfaPage })), { ssr: false })
 
 const publicPages: Record<string, React.ComponentType> = {
   landing: LandingPage,
@@ -55,6 +56,7 @@ const publicPages: Record<string, React.ComponentType> = {
 const authPages: Record<string, React.ComponentType> = {
   login: LoginPage,
   register: RegisterPage,
+  mfa: MfaPage,
 }
 
 const appPages: Record<string, React.ComponentType> = {
