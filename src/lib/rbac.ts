@@ -93,6 +93,7 @@ export type Permission =
   | 'ai-agent:view'
   | 'ai-agent:configure'
   | 'ai-agent:process'
+  | 'citizen-database:view'
 
 // ─── ROLE → PERMISSIONS MAPPING ─────────────────────────────────────────────
 
@@ -123,6 +124,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'analytics:view_own',
     'ai-agent:view',
     'notifications:view',
+    'citizen-database:view',
   ],
 
   agence: [
@@ -138,6 +140,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'analytics:view_own',
     'ai-agent:view',
     'notifications:view',
+    'citizen-database:view',
   ],
 
   ministere: [
@@ -168,6 +171,8 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'notifications:manage',
     'settings:view',
     'settings:edit',
+    'audit-logs:view',
+    'citizen-database:view',
   ],
 
   admin: [
@@ -214,6 +219,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'ai-agent:view',
     'ai-agent:configure',
     'ai-agent:process',
+    'citizen-database:view',
   ],
 
   superadmin: [
@@ -268,6 +274,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'ai-agent:view',
     'ai-agent:configure',
     'ai-agent:process',
+    'citizen-database:view',
   ],
 }
 
@@ -277,6 +284,7 @@ export interface PageAccessRule {
   page: AppPage
   requiredPermissions: Permission[]
   requireAny?: boolean  // If true, user needs ANY of the permissions (OR). If false, needs ALL (AND).
+  requiredRoles?: UserRole[]  // If specified, users with these roles bypass permission check (OR with permissions).
 }
 
 const PAGE_ACCESS_RULES: PageAccessRule[] = [
@@ -294,6 +302,9 @@ const PAGE_ACCESS_RULES: PageAccessRule[] = [
   { page: 'notifications', requiredPermissions: ['notifications:view'] },
   { page: 'audit-logs', requiredPermissions: ['audit-logs:view'] },
   { page: 'ai-assistant', requiredPermissions: ['ai-agent:view'] },
+  { page: 'mairie-dashboard', requiredPermissions: ['dashboard:view'], requiredRoles: ['mairie'] },
+  { page: 'agence-dashboard', requiredPermissions: ['dashboard:view'], requiredRoles: ['agence'] },
+  { page: 'birth-certificate-db', requiredPermissions: ['citizen-database:view'] },
 ]
 
 // ─── INSTITUTION → SERVICE CATEGORY MAPPING (for RLS) ─────────────────────
@@ -371,6 +382,12 @@ export function canAccessPage(user: UserInfo | null, page: AppPage): boolean {
   const rule = PAGE_ACCESS_RULES.find(r => r.page === page)
   if (!rule) return true // Pages without rules are accessible to all authenticated users
 
+  // Check role-based access (OR with permissions)
+  const mappedRole = mapUserRole(user)
+  if (rule.requiredRoles && rule.requiredRoles.includes(mappedRole)) {
+    return true
+  }
+
   if (rule.requireAny) {
     return hasAnyPermission(user, rule.requiredPermissions)
   }
@@ -387,6 +404,7 @@ export function getAccessiblePages(user: UserInfo | null): AppPage[] {
     'dashboard', 'ged', 'courriers', 'workflow', 'signatures',
     'analytics', 'admin', 'users', 'settings', 'notifications',
     'audit-logs', 'citizen-portal', 'service-requests', 'ai-assistant',
+    'mairie-dashboard', 'agence-dashboard', 'birth-certificate-db',
   ]
 
   return allAppPages.filter(page => canAccessPage(user, page))

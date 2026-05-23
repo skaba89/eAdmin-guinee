@@ -3,25 +3,23 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  FileText, Clock, CheckCircle2, AlertCircle, Search, Filter,
-  Building2, User, Send, Eye, MoreHorizontal, ChevronDown,
+  FileText, Clock, CheckCircle2, AlertCircle, Search,
+  Building2, User, Send, Eye,
   Shield, MessageSquare, Play, XCircle, Download, Mail,
-  MapPin, Phone, Hash, Calendar, ArrowRight, Plus, Stamp,
-  Landmark, Award, BookOpen, ClipboardCheck, Gavel, Scale,
-  GitBranch, Users, Globe, Smartphone, QrCode, Check,
+  MapPin, Phone, Hash, Calendar, Stamp,
+  ClipboardCheck,
+  Check,
   Image as ImageIcon, File, Upload as UploadIcon, Paperclip, FileCheck,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Separator } from '@/components/ui/separator'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Progress } from '@/components/ui/progress'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
 } from '@/components/ui/dialog'
@@ -30,7 +28,7 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
 import { useCitizenRequestsStore, type CitizenRequest, type RequestStatus, type UploadedDocument, type GeneratedDocument, getDeadlineDays, isDeadlineExceeded, isDeadlineApproaching } from '@/store/citizen-requests-store'
-import { formatFileSize, getFileTypeIcon, downloadUploadedFile, downloadCitizenDocument, createGeneratedDocument, downloadGeneratedDocument, ACCEPTED_FILE_TYPES, processFile } from '@/lib/document-utils'
+import { formatFileSize, getFileTypeIcon, downloadUploadedFile, ACCEPTED_FILE_TYPES, processFile } from '@/lib/document-utils'
 import { filterRequestsByRLS, canProcessRequest, getRLSScopeDescription } from '@/lib/rbac'
 import { useAppStore } from '@/store/app-store'
 
@@ -44,15 +42,7 @@ const STATUS_CONFIG: Record<RequestStatus, { label: string; color: string; icon:
   rejetee: { label: 'Rejetée', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', icon: XCircle, description: 'Demande rejetée' },
 }
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.04 } },
-}
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 15 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: 'easeOut' as const } },
-}
 
 export function ServiceRequestsPage() {
   const {
@@ -76,9 +66,6 @@ export function ServiceRequestsPage() {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
   const [generateDialogOpen, setGenerateDialogOpen] = useState(false)
-  const [generateDocDialogOpen, setGenerateDocDialogOpen] = useState(false)
-  const [previewDocDialogOpen, setPreviewDocDialogOpen] = useState(false)
-  const [previewDoc, setPreviewDoc] = useState<UploadedDocument | null>(null)
   const [successToast, setSuccessToast] = useState('')
 
   useEffect(() => {
@@ -88,9 +75,13 @@ export function ServiceRequestsPage() {
     }
   }, [successToast])
 
-  // Check for expired requests on mount
+  // Check for expired requests on mount + periodically
   useEffect(() => {
     checkAndRejectExpiredRequests()
+    const interval = setInterval(() => {
+      checkAndRejectExpiredRequests()
+    }, 60 * 60 * 1000) // Every hour
+    return () => clearInterval(interval)
   }, [checkAndRejectExpiredRequests])
 
   // Apply RLS filtering first
@@ -157,13 +148,6 @@ export function ServiceRequestsPage() {
     refreshSelected(req.id)
   }
 
-  const handleMarkReady = (req: CitizenRequest) => {
-    updateRequestStatus(req.id, 'prete', 'Document prêt pour le retrait')
-    advanceTimeline(req.id)
-    setSuccessToast(`Document ${req.reference} prêt`)
-    refreshSelected(req.id)
-  }
-
   const handleDeliver = () => {
     if (!selectedRequest) return
     const location = deliveryMode === 'guichet' ? (deliveryLocation || selectedRequest.assignedService) : undefined
@@ -210,24 +194,7 @@ export function ServiceRequestsPage() {
   const handleVerifyDocument = (requestId: string, docId: string) => {
     verifyDocument(requestId, docId)
     setSuccessToast('Document vérifié avec succès')
-    if (selectedRequest) refreshSelected(selectedRequest.id)
-  }
-
-  const handleGenerateDocument = () => {
-    if (!selectedRequest) return
-    const doc = createGeneratedDocument(selectedRequest, selectedRequest.assignedAgent || 'Agent traitant')
-    setGeneratedDocument(selectedRequest.id, doc)
-    updateRequestStatus(selectedRequest.id, 'prete', 'Document officiel généré et prêt pour le retrait')
-    advanceTimeline(selectedRequest.id)
-    setGenerateDocDialogOpen(false)
-    setSuccessToast(`Document officiel généré pour ${selectedRequest.reference}`)
-    refreshSelected(selectedRequest.id)
-  }
-
-  const handleDownloadDocument = () => {
-    if (!selectedRequest) return
-    downloadCitizenDocument(selectedRequest, selectedRequest.assignedAgent)
-    setSuccessToast(`Document ${selectedRequest.reference} téléchargé`)
+    refreshSelected(requestId)
   }
 
   const handleAddDocumentToRequest = async (file: File, requestId: string) => {
@@ -347,7 +314,7 @@ export function ServiceRequestsPage() {
       htmlContent,
       generatedAt: new Date().toISOString(),
       generatedBy: req.assignedAgent || 'Agent traitant',
-      fileName: `${req.reference.replace(/\//g, '-')}-${req.serviceName.replace(/\s+/g, '-').toLowerCase()}.html`,
+      fileName: `${req.reference}-${req.serviceName.replace(/\s+/g, '-').toLowerCase()}.html`,
     }
   }
 
@@ -362,24 +329,19 @@ export function ServiceRequestsPage() {
     refreshSelected(selectedRequest.id)
   }
 
-  const handleVerifyDoc = (requestId: string, docId: string) => {
-    verifyDocument(requestId, docId)
-    setSuccessToast('Document vérifié avec succès')
-    refreshSelected(requestId)
-  }
-
-  const handleDownloadGeneratedDoc = (req: CitizenRequest) => {
-    if (!req.generatedDocument) return
-    const blob = new Blob([req.generatedDocument.htmlContent], { type: 'text/html;charset=utf-8' })
+  const handleDownloadGeneratedDoc = () => {
+    if (!selectedRequest?.generatedDocument) return
+    const blob = new Blob([selectedRequest.generatedDocument.htmlContent], { type: 'text/html;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = req.generatedDocument.fileName
+    a.download = selectedRequest.generatedDocument.fileName
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
-    setSuccessToast(`Document ${req.reference} téléchargé`)
+    setSuccessToast(`Document ${selectedRequest.reference} téléchargé`)
+    refreshSelected(selectedRequest.id)
   }
 
   const categories = [...new Set(rlsFilteredRequests.map(r => r.category))]
@@ -675,7 +637,7 @@ export function ServiceRequestsPage() {
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
                               {!doc.verified && (
-                                <Button size="sm" variant="outline" className="h-6 px-2 text-emerald-600 text-[10px] gap-1" onClick={() => handleVerifyDoc(selectedRequest.id, doc.id)}>
+                                <Button size="sm" variant="outline" className="h-6 px-2 text-emerald-600 text-[10px] gap-1" onClick={() => handleVerifyDocument(selectedRequest.id, doc.id)}>
                                   <Check className="size-3" />
                                   Vérifier
                                 </Button>
@@ -703,7 +665,7 @@ export function ServiceRequestsPage() {
                       <p className="text-[10px] text-muted-foreground ml-6">
                         Par {selectedRequest.generatedDocument.generatedBy} le {new Date(selectedRequest.generatedDocument.generatedAt).toLocaleDateString('fr-FR')}
                       </p>
-                      <Button size="sm" className="gap-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white ml-6" onClick={() => handleDownloadGeneratedDoc(selectedRequest)}>
+                      <Button size="sm" className="gap-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white ml-6" onClick={handleDownloadGeneratedDoc}>
                         <Download className="size-3" />
                         Télécharger le document
                       </Button>
@@ -896,8 +858,8 @@ export function ServiceRequestsPage() {
 
                   {/* Generate Official Document */}
                   {selectedRequest.status === 'validee' && (
-                    <Button size="sm" className="btn-gold w-full gap-2" onClick={() => setGenerateDocDialogOpen(true)}>
-                      <FileText className="size-4" />
+                    <Button size="sm" className="btn-gold w-full gap-2" onClick={() => setGenerateDialogOpen(true)}>
+                      <Stamp className="size-4" />
                       Générer le document officiel
                     </Button>
                   )}
@@ -912,7 +874,7 @@ export function ServiceRequestsPage() {
                         </div>
                         <p className="text-[10px] text-muted-foreground">Généré le {new Date(selectedRequest.generatedDocument.generatedAt).toLocaleDateString('fr-FR')} par {selectedRequest.generatedDocument.generatedBy}</p>
                       </div>
-                      <Button size="sm" className="btn-premium w-full gap-2" onClick={handleDownloadDocument}>
+                      <Button size="sm" className="btn-premium w-full gap-2" onClick={handleDownloadGeneratedDoc}>
                         <Download className="size-4" />
                         Télécharger le document officiel
                       </Button>
@@ -1078,41 +1040,6 @@ export function ServiceRequestsPage() {
             <Button className="bg-red-600 hover:bg-red-700 text-white gap-2" onClick={handleReject} disabled={!rejectReason.trim()}>
               <XCircle className="size-4" />
               Confirmer le rejet
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Generate Document Dialog */}
-      <Dialog open={generateDocDialogOpen} onOpenChange={setGenerateDocDialogOpen}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="size-5 text-[#C8A45C]" />
-              Générer le document officiel
-            </DialogTitle>
-            <DialogDescription>Générez le document officiel pour cette demande</DialogDescription>
-          </DialogHeader>
-          {selectedRequest && (
-            <div className="space-y-4 py-2">
-              <div className="p-3 rounded-lg bg-muted/50 text-sm">
-                <p><strong>Référence :</strong> <span className="font-mono">{selectedRequest.reference}</span></p>
-                <p><strong>Service :</strong> {selectedRequest.serviceName}</p>
-                <p><strong>Citoyen :</strong> {selectedRequest.citizenFirstName} {selectedRequest.citizenName}</p>
-                <p><strong>Documents vérifiés :</strong> {(selectedRequest.uploadedDocuments ?? []).filter(d => d.verified).length} / {selectedRequest.documents?.length ?? 0}</p>
-              </div>
-              <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/40">
-                <p className="text-xs text-amber-700 dark:text-amber-400">
-                  En confirmant, le document officiel sera généré et la demande passera au statut "Document prêt". Le citoyen pourra alors le télécharger.
-                </p>
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setGenerateDocDialogOpen(false)}>Annuler</Button>
-            <Button className="btn-gold gap-2" onClick={handleGenerateDocument}>
-              <FileText className="size-4" />
-              Confirmer la génération
             </Button>
           </DialogFooter>
         </DialogContent>

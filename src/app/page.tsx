@@ -81,10 +81,10 @@ const appPages: Record<string, React.ComponentType> = {
 
 const ROLE_PAGE_ACCESS: Record<UserRole, AppPage[]> = {
   citizen: ['citizen-portal', 'public-citizen-portal', 'ai-assistant'],
-  mairie: ['mairie-dashboard', 'service-requests', 'ged', 'courriers', 'ai-assistant', 'settings', 'birth-certificate-db'],
+  mairie: ['mairie-dashboard', 'service-requests', 'ged', 'courriers', 'ai-assistant', 'settings', 'birth-certificate-db', 'notifications'],
   admin_general: ['dashboard', 'service-requests', 'ged', 'courriers', 'workflow', 'signatures', 'analytics', 'citizen-portal', 'ai-assistant', 'admin', 'users', 'notifications', 'audit-logs', 'settings', 'birth-certificate-db'],
-  agence: ['agence-dashboard', 'service-requests', 'ged', 'ai-assistant', 'settings'],
-  ministere: ['dashboard', 'service-requests', 'ged', 'courriers', 'workflow', 'signatures', 'ai-assistant', 'settings', 'birth-certificate-db'],
+  agence: ['agence-dashboard', 'service-requests', 'ged', 'ai-assistant', 'settings', 'notifications'],
+  ministere: ['dashboard', 'service-requests', 'ged', 'courriers', 'workflow', 'signatures', 'analytics', 'citizen-portal', 'ai-assistant', 'settings', 'birth-certificate-db', 'notifications', 'audit-logs'],
   super_admin: Object.keys(appPages) as AppPage[],
 }
 

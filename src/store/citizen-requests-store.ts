@@ -114,16 +114,72 @@ export interface TimelineStep {
   agent?: string
 }
 
+// ─── GUINEAN PUBLIC HOLIDAYS ─────────────────────────────────────────────────
+
+/**
+ * Returns an array of Guinean public holiday dates (as ISO date strings) for a given year.
+ * Fixed holidays are computed from the year; Islamic holidays use approximate dates
+ * for 2026–2027 and a fallback estimate for other years.
+ */
+export function GUINEAN_HOLIDAYS(year: number): string[] {
+  const mm = (m: number, d: number) => `${year}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+
+  // Fixed holidays
+  const fixed: string[] = [
+    mm(1, 1),   // January 1: New Year's Day (Jour de l'An)
+    mm(3, 8),   // March 8: International Women's Day
+    mm(4, 3),   // April 3: Independence Day Eve / Second Republic Day
+    mm(5, 1),   // May 1: Labour Day
+    mm(5, 25),  // May 25: Africa Day / OAU Day
+    mm(8, 15),  // August 15: Assumption
+    mm(10, 2),  // October 2: Independence Day (most important national holiday)
+    mm(11, 1),  // November 1: All Saints' Day
+    mm(12, 25), // December 25: Christmas
+  ]
+
+  // Variable Islamic holidays — approximate dates per year
+  const islamicHolidays: Record<number, string[]> = {
+    2026: [
+      mm(3, 30),  // Eid al-Fitr (end of Ramadan) — approx
+      mm(6, 7),   // Eid al-Adha (Tabaski) — approx
+      mm(9, 5),   // Maoulid (Prophet's Birthday) — approx
+    ],
+    2027: [
+      mm(3, 19),  // Eid al-Fitr — approx
+      mm(5, 27),  // Eid al-Adha — approx
+      mm(8, 26),  // Maoulid — approx
+    ],
+  }
+
+  const variable = islamicHolidays[year] ?? [
+    // Fallback: rough estimates for unknown years (conservative – may be off by ±1–2 days)
+    mm(3, 20),  // Eid al-Fitr approx
+    mm(6, 1),   // Eid al-Adha approx
+    mm(9, 1),   // Maoulid approx
+  ]
+
+  return [...fixed, ...variable]
+}
+
+/** Check whether a given Date falls on a Guinean public holiday */
+export function isGuineanHoliday(date: Date): boolean {
+  const year = date.getFullYear()
+  const dateStr = `${year}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+  return GUINEAN_HOLIDAYS(year).includes(dateStr)
+}
+
 // ─── LEGAL DEADLINE HELPERS ──────────────────────────────────────────────────
 
-/** Add business days to a start date (exclude Saturday & Sunday — Guinea work week Mon-Fri) */
+/** Add business days to a start date (exclude Saturday, Sunday & Guinean public holidays) */
 export function addBusinessDays(startDate: Date, days: number): Date {
   let date = new Date(startDate)
   let addedDays = 0
   while (addedDays < days) {
     date.setDate(date.getDate() + 1)
     const dayOfWeek = date.getDay()
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Not Sunday (0) or Saturday (6)
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
+    const isHoliday = isGuineanHoliday(date)
+    if (!isWeekend && !isHoliday) { // Not weekend and not a Guinean holiday
       addedDays++
     }
   }
@@ -152,20 +208,34 @@ export function isDeadlineExceeded(req: CitizenRequest): boolean {
   return new Date(req.deadlineDate) < new Date()
 }
 
-/** Check if a request is approaching its deadline (within 5 business days) */
-export function isDeadlineApproaching(req: CitizenRequest): boolean {
-  if (req.status === 'livree' || req.status === 'rejetee') return false
-  const deadline = new Date(req.deadlineDate)
+/** Count remaining business days between now and a deadline (excludes weekends & Guinean holidays) */
+export function countRemainingBusinessDays(deadline: Date): number {
   const now = new Date()
-  // Count business days remaining
   let remaining = 0
   let d = new Date(now)
   while (d < deadline) {
     const dayOfWeek = d.getDay()
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) remaining++
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
+    const isHoliday = isGuineanHoliday(d)
+    if (!isWeekend && !isHoliday) remaining++
     d.setDate(d.getDate() + 1)
   }
+  return remaining
+}
+
+/** Check if a request is approaching its deadline (within 5 business days) */
+export function isDeadlineApproaching(req: CitizenRequest): boolean {
+  if (req.status === 'livree' || req.status === 'rejetee') return false
+  const remaining = countRemainingBusinessDays(new Date(req.deadlineDate))
   return remaining > 0 && remaining <= 5
+}
+
+/** Check if a request is in the critical zone: more than 5 but 10 or fewer business days remaining.
+ *  This triggers supervisor escalation — a tier between "normal" and "approaching". */
+export function isDeadlineCritical(req: CitizenRequest): boolean {
+  if (req.status === 'livree' || req.status === 'rejetee') return false
+  const remaining = countRemainingBusinessDays(new Date(req.deadlineDate))
+  return remaining > 5 && remaining <= 10
 }
 
 const SERVICE_ENTITY_MAP: Record<string, string> = {
@@ -909,30 +979,59 @@ export const useCitizenRequestsStore = create<CitizenRequestsState>()(
       checkAndRejectExpiredRequests: () => {
         const nowIso = new Date().toISOString()
         let rejectedCount = 0
+        let criticalCount = 0
 
         set((state) => ({
           requests: state.requests.map(r => {
-            // Only reject if deadline exceeded and not already completed/rejected
+            // Skip completed/rejected requests
             if (r.status === 'livree' || r.status === 'rejetee') return r
-            if (!isDeadlineExceeded(r)) return r
 
-            rejectedCount++
-            const deadlineDateStr = new Date(r.deadlineDate).toLocaleDateString('fr-FR')
+            // ── Auto-reject if deadline exceeded ──
+            if (isDeadlineExceeded(r)) {
+              rejectedCount++
+              const deadlineDateStr = new Date(r.deadlineDate).toLocaleDateString('fr-FR')
 
-            return {
-              ...r,
-              status: 'rejetee' as const,
-              completedAt: nowIso,
-              updatedAt: nowIso,
-              processingNotes: [...r.processingNotes, {
-                id: `note-deadline-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-                author: 'Système',
-                authorRole: 'Automate',
-                text: `Demande rejetée automatiquement : délai légal de ${r.deadlineDays} jours ouvrés dépassé. Date limite : ${deadlineDateStr}.`,
-                date: nowIso,
-                type: 'decision' as const,
-              }],
+              return {
+                ...r,
+                status: 'rejetee' as const,
+                completedAt: nowIso,
+                updatedAt: nowIso,
+                processingNotes: [...r.processingNotes, {
+                  id: `note-deadline-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                  author: 'Système',
+                  authorRole: 'Automate',
+                  text: `Demande rejetée automatiquement : délai légal de ${r.deadlineDays} jours ouvrés dépassé. Date limite : ${deadlineDateStr}.`,
+                  date: nowIso,
+                  type: 'decision' as const,
+                }],
+              }
             }
+
+            // ── Supervisor escalation: deadline critical (6–10 business days remaining) ──
+            if (isDeadlineCritical(r)) {
+              // Only add a warning note if we haven't already added one for this check
+              const alreadyWarned = r.processingNotes.some(
+                n => n.authorRole === 'Automate' && n.text.includes('⚠ ESCALADE SUPERVISEUR')
+              )
+              if (!alreadyWarned) {
+                criticalCount++
+                const remaining = countRemainingBusinessDays(new Date(r.deadlineDate))
+                return {
+                  ...r,
+                  updatedAt: nowIso,
+                  processingNotes: [...r.processingNotes, {
+                    id: `note-escalation-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                    author: 'Système',
+                    authorRole: 'Automate',
+                    text: `⚠ ESCALADE SUPERVISEUR : Il ne reste que ${remaining} jours ouvrés avant la date limite du ${new Date(r.deadlineDate).toLocaleDateString('fr-FR')}. Merci d'accélérer le traitement de cette demande.`,
+                    date: nowIso,
+                    type: 'notification' as const,
+                  }],
+                }
+              }
+            }
+
+            return r
           }),
         }))
 
@@ -957,6 +1056,36 @@ export const useCitizenRequestsStore = create<CitizenRequestsState>()(
                 category: 'demande',
                 priority: 'haute',
                 link: '/citizen-portal',
+                relatedId: r.id,
+              })
+            }
+          } catch {
+            // Notification store may not be available during SSR
+          }
+        }
+
+        // Send supervisor escalation warning notifications for critical-deadline requests
+        if (criticalCount > 0) {
+          try {
+            const { useNotificationsStore } = require('@/store/notifications-store')
+            const notifStore = useNotificationsStore.getState()
+            const criticalRequests = get().requests.filter(r =>
+              r.status !== 'livree' && r.status !== 'rejetee' &&
+              isDeadlineCritical(r) &&
+              r.processingNotes.some(n =>
+                n.authorRole === 'Automate' && n.text.includes('⚠ ESCALADE SUPERVISEUR') && n.date === nowIso
+              )
+            )
+            for (const r of criticalRequests) {
+              const remaining = countRemainingBusinessDays(new Date(r.deadlineDate))
+              const agentLabel = r.assignedAgent || 'Superviseur'
+              notifStore.addNotification({
+                title: 'Escalade superviseur — Délai critique',
+                message: `La demande ${r.reference} (${r.serviceName}) n'a plus que ${remaining} jours ouvrés avant la date limite du ${new Date(r.deadlineDate).toLocaleDateString('fr-FR')}. Agent assigné : ${agentLabel}. Merci d'accélérer le traitement.`,
+                type: 'warning',
+                category: 'demande',
+                priority: 'haute',
+                link: '/admin-portal',
                 relatedId: r.id,
               })
             }
@@ -1056,12 +1185,9 @@ export const useCitizenRequestsStore = create<CitizenRequestsState>()(
     }),
     {
       name: 'citizen-requests-storage',
-      version: 8,
+      version: 9,
       migrate: (persistedState: any, version: number) => {
-        if (version < 8) {
-          return { requests: DEMO_REQUESTS }
-        }
-        if (version < 7) {
+        if (version < 9) {
           return { requests: DEMO_REQUESTS }
         }
         return persistedState

@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/dialog'
 import { useAppStore } from '@/store/app-store'
 import { useCitizenRequestsStore, type CitizenRequest, type RequestStatus, type UploadedDocument, type GeneratedDocument, type SatisfactionRating, getDeadlineDays, isDeadlineExceeded, isDeadlineApproaching } from '@/store/citizen-requests-store'
+import { useNotificationsStore, type NotificationType, type AppNotification } from '@/store/notifications-store'
 import { processFile, formatFileSize, getFileTypeIcon, downloadUploadedFile, downloadCitizenDocument, ACCEPTED_FILE_TYPES, MAX_FILE_SIZE, createGeneratedDocument } from '@/lib/document-utils'
 
 // ─── GUINEA BRAND COLORS ─────────────────────────────────────────────────────
@@ -148,6 +149,75 @@ const STATUS_CONFIG: Record<RequestStatus, { label: string; color: string; icon:
   rejetee: { label: 'Rejetée', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', icon: XCircle },
 }
 
+// ─── NOTIFICATION TYPE CONFIG ─────────────────────────────────────────────────
+const NOTIF_TYPE_CONFIG: Record<NotificationType, {
+  label: string
+  icon: React.ElementType
+  iconBg: string
+  iconColor: string
+  badgeClass: string
+  borderClass: string
+  bgLight: string
+  bgDark: string
+}> = {
+  info: {
+    label: 'Info',
+    icon: MessageSquare,
+    iconBg: 'bg-sky-100 dark:bg-sky-900/30',
+    iconColor: 'text-sky-600 dark:text-sky-400',
+    badgeClass: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400',
+    borderClass: 'border-l-sky-400',
+    bgLight: 'from-sky-50/50 to-transparent',
+    bgDark: 'from-sky-900/10 to-transparent',
+  },
+  success: {
+    label: 'Succès',
+    icon: CheckCircle2,
+    iconBg: 'bg-emerald-100 dark:bg-emerald-900/30',
+    iconColor: 'text-emerald-600 dark:text-emerald-400',
+    badgeClass: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
+    borderClass: 'border-l-emerald-400',
+    bgLight: 'from-emerald-50/50 to-transparent',
+    bgDark: 'from-emerald-900/10 to-transparent',
+  },
+  warning: {
+    label: 'Alerte',
+    icon: AlertCircle,
+    iconBg: 'bg-amber-100 dark:bg-amber-900/30',
+    iconColor: 'text-amber-600 dark:text-amber-400',
+    badgeClass: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+    borderClass: 'border-l-amber-400',
+    bgLight: 'from-amber-50/50 to-transparent',
+    bgDark: 'from-amber-900/10 to-transparent',
+  },
+  error: {
+    label: 'Erreur',
+    icon: XCircle,
+    iconBg: 'bg-red-100 dark:bg-red-900/30',
+    iconColor: 'text-red-600 dark:text-red-400',
+    badgeClass: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    borderClass: 'border-l-red-400',
+    bgLight: 'from-red-50/50 to-transparent',
+    bgDark: 'from-red-900/10 to-transparent',
+  },
+}
+
+/** Format a notification date as a human-friendly relative or absolute string */
+function formatNotifDate(isoDate: string): string {
+  const now = Date.now()
+  const date = new Date(isoDate).getTime()
+  const diffMs = now - date
+  const diffMin = Math.floor(diffMs / 60000)
+  const diffH = Math.floor(diffMs / 3600000)
+  const diffD = Math.floor(diffMs / 86400000)
+
+  if (diffMin < 1) return "À l'instant"
+  if (diffMin < 60) return `Il y a ${diffMin} min`
+  if (diffH < 24) return `Il y a ${diffH}h`
+  if (diffD < 7) return `Il y a ${diffD}j`
+  return new Date(isoDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: diffD > 365 ? 'numeric' : undefined })
+}
+
 // ─── STATS BANNER DATA ───────────────────────────────────────────────────────
 const STATS_BANNER = [
   { value: '124 500', label: 'citoyens inscrits', icon: Users },
@@ -172,7 +242,9 @@ export function CitizenPortalPage() {
   const navigate = useAppStore((s) => s.navigate)
   const user = useAppStore((s) => s.user)
   const { requests, addRequest, getRequestByReference, rateRequest, checkAndRejectExpiredRequests } = useCitizenRequestsStore()
+  const { notifications, markAsRead, markAllAsRead, getUnreadCount, getFiltered } = useNotificationsStore()
   const [activeTab, setActiveTab] = useState('mes-demandes')
+  const [notifFilter, setNotifFilter] = useState<'all' | NotificationType>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [successToast, setSuccessToast] = useState('')
@@ -211,6 +283,13 @@ export function CitizenPortalPage() {
 
   // Notification preferences
   const [notifPrefs, setNotifPrefs] = useState({ whatsapp: true, sms: false, email: true, ussd: false })
+
+  // Citizen-relevant notifications (demande + document categories)
+  const citizenNotifications = getFiltered(notifFilter, 'all', 'all')
+    .filter(n => n.category === 'demande' || n.category === 'document')
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  const citizenUnreadCount = citizenNotifications.filter(n => !n.read).length
+  const urgentUnread = citizenNotifications.filter(n => !n.read && n.priority === 'haute')
 
   // File upload state
   const [uploadedFiles, setUploadedFiles] = useState<Map<string, UploadedDocument>>(new Map())
@@ -478,6 +557,52 @@ export function CitizenPortalPage() {
       </motion.div>
 
       {/* ═══════════════════════════════════════════════════════════════════════
+          URGENT NOTIFICATIONS BANNER
+      ═══════════════════════════════════════════════════════════════════════ */}
+      {urgentUnread.length > 0 && (
+        <motion.div variants={itemVariants}>
+          <Card className="glass-premium overflow-hidden border-red-300/50 dark:border-red-700/40 bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-950/30 dark:to-orange-950/20">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-xl bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 shrink-0 animate-pulse">
+                  <AlertCircle className="size-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-sm font-semibold text-red-700 dark:text-red-400">Notifications urgentes</h3>
+                    <Badge className="h-5 min-w-[20px] px-1.5 text-[10px] font-bold bg-red-500 text-white border-0 rounded-full">
+                      {urgentUnread.length}
+                    </Badge>
+                  </div>
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {urgentUnread.slice(0, 3).map(notif => (
+                      <div key={notif.id} className="flex items-start gap-2 p-2 rounded-lg bg-white/60 dark:bg-white/5 backdrop-blur-sm">
+                        <div className={`mt-0.5 size-2 rounded-full shrink-0 ${
+                          notif.type === 'error' ? 'bg-red-500' : notif.type === 'warning' ? 'bg-amber-500' : 'bg-sky-500'
+                        }`} />
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-red-800 dark:text-red-300 truncate">{notif.title}</p>
+                          <p className="text-[11px] text-red-700/70 dark:text-red-400/70 line-clamp-2">{notif.message}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="text-xs text-red-600 dark:text-red-400 px-0 mt-1 h-auto"
+                    onClick={() => setActiveTab('notifications')}
+                  >
+                    Voir toutes les notifications →
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════
           QUICK ACTIONS
       ═══════════════════════════════════════════════════════════════════════ */}
       <motion.div variants={itemVariants}>
@@ -544,9 +669,14 @@ export function CitizenPortalPage() {
             <Search className="size-4" />
             Suivi
           </TabsTrigger>
-          <TabsTrigger value="notifications" className="gap-1.5 text-sm rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0B2E58] data-[state=active]:to-[#134A8E] data-[state=active]:text-white data-[state=active]:shadow-navy dark:data-[state=active]:from-[#3B7DD8] dark:data-[state=active]:to-[#2A6BC7] transition-all duration-300">
+          <TabsTrigger value="notifications" className="gap-1.5 text-sm rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0B2E58] data-[state=active]:to-[#134A8E] data-[state=active]:text-white data-[state=active]:shadow-navy dark:data-[state=active]:from-[#3B7DD8] dark:data-[state=active]:to-[#2A6BC7] transition-all duration-300 relative">
             <Bell className="size-4" />
             Notifications
+            {citizenUnreadCount > 0 && (
+              <Badge className="ml-0.5 h-5 min-w-[20px] px-1.5 text-[10px] font-bold bg-red-500 text-white border-0 rounded-full animate-pulse">
+                {citizenUnreadCount}
+              </Badge>
+            )}
           </TabsTrigger>
           <TabsTrigger value="transparence" className="gap-1.5 text-sm rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#0B2E58] data-[state=active]:to-[#134A8E] data-[state=active]:text-white data-[state=active]:shadow-navy dark:data-[state=active]:from-[#3B7DD8] dark:data-[state=active]:to-[#2A6BC7] transition-all duration-300">
             <Shield className="size-4" />
@@ -1045,7 +1175,8 @@ export function CitizenPortalPage() {
         ═════════════════════════════════════════════════════════════════════ */}
         <TabsContent value="notifications">
           <div className="space-y-4 mt-4">
-            {/* Real-time Activity Feed — inspired by e-Estonia notifications */}
+
+            {/* ─── CITIZEN NOTIFICATIONS FROM STORE ─────────────────────── */}
             <Card className="glass-premium overflow-hidden border-[#0B2E58]/10 dark:border-[#3B7DD8]/20">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
@@ -1055,23 +1186,175 @@ export function CitizenPortalPage() {
                     </div>
                     <div>
                       <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
-                        Activit&eacute; de vos demandes
+                        Vos notifications
                       </CardTitle>
-                      <CardDescription className="text-xs">Derni&egrave;res mises &agrave; jour de vos dossiers</CardDescription>
+                      <CardDescription className="text-xs">
+                        Alertes concernant vos demandes et documents
+                        {citizenUnreadCount > 0 && (
+                          <span className="ml-1 text-red-600 dark:text-red-400 font-medium">
+                            — {citizenUnreadCount} non lue{citizenUnreadCount > 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </CardDescription>
                     </div>
                   </div>
-                  <Badge className="badge-premium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-0 text-[10px] gap-1">
-                    <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    En direct
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    {citizenUnreadCount > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-[11px] h-7 text-[#0B2E58] dark:text-[#3B7DD8] hover:text-[#0B2E58]/80"
+                        onClick={markAllAsRead}
+                      >
+                        <Check className="size-3 mr-1" />
+                        Tout marquer lu
+                      </Button>
+                    )}
+                    <Badge className="badge-premium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-0 text-[10px] gap-1">
+                      <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      En direct
+                    </Badge>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {/* Type filter tabs */}
+                <div className="flex flex-wrap gap-1.5 mb-4">
+                  {[
+                    { value: 'all' as const, label: 'Toutes', icon: Bell },
+                    { value: 'info' as const, label: 'Info', icon: MessageSquare },
+                    { value: 'success' as const, label: 'Succès', icon: CheckCircle2 },
+                    { value: 'warning' as const, label: 'Alerte', icon: AlertCircle },
+                    { value: 'error' as const, label: 'Erreur', icon: XCircle },
+                  ].map(f => (
+                    <Button
+                      key={f.value}
+                      variant={notifFilter === f.value ? 'default' : 'outline'}
+                      size="sm"
+                      className={`text-[11px] h-7 gap-1 ${
+                        notifFilter === f.value
+                          ? 'bg-gradient-to-r from-[#0B2E58] to-[#134A8E] text-white shadow-navy'
+                          : ''
+                      }`}
+                      onClick={() => setNotifFilter(f.value)}
+                    >
+                      <f.icon className="size-3" />
+                      {f.label}
+                      {f.value === 'all' && citizenUnreadCount > 0 && (
+                        <Badge className="ml-0.5 h-4 min-w-[16px] px-1 text-[9px] font-bold bg-red-500 text-white border-0 rounded-full">
+                          {citizenUnreadCount}
+                        </Badge>
+                      )}
+                    </Button>
+                  ))}
+                </div>
+
+                {citizenNotifications.length === 0 ? (
+                  <div className="text-center py-10">
+                    <Bell className="size-12 text-muted-foreground/20 mx-auto mb-3" />
+                    <p className="text-sm text-muted-foreground font-medium">Aucune notification</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {notifFilter !== 'all'
+                        ? 'Aucune notification de ce type. Modifiez le filtre ci-dessus.'
+                        : 'Vos notifications relatives aux demandes et documents apparaîtront ici.'
+                      }
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-[28rem] overflow-y-auto pr-1">
+                    {citizenNotifications.map((notif) => {
+                      const typeConfig = NOTIF_TYPE_CONFIG[notif.type]
+                      return (
+                        <motion.div
+                          key={notif.id}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className={`card-interactive group relative flex items-start gap-3 p-3.5 rounded-xl border-l-3 transition-all ${
+                            !notif.read
+                              ? `${typeConfig.borderClass} bg-gradient-to-r ${typeConfig.bgLight} dark:${typeConfig.bgDark}`
+                              : 'border-l-muted/30 opacity-70 hover:opacity-100'
+                          }`}
+                        >
+                          {/* Unread dot indicator */}
+                          {!notif.read && (
+                            <div className="absolute top-3.5 right-3 size-2 rounded-full bg-red-500 animate-pulse" />
+                          )}
+
+                          {/* Type icon */}
+                          <div className={`mt-0.5 p-2 rounded-lg shrink-0 ${typeConfig.iconBg}`}>
+                            <typeConfig.icon className={`size-4 ${typeConfig.iconColor}`} />
+                          </div>
+
+                          {/* Content */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                              <p className={`text-sm font-semibold leading-tight ${!notif.read ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                {notif.title}
+                              </p>
+                              <Badge className={`text-[9px] h-4 px-1.5 border-0 ${typeConfig.badgeClass}`}>
+                                {typeConfig.label}
+                              </Badge>
+                              {notif.priority === 'haute' && (
+                                <Badge className="text-[9px] h-4 px-1.5 bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 border-0">
+                                  Urgent
+                                </Badge>
+                              )}
+                              <Badge variant="outline" className="text-[9px] h-4 px-1.5">
+                                {notif.category === 'demande' ? 'Demande' : 'Document'}
+                              </Badge>
+                            </div>
+                            <p className={`text-xs leading-relaxed ${!notif.read ? 'text-foreground/80' : 'text-muted-foreground'}`}>
+                              {notif.message}
+                            </p>
+                            <div className="flex items-center gap-2 mt-1.5">
+                              <p className="text-[10px] text-muted-foreground">
+                                {formatNotifDate(notif.date)}
+                              </p>
+                              {!notif.read && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-[10px] h-5 px-1.5 text-[#0B2E58] dark:text-[#3B7DD8] hover:text-[#0B2E58]/80"
+                                  onClick={(e) => { e.stopPropagation(); markAsRead(notif.id) }}
+                                >
+                                  <Check className="size-2.5 mr-0.5" />
+                                  Marquer lu
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </motion.div>
+                      )
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* ─── ACTIVITY FEED (existing request processing notes) ──────── */}
+            <Card className="glass-premium overflow-hidden border-[#0B2E58]/10 dark:border-[#3B7DD8]/20">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-lg bg-gradient-to-br from-[#C8A45C] to-[#A88A3C] text-[#0B2E58] shadow-sm">
+                      <Clock className="size-4" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
+                        Historique de vos demandes
+                      </CardTitle>
+                      <CardDescription className="text-xs">Détails de traitement de chaque dossier</CardDescription>
+                    </div>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
                 {myRequests.length === 0 ? (
                   <div className="text-center py-8">
-                    <Bell className="size-10 text-muted-foreground/20 mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">Aucune activit&eacute; &agrave; afficher</p>
-                    <p className="text-xs text-muted-foreground">Soumettez une demande pour voir les mises &agrave; jour ici</p>
+                    <Clock className="size-10 text-muted-foreground/20 mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">Aucune activité à afficher</p>
+                    <p className="text-xs text-muted-foreground">Soumettez une demande pour voir les mises à jour ici</p>
                   </div>
                 ) : (
                   <div className="space-y-1 max-h-80 overflow-y-auto">
