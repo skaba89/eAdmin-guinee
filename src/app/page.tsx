@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
-import { useAppStore, ROLE_DEFAULT_PAGE, type AppPage, type UserRole } from '@/store/app-store'
+import { useAppStore, ROLE_DEFAULT_PAGE, type AppPage } from '@/store/app-store'
+import { useCitizenRequestsStore } from '@/store/citizen-requests-store'
+import { canAccessPage, getDefaultPage } from '@/lib/rbac'
 
 // Lazy load all page components to reduce initial bundle size
 const LandingPage = dynamic(() => import('@/components/landing/landing-page').then(m => ({ default: m.LandingPage })), { ssr: false })
@@ -79,17 +81,30 @@ const appPages: Record<string, React.ComponentType> = {
   'ai-assistant': AiAssistantPage,
 }
 
-const ROLE_PAGE_ACCESS: Record<UserRole, AppPage[]> = {
-  citizen: ['citizen-portal', 'public-citizen-portal', 'ai-assistant'],
-  mairie: ['mairie-dashboard', 'service-requests', 'ged', 'courriers', 'ai-assistant', 'settings', 'birth-certificate-db', 'notifications'],
-  admin_general: ['dashboard', 'service-requests', 'ged', 'courriers', 'workflow', 'signatures', 'analytics', 'citizen-portal', 'ai-assistant', 'admin', 'users', 'notifications', 'audit-logs', 'settings', 'birth-certificate-db'],
-  agence: ['agence-dashboard', 'service-requests', 'ged', 'ai-assistant', 'settings', 'notifications'],
-  ministere: ['dashboard', 'service-requests', 'ged', 'courriers', 'workflow', 'signatures', 'analytics', 'citizen-portal', 'ai-assistant', 'settings', 'birth-certificate-db', 'notifications', 'audit-logs'],
-  super_admin: Object.keys(appPages) as AppPage[],
-}
+// RBAC is now centralized in src/lib/rbac.ts — canAccessPage() and getDefaultPage()
+// No more duplicate ROLE_PAGE_ACCESS here.
 
 export default function Home() {
   const { currentPage, isAuth, user, navigate } = useAppStore()
+  const checkAndRejectExpiredRequests = useCitizenRequestsStore((s) => s.checkAndRejectExpiredRequests)
+  const deadlineCheckRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Global deadline enforcement: run on app load + every 30 minutes
+  useEffect(() => {
+    // Run immediately on mount
+    checkAndRejectExpiredRequests()
+
+    // Then periodically every 30 minutes
+    deadlineCheckRef.current = setInterval(() => {
+      checkAndRejectExpiredRequests()
+    }, 30 * 60 * 1000)
+
+    return () => {
+      if (deadlineCheckRef.current) {
+        clearInterval(deadlineCheckRef.current)
+      }
+    }
+  }, [checkAndRejectExpiredRequests])
 
   // Auth pages (login, register, etc.)
   if (!isAuth && currentPage in authPages) {
@@ -97,15 +112,12 @@ export default function Home() {
     return <AuthComponent />
   }
 
-  // Authenticated app pages
+  // Authenticated app pages — using unified RBAC from src/lib/rbac.ts
   if (isAuth) {
-    const userRole = (user?.role || 'citizen') as UserRole
-    const allowedPages = ROLE_PAGE_ACCESS[userRole] || []
-    const defaultPage = ROLE_DEFAULT_PAGE[userRole] || 'dashboard'
-
-    // If user tries to access a page they don't have access to, redirect to default
-    const hasAccess = allowedPages.includes(currentPage as AppPage)
-    const effectivePage = hasAccess ? currentPage : defaultPage
+    const page = currentPage as AppPage
+    const defaultPage = getDefaultPage(user)
+    const hasAccess = canAccessPage(user, page)
+    const effectivePage = hasAccess ? page : defaultPage
 
     // Redirect if user is on a page they can't access
     if (!hasAccess) {

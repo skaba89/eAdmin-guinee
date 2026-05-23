@@ -23,11 +23,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
 } from '@/components/ui/dialog'
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu'
-import { useCitizenRequestsStore, type CitizenRequest, type RequestStatus, type UploadedDocument, type GeneratedDocument, getDeadlineDays, isDeadlineExceeded, isDeadlineApproaching } from '@/store/citizen-requests-store'
+import { useCitizenRequestsStore, type CitizenRequest, type RequestStatus, type UploadedDocument, type GeneratedDocument, isDeadlineExceeded, isDeadlineApproaching } from '@/store/citizen-requests-store'
 import { formatFileSize, getFileTypeIcon, downloadUploadedFile, ACCEPTED_FILE_TYPES, processFile } from '@/lib/document-utils'
 import { filterRequestsByRLS, canProcessRequest, getRLSScopeDescription } from '@/lib/rbac'
 import { useAppStore } from '@/store/app-store'
@@ -856,29 +852,12 @@ export function ServiceRequestsPage() {
                     )}
                   </div>
 
-                  {/* Generate Official Document */}
-                  {selectedRequest.status === 'validee' && (
-                    <Button size="sm" className="btn-gold w-full gap-2" onClick={() => setGenerateDialogOpen(true)}>
-                      <Stamp className="size-4" />
-                      Générer le document officiel
-                    </Button>
-                  )}
-
-                  {/* Download Generated Document */}
+                  {/* Download Generated Document (only if no generatedDocument section already shown above) */}
                   {(selectedRequest.status === 'prete' || selectedRequest.status === 'livree') && selectedRequest.generatedDocument && (
-                    <div className="space-y-2">
-                      <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800/40">
-                        <div className="flex items-center gap-2 mb-1">
-                          <FileCheck className="size-4 text-emerald-600 dark:text-emerald-400" />
-                          <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Document officiel généré</p>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground">Généré le {new Date(selectedRequest.generatedDocument.generatedAt).toLocaleDateString('fr-FR')} par {selectedRequest.generatedDocument.generatedBy}</p>
-                      </div>
-                      <Button size="sm" className="btn-premium w-full gap-2" onClick={handleDownloadGeneratedDoc}>
-                        <Download className="size-4" />
-                        Télécharger le document officiel
-                      </Button>
-                    </div>
+                    <Button size="sm" className="btn-premium w-full gap-2" onClick={handleDownloadGeneratedDoc}>
+                      <Download className="size-4" />
+                      Télécharger le document officiel
+                    </Button>
                   )}
                 </CardContent>
               </Card>
