@@ -201,3 +201,26 @@ Stage Summary:
 - AI Agent page now has all required properties on CitizenRequest
 - Access guard no longer crashes on audit logging
 - MFA bypass implemented until page is built
+---
+Task ID: 1
+Agent: Main Agent
+Task: Corriger les bugs d'affichage des popups Dialog dans l'application eAdmin Guinée
+
+Work Log:
+- Analysé la capture d'écran uploadée par l'utilisateur montrant les demandes sans popup
+- Exploré le code des popups/modals dans 4 pages principales: citizen-portal, service-requests, mairie-dashboard, agence-dashboard
+- Identifié que le composant Dialog de Radix UI ne rendait PAS du tout dans le DOM
+- Testé avec le navigateur agent-browser: cliquer sur les cartes de demande ne déclenchait aucun dialog
+- Découvert la cause racine: la classe CSS `glass-premium` a `position: relative` qui surcharge le `position: fixed` du DialogContent (car les classes Tailwind sont dans un @layer, ce qui donne une spécificité inférieure aux classes non-layer comme glass-premium)
+- Retiré `glass-premium` des DialogContent dans: citizen-portal-page.tsx (2 dialogs), mairie-dashboard-page.tsx (3 dialogs), agence-dashboard-page.tsx (3 dialogs)
+- Ajouté des règles CSS safety net dans globals.css pour forcer `position: fixed !important` sur les DialogContent avec glass-premium
+- Ajouté des règles pour désactiver `::before` sur DialogContent avec glass-premium (le pseudo-élément couvrait le contenu)
+- Corrigé le z-index des toasts de succès (z-50 → z-[60]) dans 8 pages pour ne pas bloquer les dialogs
+- Testé avec le navigateur: le dialog s'ouvre maintenant correctement avec tout le contenu (statut, infos citoyen, timeline, documents, notes)
+- Build réussi, commité et poussé sur GitHub
+
+Stage Summary:
+- Bug principal corrigé: les popups Dialog s'affichent maintenant correctement
+- Cause racine: `glass-premium` CSS class `position: relative` surchargeait `position: fixed` du DialogContent
+- 10 fichiers modifiés, poussé sur https://github.com/skaba89/eAdmin-guinee
+- Les 5 bugs critiques identifiés précédemment étaient déjà corrigés dans le code (AI properties, aiAutoProcess, addActionLog→addLog, MFA page, regex)
