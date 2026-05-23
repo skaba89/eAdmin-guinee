@@ -28,7 +28,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
 } from '@/components/ui/dialog'
 import { useAppStore } from '@/store/app-store'
-import { useCitizenRequestsStore, type CitizenRequest, type RequestStatus, type UploadedDocument, type GeneratedDocument, type SatisfactionRating, getDeadlineDays, isDeadlineExceeded, isDeadlineApproaching } from '@/store/citizen-requests-store'
+import { useCitizenRequestsStore, type CitizenRequest, type RequestStatus, type UploadedDocument, type GeneratedDocument, type SatisfactionRating, getDeadlineDays, isDeadlineExceeded, isDeadlineApproaching, isDeadlineCritical, countRemainingBusinessDays } from '@/store/citizen-requests-store'
 import { useNotificationsStore, type NotificationType, type AppNotification } from '@/store/notifications-store'
 import { processFile, formatFileSize, getFileTypeIcon, downloadUploadedFile, downloadCitizenDocument, ACCEPTED_FILE_TYPES, MAX_FILE_SIZE, createGeneratedDocument } from '@/lib/document-utils'
 
@@ -867,13 +867,15 @@ export function CitizenPortalPage() {
                               </div>
                               {/* SLA & Legal deadline display */}
                               {!['livree', 'rejetee'].includes(req.status) && getDaysRemaining(req) !== null && (
-                                <div className={`flex items-center gap-1 text-xs mt-1 ${isDeadlineExceeded(req) ? 'text-red-600 dark:text-red-400 font-semibold' : isDeadlineApproaching(req) ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-muted-foreground'}`}>
+                                <div className={`flex items-center gap-1 text-xs mt-1 ${isDeadlineExceeded(req) ? 'text-red-600 dark:text-red-400 font-semibold' : isDeadlineApproaching(req) ? 'text-amber-600 dark:text-amber-400 font-medium' : isDeadlineCritical(req) ? 'text-orange-600 dark:text-orange-400 font-medium' : 'text-muted-foreground'}`}>
                                   <Clock className="size-3" />
                                   {isDeadlineExceeded(req)
                                     ? `Délai légal dépassé de ${Math.abs(getDaysRemaining(req)!)} jour(s) ouvré(s)`
                                     : isDeadlineApproaching(req)
                                       ? `Délai légal : ${getDaysRemaining(req)} jour(s) ouvré(s) restant(s) — Approche de la date limite !`
-                                      : `Délai légal : ${getDaysRemaining(req)} jour(s) ouvré(s) restant(s)`
+                                      : isDeadlineCritical(req)
+                                        ? `Délai légal : ${getDaysRemaining(req)} jour(s) ouvré(s) restant(s) — Escalade superviseur`
+                                        : `Délai légal : ${getDaysRemaining(req)} jour(s) ouvré(s) restant(s)`
                                   }
                                 </div>
                               )}
@@ -1817,7 +1819,9 @@ export function CitizenPortalPage() {
                       ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/40' 
                       : isDeadlineApproaching(selectedRequest)
                         ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800/40'
-                        : 'bg-gradient-to-r from-[#0B2E58]/5 to-[#3B7DD8]/5 dark:from-[#3B7DD8]/10 dark:to-[#0B2E58]/10 border-[#0B2E58]/10 dark:border-[#3B7DD8]/20'
+                        : isDeadlineCritical(selectedRequest)
+                          ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800/40'
+                          : 'bg-gradient-to-r from-[#0B2E58]/5 to-[#3B7DD8]/5 dark:from-[#3B7DD8]/10 dark:to-[#0B2E58]/10 border-[#0B2E58]/10 dark:border-[#3B7DD8]/20'
                   }`}>
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="text-xs font-medium text-[#0B2E58] dark:text-[#3B7DD8]">Délai légal</span>
@@ -1826,7 +1830,9 @@ export function CitizenPortalPage() {
                           ? <span className="text-red-600 dark:text-red-400">⚠ Délai dépassé de {Math.abs(getDaysRemaining(selectedRequest)!)}j ouvré(s)</span>
                           : isDeadlineApproaching(selectedRequest)
                             ? <span className="text-amber-600 dark:text-amber-400">{getDaysRemaining(selectedRequest)}j ouvré(s) restants — Approche !</span>
-                            : <span className="text-emerald-600 dark:text-emerald-400">{getDaysRemaining(selectedRequest)}j ouvré(s) restants</span>
+                            : isDeadlineCritical(selectedRequest)
+                              ? <span className="text-orange-600 dark:text-orange-400">{getDaysRemaining(selectedRequest)}j ouvré(s) restants — Escalade superviseur</span>
+                              : <span className="text-emerald-600 dark:text-emerald-400">{getDaysRemaining(selectedRequest)}j ouvré(s) restants</span>
                         }
                       </span>
                     </div>
@@ -1837,7 +1843,9 @@ export function CitizenPortalPage() {
                             ? 'bg-red-500'
                             : isDeadlineApproaching(selectedRequest)
                               ? 'bg-amber-500'
-                              : 'bg-gradient-to-r from-[#0B2E58] to-[#3B7DD8]'
+                              : isDeadlineCritical(selectedRequest)
+                                ? 'bg-orange-500'
+                                : 'bg-gradient-to-r from-[#0B2E58] to-[#3B7DD8]'
                         }`}
                         style={{ 
                           width: `${Math.min(100, Math.max(0, (() => {

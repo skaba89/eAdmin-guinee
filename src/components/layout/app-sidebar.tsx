@@ -11,6 +11,8 @@ import {
   Home, Briefcase, BookOpen,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { getAccessiblePages, canAccessPage } from '@/lib/rbac'
+import type { UserInfo } from '@/store/app-store'
 
 // ─── NAV ITEM DEFINITION ─────────────────────────────────────────────────────
 interface NavItem {
@@ -19,104 +21,72 @@ interface NavItem {
   icon: string
 }
 
-// ─── ROLE-BASED NAVIGATION ───────────────────────────────────────────────────
-const ROLE_NAV: Record<UserRole, { main: NavItem[]; admin?: NavItem[] }> = {
-  citizen: {
-    main: [
-      { page: 'citizen-portal', label: 'Mon Portail', icon: 'Home' },
-      { page: 'public-citizen-portal', label: 'Services publics', icon: 'Briefcase' },
-      { page: 'ai-assistant', label: 'Assistant IA', icon: 'Sparkles' },
-    ],
-  },
-  mairie: {
-    main: [
-      { page: 'mairie-dashboard', label: 'Tableau de bord', icon: 'LayoutDashboard' },
-      { page: 'service-requests', label: 'Demandes citoyennes', icon: 'ClipboardCheck' },
-      { page: 'ged', label: 'GED', icon: 'FileText' },
-      { page: 'courriers', label: 'Courriers', icon: 'Mail' },
-      { page: 'ai-assistant', label: 'Assistant IA', icon: 'Sparkles' },
-      { page: 'settings', label: 'Paramètres', icon: 'Settings' },
-    ],
-  },
-  admin_general: {
-    main: [
-      { page: 'dashboard', label: 'Tableau de bord', icon: 'LayoutDashboard' },
-      { page: 'service-requests', label: 'Demandes citoyennes', icon: 'ClipboardCheck' },
-      { page: 'ged', label: 'Documents (GED)', icon: 'FileText' },
-      { page: 'courriers', label: 'Courriers', icon: 'Mail' },
-      { page: 'workflow', label: 'Workflows', icon: 'GitBranch' },
-      { page: 'signatures', label: 'Signatures', icon: 'PenTool' },
-      { page: 'analytics', label: 'Analytics', icon: 'BarChart3' },
-      { page: 'citizen-portal', label: 'Portail Citoyen', icon: 'Users' },
-      { page: 'ai-assistant', label: 'Assistant IA', icon: 'Sparkles' },
-    ],
-    admin: [
-      { page: 'admin', label: 'Administration', icon: 'Shield' },
-      { page: 'users', label: 'Utilisateurs', icon: 'UserCog' },
-      { page: 'notifications', label: 'Notifications', icon: 'Bell' },
-      { page: 'audit-logs', label: 'Audit Logs', icon: 'ScrollText' },
-      { page: 'settings', label: 'Paramètres', icon: 'Settings' },
-    ],
-  },
-  agence: {
-    main: [
-      { page: 'agence-dashboard', label: 'Tableau de bord', icon: 'LayoutDashboard' },
-      { page: 'service-requests', label: 'Demandes citoyennes', icon: 'ClipboardCheck' },
-      { page: 'ged', label: 'GED', icon: 'FileText' },
-      { page: 'ai-assistant', label: 'Assistant IA', icon: 'Sparkles' },
-      { page: 'settings', label: 'Paramètres', icon: 'Settings' },
-    ],
-  },
-  ministere: {
-    main: [
-      { page: 'dashboard', label: 'Tableau de bord', icon: 'LayoutDashboard' },
-      { page: 'service-requests', label: 'Toutes les demandes', icon: 'ClipboardCheck' },
-      { page: 'ged', label: 'GED', icon: 'FileText' },
-      { page: 'courriers', label: 'Courriers', icon: 'Mail' },
-      { page: 'workflow', label: 'Workflows', icon: 'GitBranch' },
-      { page: 'signatures', label: 'Signatures', icon: 'PenTool' },
-      { page: 'ai-assistant', label: 'Assistant IA', icon: 'Sparkles' },
-      { page: 'settings', label: 'Paramètres', icon: 'Settings' },
-    ],
-  },
-  super_admin: {
-    main: [
-      { page: 'dashboard', label: 'Tableau de bord', icon: 'LayoutDashboard' },
-      { page: 'service-requests', label: 'Demandes citoyennes', icon: 'ClipboardCheck' },
-      { page: 'ged', label: 'Documents (GED)', icon: 'FileText' },
-      { page: 'courriers', label: 'Courriers', icon: 'Mail' },
-      { page: 'workflow', label: 'Workflows', icon: 'GitBranch' },
-      { page: 'signatures', label: 'Signatures', icon: 'PenTool' },
-      { page: 'analytics', label: 'Analytics', icon: 'BarChart3' },
-      { page: 'citizen-portal', label: 'Portail Citoyen', icon: 'Users' },
-      { page: 'mairie-dashboard', label: 'Espace Mairie', icon: 'Building2' },
-      { page: 'agence-dashboard', label: 'Espace Agence', icon: 'Fingerprint' },
-      { page: 'ai-assistant', label: 'Assistant IA', icon: 'Sparkles' },
-    ],
-    admin: [
-      { page: 'admin', label: 'Administration', icon: 'Shield' },
-      { page: 'users', label: 'Utilisateurs', icon: 'UserCog' },
-      { page: 'notifications', label: 'Notifications', icon: 'Bell' },
-      { page: 'audit-logs', label: 'Audit Logs', icon: 'ScrollText' },
-      { page: 'settings', label: 'Paramètres', icon: 'Settings' },
-    ],
-  },
+// ─── ALL PAGE METADATA (single source of truth for labels & icons) ───────────
+const PAGE_META: Record<AppPage, { label: string; icon: string; section: 'main' | 'admin' }> = {
+  // Main modules
+  'citizen-portal': { label: 'Mon Portail', icon: 'Home', section: 'main' },
+  'public-citizen-portal': { label: 'Services publics', icon: 'Briefcase', section: 'main' },
+  'mairie-dashboard': { label: 'Tableau de bord Mairie', icon: 'LayoutDashboard', section: 'main' },
+  'agence-dashboard': { label: 'Tableau de bord Agence', icon: 'LayoutDashboard', section: 'main' },
+  'dashboard': { label: 'Tableau de bord', icon: 'LayoutDashboard', section: 'main' },
+  'service-requests': { label: 'Demandes citoyennes', icon: 'ClipboardCheck', section: 'main' },
+  'ged': { label: 'GED', icon: 'FileText', section: 'main' },
+  'courriers': { label: 'Courriers', icon: 'Mail', section: 'main' },
+  'workflow': { label: 'Workflows', icon: 'GitBranch', section: 'main' },
+  'signatures': { label: 'Signatures', icon: 'PenTool', section: 'main' },
+  'analytics': { label: 'Analytics', icon: 'BarChart3', section: 'main' },
+  'birth-certificate-db': { label: 'Base État Civil', icon: 'BookOpen', section: 'main' },
+  'ai-assistant': { label: 'Assistant IA', icon: 'Sparkles', section: 'main' },
+  'settings': { label: 'Paramètres', icon: 'Settings', section: 'main' },
+  'notifications': { label: 'Notifications', icon: 'Bell', section: 'main' },
+  // Admin modules
+  'admin': { label: 'Administration', icon: 'Shield', section: 'admin' },
+  'users': { label: 'Utilisateurs', icon: 'UserCog', section: 'admin' },
+  'audit-logs': { label: 'Audit Logs', icon: 'ScrollText', section: 'admin' },
+  // Non-sidebar pages (public/auth)
+  'landing': { label: 'Accueil', icon: 'Home', section: 'main' },
+  'about': { label: 'À propos', icon: 'FileText', section: 'main' },
+  'services': { label: 'Services', icon: 'Briefcase', section: 'main' },
+  'solutions': { label: 'Solutions', icon: 'Sparkles', section: 'main' },
+  'pricing': { label: 'Tarifs', icon: 'BarChart3', section: 'main' },
+  'contact': { label: 'Contact', icon: 'Mail', section: 'main' },
+  'blog': { label: 'Blog', icon: 'FileText', section: 'main' },
+  'faq': { label: 'FAQ', icon: 'FileText', section: 'main' },
+  'demo': { label: 'Démo', icon: 'LayoutDashboard', section: 'main' },
+  'login': { label: 'Connexion', icon: 'LogOut', section: 'main' },
+  'register': { label: 'Inscription', icon: 'Users', section: 'main' },
+  'mfa': { label: 'MFA', icon: 'Shield', section: 'main' },
 }
 
-// Role-specific extra nav items
-const ROLE_EXTRA_NAV: Partial<Record<UserRole, NavItem[]>> = {
-  mairie: [
-    { page: 'birth-certificate-db', label: 'Base État Civil', icon: 'BookOpen' },
-  ],
-  admin_general: [
-    { page: 'birth-certificate-db', label: 'Base État Civil', icon: 'BookOpen' },
-  ],
-  ministere: [
-    { page: 'birth-certificate-db', label: 'Base État Civil', icon: 'BookOpen' },
-  ],
-  super_admin: [
-    { page: 'birth-certificate-db', label: 'Base État Civil', icon: 'BookOpen' },
-  ],
+// Pages that should NOT appear in the sidebar
+const HIDDEN_PAGES: AppPage[] = [
+  'landing', 'about', 'services', 'solutions', 'pricing',
+  'contact', 'blog', 'faq', 'demo', 'login', 'register', 'mfa',
+  'public-citizen-portal', // accessed via citizen-portal tab
+]
+
+/**
+ * Build navigation items dynamically from RBAC.
+ * Only pages the user can access (via canAccessPage) appear in the sidebar.
+ */
+function buildNavItems(user: UserInfo | null): { main: NavItem[]; admin: NavItem[] } {
+  const accessiblePages = getAccessiblePages(user)
+  const main: NavItem[] = []
+  const admin: NavItem[] = []
+
+  for (const page of accessiblePages) {
+    if (HIDDEN_PAGES.includes(page)) continue
+    const meta = PAGE_META[page]
+    if (!meta) continue
+    const item: NavItem = { page, label: meta.label, icon: meta.icon }
+    if (meta.section === 'admin') {
+      admin.push(item)
+    } else {
+      main.push(item)
+    }
+  }
+
+  return { main, admin }
 }
 
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -263,8 +233,7 @@ export function AppSidebar() {
   const { currentPage, navigate, sidebarCollapsed, toggleSidebarCollapse, logout, user } = useAppStore()
 
   const userRole = (user?.role || 'citizen') as UserRole
-  const navConfig = ROLE_NAV[userRole] || ROLE_NAV.citizen
-  const extraNav = ROLE_EXTRA_NAV[userRole] || []
+  const { main: navItems, admin: adminItems } = buildNavItems(user)
 
   return (
     <motion.aside
@@ -331,7 +300,7 @@ export function AppSidebar() {
         <div>
           <SectionLabel collapsed={sidebarCollapsed}>Modules</SectionLabel>
           <div className="space-y-0.5">
-            {navConfig.main.map((item) => (
+            {navItems.map((item) => (
               <PremiumNavItem
                 key={item.page}
                 page={item.page}
@@ -345,32 +314,12 @@ export function AppSidebar() {
           </div>
         </div>
 
-        {/* Extra nav items */}
-        {extraNav.length > 0 && (
-          <div>
-            <SectionLabel collapsed={sidebarCollapsed}>Accès rapide</SectionLabel>
-            <div className="space-y-0.5">
-              {extraNav.map((item) => (
-                <PremiumNavItem
-                  key={item.page}
-                  page={item.page}
-                  label={item.label}
-                  icon={item.icon}
-                  isActive={currentPage === item.page}
-                  collapsed={sidebarCollapsed}
-                  onClick={() => navigate(item.page)}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* Admin section */}
-        {navConfig.admin && navConfig.admin.length > 0 && (
+        {adminItems.length > 0 && (
           <div>
             <SectionLabel collapsed={sidebarCollapsed}>Administration</SectionLabel>
             <div className="space-y-0.5">
-              {navConfig.admin.map((item) => (
+              {adminItems.map((item) => (
                 <PremiumNavItem
                   key={item.page}
                   page={item.page}

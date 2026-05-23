@@ -636,24 +636,17 @@ export const useAIAgentStore = create<AIAgentState>()(
                 })
               })()
 
-              useCitizenRequestsStore.setState((state) => ({
-                requests: state.requests.map(r =>
-                  r.id === requestId
-                    ? {
-                        ...r,
-                        status: newStatus,
-                        timeline: newTimeline,
-                        updatedAt: now,
-                        assignedAgent: r.assignedAgent || 'Agent IA Réel',
-                        aiProcessingStatus: aiStatus,
-                        aiProcessingDate: now,
-                        aiConfidence: confidence,
-                        aiProcessingDetails: details,
-                        processingNotes: [...r.processingNotes, aiNote],
-                      }
-                    : r
-                ),
-              }))
+              useCitizenRequestsStore.getState().updateRequestAIFields(requestId, {
+                status: newStatus,
+                timeline: newTimeline,
+                updatedAt: now,
+                assignedAgent: req.assignedAgent || 'Agent IA Réel',
+                aiProcessingStatus: aiStatus,
+                aiProcessingDate: now,
+                aiConfidence: confidence,
+                aiProcessingDetails: details,
+                processingNotes: [...req.processingNotes, aiNote],
+              })
 
               // If escalated, add to escalation queue
               if (aiDecision.decision === 'escaladee' || aiDecision.needsHumanReview) {
@@ -1329,67 +1322,25 @@ export const useAIAgentStore = create<AIAgentState>()(
         const noteText = note || (action === 'approve' ? 'Approuvé par l\'agent' : action === 'reject' ? 'Rejeté par l\'agent' : 'Documents complémentaires demandés')
 
         if (action === 'approve') {
-          useCitizenRequestsStore.setState((state) => ({
-            requests: state.requests.map(r =>
-              r.id === escalation.requestId
-                ? {
-                    ...r,
-                    status: 'validee' as const,
-                    aiProcessingStatus: 'ai_auto_validated' as const,
-                    updatedAt: now,
-                    processingNotes: [...r.processingNotes, {
-                      id: `note-esc-${Date.now()}`,
-                      author: 'Agent (résolution escalade)',
-                      authorRole: 'Agent',
-                      text: `✅ Escalade résolue — ${noteText}`,
-                      date: now,
-                      type: 'decision' as const,
-                    }],
-                  }
-                : r
-            ),
-          }))
+          const reqStore = useCitizenRequestsStore.getState()
+          reqStore.updateRequestStatus(escalation.requestId, 'validee', `Escalade résolue — ${noteText}`)
+          reqStore.updateRequestAIFields(escalation.requestId, {
+            aiProcessingStatus: 'ai_auto_validated',
+            updatedAt: now,
+          })
         } else if (action === 'reject') {
-          useCitizenRequestsStore.setState((state) => ({
-            requests: state.requests.map(r =>
-              r.id === escalation.requestId
-                ? {
-                    ...r,
-                    status: 'rejetee' as const,
-                    aiProcessingStatus: 'ai_auto_rejected' as const,
-                    updatedAt: now,
-                    processingNotes: [...r.processingNotes, {
-                      id: `note-esc-${Date.now()}`,
-                      author: 'Agent (résolution escalade)',
-                      authorRole: 'Agent',
-                      text: `❌ Escalade résolue — ${noteText}`,
-                      date: now,
-                      type: 'decision' as const,
-                    }],
-                  }
-                : r
-            ),
-          }))
+          const reqStore = useCitizenRequestsStore.getState()
+          reqStore.updateRequestStatus(escalation.requestId, 'rejetee', `Escalade résolue — ${noteText}`)
+          reqStore.updateRequestAIFields(escalation.requestId, {
+            aiProcessingStatus: 'ai_auto_rejected',
+            updatedAt: now,
+          })
         } else {
-          useCitizenRequestsStore.setState((state) => ({
-            requests: state.requests.map(r =>
-              r.id === escalation.requestId
-                ? {
-                    ...r,
-                    status: 'pieces_complementaires' as const,
-                    updatedAt: now,
-                    processingNotes: [...r.processingNotes, {
-                      id: `note-esc-${Date.now()}`,
-                      author: 'Agent (résolution escalade)',
-                      authorRole: 'Agent',
-                      text: `📋 Escalade résolue — ${noteText}`,
-                      date: now,
-                      type: 'info_complementaire' as const,
-                    }],
-                  }
-                : r
-            ),
-          }))
+          const reqStore = useCitizenRequestsStore.getState()
+          reqStore.updateRequestStatus(escalation.requestId, 'pieces_complementaires', `Escalade résolue — ${noteText}`)
+          reqStore.updateRequestAIFields(escalation.requestId, {
+            updatedAt: now,
+          })
         }
 
         // Log the resolution
@@ -1571,25 +1522,18 @@ export const useAIAgentStore = create<AIAgentState>()(
           })
         })()
 
-        // Update request
-        useCitizenRequestsStore.setState((state) => ({
-          requests: state.requests.map(r =>
-            r.id === requestId
-              ? {
-                  ...r,
-                  status: newStatus,
-                  timeline: newTimeline,
-                  updatedAt: now,
-                  assignedAgent: r.assignedAgent || 'Agent IA Autonome',
-                  aiProcessingStatus: aiStatus,
-                  aiProcessingDate: now,
-                  aiConfidence: decision.confidence,
-                  aiProcessingDetails: details,
-                  processingNotes: [...r.processingNotes, aiNote],
-                }
-              : r
-          ),
-        }))
+        // Update request using store actions
+        useCitizenRequestsStore.getState().updateRequestAIFields(requestId, {
+          status: newStatus,
+          timeline: newTimeline,
+          updatedAt: now,
+          assignedAgent: req.assignedAgent || 'Agent IA Autonome',
+          aiProcessingStatus: aiStatus,
+          aiProcessingDate: now,
+          aiConfidence: decision.confidence,
+          aiProcessingDetails: details,
+          processingNotes: [...req.processingNotes, aiNote],
+        })
 
         return decision
       },
