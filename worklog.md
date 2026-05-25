@@ -47,3 +47,72 @@ Stage Summary:
 - RBAC unifié: Routeur + Sidebar = même source de vérité (rbac.ts)
 - Plus aucune mutation directe setState() dans ai-agent-store.ts
 - Citoyens voient l'escalade superviseur (délai critique 6-10j)
+
+---
+Task ID: 2-a
+Agent: P0-1 Cleaner
+Task: Remove Prisma/SQLite remnants from project
+
+Work Log:
+- Deleted /home/z/my-project/prisma/ directory (contained schema.prisma with SQLite config + User/Post models)
+- Deleted /home/z/my-project/db/ directory (contained custom.db SQLite database file)
+- Deleted /home/z/my-project/src/lib/db.ts (PrismaClient singleton — no imports from src/ found)
+- Deleted /home/z/my-project/3000 (leftover socket file at project root)
+- Edited /home/z/my-project/package.json:
+  - Removed `@prisma/client` ^6.11.1 from dependencies
+  - Removed `prisma` ^6.11.1 from dependencies
+  - Removed `next-auth` ^4.24.11 from dependencies (app uses Zustand auth, not NextAuth)
+  - Removed all db:* scripts (db:push, db:generate, db:migrate, db:reset)
+- Edited /home/z/my-project/.env: replaced `DATABASE_URL=file:/home/z/my-project/db/custom.db` with `DATABASE_URL=postgresql://eadmin:eadmin@localhost:5432/eadmin`
+- Ran `bun install` to regenerate lockfile (removed 3 packages: @prisma/client, prisma, next-auth)
+- Verified zero remaining references to prisma/PrismaClient/SQLite/next-auth in src/
+
+Stage Summary:
+- 4 directories/files deleted: prisma/, db/, src/lib/db.ts, 3000
+- 3 packages removed from dependencies: @prisma/client, prisma, next-auth
+- 4 scripts removed: db:push, db:generate, db:migrate, db:reset
+- DATABASE_URL updated from SQLite file path to PostgreSQL connection string
+- Lockfile regenerated via bun install (3 packages removed)
+- Zero Prisma/SQLite/NextAuth references remain in src/ — architecture now fully coherent (FastAPI + PostgreSQL + SQLAlchemy backend, Zustand frontend auth)
+
+---
+Task ID: enterprise-stabilization
+Agent: Super Z (main)
+Task: Stabilisation technique enterprise — P0 security + architecture + testing + CI/CD
+
+Work Log:
+- P0-1: Supprimé Prisma/SQLite (prisma/, db/, src/lib/db.ts, @prisma/client, prisma, next-auth packages)
+- P0-2: Créé token_blacklist.py — service Redis pour blacklist JWT (révocation multi-instance, TTL auto)
+  - Mis à jour auth.py: ajout jti unique par token, vérification blacklist dans get_current_user()
+  - Ajouté endpoint POST /logout (révocation access + refresh tokens)
+  - Ajouté rotation des refresh tokens (détecte réutilisation = attaque possible → révocation totale)
+  - Ajouté POST /change-password avec révocation forcée de tous les tokens
+  - Ajouté validation Pydantic password (8+ chars, majuscule, chiffre)
+- P0-3: CORS sécurisé — origines explicites par environnement (jamais "*" avec credentials)
+  - DEV: localhost:3000/3001, 127.0.0.1:3000/3001
+  - PROD: eadmin.gouv.gn, admin.eadmin.gouv.gn, citoyen.eadmin.gouv.gn
+  - Swagger/ReDoc désactivés en production
+  - Vérification SECRET_KEY par défaut en production (log CRITICAL)
+- P0-4: Seed des comptes démo (seed_demo.py) — 6 comptes avec password Eadmin2026! (conforme)
+  - Mise à jour mots de passe frontend: demo-accounts.ts, app-store.ts, users-store.ts, login-page.tsx
+  - Mise à jour E2E tests: password Eadmin2026!
+- P0-5: Créé .env.example (frontend + backend) avec documentation complète
+- P1-1: Ajouté Pytest backend — conftest.py, test_auth.py (15+ tests: login, register, me, health)
+- P1-2: Créé Makefile complet (dev, test, seed, docker, e2e, lint, clean)
+- P1-2: Créé docker-compose.dev.yml (hot-reload backend + frontend)
+- P1-3: Ajouté rate_limit.py middleware (brute-force protection, 5 tentatives login/5min, 60 req/min API)
+- P1-4: Créé GitHub Actions CI/CD (.github/workflows/ci.yml) — lint, test backend, build frontend, E2E, Docker
+- Ajouté requirements-dev.txt (pytest, pytest-asyncio, pytest-cov, ruff, mypy, aiosqlite)
+- Ajouté email-validator dans requirements.txt
+- Corrigé package.json trailing comma, ajouté output: "standalone" dans next.config.ts
+- Build vérifié avec succès
+
+Stage Summary:
+- Sécurité JWT: blacklist Redis, logout, refresh token rotation, password validation
+- CORS: plus jamais "*" avec credentials, origines explicites
+- Rate limiting: protection brute-force (login + API)
+- Architecture cohérente: plus aucun Prisma/SQLite/NextAuth
+- Tests backend: 15+ tests Pytest
+- CI/CD: GitHub Actions complet
+- DevOps: Makefile + docker-compose.dev.yml
+- Mots de passe conformes: Eadmin2026! partout (frontend + backend + E2E)

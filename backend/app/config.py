@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     )
 
     # --- Environnement ---
-    ENVIRONMENT: Literal["development", "production"] = "development"
+    ENVIRONMENT: Literal["development", "staging", "production"] = "development"
 
     # --- Base de données ---
     DATABASE_URL: str = "postgresql://eadmin:eadmin@localhost:5432/eadmin"
@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "dev-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    # --- CORS ---
+    EXTRA_CORS_ORIGINS: str = "[]"  # JSON array of additional allowed origins
 
     # --- Stockage objet (MinIO / S3) ---
     MINIO_ENDPOINT: str = "localhost:9000"
@@ -43,6 +47,11 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = True
 
+    # --- Rate Limiting ---
+    RATE_LIMIT_LOGIN_MAX_ATTEMPTS: int = 5
+    RATE_LIMIT_LOGIN_WINDOW_SECONDS: int = 300  # 5 minutes
+    RATE_LIMIT_API_PER_MINUTE: int = 60
+
     @property
     def is_development(self) -> bool:
         """Vérifie si l'application est en mode développement."""
@@ -52,6 +61,11 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         """Vérifie si l'application est en mode production."""
         return self.ENVIRONMENT == "production"
+
+    @property
+    def is_staging(self) -> bool:
+        """Vérifie si l'application est en mode staging."""
+        return self.ENVIRONMENT == "staging"
 
 
 # Instance singleton de la configuration

@@ -47,7 +47,7 @@ const DEMO_USERS: UserAccount[] = [
     nin: 'NIN-2010-78432',
     createdAt: dateAt(2025, 11, 15, 10, 0),
     lastLogin: dateAt(2026, 3, 10, 8, 30),
-    password: 'demo123',
+    password: 'Eadmin2026!',
   },
   {
     id: 'user-demo-002',
@@ -61,7 +61,7 @@ const DEMO_USERS: UserAccount[] = [
     mairie: 'Mairie de Conakry',
     createdAt: dateAt(2025, 10, 1, 9, 0),
     lastLogin: dateAt(2026, 3, 10, 9, 15),
-    password: 'demo123',
+    password: 'Eadmin2026!',
   },
   {
     id: 'user-demo-003',
@@ -75,7 +75,7 @@ const DEMO_USERS: UserAccount[] = [
     institution: 'Direction Générale de la Modernisation Administrative',
     createdAt: dateAt(2025, 9, 1, 8, 0),
     lastLogin: dateAt(2026, 3, 10, 7, 45),
-    password: 'demo123',
+    password: 'Eadmin2026!',
   },
   {
     id: 'user-demo-004',
@@ -89,7 +89,7 @@ const DEMO_USERS: UserAccount[] = [
     agence: 'ANIP',
     createdAt: dateAt(2025, 10, 15, 10, 30),
     lastLogin: dateAt(2026, 3, 9, 16, 0),
-    password: 'demo123',
+    password: 'Eadmin2026!',
   },
   {
     id: 'user-demo-005',
@@ -103,7 +103,7 @@ const DEMO_USERS: UserAccount[] = [
     institution: 'MEF',
     createdAt: dateAt(2025, 8, 20, 11, 0),
     lastLogin: dateAt(2026, 3, 10, 10, 0),
-    password: 'demo123',
+    password: 'Eadmin2026!',
   },
   {
     id: 'user-demo-006',
@@ -132,7 +132,7 @@ const DEMO_USERS: UserAccount[] = [
     nin: 'NIN-2012-54321',
     createdAt: dateAt(2026, 1, 10, 14, 0),
     lastLogin: dateAt(2026, 3, 8, 11, 20),
-    password: 'demo123',
+    password: 'Eadmin2026!',
   },
   {
     id: 'user-demo-008',
@@ -145,7 +145,7 @@ const DEMO_USERS: UserAccount[] = [
     nin: 'NIN-2009-67890',
     mairie: 'Mairie de Kindia',
     createdAt: dateAt(2025, 12, 5, 9, 30),
-    password: 'demo123',
+    password: 'Eadmin2026!',
   },
   {
     id: 'user-demo-009',
@@ -159,7 +159,7 @@ const DEMO_USERS: UserAccount[] = [
     agence: 'DNE',
     createdAt: dateAt(2025, 11, 20, 15, 0),
     lastLogin: dateAt(2026, 1, 15, 10, 45),
-    password: 'demo123',
+    password: 'Eadmin2026!',
   },
   {
     id: 'user-demo-010',
@@ -171,7 +171,7 @@ const DEMO_USERS: UserAccount[] = [
     phone: '+224 624 55 66 77',
     nin: 'NIN-2015-24680',
     createdAt: dateAt(2026, 3, 1, 16, 30),
-    password: 'demo123',
+    password: 'Eadmin2026!',
   },
   {
     id: 'user-demo-011',
@@ -185,7 +185,7 @@ const DEMO_USERS: UserAccount[] = [
     institution: 'MESRS',
     createdAt: dateAt(2025, 9, 15, 10, 0),
     lastLogin: dateAt(2026, 3, 7, 14, 0),
-    password: 'demo123',
+    password: 'Eadmin2026!',
   },
   {
     id: 'user-demo-012',
@@ -199,7 +199,7 @@ const DEMO_USERS: UserAccount[] = [
     institution: 'Direction Générale de la Modernisation Administrative',
     createdAt: dateAt(2025, 10, 20, 11, 30),
     lastLogin: dateAt(2026, 3, 9, 8, 0),
-    password: 'demo123',
+    password: 'Eadmin2026!',
   },
 ]
 

@@ -25,7 +25,7 @@ export interface DemoAccount {
 export const MAIN_ACCOUNTS: DemoAccount[] = [
   {
     email: 'citoyen@eadmin.gn',
-    password: 'demo2026',
+    password: 'Eadmin2026!',
     name: 'Condé',
     firstName: 'Sékou',
     role: 'citoyen',
@@ -37,7 +37,7 @@ export const MAIN_ACCOUNTS: DemoAccount[] = [
   },
   {
     email: 'mairie@eadmin.gn',
-    password: 'demo2026',
+    password: 'Eadmin2026!',
     name: 'Bah',
     firstName: 'Fatoumata',
     role: 'mairie',
@@ -46,7 +46,7 @@ export const MAIN_ACCOUNTS: DemoAccount[] = [
   },
   {
     email: 'admin@eadmin.gn',
-    password: 'demo2026',
+    password: 'Eadmin2026!',
     name: 'Diallo',
     firstName: 'Alpha',
     role: 'admin',
@@ -55,7 +55,7 @@ export const MAIN_ACCOUNTS: DemoAccount[] = [
   },
   {
     email: 'agence@eadmin.gn',
-    password: 'demo2026',
+    password: 'Eadmin2026!',
     name: 'Soumah',
     firstName: 'Mamadou',
     role: 'agence',
@@ -64,7 +64,7 @@ export const MAIN_ACCOUNTS: DemoAccount[] = [
   },
   {
     email: 'ministere@eadmin.gn',
-    password: 'demo2026',
+    password: 'Eadmin2026!',
     name: 'Sylla',
     firstName: 'Aissatou',
     role: 'ministere',
@@ -73,7 +73,7 @@ export const MAIN_ACCOUNTS: DemoAccount[] = [
   },
   {
     email: 'superadmin@eadmin.gn',
-    password: 'demo2026',
+    password: 'Eadmin2026!',
     name: 'Touré',
     firstName: 'Ibrahima',
     role: 'superadmin',

@@ -1,0 +1,40 @@
+# =============================================================================
+# Docker Compose Override — Environnement de développement
+# eAdministration Suite Guinea
+#
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# Ou:   make docker-dev
+# =============================================================================
+
+version: "3.9"
+
+services:
+  # ------------------------------------------------------------------
+  # Backend avec hot-reload et variables de développement
+  # ------------------------------------------------------------------
+  backend:
+    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+    environment:
+      ENVIRONMENT: development
+      DEBUG: "true"
+      SECRET_KEY: dev-secret-key-change-in-production
+      DATABASE_URL: postgresql://eadmin:eadmin@postgres:5432/eadmin
+      REDIS_URL: redis://redis:6379
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    volumes:
+      - ./backend:/app  # Hot-reload du code backend
+
+  # ------------------------------------------------------------------
+  # Frontend avec hot-reload
+  # ------------------------------------------------------------------
+  frontend:
+    command: bun run dev
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_APP_NAME: eAdministration Suite Guinea
+      DATABASE_URL: postgresql://eadmin:eadmin@postgres:5432/eadmin
+    volumes:
+      - ./src:/app/src        # Hot-reload du code frontend
+      - ./public:/app/public

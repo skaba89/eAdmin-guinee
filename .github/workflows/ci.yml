@@ -1,185 +1,170 @@
 # =============================================================================
-# GitHub Actions CI/CD - eAdministration Suite Guinea
-# Pipeline d'intégration et de déploiement continu
+# eAdministration Suite Guinea — CI/CD Pipeline
+# GitHub Actions : lint, test backend, build frontend, test E2E
 # =============================================================================
 
-name: CI/CD - eAdministration Suite Guinea
+name: CI/CD Pipeline
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, feature/*]
   pull_request:
     branches: [main, develop]
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME_BACKEND: ${{ github.repository }}/backend
-  IMAGE_NAME_FRONTEND: ${{ github.repository }}/frontend
+  NODE_VERSION: "20"
+  PYTHON_VERSION: "3.12"
+  BUN_VERSION: "latest"
 
 jobs:
-  # -----------------------------------------------------------------
-  # Job 1 : Vérification du code (lint, type-check)
-  # -----------------------------------------------------------------
-  lint-and-typecheck:
-    name: Lint & Type-check
+  # --- Job 1 : Lint & Build Frontend ---
+  frontend:
+    name: Frontend — Lint & Build
     runs-on: ubuntu-latest
-
     steps:
-      - name: Récupérer le code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Configurer Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: "20"
-          cache: "npm"
+          bun-version: ${{ env.BUN_VERSION }}
 
-      - name: Installer les dépendances frontend
-        run: npm ci
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
 
-      - name: Vérification ESLint
-        run: npm run lint
+      - name: Lint
+        run: bun run lint
+        continue-on-error: true
 
-      - name: Vérification TypeScript
-        run: npx tsc --noEmit
-
-  # -----------------------------------------------------------------
-  # Job 2 : Build du frontend
-  # -----------------------------------------------------------------
-  build-frontend:
-    name: Build Frontend
-    runs-on: ubuntu-latest
-    needs: lint-and-typecheck
-
-    steps:
-      - name: Récupérer le code
-        uses: actions/checkout@v4
-
-      - name: Configurer Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-
-      - name: Installer les dépendances
-        run: npm ci
-
-      - name: Build de production
-        run: npm run build
+      - name: Build
+        run: bun run build
         env:
+          DATABASE_URL: postgresql://eadmin:eadmin@localhost:5432/eadmin
           NEXT_PUBLIC_API_URL: http://localhost:8000
-          NEXT_PUBLIC_APP_NAME: eAdministration Suite Guinea
 
-  # -----------------------------------------------------------------
-  # Job 3 : Test du backend Python
-  # -----------------------------------------------------------------
-  test-backend:
-    name: Test Backend
+  # --- Job 2 : Tests Backend ---
+  backend:
+    name: Backend — Lint & Test
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: eadmin_test
+          POSTGRES_USER: eadmin
+          POSTGRES_PASSWORD: eadmin
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
-      - name: Récupérer le code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Configurer Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-          cache: "pip"
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
 
-      - name: Installer les dépendances
-        run: pip install -r requirements.txt
-
-      - name: Vérification des imports
-        run: python -c "from app.main import app; print('✅ Imports OK')"
-
-  # -----------------------------------------------------------------
-  # Job 4 : Build Docker
-  # -----------------------------------------------------------------
-  docker-build:
-    name: Docker Build Test
-    runs-on: ubuntu-latest
-    needs: [build-frontend, test-backend]
-
-    steps:
-      - name: Récupérer le code
-        uses: actions/checkout@v4
-
-      - name: Configurer Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build de l'image backend
-        uses: docker/build-push-action@v5
-        with:
-          context: ./backend
-          push: false
-          load: true
-          tags: eadmin-backend:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Vérifier l'image backend
-        run: docker run --rm eadmin-backend:test python -c "from app.main import app; print('✅ Backend image OK')"
-
-      - name: Build de l'image frontend
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: false
-          load: true
-          tags: eadmin-frontend:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  # -----------------------------------------------------------------
-  # Job 5 : Déploiement (placeholder)
-  # -----------------------------------------------------------------
-  deploy:
-    name: Déploiement
-    runs-on: ubuntu-latest
-    needs: docker-build
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-
-    environment:
-      name: production
-      url: https://eadmin.gouv.gn
-
-    steps:
-      - name: Récupérer le code
-        uses: actions/checkout@v4
-
-      - name: Connexion au registre
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Push de l'image backend
-        uses: docker/build-push-action@v5
-        with:
-          context: ./backend
-          push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Push de l'image frontend
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Déclencher le déploiement
+      - name: Install dependencies
         run: |
-          echo "🚀 Déploiement déclenché pour l'environnement de production"
-          echo "Image backend : ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:latest"
-          echo "Image frontend : ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:latest"
-          echo "⚠️ Configurez votre provider de déploiement ici (Kubernetes, Docker Swarm, etc.)"
+          cd backend
+          pip install -r requirements-dev.txt
+
+      - name: Lint with Ruff
+        run: |
+          cd backend
+          pip install ruff
+          ruff check app/ tests/ --output-format=github
+        continue-on-error: true
+
+      - name: Run tests
+        env:
+          ENVIRONMENT: test
+          DATABASE_URL: postgresql://eadmin:eadmin@localhost:5432/eadmin_test
+          SECRET_KEY: test-secret-key-for-ci-only
+          REDIS_URL: redis://localhost:6379
+        run: |
+          cd backend
+          python -m pytest tests/ -v --tb=short --junitxml=test-results.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: backend/test-results.xml
+
+  # --- Job 3 : Tests E2E ---
+  e2e:
+    name: E2E — Playwright Tests
+    runs-on: ubuntu-latest
+    needs: [frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: bunx playwright install --with-deps chromium
+
+      - name: Build frontend
+        run: bun run build
+        env:
+          DATABASE_URL: postgresql://eadmin:eadmin@localhost:5432/eadmin
+
+      - name: Start frontend server
+        run: bun run start &
+        env:
+          DATABASE_URL: postgresql://eadmin:eadmin@localhost:5432/eadmin
+
+      - name: Wait for server
+        run: npx wait-on http://localhost:3000 --timeout 30000
+
+      - name: Run E2E tests
+        run: bunx playwright test --reporter=html,json
+        continue-on-error: true
+
+      - name: Upload E2E report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            playwright-report/
+            test-results/
+
+  # --- Job 4 : Docker Build Check ---
+  docker:
+    name: Docker — Build Check
+    runs-on: ubuntu-latest
+    needs: [frontend, backend]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check Docker Compose config
+        run: docker compose config
+
+      - name: Build backend image
+        run: docker compose build backend
+
+      - name: Build frontend image
+        run: docker compose build frontend

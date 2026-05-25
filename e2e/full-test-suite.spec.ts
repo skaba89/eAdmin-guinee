@@ -19,13 +19,16 @@ import { test, expect } from '@playwright/test'
  */
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────
+// Mot de passe démo conforme : majuscule + chiffre + spécial + 10+ caractères
+const DEMO_PASSWORD = 'Eadmin2026!'
+
 const DEMO_ACCOUNTS = {
-  citizen: { email: 'citoyen@eadmin.gn', password: 'demo2026', name: 'Aminata Diallo', role: 'Citoyen' },
-  mairie: { email: 'mairie@eadmin.gn', password: 'demo2026', name: 'Mme Fatoumata Bah', role: 'Agent de Mairie' },
-  admin: { email: 'admin@eadmin.gn', password: 'demo2026', name: 'Sékou Condé', role: 'Administrateur Général' },
-  agence: { email: 'agence@eadmin.gn', password: 'demo2026', name: 'M. Mamadou Soumah', role: "Agent d'Agence" },
-  ministere: { email: 'ministere@eadmin.gn', password: 'demo2026', name: 'Dr. Alpha Diallo', role: 'Agent Ministériel' },
-  superadmin: { email: 'superadmin@eadmin.gn', password: 'demo2026', name: 'Amadou Oury Bah', role: 'Super Administrateur' },
+  citizen: { email: 'citoyen@eadmin.gn', password: DEMO_PASSWORD, name: 'Aminata Diallo', role: 'Citoyen' },
+  mairie: { email: 'mairie@eadmin.gn', password: DEMO_PASSWORD, name: 'Mme Fatoumata Bah', role: 'Agent de Mairie' },
+  admin: { email: 'admin@eadmin.gn', password: DEMO_PASSWORD, name: 'Sékou Condé', role: 'Administrateur Général' },
+  agence: { email: 'agence@eadmin.gn', password: DEMO_PASSWORD, name: 'M. Mamadou Soumah', role: "Agent d'Agence" },
+  ministere: { email: 'ministere@eadmin.gn', password: DEMO_PASSWORD, name: 'Dr. Alpha Diallo', role: 'Agent Ministériel' },
+  superadmin: { email: 'superadmin@eadmin.gn', password: DEMO_PASSWORD, name: 'Amadou Oury Bah', role: 'Super Administrateur' },
 }
 
 /**
@@ -254,7 +257,7 @@ test.describe('TC-AUTH: Authentification', () => {
     const passwordInput = page.locator('input[type="password"]').first()
     
     await emailInput.fill('unknown@test.com')
-    await passwordInput.fill('demo2026')
+    await passwordInput.fill('Eadmin2026!')
     await page.locator('button[type="submit"]').first().click()
     await page.waitForTimeout(2000)
     
@@ -296,7 +299,7 @@ test.describe('TC-AUTH: Authentification', () => {
     await emailInput.fill('test@register.gn')
     
     const passwordInput = page.locator('input[type="password"]').first()
-    await passwordInput.fill('test123')
+    await passwordInput.fill('Eadmin2026!')
     
     // Submit
     await page.locator('button[type="submit"]').first().click()
