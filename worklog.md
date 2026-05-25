@@ -116,3 +116,49 @@ Stage Summary:
 - CI/CD: GitHub Actions complet
 - DevOps: Makefile + docker-compose.dev.yml
 - Mots de passe conformes: Eadmin2026! partout (frontend + backend + E2E)
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Phase 1 Implementation — Security, RBAC, Audit Trail, Tests, Monitoring
+
+Work Log:
+- Fixed Dockerfile: Added COPY prisma/, prisma generate, openssl, Prisma client in runner stage
+- Fixed Prisma schema: Updated to PostgreSQL with User, AuditLog, Session models
+- Fixed CORS: Replaced allow_origins=["*"] with explicit localhost origins in dev, restricted methods/headers
+- Added Security Headers Middleware (CSP, X-Frame-Options, X-Content-Type-Options, HSTS, Referrer-Policy, Permissions-Policy)
+- Added Rate Limiting Middleware (100 req/60s per IP)
+- Added Request Logging Middleware with structured JSON logging
+- Enhanced /health endpoint with Redis and DB connectivity checks
+- Updated backend config with MFA_ISSUER, RATE_LIMIT, REFRESH_TOKEN settings
+- Implemented 7-level hierarchical RBAC (citoyen→mairie→agence→agent→chef_service→directeur→ministre→admin→superadmin)
+- Added HIERARCHY_LEVELS, getHierarchyLevel(), isRoleAbove() utility functions
+- Implemented hierarchical permission inheritance via getInheritedPermissions()
+- Added 2 new demo accounts (agent@eadmin.gn, directeur@eadmin.gn)
+- Updated backend RoleEnum to 9 roles (SUPER_ADMIN, MINISTRE, DIRECTEUR, CHEF_SERVICE, ADMIN, AGENT, MAIRIE, AGENCE, CITOYEN)
+- Added MFA fields to User model (mfa_enabled, mfa_secret, last_login_at)
+- Created enterprise Audit Trail engine (src/lib/audit-trail.ts) with hash chain integrity, 34 action types, 9 categories
+- Updated audit-logs-store with new AuditEntry format, integrity check, compliance report
+- Created useAuditTrail React hook
+- Enhanced audit-logs-page with category filter, session ID search, integrity check, compliance report, export buttons
+- Created security module (src/lib/security.ts) with TOTP, AES-256-GCM encryption, password policy, rate limiter, suspicious activity detection, CSRF
+- Enhanced MFA page with TOTP setup flow, QR code, backup codes, rate limiting
+- Enhanced session store with JWT rotation, concurrent session limit, IP change detection, security events
+- Enhanced backend auth with account lockout, JWT rotation, token blacklist, MFA-aware login
+- Created backend security API (setup-mfa, verify-mfa, disable-mfa, change-password, sessions, security-events)
+- Created monitoring module (src/lib/monitoring.ts) with structured logging, health checks, metrics collection, performance tracking
+- Added Monitoring & Observabilité section to admin page
+- Added /metrics Prometheus endpoint to backend
+- Created RBAC & Security E2E test suite (rbac-security.spec.ts)
+- Created Workflow E2E test suite (workflow-tests.spec.ts)
+- Created backend auth security tests (test_auth_security.py)
+- Created backend RBAC tests (test_rbac.py)
+- Fixed TypeScript errors in access-guard.tsx, login-page.tsx, mfa-page.tsx, security.ts, audit-logs-store.ts, recommendations-store.ts
+
+Stage Summary:
+- Phase 1 implementation complete: Security Enterprise, RBAC hiérarchique 7 niveaux, Audit Trail complet, Tests, Monitoring
+- Build passes successfully with Next.js 16 Turbopack
+- All new features are backward compatible with existing demo accounts
+- 9 roles now supported across frontend and backend
+- Hash chain integrity ensures audit trail tamper detection
+- TOTP MFA available for admin+ roles

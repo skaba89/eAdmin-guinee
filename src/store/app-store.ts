@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export type UserRole = 'citizen' | 'mairie' | 'admin_general' | 'agence' | 'ministere' | 'super_admin'
+export type UserRole = 'citizen' | 'mairie' | 'admin_general' | 'agence' | 'agent' | 'chef_service' | 'directeur' | 'ministre' | 'ministere' | 'super_admin'
 
 export type AppPage = 
   | 'landing' | 'about' | 'services' | 'solutions' | 'pricing'
@@ -101,6 +101,28 @@ export const DEMO_ACCOUNTS: Record<string, { password: string; user: UserInfo }>
       fonction: 'Administrateur Système National',
     }
   },
+  'agent@eadmin.gn': {
+    password: 'demo2026',
+    user: {
+      id: 'demo-agent-1',
+      name: 'Ibrahim Camara',
+      email: 'agent@eadmin.gn',
+      role: 'agent',
+      institution: 'Mairie de Kaloum',
+      fonction: 'Agent de Traitement — État Civil',
+    }
+  },
+  'directeur@eadmin.gn': {
+    password: 'demo2026',
+    user: {
+      id: 'demo-directeur-1',
+      name: 'Mamadou Sylla',
+      email: 'directeur@eadmin.gn',
+      role: 'directeur',
+      institution: 'Direction Générale de la Modernisation Administrative',
+      fonction: "Directeur des Systèmes d'Information",
+    }
+  },
 }
 
 // Role labels for UI
@@ -109,6 +131,10 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   mairie: 'Agent de Mairie',
   admin_general: 'Administrateur Général',
   agence: "Agent d'Agence",
+  agent: 'Agent de Traitement',
+  chef_service: 'Chef de Service',
+  directeur: 'Directeur / DSI',
+  ministre: 'Ministre',
   ministere: 'Agent Ministériel',
   super_admin: 'Super Administrateur',
 }
@@ -119,6 +145,10 @@ export const ROLE_COLORS: Record<UserRole, string> = {
   mairie: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
   admin_general: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
   agence: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  agent: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
+  chef_service: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
+  directeur: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
+  ministre: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400',
   ministere: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
   super_admin: 'bg-[#0B2E58] text-white dark:bg-[#3B7DD8] dark:text-white',
 }
@@ -129,6 +159,10 @@ export const ROLE_DEFAULT_PAGE: Record<UserRole, AppPage> = {
   mairie: 'mairie-dashboard',
   admin_general: 'dashboard',
   agence: 'agence-dashboard',
+  agent: 'service-requests',
+  chef_service: 'service-requests',
+  directeur: 'dashboard',
+  ministre: 'dashboard',
   ministere: 'dashboard',
   super_admin: 'dashboard',
 }

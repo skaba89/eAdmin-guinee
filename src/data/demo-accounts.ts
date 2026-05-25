@@ -3,7 +3,7 @@
 // 6 main role accounts + 140 citizen test accounts (5 per service × 28 services)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export type UserRole = 'citoyen' | 'mairie' | 'admin' | 'agence' | 'ministere' | 'superadmin'
+export type UserRole = 'citoyen' | 'mairie' | 'agence' | 'agent' | 'chef_service' | 'directeur' | 'ministre' | 'admin' | 'ministere' | 'superadmin'
 
 export interface DemoAccount {
   email: string
@@ -21,7 +21,7 @@ export interface DemoAccount {
   scenario?: string   // Test scenario description
 }
 
-// ─── 6 MAIN ROLE ACCOUNTS ──────────────────────────────────────────────────────
+// ─── 8 MAIN ROLE ACCOUNTS ──────────────────────────────────────────────────────
 export const MAIN_ACCOUNTS: DemoAccount[] = [
   {
     email: 'citoyen@eadmin.gn',
@@ -79,6 +79,24 @@ export const MAIN_ACCOUNTS: DemoAccount[] = [
     role: 'superadmin',
     institution: 'Présidence de la République — Service e-Gouvernement',
     fonction: 'Super Administrateur Plateforme',
+  },
+  {
+    email: 'agent@eadmin.gn',
+    password: 'demo2026',
+    name: 'Camara',
+    firstName: 'Ibrahim',
+    role: 'agent',
+    institution: 'Mairie de Kaloum',
+    fonction: 'Agent de Traitement — État Civil',
+  },
+  {
+    email: 'directeur@eadmin.gn',
+    password: 'demo2026',
+    name: 'Sylla',
+    firstName: 'Mamadou',
+    role: 'directeur',
+    institution: 'Direction Générale de la Modernisation Administrative',
+    fonction: "Directeur des Systèmes d'Information",
   },
 ]
 

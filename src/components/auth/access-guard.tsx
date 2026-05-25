@@ -4,6 +4,7 @@ import { useAppStore, type AppPage } from '@/store/app-store'
 import { canAccessPage, getDefaultPage, getRLSScopeDescription } from '@/lib/rbac'
 import { useSessionStore } from '@/store/session-store'
 import { useAuditLogsStore } from '@/store/audit-logs-store'
+import { auditLog } from '@/lib/audit-trail'
 import { useMemo, useRef, useCallback, useEffect } from 'react'
 import { Shield, Lock, ArrowLeft, AlertTriangle, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -11,7 +12,7 @@ import { motion } from 'framer-motion'
 import * as rbacModule from '@/lib/rbac'
 
 // Roles that require MFA verification
-const MFA_REQUIRED_ROLES = ['admin_general', 'ministere', 'super_admin']
+const MFA_REQUIRED_ROLES = ['admin_general', 'ministere', 'super_admin', 'directeur', 'ministre']
 
 // Session timeout: 8 hours in milliseconds
 const SESSION_TIMEOUT_MS = 8 * 60 * 60 * 1000
@@ -66,30 +67,30 @@ export function AccessGuard({ page, children }: { page: AppPage; children: React
   const handleDeniedLog = useCallback(() => {
     if (user && !loggedRef.current) {
       loggedRef.current = true
-      useAuditLogsStore.getState().addLog({
+      const entry = auditLog({
         action: 'status_change',
+        category: 'security',
         resource: 'systeme',
+        resourceId: page,
         description: `Tentative d'accès non autorisé à la page « ${page} » — rôle: ${user.role}`,
         severity: 'warning',
-        userId: user.email,
-        userName: user.name,
-        userRole: user.role,
       })
+      useAuditLogsStore.getState().addLogFromEntry(entry)
     }
   }, [user, page])
 
   const handleExpiredLog = useCallback(() => {
     if (user && !loggedRef.current) {
       loggedRef.current = true
-      useAuditLogsStore.getState().addLog({
-        action: 'logout',
+      const entry = auditLog({
+        action: 'session_timeout',
+        category: 'security',
         resource: 'systeme',
+        resourceId: 'session',
         description: `Session expirée après 8h — déconnexion automatique`,
         severity: 'info',
-        userId: user.email,
-        userName: user.name,
-        userRole: user.role,
       })
+      useAuditLogsStore.getState().addLogFromEntry(entry)
     }
   }, [user])
 

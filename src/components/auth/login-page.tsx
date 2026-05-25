@@ -17,18 +17,26 @@ const GUINEA_GREEN = '#009460'
 const ROLE_ICONS: Record<UserRole, React.ElementType> = {
   citizen: Users,
   mairie: Building2,
-  admin_general: Shield,
   agence: IdCard,
+  agent: Users,
+  chef_service: Shield,
+  admin_general: Shield,
+  directeur: Building2,
   ministere: Scale,
+  ministre: Scale,
   super_admin: Crown,
 }
 
 const ROLE_ICON_COLORS: Record<UserRole, string> = {
   citizen: 'text-emerald-400',
   mairie: 'text-blue-400',
-  admin_general: 'text-purple-400',
   agence: 'text-amber-400',
+  agent: 'text-teal-400',
+  chef_service: 'text-cyan-400',
+  admin_general: 'text-purple-400',
+  directeur: 'text-violet-400',
   ministere: 'text-red-400',
+  ministre: 'text-rose-400',
   super_admin: 'text-[#C8A45C]',
 }
 
@@ -592,9 +600,13 @@ export function LoginPage() {
                 const guineaRoleBorder: Record<UserRole, string> = {
                   citizen: GUINEA_GREEN,
                   mairie: GUINEA_RED,
-                  admin_general: '#0B2E58',
                   agence: GUINEA_YELLOW,
+                  agent: '#14B8A6',
+                  chef_service: '#06B6D4',
+                  admin_general: '#0B2E58',
+                  directeur: '#8B5CF6',
                   ministere: '#8B5CF6',
+                  ministre: '#F43F5E',
                   super_admin: '#C8A45C',
                 }
 

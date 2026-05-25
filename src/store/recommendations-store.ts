@@ -17,7 +17,7 @@ export type RecommendationType =
 
 export type RecommendationPriority = 'low' | 'medium' | 'high' | 'urgent'
 
-export type RecommendationAudience = 'citoyen' | 'mairie' | 'agence' | 'ministere' | 'admin' | 'superadmin' | 'all'
+export type RecommendationAudience = 'citoyen' | 'mairie' | 'agence' | 'agent' | 'chef_service' | 'directeur' | 'ministere' | 'ministre' | 'admin' | 'superadmin' | 'all'
 
 export interface Recommendation {
   id: string

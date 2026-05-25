@@ -17,11 +17,14 @@ from app.database import Base
 class RoleEnum(str, enum.Enum):
     """Rôles disponibles dans la plateforme."""
     SUPER_ADMIN = "SUPER_ADMIN"
-    ADMIN = "ADMIN"
-    DIRECTOR = "DIRECTOR"
+    MINISTRE = "MINISTRE"
+    DIRECTEUR = "DIRECTEUR"
     CHEF_SERVICE = "CHEF_SERVICE"
+    ADMIN = "ADMIN"
     AGENT = "AGENT"
-    LECTEUR = "LECTEUR"
+    MAIRIE = "MAIRIE"
+    AGENCE = "AGENCE"
+    CITOYEN = "CITOYEN"
 
     def to_frontend_role(self) -> str:
         """Map backend role to frontend role name."""
@@ -54,6 +57,11 @@ class User(Base):
     )
     institution: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    mfa_secret: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    last_login_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

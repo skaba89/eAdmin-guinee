@@ -29,6 +29,16 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    # --- MFA ---
+    MFA_ISSUER: str = "eAdmin Guinée"
+
+    # --- Rate Limiting ---
+    RATE_LIMIT_MAX_REQUESTS: int = 100
+    RATE_LIMIT_WINDOW_SECONDS: int = 60
+    RATE_LIMIT_LOGIN_MAX_ATTEMPTS: int = 5
+    RATE_LIMIT_LOGIN_WINDOW_SECONDS: int = 300  # 5 minutes
+    RATE_LIMIT_API_PER_MINUTE: int = 60
+
     # --- CORS ---
     EXTRA_CORS_ORIGINS: str = "[]"  # JSON array of additional allowed origins
 
@@ -47,10 +57,20 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = True
 
-    # --- Rate Limiting ---
-    RATE_LIMIT_LOGIN_MAX_ATTEMPTS: int = 5
-    RATE_LIMIT_LOGIN_WINDOW_SECONDS: int = 300  # 5 minutes
-    RATE_LIMIT_API_PER_MINUTE: int = 60
+    # --- CORS Origins ---
+    CORS_ORIGINS_DEV: list[str] = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+    ]
+
+    CORS_ORIGINS_PROD: list[str] = [
+        "https://eadmin.gouv.gn",
+        "https://admin.eadmin.gouv.gn",
+        "https://citoyen.eadmin.gouv.gn",
+        "https://api.eadmin.gouv.gn",
+    ]
 
     @property
     def is_development(self) -> bool:
