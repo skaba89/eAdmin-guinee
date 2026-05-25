@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import analytics, audit, auth, courriers, documents, metrics, users, workflows
+from app.api import ai, analytics, audit, auth, courriers, documents, documents_search, metrics, users, workflows
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -119,6 +119,8 @@ app.include_router(workflows.router, prefix="/api/v1/workflows", tags=["Workflow
 app.include_router(users.router, prefix="/api/v1/users", tags=["Utilisateurs"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytique"])
 app.include_router(audit.router, prefix="/api/v1/audit", tags=["Audit"])
+app.include_router(ai.router, prefix="/api/v1/ai", tags=["Intelligence Artificielle"])
+app.include_router(documents_search.router, prefix="/api/v1/documents", tags=["Recherche Documentaire"])
 
 # --- Métriques Prometheus ---
 app.include_router(metrics.router, tags=["Métriques"])

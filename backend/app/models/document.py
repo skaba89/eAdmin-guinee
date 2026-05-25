@@ -41,6 +41,7 @@ class Document(Base):
         Enum(DocumentStatusEnum), default=DocumentStatusEnum.DRAFT, nullable=False
     )
     tags: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    current_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     owner_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), nullable=False, index=True
     )
@@ -54,6 +55,12 @@ class Document(Base):
 
     # Relations
     owner = relationship("User", back_populates="documents", lazy="selectin")
+    versions = relationship(
+        "DocumentVersion", back_populates="document", lazy="selectin",
+        order_by="DocumentVersion.version_number.desc()"
+    )
+    stamps = relationship("ElectronicStamp", back_populates="document", lazy="selectin")
+    signature_circuits = relationship("SignatureCircuit", back_populates="document", lazy="selectin")
 
     def __repr__(self) -> str:
         return f"<Document {self.title} ({self.status})>"
