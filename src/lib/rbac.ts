@@ -482,6 +482,9 @@ const PAGE_ACCESS_RULES: PageAccessRule[] = [
   { page: 'ai-assistant', requiredPermissions: ['ai-agent:view'] },
   { page: 'mairie-dashboard', requiredPermissions: ['dashboard:view'], requiredRoles: ['mairie'] },
   { page: 'agence-dashboard', requiredPermissions: ['dashboard:view'], requiredRoles: ['agence'] },
+  { page: 'agent-dashboard', requiredPermissions: ['service-requests:view_assigned'], requiredRoles: ['agent'] },
+  { page: 'chef-service-dashboard', requiredPermissions: ['service-requests:view_assigned'], requiredRoles: ['chef_service'] },
+  { page: 'ministre-dashboard', requiredPermissions: ['dashboard:view'], requiredRoles: ['ministre'] },
   { page: 'birth-certificate-db', requiredPermissions: ['citizen-database:view'] },
 ]
 
@@ -582,7 +585,8 @@ export function getAccessiblePages(user: UserInfo | null): AppPage[] {
     'dashboard', 'ged', 'courriers', 'workflow', 'signatures',
     'analytics', 'admin', 'users', 'settings', 'notifications',
     'audit-logs', 'citizen-portal', 'service-requests', 'ai-assistant',
-    'mairie-dashboard', 'agence-dashboard', 'birth-certificate-db',
+    'mairie-dashboard', 'agence-dashboard', 'agent-dashboard',
+    'chef-service-dashboard', 'ministre-dashboard', 'birth-certificate-db',
   ]
 
   return allAppPages.filter(page => canAccessPage(user, page))
@@ -600,12 +604,12 @@ export function getDefaultPage(user: UserInfo | null): AppPage {
   // Return the first accessible page based on role priority
   const roleDefaultPage: Record<UserRole, AppPage> = {
     citoyen: 'citizen-portal',
-    mairie: 'service-requests',
-    agence: 'service-requests',
-    agent: 'service-requests',
-    chef_service: 'service-requests',
+    mairie: 'mairie-dashboard',
+    agence: 'agence-dashboard',
+    agent: 'agent-dashboard',
+    chef_service: 'chef-service-dashboard',
     directeur: 'dashboard',
-    ministre: 'dashboard',
+    ministre: 'ministre-dashboard',
     ministere: 'dashboard',
     admin: 'admin',
     superadmin: 'dashboard',

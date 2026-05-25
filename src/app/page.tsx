@@ -37,6 +37,9 @@ const PublicCitizenPortal = dynamic(() => import('@/components/landing/public-ci
 const ServiceRequestsPage = dynamic(() => import('@/components/app/service-requests-page').then(m => ({ default: m.ServiceRequestsPage })), { ssr: false })
 const MairieDashboardPage = dynamic(() => import('@/components/app/mairie-dashboard-page').then(m => ({ default: m.MairieDashboardPage })), { ssr: false })
 const AgenceDashboardPage = dynamic(() => import('@/components/app/agence-dashboard-page').then(m => ({ default: m.AgenceDashboardPage })), { ssr: false })
+const AgentDashboardPage = dynamic(() => import('@/components/app/agent-dashboard-page').then(m => ({ default: m.AgentDashboardPage })), { ssr: false })
+const ChefServiceDashboardPage = dynamic(() => import('@/components/app/chef-service-dashboard-page').then(m => ({ default: m.ChefServiceDashboardPage })), { ssr: false })
+const MinistreDashboardPage = dynamic(() => import('@/components/app/ministre-dashboard-page').then(m => ({ default: m.MinistreDashboardPage })), { ssr: false })
 const BirthCertificateDbPage = dynamic(() => import('@/components/app/birth-certificate-db-page').then(m => ({ default: m.BirthCertificateDbPage })), { ssr: false })
 const AiAssistantPage = dynamic(() => import('@/components/app/ai-assistant-page').then(m => ({ default: m.AiAssistantPage })), { ssr: false })
 const AiChatbotWidget = dynamic(() => import('@/components/app/ai-chatbot-widget').then(m => ({ default: m.AiChatbotWidget })), { ssr: false })
@@ -77,6 +80,9 @@ const appPages: Record<string, React.ComponentType> = {
   'service-requests': ServiceRequestsPage,
   'mairie-dashboard': MairieDashboardPage,
   'agence-dashboard': AgenceDashboardPage,
+  'agent-dashboard': AgentDashboardPage,
+  'chef-service-dashboard': ChefServiceDashboardPage,
+  'ministre-dashboard': MinistreDashboardPage,
   'birth-certificate-db': BirthCertificateDbPage,
   'ai-assistant': AiAssistantPage,
 }

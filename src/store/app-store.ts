@@ -11,6 +11,7 @@ export type AppPage =
   | 'analytics' | 'admin' | 'users' | 'settings' | 'notifications'
   | 'audit-logs' | 'citizen-portal' | 'service-requests'
   | 'public-citizen-portal' | 'mairie-dashboard' | 'agence-dashboard'
+  | 'agent-dashboard' | 'chef-service-dashboard' | 'ministre-dashboard'
   | 'birth-certificate-db'
   | 'ai-assistant'
   | 'mfa'
@@ -123,6 +124,29 @@ export const DEMO_ACCOUNTS: Record<string, { password: string; user: UserInfo }>
       fonction: "Directeur des Systèmes d'Information",
     }
   },
+  'chef_service@eadmin.gn': {
+    password: 'demo2026',
+    user: {
+      id: 'demo-chef-service-1',
+      name: 'Aissatou Touré',
+      email: 'chef_service@eadmin.gn',
+      role: 'chef_service',
+      institution: 'Mairie de Kaloum',
+      fonction: 'Chef de Service — État Civil & Résidence',
+      mairie: 'Mairie de Kaloum',
+    }
+  },
+  'ministre@eadmin.gn': {
+    password: 'demo2026',
+    user: {
+      id: 'demo-ministre-1',
+      name: 'S.E.M. Abdoulaye Condé',
+      email: 'ministre@eadmin.gn',
+      role: 'ministre',
+      institution: "Ministère de l'Administration Territoriale et de la Décentralisation",
+      fonction: "Ministre de l'Administration Territoriale",
+    }
+  },
 }
 
 // Role labels for UI
@@ -159,10 +183,10 @@ export const ROLE_DEFAULT_PAGE: Record<UserRole, AppPage> = {
   mairie: 'mairie-dashboard',
   admin_general: 'dashboard',
   agence: 'agence-dashboard',
-  agent: 'service-requests',
-  chef_service: 'service-requests',
+  agent: 'agent-dashboard',
+  chef_service: 'chef-service-dashboard',
   directeur: 'dashboard',
-  ministre: 'dashboard',
+  ministre: 'ministre-dashboard',
   ministere: 'dashboard',
   super_admin: 'dashboard',
 }

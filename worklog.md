@@ -162,3 +162,27 @@ Stage Summary:
 - 9 roles now supported across frontend and backend
 - Hash chain integrity ensures audit trail tamper detection
 - TOTP MFA available for admin+ roles
+---
+Task ID: 1-6
+Agent: Main Agent
+Task: Implement role-specific dashboards and accounts for all 7 RBAC roles in eAdmin Guinée
+
+Work Log:
+- Added 2 missing demo accounts (chef_service@eadmin.gn, ministre@eadmin.gn) to app-store.ts
+- Added 3 new AppPage types: agent-dashboard, chef-service-dashboard, ministre-dashboard
+- Updated ROLE_DEFAULT_PAGE to route each role to their dedicated dashboard
+- Updated RBAC page access rules for 3 new dashboard pages with role-based bypass
+- Updated getAccessiblePages() and getDefaultPage() in rbac.ts with correct defaults per role
+- Created agent-dashboard-page.tsx: operational dashboard with pipeline, request list, stats
+- Created chef-service-dashboard-page.tsx: management dashboard with KPIs, team overview, approval queue
+- Created ministre-dashboard-page.tsx: strategic dashboard with 8 KPIs, category breakdown, priority requests
+- Updated page.tsx router with dynamic imports for all 3 new dashboards
+- Updated app-sidebar.tsx PAGE_META with labels for new dashboard pages
+- Verified TypeScript compilation passes with 0 errors
+- Verified Next.js build succeeds
+
+Stage Summary:
+- All 10 UserRole types now have dedicated landing pages
+- 8 demo accounts available (was 8, added 2 new: chef_service, ministre)
+- Complete RBAC integration for all role-specific dashboards
+- Build passes cleanly
