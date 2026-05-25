@@ -60,3 +60,7 @@ prompt
 server.log
 # Skills directory
 /skills/
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
