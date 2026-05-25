@@ -1,9 +1,11 @@
 """
-Service de blacklist JWT via Redis - eAdministration Suite Guinea.
+Service de blacklist JWT et suivi des tentatives de connexion via Redis - eAdministration Suite Guinea.
 Stocke les tokens révoqués dans Redis avec TTL automatique.
+Suit les tentatives de connexion échouées pour le verrouillage de compte.
 Supporte le multi-instance (contrairement à un set Python en mémoire).
 """
 
+import time
 import logging
 from datetime import datetime, timezone
 
@@ -17,6 +19,8 @@ logger = logging.getLogger(__name__)
 BLACKLIST_PREFIX = "eadmin:token_blacklist:"
 # Préfixe Redis pour les refresh tokens actifs
 REFRESH_TOKEN_PREFIX = "eadmin:refresh_tokens:"
+# Préfixe Redis pour les tentatives de connexion
+LOGIN_ATTEMPTS_PREFIX = "eadmin:login_attempts:"
 
 
 class TokenBlacklistService:
@@ -125,6 +129,85 @@ class TokenBlacklistService:
         await redis.delete(key)
         logger.info(f"Tous les refresh tokens révoqués pour l'utilisateur {user_id} ({count} tokens)")
         return count
+
+    # --- Suivi des tentatives de connexion (Redis-backed) ---
+
+    async def is_account_locked(self, email: str, max_attempts: int = 5, lockout_seconds: int = 900) -> bool:
+        """
+        Vérifie si un compte est verrouillé suite à trop de tentatives échouées.
+
+        Args:
+            email: Adresse email du compte
+            max_attempts: Nombre maximum de tentatives avant verrouillage (défaut: 5)
+            lockout_seconds: Durée du verrouillage en secondes (défaut: 900 = 15 min)
+
+        Returns:
+            True si le compte est verrouillé, False sinon
+        """
+        redis = await self._get_redis()
+        key = f"{LOGIN_ATTEMPTS_PREFIX}{email}"
+        now = time.time()
+
+        # Récupérer les tentatives existantes
+        attempts_raw = await redis.lrange(key, 0, -1)
+        attempts = [float(t) for t in attempts_raw if now - float(t) < lockout_seconds]
+
+        # Nettoyer les tentatives expirées et remettre à jour la liste
+        if len(attempts) != len(attempts_raw):
+            await redis.delete(key)
+            if attempts:
+                await redis.rpush(key, *[str(t) for t in attempts])
+                await redis.expire(key, lockout_seconds)
+
+        return len(attempts) >= max_attempts
+
+    async def record_failed_login(self, email: str, lockout_seconds: int = 900) -> None:
+        """
+        Enregistre une tentative de connexion échouée dans Redis.
+
+        Args:
+            email: Adresse email du compte
+            lockout_seconds: Durée du verrouillage en secondes (défaut: 900 = 15 min)
+        """
+        redis = await self._get_redis()
+        key = f"{LOGIN_ATTEMPTS_PREFIX}{email}"
+        now = time.time()
+
+        await redis.rpush(key, str(now))
+        await redis.expire(key, lockout_seconds)
+        logger.info(f"Tentative de connexion échouée enregistrée pour {email}")
+
+    async def reset_login_attempts(self, email: str) -> None:
+        """
+        Réinitialise le compteur de tentatives de connexion après une connexion réussie.
+
+        Args:
+            email: Adresse email du compte
+        """
+        redis = await self._get_redis()
+        key = f"{LOGIN_ATTEMPTS_PREFIX}{email}"
+        await redis.delete(key)
+
+    async def get_remaining_attempts(self, email: str, max_attempts: int = 5, lockout_seconds: int = 900) -> int:
+        """
+        Retourne le nombre de tentatives restantes avant verrouillage.
+
+        Args:
+            email: Adresse email du compte
+            max_attempts: Nombre maximum de tentatives (défaut: 5)
+            lockout_seconds: Fenêtre de temps en secondes (défaut: 900 = 15 min)
+
+        Returns:
+            Nombre de tentatives restantes (0 si verrouillé)
+        """
+        redis = await self._get_redis()
+        key = f"{LOGIN_ATTEMPTS_PREFIX}{email}"
+        now = time.time()
+
+        attempts_raw = await redis.lrange(key, 0, -1)
+        valid_attempts = [float(t) for t in attempts_raw if now - float(t) < lockout_seconds]
+
+        return max(0, max_attempts - len(valid_attempts))
 
     async def close(self) -> None:
         """Ferme la connexion Redis."""

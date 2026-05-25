@@ -1,0 +1,24 @@
+# =============================================================================
+# HorizontalPodAutoscaler - eAdmin Guinée Backend
+# Automatically scales backend pods based on CPU utilization
+# Min: 3 replicas (high availability), Max: 10 replicas (cost control)
+# =============================================================================
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: eadmin-backend-hpa
+  namespace: eadmin
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: eadmin-backend
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

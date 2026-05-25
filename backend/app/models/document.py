@@ -7,7 +7,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, Integer, String, Text, func
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -43,9 +43,16 @@ class Document(Base):
     tags: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     current_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     owner_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
     )
-    institution_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    tenant_id: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, index=True,
+        comment="Tenant identifier for multi-tenant isolation"
+    )
+    institution_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True,
+        comment="Institution identifier for RLS"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

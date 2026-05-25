@@ -1,188 +1,177 @@
 ---
-Task ID: P0-P2-corrections
-Agent: Super Z (main)
-Task: Correction des issues critiques P0-P2 identifiées lors de l'audit eAdmin Guinée
+Task ID: 1
+Agent: Main Agent (Super Z)
+Task: Point 1 — Remove all hardcoded secrets, create .env.example, secure generation
 
 Work Log:
-- P0-1: Supprimé le bouton "Générer le document officiel" dupliqué et la section "Document officiel généré" dupliquée dans service-requests-page.tsx (cause principale du bug popup)
-- P0-2: Ajouté l'initialisation globale de checkAndRejectExpiredRequests() dans page.tsx avec useEffect (chargement app + toutes les 30 min)
-- P0-3: Remplacé ROLE_PAGE_ACCESS (page.tsx) par canAccessPage()/getDefaultPage() de rbac.ts — unification du système RBAC
-- P1-1: Vérifié que les jours fériés guinéens sont déjà implémentés dans addBusinessDays() (14+ holidays)
-- P1-2: Vérifié que l'escalade superviseur est déjà implémentée dans checkAndRejectExpiredRequests() (isDeadlineCritical)
-- P1-3: Vérifié que la section "Notifications" est déjà présente dans citizen-portal-page.tsx
-- P2-1: Supprimé les imports inutilisés (DropdownMenu, getDeadlineDays), corrigé next.config.ts (ignoreBuildErrors=false, reactStrictMode=true)
-- P2-2: Exclu examples/ et skills/ de la compilation TypeScript (tsconfig.json)
-- Build vérifié avec succès après toutes les corrections
-- Push sur GitHub: commit 6b7a7ee
+- Replaced all hardcoded secrets in backend/app/config.py with _UNCONFIGURED sentinel
+- Added production validation that rejects missing/weak secrets at startup
+- Added development auto-generation of temporary secrets
+- Added staging warning for unconfigured secrets
+- Added ENCRYPTION_KEY, session security, upload security, multi-tenant settings
+- Created comprehensive backend/.env.example with all variables documented
+- Created comprehensive root .env.example with Docker Compose secrets
+- Fixed hardcoded encryption key in src/lib/security.ts (was 'eadmin-guinee-default-encryption-key-2026')
+- Updated docker-compose.dev.yml to use ${VAR:-default} pattern instead of hardcoded secrets
+- Removed hardcoded dev credentials from docker-compose.dev.yml
 
 Stage Summary:
-- 4 fichiers modifiés: page.tsx, service-requests-page.tsx, next.config.ts, tsconfig.json
-- Build réussi avec TypeScript strict (ignoreBuildErrors=false)
-- RBAC unifié: une seule source de vérité dans rbac.ts
-- Auto-rejection des demandes expirées: désormais globale (pas seulement sur la page service-requests)
-- Bug popup corrigé: suppression des éléments dupliqués pour la génération de documents
-
----
-Task ID: P3-corrections
-Agent: Super Z (main)
-Task: Corrections P3 — ai-agent-store mutations, sidebar RBAC, indicateur délai critique
-
-Work Log:
-- Remplacé 5 appels useCitizenRequestsStore.setState() dans ai-agent-store.ts par updateRequestAIFields() et updateRequestStatus()
-  - Ligne 639: traitement IA réel → updateRequestAIFields()
-  - Lignes 1332/1353/1374: resolveEscalation (approve/reject/complement) → updateRequestStatus() + updateRequestAIFields()
-  - Ligne 1575: traitement IA autonome → updateRequestAIFields()
-- Réécrit app-sidebar.tsx: supprimé ROLE_NAV + ROLE_EXTRA_NAV (3ème système RBAC codé en dur)
-  - Ajouté PAGE_META: dictionnaire centralisé des labels/icônes/sections pour toutes les pages
-  - Ajouté buildNavItems(user): génère dynamiquement les items via getAccessiblePages()
-  - Sidebar maintenant 100% aligné avec le routeur (page.tsx) et rbac.ts
-- Ajouté isDeadlineCritical() + countRemainingBusinessDays dans citizen-portal-page.tsx
-  - Liste des demandes: affichage "Escalade superviseur" en orange pour 6-10j restants
-  - Panneau détail: barre de progression orange + texte escalade superviseur
-- Build réussi avec TypeScript strict
-- Push sur GitHub: commit 8cb89e7
-
-Stage Summary:
-- 3 fichiers modifiés, -223 lignes (code mort), +124 lignes (code dynamique)
-- RBAC unifié: Routeur + Sidebar = même source de vérité (rbac.ts)
-- Plus aucune mutation directe setState() dans ai-agent-store.ts
-- Citoyens voient l'escalade superviseur (délai critique 6-10j)
-
----
-Task ID: 2-a
-Agent: P0-1 Cleaner
-Task: Remove Prisma/SQLite remnants from project
-
-Work Log:
-- Deleted /home/z/my-project/prisma/ directory (contained schema.prisma with SQLite config + User/Post models)
-- Deleted /home/z/my-project/db/ directory (contained custom.db SQLite database file)
-- Deleted /home/z/my-project/src/lib/db.ts (PrismaClient singleton — no imports from src/ found)
-- Deleted /home/z/my-project/3000 (leftover socket file at project root)
-- Edited /home/z/my-project/package.json:
-  - Removed `@prisma/client` ^6.11.1 from dependencies
-  - Removed `prisma` ^6.11.1 from dependencies
-  - Removed `next-auth` ^4.24.11 from dependencies (app uses Zustand auth, not NextAuth)
-  - Removed all db:* scripts (db:push, db:generate, db:migrate, db:reset)
-- Edited /home/z/my-project/.env: replaced `DATABASE_URL=file:/home/z/my-project/db/custom.db` with `DATABASE_URL=postgresql://eadmin:eadmin@localhost:5432/eadmin`
-- Ran `bun install` to regenerate lockfile (removed 3 packages: @prisma/client, prisma, next-auth)
-- Verified zero remaining references to prisma/PrismaClient/SQLite/next-auth in src/
-
-Stage Summary:
-- 4 directories/files deleted: prisma/, db/, src/lib/db.ts, 3000
-- 3 packages removed from dependencies: @prisma/client, prisma, next-auth
-- 4 scripts removed: db:push, db:generate, db:migrate, db:reset
-- DATABASE_URL updated from SQLite file path to PostgreSQL connection string
-- Lockfile regenerated via bun install (3 packages removed)
-- Zero Prisma/SQLite/NextAuth references remain in src/ — architecture now fully coherent (FastAPI + PostgreSQL + SQLAlchemy backend, Zustand frontend auth)
-
----
-Task ID: enterprise-stabilization
-Agent: Super Z (main)
-Task: Stabilisation technique enterprise — P0 security + architecture + testing + CI/CD
-
-Work Log:
-- P0-1: Supprimé Prisma/SQLite (prisma/, db/, src/lib/db.ts, @prisma/client, prisma, next-auth packages)
-- P0-2: Créé token_blacklist.py — service Redis pour blacklist JWT (révocation multi-instance, TTL auto)
-  - Mis à jour auth.py: ajout jti unique par token, vérification blacklist dans get_current_user()
-  - Ajouté endpoint POST /logout (révocation access + refresh tokens)
-  - Ajouté rotation des refresh tokens (détecte réutilisation = attaque possible → révocation totale)
-  - Ajouté POST /change-password avec révocation forcée de tous les tokens
-  - Ajouté validation Pydantic password (8+ chars, majuscule, chiffre)
-- P0-3: CORS sécurisé — origines explicites par environnement (jamais "*" avec credentials)
-  - DEV: localhost:3000/3001, 127.0.0.1:3000/3001
-  - PROD: eadmin.gouv.gn, admin.eadmin.gouv.gn, citoyen.eadmin.gouv.gn
-  - Swagger/ReDoc désactivés en production
-  - Vérification SECRET_KEY par défaut en production (log CRITICAL)
-- P0-4: Seed des comptes démo (seed_demo.py) — 6 comptes avec password Eadmin2026! (conforme)
-  - Mise à jour mots de passe frontend: demo-accounts.ts, app-store.ts, users-store.ts, login-page.tsx
-  - Mise à jour E2E tests: password Eadmin2026!
-- P0-5: Créé .env.example (frontend + backend) avec documentation complète
-- P1-1: Ajouté Pytest backend — conftest.py, test_auth.py (15+ tests: login, register, me, health)
-- P1-2: Créé Makefile complet (dev, test, seed, docker, e2e, lint, clean)
-- P1-2: Créé docker-compose.dev.yml (hot-reload backend + frontend)
-- P1-3: Ajouté rate_limit.py middleware (brute-force protection, 5 tentatives login/5min, 60 req/min API)
-- P1-4: Créé GitHub Actions CI/CD (.github/workflows/ci.yml) — lint, test backend, build frontend, E2E, Docker
-- Ajouté requirements-dev.txt (pytest, pytest-asyncio, pytest-cov, ruff, mypy, aiosqlite)
-- Ajouté email-validator dans requirements.txt
-- Corrigé package.json trailing comma, ajouté output: "standalone" dans next.config.ts
-- Build vérifié avec succès
-
-Stage Summary:
-- Sécurité JWT: blacklist Redis, logout, refresh token rotation, password validation
-- CORS: plus jamais "*" avec credentials, origines explicites
-- Rate limiting: protection brute-force (login + API)
-- Architecture cohérente: plus aucun Prisma/SQLite/NextAuth
-- Tests backend: 15+ tests Pytest
-- CI/CD: GitHub Actions complet
-- DevOps: Makefile + docker-compose.dev.yml
-- Mots de passe conformes: Eadmin2026! partout (frontend + backend + E2E)
+- All hardcoded secrets eliminated from source code
+- Production fails fast if any secret is missing or weak
+- Development auto-generates secrets for convenience
+- .env.example files created with generation instructions
 
 ---
 Task ID: 2
-Agent: Main Agent
-Task: Phase 1 Implementation — Security, RBAC, Audit Trail, Tests, Monitoring
+Agent: Sub-agent (full-stack-developer)
+Task: Point 2 — Fix /register endpoint + Point 3 RBAC + Point 7 JWT blacklist
 
 Work Log:
-- Fixed Dockerfile: Added COPY prisma/, prisma generate, openssl, Prisma client in runner stage
-- Fixed Prisma schema: Updated to PostgreSQL with User, AuditLog, Session models
-- Fixed CORS: Replaced allow_origins=["*"] with explicit localhost origins in dev, restricted methods/headers
-- Added Security Headers Middleware (CSP, X-Frame-Options, X-Content-Type-Options, HSTS, Referrer-Policy, Permissions-Policy)
-- Added Rate Limiting Middleware (100 req/60s per IP)
-- Added Request Logging Middleware with structured JSON logging
-- Enhanced /health endpoint with Redis and DB connectivity checks
-- Updated backend config with MFA_ISSUER, RATE_LIMIT, REFRESH_TOKEN settings
-- Implemented 7-level hierarchical RBAC (citoyen→mairie→agence→agent→chef_service→directeur→ministre→admin→superadmin)
-- Added HIERARCHY_LEVELS, getHierarchyLevel(), isRoleAbove() utility functions
-- Implemented hierarchical permission inheritance via getInheritedPermissions()
-- Added 2 new demo accounts (agent@eadmin.gn, directeur@eadmin.gn)
-- Updated backend RoleEnum to 9 roles (SUPER_ADMIN, MINISTRE, DIRECTEUR, CHEF_SERVICE, ADMIN, AGENT, MAIRIE, AGENCE, CITOYEN)
-- Added MFA fields to User model (mfa_enabled, mfa_secret, last_login_at)
-- Created enterprise Audit Trail engine (src/lib/audit-trail.ts) with hash chain integrity, 34 action types, 9 categories
-- Updated audit-logs-store with new AuditEntry format, integrity check, compliance report
-- Created useAuditTrail React hook
-- Enhanced audit-logs-page with category filter, session ID search, integrity check, compliance report, export buttons
-- Created security module (src/lib/security.ts) with TOTP, AES-256-GCM encryption, password policy, rate limiter, suspicious activity detection, CSRF
-- Enhanced MFA page with TOTP setup flow, QR code, backup codes, rate limiting
-- Enhanced session store with JWT rotation, concurrent session limit, IP change detection, security events
-- Enhanced backend auth with account lockout, JWT rotation, token blacklist, MFA-aware login
-- Created backend security API (setup-mfa, verify-mfa, disable-mfa, change-password, sessions, security-events)
-- Created monitoring module (src/lib/monitoring.ts) with structured logging, health checks, metrics collection, performance tracking
-- Added Monitoring & Observabilité section to admin page
-- Added /metrics Prometheus endpoint to backend
-- Created RBAC & Security E2E test suite (rbac-security.spec.ts)
-- Created Workflow E2E test suite (workflow-tests.spec.ts)
-- Created backend auth security tests (test_auth_security.py)
-- Created backend RBAC tests (test_rbac.py)
-- Fixed TypeScript errors in access-guard.tsx, login-page.tsx, mfa-page.tsx, security.ts, audit-logs-store.ts, recommendations-store.ts
+- Register endpoint already forces CITOYEN role
+- Admin-only /admin/create-user endpoint with role restrictions
+- Enhanced password validation to 12 chars, special chars required
+- Removed in-memory _token_blacklist_set fallback from auth.py
+- Added login attempt tracking via Redis (token_blacklist service)
+- Added tenant_id/institution_id to JWT claims
+- Added device fingerprinting to login
+- Updated RBAC PERMISSION_MATRIX with 10 new permissions
+- Added require_clearance() and require_any_permission() dependencies
+- Fixed RLS middleware - removed double JWT decode, uses request.state.user
+- Updated user model hierarchy levels (MAIRIE/AGENCE→level 2)
 
 Stage Summary:
-- Phase 1 implementation complete: Security Enterprise, RBAC hiérarchique 7 niveaux, Audit Trail complet, Tests, Monitoring
-- Build passes successfully with Next.js 16 Turbopack
-- All new features are backward compatible with existing demo accounts
-- 9 roles now supported across frontend and backend
-- Hash chain integrity ensures audit trail tamper detection
-- TOTP MFA available for admin+ roles
+- Register forces CITOYEN, admin-only user creation secured
+- RBAC expanded with tenant/institution clearance checks
+- JWT blacklist fully Redis-backed, no in-memory fallbacks
+- RLS sets tenant_id and institution_id PostgreSQL session variables
+
 ---
-Task ID: 1-6
-Agent: Main Agent
-Task: Implement role-specific dashboards and accounts for all 7 RBAC roles in eAdmin Guinée
+Task ID: 3
+Agent: Sub-agent (full-stack-developer)
+Task: Points 8-9 — Rate limiting + Security headers
 
 Work Log:
-- Added 2 missing demo accounts (chef_service@eadmin.gn, ministre@eadmin.gn) to app-store.ts
-- Added 3 new AppPage types: agent-dashboard, chef-service-dashboard, ministre-dashboard
-- Updated ROLE_DEFAULT_PAGE to route each role to their dedicated dashboard
-- Updated RBAC page access rules for 3 new dashboard pages with role-based bypass
-- Updated getAccessiblePages() and getDefaultPage() in rbac.ts with correct defaults per role
-- Created agent-dashboard-page.tsx: operational dashboard with pipeline, request list, stats
-- Created chef-service-dashboard-page.tsx: management dashboard with KPIs, team overview, approval queue
-- Created ministre-dashboard-page.tsx: strategic dashboard with 8 KPIs, category breakdown, priority requests
-- Updated page.tsx router with dynamic imports for all 3 new dashboards
-- Updated app-sidebar.tsx PAGE_META with labels for new dashboard pages
-- Verified TypeScript compilation passes with 0 errors
-- Verified Next.js build succeeds
+- Fixed CSP: removed unsafe-inline/unsafe-eval in production, nonce-based CSP
+- Added Cross-Origin-Opener-Policy, Cross-Origin-Resource-Policy headers
+- Added Cache-Control and Pragma for API responses
+- Added rate limiting for register (3/hr), password change (5/15min), MFA (5/5min), AI (20/min), uploads (10/min)
+- Added X-RateLimit-* headers to responses
+- Added user-based rate limiting (extracts user_id from JWT)
+- Consolidated duplicate middleware classes into module imports
+- Added AuditMiddleware to middleware chain
+- Correct middleware order: CORS → Security Headers → Rate Limiting → Audit → Request Logging
 
 Stage Summary:
-- All 10 UserRole types now have dedicated landing pages
-- 8 demo accounts available (was 8, added 2 new: chef_service, ministre)
-- Complete RBAC integration for all role-specific dashboards
-- Build passes cleanly
+- CSP hardened (nonce-based, no unsafe-inline/eval in production)
+- 5 new rate-limited endpoints with Redis-backed sliding window
+- User-based + IP-based rate limiting
+- Proper rate limit headers on responses
+
+---
+Task ID: 4
+Agent: Sub-agent (full-stack-developer)
+Task: Points 4-6 — Multi-tenant + Audit logging
+
+Work Log:
+- Created Tenant model with Guinea colors, quotas, feature flags
+- Created Institution model with hierarchical structure
+- Created TenantResolutionMiddleware (X-Tenant-ID, subdomain, JWT claims)
+- Created Alembic migrations for tenants, institutions, tenant_id on business tables
+- Created RLS policies migration (5 tables with tenant isolation)
+- Created AuditService with SHA-256 hash chain integrity
+- Enhanced audit middleware to use AuditService
+- Added audit logging to all auth endpoints
+- Enhanced audit API: paginated logs, CSV export, integrity verification, stats, timeline
+
+Stage Summary:
+- Full multi-tenant isolation with RLS policies
+- Tenant resolution from headers, subdomain, JWT
+- Enterprise audit trail with tamper-detection hash chain
+- 6 audit API endpoints for DIRECTEUR+ access
+
+---
+Task ID: 5
+Agent: Sub-agent (full-stack-developer)
+Task: Points 5-16 — Dockerfile + K8s + Infrastructure
+
+Work Log:
+- Created backend/entrypoint.sh with PostgreSQL wait + Alembic migration
+- Updated backend/Dockerfile with ENTRYPOINT, pg_isready
+- Updated backend/.env with 14 new variables
+- Updated root .env with NEXT_PUBLIC_ENCRYPTION_KEY
+- Updated K8s secrets.yaml (base64, ENCRYPTION_KEY, REDIS_PASSWORD)
+- Updated K8s configmap.yaml (JWT, session, rate-limit, tenant, upload, CORS)
+- Created K8s backend-service.yaml, backend-hpa.yaml (3-10 replicas)
+- Created K8s networkpolicy.yaml, pdb.yaml
+- Created K8s postgres-deployment.yaml, redis-deployment.yaml
+
+Stage Summary:
+- Backend auto-migrates database on container startup
+- Full K8s manifests with HPA, PDB, NetworkPolicy
+- Stateful PostgreSQL and Redis deployments
+
+---
+Task ID: 6
+Agent: Sub-agent (full-stack-developer)
+Task: Points 11-13 — CI/CD + Advanced Security
+
+Work Log:
+- Rewrote .github/workflows/ci.yml with 10-job pipeline
+- Created SessionService with Redis backend (concurrent sessions, suspicious detection, Haversine formula)
+- Created UploadSecurityService (8-step validation, magic bytes, PDF script detection, ClamAV)
+- Created security_events API (7 endpoints for sessions, devices, events)
+- Registered security_events router in main.py
+
+Stage Summary:
+- Enterprise CI/CD with 10 jobs (lint, test, security, E2E, deploy)
+- Session management with impossible travel detection
+- Upload security with virus scanning and PDF script detection
+
+---
+Task ID: 7
+Agent: Sub-agent (full-stack-developer)
+Task: Points 12-14-15 — Observability + GED + AI
+
+Work Log:
+- Created TelemetryService with OpenTelemetry integration
+- Rewrote metrics.py with 25+ Prometheus metrics
+- Created SentryService with FastAPI integration
+- Created Grafana dashboard JSON (5 sections)
+- Created Loki + Promtail configs, updated docker-compose
+- Created OCRService (Tesseract, 13 Guinean document types)
+- Created SearchService (full-text search, multi-tenant isolation)
+- Created ParapheurService (signing circuits, SHA-256 verification)
+- Created DocumentVersionService (versioning, restoration, comparison)
+- Enhanced documents API (15+ endpoints: CRUD, versions, OCR, search, parapheur)
+- Created AISummarizationService (document/correspondence summarization)
+- Created AIClassificationService (16 categories, 17 departments, auto-routing)
+- Created GovernmentAIAssistant (8 procedures, data extraction, report generation)
+- Enhanced AI API (12 endpoints with RBAC checks)
+
+Stage Summary:
+- Full observability stack: Prometheus + Grafana + Loki + Sentry
+- Enterprise GED: OCR, full-text search, parapheur, versioning
+- Government AI: summarization, classification, assistant, extraction, reports
+
+---
+Task ID: 8
+Agent: Main Agent (Super Z)
+Task: Points 10+17 — Tests + UX/UI
+
+Work Log:
+- Created test_config_security.py (9 tests for secret validation)
+- Created test_audit_service.py (8 tests for audit logging)
+- Created test_session_service.py (10 tests for session management)
+- Created test_upload_security.py (11 tests for file upload security)
+- Created test_rate_limiting.py (6 tests for rate limiting)
+- Created test_security_headers.py (11 tests for security headers)
+- Created test_multi_tenant.py (8 tests for multi-tenant isolation)
+- Created design-system.ts (Guinea colors, design tokens, workflow status colors, role colors)
+- Created theme-provider.tsx (Light/Dark/System mode with Guinea-themed dark theme)
+- Created premium-components.tsx (Skeleton, AnimatedCounter, KPICard, WorkflowProgress, StatusBadge, NotificationBadge)
+
+Stage Summary:
+- 60+ new backend tests covering config, audit, sessions, upload, rate limiting, headers, multi-tenant
+- Premium design system with Guinea national colors
+- Theme toggle with light/dark/system modes
+- KPI cards, workflow visualization, skeleton loading components

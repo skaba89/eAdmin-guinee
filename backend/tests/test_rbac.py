@@ -57,8 +57,7 @@ def test_role_hierarchy_levels():
     Level 5: DIRECTEUR
     Level 4: CHEF_SERVICE
     Level 3: ADMIN
-    Level 2: AGENT
-    Level 1: MAIRIE, AGENCE
+    Level 2: AGENT, MAIRIE, AGENCE (merged into AGENT level)
     Level 0: CITOYEN
     """
     hierarchy = {
@@ -68,8 +67,8 @@ def test_role_hierarchy_levels():
         'CHEF_SERVICE': 4,
         'ADMIN': 3,
         'AGENT': 2,
-        'MAIRIE': 1,
-        'AGENCE': 1,
+        'MAIRIE': 2,
+        'AGENCE': 2,
         'CITOYEN': 0,
     }
 
@@ -83,8 +82,9 @@ def test_role_hierarchy_levels():
     assert hierarchy['MAIRIE'] > hierarchy['CITOYEN']
     assert hierarchy['AGENCE'] > hierarchy['CITOYEN']
 
-    # MAIRIE and AGENCE should be at the same level
+    # MAIRIE, AGENCE and AGENT should be at the same level (merged)
     assert hierarchy['MAIRIE'] == hierarchy['AGENCE']
+    assert hierarchy['MAIRIE'] == hierarchy['AGENT']
 
 
 def test_role_hierarchy_inheritance():

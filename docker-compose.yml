@@ -131,6 +131,38 @@ services:
     networks:
       - eadmin-network
 
+  loki:
+    image: grafana/loki:2.9.4
+    container_name: eadmin-loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./monitoring/loki-config.yaml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3100/ready || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - eadmin-network
+
+  promtail:
+    image: grafana/promtail:2.9.4
+    container_name: eadmin-promtail
+    restart: unless-stopped
+    volumes:
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./monitoring/promtail-config.yaml:/etc/promtail/config.yml:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    networks:
+      - eadmin-network
+
   frontend:
     build:
       context: .
@@ -163,3 +195,5 @@ volumes:
     name: eadmin-prometheus-data
   grafana_data:
     name: eadmin-grafana-data
+  loki_data:
+    name: eadmin-loki-data

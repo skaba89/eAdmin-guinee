@@ -2,7 +2,7 @@ apiVersion: 1
 providers:
   - name: 'eAdmin Guinée'
     orgId: 1
-    folder: ''
+    folder: 'eAdmin'
     type: file
     disableDeletion: false
     updateIntervalSeconds: 30

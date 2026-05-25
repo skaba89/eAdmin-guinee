@@ -4,6 +4,8 @@
 #
 # Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 # Ou:   make docker-dev
+#
+# ⚠️ Dev secrets are auto-generated. For custom values, set them in .env
 # =============================================================================
 
 version: "3.9"
@@ -17,12 +19,15 @@ services:
     environment:
       ENVIRONMENT: development
       DEBUG: "true"
-      SECRET_KEY: dev-secret-key-change-in-production
-      DATABASE_URL: postgresql://eadmin:eadmin@postgres:5432/eadmin
-      REDIS_URL: redis://redis:6379
+      # In dev mode, the backend auto-generates temporary secrets if not set.
+      # Override these in your .env file for persistent dev secrets.
+      SECRET_KEY: ${SECRET_KEY:-dev-auto-generated-do-not-use-in-prod}
+      DATABASE_URL: postgresql+asyncpg://eadmin:${POSTGRES_PASSWORD:-eadmin_dev}@postgres:5432/eadmin
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_dev}@redis:6379
       MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-eadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin_dev}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-dev-encryption-key-not-for-production}
     volumes:
       - ./backend:/app  # Hot-reload du code backend
 
@@ -34,7 +39,8 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8000
       NEXT_PUBLIC_APP_NAME: eAdministration Suite Guinea
-      DATABASE_URL: postgresql://eadmin:eadmin@postgres:5432/eadmin
+      NEXT_PUBLIC_ENCRYPTION_KEY: ${NEXT_PUBLIC_ENCRYPTION_KEY:-dev-encryption-key-not-for-production}
+      DATABASE_URL: postgresql://eadmin:${POSTGRES_PASSWORD:-eadmin_dev}@postgres:5432/eadmin
     volumes:
       - ./src:/app/src        # Hot-reload du code frontend
       - ./public:/app/public

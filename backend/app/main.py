@@ -6,15 +6,18 @@ Point d'entrée de l'API backend.
 import time
 import logging
 from contextlib import asynccontextmanager
-from collections import defaultdict
 
-from fastapi import FastAPI, Request, HTTPException, status
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from app.api import ai, analytics, audit, auth, courriers, documents, documents_search, metrics, security, users, workflows
+from app.api import ai, analytics, audit, auth, courriers, documents, documents_search, metrics, security, security_events, users, workflows
 from app.config import settings
+from app.middleware.security_headers import SecurityHeadersMiddleware
+from app.middleware.rate_limit import RateLimitMiddleware
+from app.middleware.audit import AuditMiddleware
+from app.middleware.tenant import TenantResolutionMiddleware
 
 logger = logging.getLogger("eadmin")
 logger.setLevel(logging.INFO)
@@ -32,77 +35,9 @@ active_sessions_count = 1
 APP_START_TIME = time.time()
 
 
-# --- Rate Limiting (in-memory, Redis-backed in production) ---
-class RateLimitMiddleware(BaseHTTPMiddleware):
-    """Simple rate limiter: max_requests per window_seconds per IP."""
-
-    def __init__(self, app, max_requests: int = 100, window_seconds: int = 60):
-        super().__init__(app)
-        self.max_requests = max_requests
-        self.window_seconds = window_seconds
-        self.requests: dict[str, list[float]] = defaultdict(list)
-
-    async def dispatch(self, request: Request, call_next):
-        # Skip rate limiting for health checks
-        if request.url.path == "/health":
-            return await call_next(request)
-
-        client_ip = request.client.host if request.client else "unknown"
-        now = time.time()
-
-        # Clean old entries
-        self.requests[client_ip] = [
-            t for t in self.requests[client_ip]
-            if now - t < self.window_seconds
-        ]
-
-        if len(self.requests[client_ip]) >= self.max_requests:
-            logger.warning(f"Rate limit exceeded for IP: {client_ip}")
-            return JSONResponse(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                content={"detail": "Trop de requêtes. Réessayez dans quelques secondes."}
-            )
-
-        self.requests[client_ip].append(now)
-        return await call_next(request)
-
-
-# --- Security Headers Middleware ---
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """Add security headers to all responses."""
-
-    async def dispatch(self, request: Request, call_next):
-        response = await call_next(request)
-
-        # Content Security Policy - GovTech specific
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-            "font-src 'self' https://fonts.gstatic.com; "
-            "img-src 'self' data: blob:; "
-            "connect-src 'self' http://localhost:3000 http://localhost:8000; "
-            "frame-ancestors 'none'; "
-            "base-uri 'self'; "
-            "form-action 'self'"
-        )
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self)"
-        response.headers["X-Admin-Guinee"] = "eAdministration-Suite-Guinea"
-
-        # HSTS in production only
-        if settings.is_production:
-            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
-
-        return response
-
-
 # --- Request Logging Middleware ---
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    """Log all API requests for audit trail and increment metrics counters."""
+    """Journalise toutes les requêtes API pour l'audit et incrémente les compteurs de métriques."""
 
     async def dispatch(self, request: Request, call_next):
         global request_counter, error_counter, total_response_time_ms
@@ -147,6 +82,26 @@ async def lifespan(application: FastAPI):
     if settings.is_production and settings.SECRET_KEY == "dev-secret-key-change-in-production":
         logger.critical("SECRET_KEY par défaut détectée en production ! Changez-la immédiatement.")
 
+    # Initialiser OpenTelemetry (dégénération gracieuse si non disponible)
+    try:
+        from app.services.telemetry import telemetry_service
+        telemetry_service.setup(otlp_endpoint="http://localhost:4317")
+    except Exception as e:
+        logger.warning(f"OpenTelemetry non initialisé: {e}")
+
+    # Initialiser Sentry (dégénération gracieuse si non configuré)
+    try:
+        from app.services.sentry_service import sentry_service
+        sentry_dsn = getattr(settings, 'SENTRY_DSN', '') or ''
+        if sentry_dsn:
+            sentry_service.init(
+                dsn=sentry_dsn,
+                environment=settings.ENVIRONMENT,
+                release=settings.APP_VERSION,
+            )
+    except Exception as e:
+        logger.warning(f"Sentry non initialisé: {e}")
+
     # Vérifier la connexion Redis (optionnel — ne pas bloquer le démarrage)
     try:
         from app.services.token_blacklist import token_blacklist
@@ -165,6 +120,16 @@ async def lifespan(application: FastAPI):
     from app.services.token_blacklist import token_blacklist
     await token_blacklist.close()
 
+    from app.services.session_service import session_service
+    await session_service.close()
+
+    # Nettoyer Sentry
+    try:
+        from app.services.sentry_service import sentry_service
+        sentry_service.clear_user_context()
+    except Exception:
+        pass
+
     logger.info("Arrêt propre de l'application")
 
 
@@ -177,17 +142,27 @@ app = FastAPI(
     redoc_url="/redoc" if settings.is_development else None,
 )
 
-# --- Middlewares (order matters: outermost first) ---
-# Rate limiting
-app.add_middleware(RateLimitMiddleware, max_requests=100, window_seconds=60)
+# --- Middlewares (ordre important : outermost → innermost) ---
+# L'ordre d'ajout est INVERSE : le dernier ajouté est le premier exécuté.
+# On veut : CORS → Tenant Resolution → Security Headers → Rate Limiting → Audit → Request Logging
+# Donc on ajoute dans l'ordre inverse :
 
-# Security headers
-app.add_middleware(SecurityHeadersMiddleware)
-
-# Request logging
+# 6. Request Logging (innermost — le plus proche de l'app)
 app.add_middleware(RequestLoggingMiddleware)
 
-# CORS — strict configuration: never "*" with credentials
+# 5. Audit — journalisation automatique des accès API
+app.add_middleware(AuditMiddleware)
+
+# 4. Rate Limiting — protection brute-force et abus d'API
+app.add_middleware(RateLimitMiddleware)
+
+# 3. Security Headers — en-têtes de sécurité HTTP
+app.add_middleware(SecurityHeadersMiddleware)
+
+# 2. Tenant Resolution — résolution du tenant multi-tenant (avant tout le reste)
+app.add_middleware(TenantResolutionMiddleware)
+
+# 1. CORS (outermost — premier à traiter la requête)
 ALLOWED_ORIGINS_DEV = [
     "http://localhost:3000",
     "http://localhost:3001",
@@ -222,8 +197,8 @@ app.add_middleware(
     allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Request-ID", "X-Tenant-ID"],
-    expose_headers=["X-Request-ID", "X-Response-Time"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID", "X-Tenant-ID", "X-Institution-ID"],
+    expose_headers=["X-Request-ID", "X-Response-Time", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset"],
 )
 
 # --- Routeurs API ---
@@ -237,6 +212,7 @@ app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytiq
 app.include_router(audit.router, prefix="/api/v1/audit", tags=["Audit"])
 app.include_router(ai.router, prefix="/api/v1/ai", tags=["Intelligence Artificielle"])
 app.include_router(security.router, prefix="/api/v1/security", tags=["Sécurité"])
+app.include_router(security_events.router, prefix="/api/v1/security-events", tags=["Événements de Sécurité"])
 app.include_router(metrics.router, tags=["Métriques"])
 
 

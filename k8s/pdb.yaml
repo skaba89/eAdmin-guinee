@@ -1,0 +1,16 @@
+# =============================================================================
+# PodDisruptionBudget - eAdmin Guinée Backend
+# Ensures minimum available replicas during voluntary disruptions
+# (e.g., node drains, cluster upgrades)
+# With 3 replicas min, this ensures at least 2 are always available
+# =============================================================================
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: eadmin-backend-pdb
+  namespace: eadmin
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: eadmin-backend

@@ -1,0 +1,117 @@
+# =============================================================================
+# Redis Deployment - eAdmin Guinée
+# In-memory cache for JWT blacklist, rate limiting, and session management
+# Uses password authentication and persistence via append-only file
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eadmin-redis
+  namespace: eadmin
+  labels:
+    app: eadmin-redis
+    tier: cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eadmin-redis
+  template:
+    metadata:
+      labels:
+        app: eadmin-redis
+        tier: cache
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+          command:
+            - redis-server
+            - --appendonly
+            - "yes"
+            - --maxmemory
+            - "512mb"
+            - --maxmemory-policy
+            - allkeys-lru
+            - --requirepass
+            - $(REDIS_PASSWORD)
+            - --save
+            - "60"
+            - "1000"
+            - --save
+            - "300"
+            - "100"
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: eadmin-secrets
+                  key: REDIS_PASSWORD
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          livenessProbe:
+            exec:
+              command:
+                - redis-cli
+                - -a
+                - $(REDIS_PASSWORD)
+                - ping
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - -a
+                - $(REDIS_PASSWORD)
+                - ping
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+      volumes:
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: eadmin-redis-data
+---
+# Redis PersistentVolumeClaim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: eadmin-redis-data
+  namespace: eadmin
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+# Redis ClusterIP Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: eadmin-redis
+  namespace: eadmin
+  labels:
+    app: eadmin-redis
+    tier: cache
+spec:
+  type: ClusterIP
+  selector:
+    app: eadmin-redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+      protocol: TCP

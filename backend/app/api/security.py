@@ -25,9 +25,8 @@ from app.api.auth import (
     get_password_hash,
     create_access_token,
     create_refresh_token,
-    blacklist_token,
-    _token_blacklist,
 )
+from app.services.token_blacklist import token_blacklist as _token_blacklist
 from app.database import get_db
 from app.models.user import User
 

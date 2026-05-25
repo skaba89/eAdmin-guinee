@@ -18,6 +18,8 @@ from app.models import (  # noqa: F401
     AuditLog,
     Courrier,
     Document,
+    Institution,
+    Tenant,
     User,
     Workflow,
     WorkflowStep,

@@ -7,7 +7,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, Integer, String, Text, func
+from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -49,7 +49,14 @@ class Workflow(Base):
     created_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), nullable=False, index=True
     )
-    institution_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    tenant_id: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, index=True,
+        comment="Tenant identifier for multi-tenant isolation"
+    )
+    institution_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True,
+        comment="Institution identifier for RLS"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -77,7 +84,7 @@ class WorkflowStep(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True
     )
     workflow_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True
+        UUID(as_uuid=True), ForeignKey("workflows.id"), nullable=False, index=True
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     assignee_id: Mapped[uuid.UUID | None] = mapped_column(

@@ -1,0 +1,118 @@
+# =============================================================================
+# PostgreSQL StatefulSet - eAdmin Guinée
+# Stateful database with persistent volume, health checks, and proper shutdown
+# For production, consider using a managed database service or Postgres operator
+# =============================================================================
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: eadmin-postgres
+  namespace: eadmin
+  labels:
+    app: eadmin-postgres
+    tier: database
+spec:
+  serviceName: eadmin-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eadmin-postgres
+  template:
+    metadata:
+      labels:
+        app: eadmin-postgres
+        tier: database
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: eadmin-config
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: eadmin-config
+                  key: POSTGRES_USER
+            # ⚠️ In production, add POSTGRES_PASSWORD to eadmin-secrets Secret
+            # and reference it here:
+            # - name: POSTGRES_PASSWORD
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: eadmin-secrets
+            #       key: POSTGRES_PASSWORD
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+              cpu: "2000m"
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - eadmin
+                - -d
+                - eadmin
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - eadmin
+                - -d
+                - eadmin
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          lifecycle:
+            preStop:
+              exec:
+                command: ["pg_ctl", "stop", "-m", "fast"]
+      terminationGracePeriodSeconds: 60
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+---
+# PostgreSQL Headless Service (for StatefulSet DNS: eadmin-postgres-0.eadmin-postgres.eadmin.svc.cluster.local)
+apiVersion: v1
+kind: Service
+metadata:
+  name: eadmin-postgres
+  namespace: eadmin
+  labels:
+    app: eadmin-postgres
+    tier: database
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless service for StatefulSet
+  selector:
+    app: eadmin-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      protocol: TCP

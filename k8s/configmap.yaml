@@ -1,16 +1,70 @@
+# =============================================================================
+# ConfigMap - eAdmin Guinée Backend Configuration
+# Non-secret application configuration values
+# =============================================================================
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: eadmin-config
   namespace: eadmin
 data:
+  # --- Environment ---
   ENVIRONMENT: "production"
   APP_NAME: "eAdministration Suite Guinea"
+  APP_VERSION: "1.0.0"
+  DEBUG: "false"
+
+  # --- JWT / Authentication ---
+  ALGORITHM: "HS256"
+  ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+  REFRESH_TOKEN_EXPIRE_DAYS: "7"
   MFA_ISSUER: "eAdmin Guinée"
+
+  # --- Session Security ---
+  SESSION_MAX_CONCURRENT: "3"
+  SESSION_TIMEOUT_HOURS: "8"
+  SESSION_INACTIVITY_TIMEOUT_MINUTES: "30"
+
+  # --- Rate Limiting ---
+  RATE_LIMIT_MAX_REQUESTS: "100"
+  RATE_LIMIT_WINDOW_SECONDS: "60"
+  RATE_LIMIT_LOGIN_MAX_ATTEMPTS: "5"
+  RATE_LIMIT_LOGIN_WINDOW_SECONDS: "300"
+  RATE_LIMIT_API_PER_MINUTE: "60"
+  RATE_LIMIT_REGISTER_MAX_ATTEMPTS: "3"
+  RATE_LIMIT_REGISTER_WINDOW_SECONDS: "3600"
+
+  # --- Multi-tenant ---
+  TENANT_DEFAULT_ID: "republique-de-guinee"
+  TENANT_ISOLATION_MODE: "strict"
+
+  # --- Upload Security ---
+  UPLOAD_MAX_SIZE_MB: "50"
+  UPLOAD_ALLOWED_TYPES: "application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/webp"
+  UPLOAD_ANTIVIRUS_ENABLED: "false"
+  UPLOAD_QUARANTINE_PATH: "/tmp/eadmin-quarantine"
+
+  # --- MinIO / S3 (non-secret config) ---
   MINIO_ENDPOINT: "minio:9000"
   MINIO_BUCKET_NAME: "eadmin-documents"
   MINIO_SECURE: "true"
+
+  # --- CORS Origins (production) ---
+  # Extra origins beyond the built-in CORS_ORIGINS_PROD list
+  EXTRA_CORS_ORIGINS: "[]"
+
+  # --- Database connection host/port (used by entrypoint.sh pg_isready) ---
+  POSTGRES_HOST: "postgres"
+  POSTGRES_PORT: "5432"
+  POSTGRES_USER: "eadmin"
+  POSTGRES_DB: "eadmin"
+
+  # --- Uvicorn ---
+  UVICORN_WORKERS: "4"
 ---
+# =============================================================================
+# ConfigMap - eAdmin Guinée Frontend Configuration
+# =============================================================================
 apiVersion: v1
 kind: ConfigMap
 metadata:

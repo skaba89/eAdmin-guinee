@@ -88,3 +88,5 @@ upload/
 # Test artifacts
 test-results/
 playwright-report/
+backend/test_eadmin.db
+backend/.env

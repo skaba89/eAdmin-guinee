@@ -1,0 +1,178 @@
+# =============================================================================
+# NetworkPolicies - eAdmin Guinée
+# Restricts pod-to-pod communication following least-privilege principle
+#
+# Traffic flow:
+#   Frontend → Backend → PostgreSQL
+#   Backend → Redis
+#   Backend → MinIO
+#   Prometheus → Backend (metrics scraping)
+#   All other ingress is denied by default
+# =============================================================================
+
+# --- Default deny all ingress within the namespace ---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: eadmin
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+# --- Backend: allow ingress from frontend and prometheus ---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-allow
+  namespace: eadmin
+spec:
+  podSelector:
+    matchLabels:
+      app: eadmin-backend
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Frontend -> Backend (API requests)
+    - from:
+        - podSelector:
+            matchLabels:
+              app: eadmin-frontend
+      ports:
+        - port: 8000
+          protocol: TCP
+    # Prometheus -> Backend (metrics scraping)
+    - from:
+        - podSelector:
+            matchLabels:
+              app: eadmin-prometheus
+      ports:
+        - port: 8000
+          protocol: TCP
+  egress:
+    # Backend -> PostgreSQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app: eadmin-postgres
+      ports:
+        - port: 5432
+          protocol: TCP
+    # Backend -> Redis
+    - to:
+        - podSelector:
+            matchLabels:
+              app: eadmin-redis
+      ports:
+        - port: 6379
+          protocol: TCP
+    # Backend -> MinIO
+    - to:
+        - podSelector:
+            matchLabels:
+              app: eadmin-minio
+      ports:
+        - port: 9000
+          protocol: TCP
+    # DNS resolution
+    - to: []
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+---
+# --- PostgreSQL: allow ingress from backend only ---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-allow
+  namespace: eadmin
+spec:
+  podSelector:
+    matchLabels:
+      app: eadmin-postgres
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: eadmin-backend
+      ports:
+        - port: 5432
+          protocol: TCP
+  egress:
+    # DNS resolution
+    - to: []
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+---
+# --- Redis: allow ingress from backend only ---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis-allow
+  namespace: eadmin
+spec:
+  podSelector:
+    matchLabels:
+      app: eadmin-redis
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: eadmin-backend
+      ports:
+        - port: 6379
+          protocol: TCP
+  egress:
+    # DNS resolution
+    - to: []
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+---
+# --- MinIO: allow ingress from backend only ---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: minio-allow
+  namespace: eadmin
+spec:
+  podSelector:
+    matchLabels:
+      app: eadmin-minio
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Backend -> MinIO (document storage)
+    - from:
+        - podSelector:
+            matchLabels:
+              app: eadmin-backend
+      ports:
+        - port: 9000
+          protocol: TCP
+        - port: 9001
+          protocol: TCP
+  egress:
+    # DNS resolution
+    - to: []
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP

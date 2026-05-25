@@ -13,6 +13,8 @@ from app.models.courrier import (
 from app.models.document import Document, DocumentStatusEnum
 from app.models.document_version import DocumentVersion
 from app.models.electronic_stamp import ElectronicStamp, SignatureCircuit, SignatureStep
+from app.models.institution import Institution
+from app.models.tenant import Tenant
 from app.models.user import RoleEnum, User
 from app.models.workflow import (
     Workflow,
@@ -25,6 +27,9 @@ __all__ = [
     # Utilisateurs
     "User",
     "RoleEnum",
+    # Tenants & Institutions
+    "Tenant",
+    "Institution",
     # Documents
     "Document",
     "DocumentStatusEnum",

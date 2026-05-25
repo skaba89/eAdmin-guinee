@@ -118,6 +118,35 @@
   --glow-navy: rgba(11, 46, 88, 0.2);
   --selection-bg: rgba(200, 164, 92, 0.25);
   --selection-text: #0B2E58;
+
+  /* Guinea National Colors — CSS Custom Properties */
+  --guinea-red: #CE1126;
+  --guinea-red-light: #E8384F;
+  --guinea-red-dark: #A80E1E;
+  --guinea-yellow: #FCD116;
+  --guinea-yellow-light: #FDE68A;
+  --guinea-yellow-dark: #D4AD12;
+  --guinea-green: #009460;
+  --guinea-green-light: #00B870;
+  --guinea-green-dark: #007A4E;
+
+  /* Guinea Accent Colors */
+  --guinea-red-50: #FEF2F2;
+  --guinea-red-100: #FEE2E2;
+  --guinea-yellow-50: #FFFBEB;
+  --guinea-yellow-100: #FEF3C7;
+  --guinea-green-50: #ECFDF5;
+  --guinea-green-100: #D1FAE5;
+
+  /* Premium gradient utilities */
+  --gradient-tricolor: linear-gradient(90deg, #CE1126, #CE1126 33%, #FCD116 33%, #FCD116 66%, #009460 66%);
+  --gradient-navy-gold: linear-gradient(135deg, #0B2E58, #C8A45C);
+  --gradient-premium: linear-gradient(135deg, #0B2E58 0%, #3B7DD8 50%, #C8A45C 100%);
+
+  /* Premium shadow utilities */
+  --shadow-guinea-red: 0 4px 12px -2px rgba(206, 17, 38, 0.2);
+  --shadow-guinea-yellow: 0 4px 12px -2px rgba(252, 209, 22, 0.2);
+  --shadow-guinea-green: 0 4px 12px -2px rgba(0, 148, 96, 0.2);
 }
 
 .dark {
@@ -171,6 +200,35 @@
   --glow-navy: rgba(59, 125, 216, 0.15);
   --selection-bg: rgba(200, 164, 92, 0.3);
   --selection-text: #D4B878;
+
+  /* Guinea National Colors — Dark Mode (muted for dark bg) */
+  --guinea-red: #E8384F;
+  --guinea-red-light: #F87171;
+  --guinea-red-dark: #CE1126;
+  --guinea-yellow: #FCD116;
+  --guinea-yellow-light: #FDE68A;
+  --guinea-yellow-dark: #D4AD12;
+  --guinea-green: #00B870;
+  --guinea-green-light: #34D399;
+  --guinea-green-dark: #009460;
+
+  /* Guinea Accent Colors — Dark Mode */
+  --guinea-red-50: rgba(206, 17, 38, 0.08);
+  --guinea-red-100: rgba(206, 17, 38, 0.15);
+  --guinea-yellow-50: rgba(252, 209, 22, 0.08);
+  --guinea-yellow-100: rgba(252, 209, 22, 0.15);
+  --guinea-green-50: rgba(0, 148, 96, 0.08);
+  --guinea-green-100: rgba(0, 148, 96, 0.15);
+
+  /* Premium gradient utilities — dark mode */
+  --gradient-tricolor: linear-gradient(90deg, #A80E1E, #A80E1E 33%, #D4AD12 33%, #D4AD12 66%, #007A50 66%);
+  --gradient-navy-gold: linear-gradient(135deg, #3B7DD8, #D4B878);
+  --gradient-premium: linear-gradient(135deg, #3B7DD8 0%, #5A96E6 50%, #D4B878 100%);
+
+  /* Premium shadow utilities — dark mode */
+  --shadow-guinea-red: 0 4px 12px -2px rgba(206, 17, 38, 0.15);
+  --shadow-guinea-yellow: 0 4px 12px -2px rgba(252, 209, 22, 0.1);
+  --shadow-guinea-green: 0 4px 12px -2px rgba(0, 148, 96, 0.15);
 }
 
 /* ================================================================
@@ -1516,4 +1574,73 @@
 
 [data-slot="dialog-content"].card-premium::before {
   display: none;
+}
+
+/* ================================================================
+   THEME TRANSITION — Smooth switching between light/dark
+   ================================================================ */
+
+.theme-transition,
+.theme-transition *,
+.theme-transition *::before,
+.theme-transition *::after {
+  transition: background-color 300ms ease,
+              border-color 300ms ease,
+              color 200ms ease,
+              box-shadow 300ms ease,
+              fill 300ms ease,
+              stroke 300ms ease !important;
+}
+
+/* ================================================================
+   GUINEA NATIONAL COLOR UTILITIES
+   ================================================================ */
+
+.bg-guinea-red { background-color: var(--guinea-red); }
+.bg-guinea-yellow { background-color: var(--guinea-yellow); }
+.bg-guinea-green { background-color: var(--guinea-green); }
+.text-guinea-red { color: var(--guinea-red); }
+.text-guinea-yellow { color: var(--guinea-yellow); }
+.text-guinea-green { color: var(--guinea-green); }
+.border-guinea-red { border-color: var(--guinea-red); }
+.border-guinea-yellow { border-color: var(--guinea-yellow); }
+.border-guinea-green { border-color: var(--guinea-green); }
+
+/* Guinea tricolor bar */
+.bg-tricolor {
+  background: linear-gradient(90deg, #CE1126, #CE1126 33%, #FCD116 33%, #FCD116 66%, #009460 66%);
+}
+.dark .bg-tricolor {
+  background: linear-gradient(90deg, #A80E1E, #A80E1E 33%, #D4AD12 33%, #D4AD12 66%, #007A50 66%);
+}
+
+.bg-tricolor-vertical {
+  background: linear-gradient(180deg, #CE1126, #CE1126 33%, #FCD116 33%, #FCD116 66%, #009460 66%);
+}
+.dark .bg-tricolor-vertical {
+  background: linear-gradient(180deg, #A80E1E, #A80E1E 33%, #D4AD12 33%, #D4AD12 66%, #007A50 66%);
+}
+
+/* Guinea shadow utilities */
+.shadow-guinea-red { box-shadow: var(--shadow-guinea-red); }
+.shadow-guinea-yellow { box-shadow: var(--shadow-guinea-yellow); }
+.shadow-guinea-green { box-shadow: var(--shadow-guinea-green); }
+
+/* Premium stat number styling */
+.premium-stat {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+  letter-spacing: -0.02em;
+}
+
+/* Badge premium styling */
+.badge-premium {
+  background: linear-gradient(135deg, rgba(200, 164, 92, 0.15), rgba(200, 164, 92, 0.08));
+  color: #A88A3C;
+  border: 1px solid rgba(200, 164, 92, 0.2);
+}
+.dark .badge-premium {
+  background: linear-gradient(135deg, rgba(200, 164, 92, 0.12), rgba(200, 164, 92, 0.05));
+  color: #D4B878;
+  border-color: rgba(200, 164, 92, 0.15);
 }

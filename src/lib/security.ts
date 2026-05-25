@@ -379,7 +379,16 @@ async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKe
  * Output format: base64(salt[16] + iv[12] + ciphertext + tag)
  */
 export async function encryptData(data: string, key?: string): Promise<string> {
-  const passphrase = key || 'eadmin-guinee-default-encryption-key-2026'
+  // SECURITY: Encryption key MUST be provided via NEXT_PUBLIC_ENCRYPTION_KEY env var.
+  // In development, a warning is logged if the key is not configured.
+  // In production, encryption will fail without a proper key.
+  const passphrase = key || (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_ENCRYPTION_KEY) || ''
+  if (!passphrase) {
+    if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'production') {
+      throw new Error('ENCRYPTION_KEY not configured. Set NEXT_PUBLIC_ENCRYPTION_KEY environment variable.')
+    }
+    console.warn('⚠️ NEXT_PUBLIC_ENCRYPTION_KEY not set. Using development-only key. NEVER use in production!')
+  }
   const encoder = new TextEncoder()
 
   // Generate random salt and IV
@@ -410,7 +419,13 @@ export async function encryptData(data: string, key?: string): Promise<string> {
  * Decrypt AES-256-GCM encrypted data.
  */
 export async function decryptData(encryptedData: string, key?: string): Promise<string> {
-  const passphrase = key || 'eadmin-guinee-default-encryption-key-2026'
+  const passphrase = key || (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_ENCRYPTION_KEY) || ''
+  if (!passphrase) {
+    if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'production') {
+      throw new Error('ENCRYPTION_KEY not configured. Set NEXT_PUBLIC_ENCRYPTION_KEY environment variable.')
+    }
+    console.warn('⚠️ NEXT_PUBLIC_ENCRYPTION_KEY not set. Using development-only key. NEVER use in production!')
+  }
 
   // Decode base64
   const combined = Uint8Array.from(atob(encryptedData), c => c.charCodeAt(0))

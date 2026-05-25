@@ -7,7 +7,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, String, Text, func
+from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -61,10 +61,18 @@ class Courrier(Base):
     recipient: Mapped[str] = mapped_column(String(255), nullable=False)
     service_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     workflow_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), nullable=True
+        UUID(as_uuid=True), ForeignKey("workflows.id"), nullable=True
     )
     due_date: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+    tenant_id: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, index=True,
+        comment="Tenant identifier for multi-tenant isolation"
+    )
+    institution_id: Mapped[str | None] = mapped_column(
+        String(255), nullable=True,
+        comment="Institution identifier for RLS"
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

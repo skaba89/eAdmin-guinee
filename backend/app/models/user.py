@@ -15,7 +15,20 @@ from app.database import Base
 
 
 class RoleEnum(str, enum.Enum):
-    """Rôles disponibles dans la plateforme — 9 niveaux hiérarchiques."""
+    """
+    Rôles disponibles dans la plateforme — 7 niveaux hiérarchiques.
+
+    Niveaux de la hiérarchie (0=le plus bas, 7=le plus élevé) :
+    - CITOYEN (0) : Citoyen usager des services publics
+    - AGENT (2)   : Agent de traitement (inclut les anciens rôles MAIRIE/AGENCE)
+    - MAIRIE (2)  : Agent municipal (conservé pour compatibilité, même niveau qu'AGENT)
+    - AGENCE (2)  : Agent d'agence (conservé pour compatibilité, même niveau qu'AGENT)
+    - ADMIN (3)   : Administrateur de la plateforme
+    - CHEF_SERVICE (4) : Chef de service, pouvoir d'approbation
+    - DIRECTEUR (5)    : Directeur, visibilité complète sur son institution
+    - MINISTRE (6)     : Ministre, supervision stratégique
+    - SUPER_ADMIN (7)  : Super administrateur, accès total
+    """
     SUPER_ADMIN = "SUPER_ADMIN"
     MINISTRE = "MINISTRE"
     DIRECTEUR = "DIRECTEUR"
@@ -42,14 +55,20 @@ class RoleEnum(str, enum.Enum):
         return mapping.get(self, "citoyen")
 
     def hierarchy_level(self) -> int:
-        """Return the hierarchy level for this role (0=lowest, 7=highest)."""
+        """
+        Retourne le niveau hiérarchique du rôle (0=le plus bas, 7=le plus élevé).
+
+        La hiérarchie à 7 niveaux effectifs :
+        - CITOYEN: 0, AGENT/MAIRIE/AGENCE: 2, ADMIN: 3,
+        - CHEF_SERVICE: 4, DIRECTEUR: 5, MINISTRE: 6, SUPER_ADMIN: 7
+        """
         levels = {
             RoleEnum.CITOYEN: 0,
-            RoleEnum.MAIRIE: 1,
-            RoleEnum.AGENCE: 1,
+            RoleEnum.MAIRIE: 2,
+            RoleEnum.AGENCE: 2,
             RoleEnum.AGENT: 2,
-            RoleEnum.CHEF_SERVICE: 3,
-            RoleEnum.ADMIN: 4,
+            RoleEnum.ADMIN: 3,
+            RoleEnum.CHEF_SERVICE: 4,
             RoleEnum.DIRECTEUR: 5,
             RoleEnum.MINISTRE: 6,
             RoleEnum.SUPER_ADMIN: 7,
