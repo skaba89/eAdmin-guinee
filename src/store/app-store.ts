@@ -103,7 +103,7 @@ export const DEMO_ACCOUNTS: Record<string, { password: string; user: UserInfo }>
     }
   },
   'agent@eadmin.gn': {
-    password: 'demo2026',
+    password: 'Eadmin2026!',
     user: {
       id: 'demo-agent-1',
       name: 'Ibrahim Camara',
@@ -114,7 +114,7 @@ export const DEMO_ACCOUNTS: Record<string, { password: string; user: UserInfo }>
     }
   },
   'directeur@eadmin.gn': {
-    password: 'demo2026',
+    password: 'Eadmin2026!',
     user: {
       id: 'demo-directeur-1',
       name: 'Mamadou Sylla',
@@ -125,7 +125,7 @@ export const DEMO_ACCOUNTS: Record<string, { password: string; user: UserInfo }>
     }
   },
   'chef_service@eadmin.gn': {
-    password: 'demo2026',
+    password: 'Eadmin2026!',
     user: {
       id: 'demo-chef-service-1',
       name: 'Aissatou Touré',
@@ -137,7 +137,7 @@ export const DEMO_ACCOUNTS: Record<string, { password: string; user: UserInfo }>
     }
   },
   'ministre@eadmin.gn': {
-    password: 'demo2026',
+    password: 'Eadmin2026!',
     user: {
       id: 'demo-ministre-1',
       name: 'S.E.M. Abdoulaye Condé',

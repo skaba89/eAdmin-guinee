@@ -117,8 +117,8 @@ class InstitutionValidator:
         """Validate institution assignment for a role."""
         errors = []
         
-        # Lecteur/citoyen doesn't need an institution
-        if role == "LECTEUR":
+        # Citoyen doesn't need an institution
+        if role == "CITOYEN":
             return ValidationResult.success()
         
         if not institution:

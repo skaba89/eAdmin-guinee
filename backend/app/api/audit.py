@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user
 from app.database import get_db
+from app.middleware.rbac import require_permission
 from app.models.audit import AuditLog
 from app.models.user import RoleEnum, User
 
@@ -43,7 +44,7 @@ class PaginatedAuditLogs(BaseModel):
 
 # --- Endpoints ---
 
-@router.get("/logs", response_model=PaginatedAuditLogs, summary="Journal d'audit")
+@router.get("/logs", response_model=PaginatedAuditLogs, summary="Journal d'audit", dependencies=[Depends(require_permission("audit", "read"))])
 async def list_audit_logs(
     page: int = Query(1, ge=1, description="Numéro de page"),
     page_size: int = Query(50, ge=1, le=200, description="Éléments par page"),
@@ -61,7 +62,7 @@ async def list_audit_logs(
     if current_user.role not in (
         RoleEnum.SUPER_ADMIN,
         RoleEnum.ADMIN,
-        RoleEnum.DIRECTOR,
+        RoleEnum.DIRECTEUR,
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -101,7 +102,7 @@ async def list_audit_logs(
     )
 
 
-@router.get("/logs/{log_id}", response_model=AuditLogResponse, summary="Détail d'une entrée d'audit")
+@router.get("/logs/{log_id}", response_model=AuditLogResponse, summary="Détail d'une entrée d'audit", dependencies=[Depends(require_permission("audit", "read"))])
 async def get_audit_log(
     log_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -114,7 +115,7 @@ async def get_audit_log(
     if current_user.role not in (
         RoleEnum.SUPER_ADMIN,
         RoleEnum.ADMIN,
-        RoleEnum.DIRECTOR,
+        RoleEnum.DIRECTEUR,
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

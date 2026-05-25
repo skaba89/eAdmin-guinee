@@ -82,7 +82,7 @@ export const MAIN_ACCOUNTS: DemoAccount[] = [
   },
   {
     email: 'agent@eadmin.gn',
-    password: 'demo2026',
+    password: 'Eadmin2026!',
     name: 'Camara',
     firstName: 'Ibrahim',
     role: 'agent',
@@ -91,7 +91,7 @@ export const MAIN_ACCOUNTS: DemoAccount[] = [
   },
   {
     email: 'directeur@eadmin.gn',
-    password: 'demo2026',
+    password: 'Eadmin2026!',
     name: 'Sylla',
     firstName: 'Mamadou',
     role: 'directeur',

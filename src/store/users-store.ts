@@ -117,7 +117,7 @@ const DEMO_USERS: UserAccount[] = [
     institution: 'Présidence de la République',
     createdAt: dateAt(2025, 7, 1, 8, 0),
     lastLogin: dateAt(2026, 3, 10, 6, 30),
-    password: 'admin2026',
+    password: 'Eadmin2026!',
   },
 
   // ── 6 utilisateurs supplémentaires — statuts variés ─────────────────────

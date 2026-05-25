@@ -196,13 +196,13 @@ async def super_admin_user(db_session: AsyncSession) -> User:
 
 
 @pytest_asyncio.fixture
-async def director_user(db_session: AsyncSession) -> User:
+async def directeur_user(db_session: AsyncSession) -> User:
     """Crée un directeur de test."""
     user = User(
-        email="director.test@eadmin.gn",
-        hashed_password=pwd_context.hash("Director2026!"),
+        email="directeur.test@eadmin.gn",
+        hashed_password=pwd_context.hash("Directeur2026!"),
         full_name="Directeur Test",
-        role=RoleEnum.DIRECTOR,
+        role=RoleEnum.DIRECTEUR,
         institution="Ministère de l'Éducation Test",
         is_active=True,
     )
@@ -230,13 +230,13 @@ async def chef_service_user(db_session: AsyncSession) -> User:
 
 
 @pytest_asyncio.fixture
-async def lecteur_user(db_session: AsyncSession) -> User:
-    """Crée un utilisateur lecteur (citoyen) de test."""
+async def citoyen_user(db_session: AsyncSession) -> User:
+    """Crée un utilisateur citoyen de test."""
     user = User(
-        email="lecteur.test@eadmin.gn",
-        hashed_password=pwd_context.hash("Lecteur2026!"),
-        full_name="Lecteur Test",
-        role=RoleEnum.LECTEUR,
+        email="citoyen.test@eadmin.gn",
+        hashed_password=pwd_context.hash("Citoyen2026!"),
+        full_name="Citoyen Test",
+        role=RoleEnum.CITOYEN,
         institution=None,
         is_active=True,
     )

@@ -245,12 +245,12 @@ const doc = new Document({
         makeTable(
           ["Email", "Mot de passe", "Rôle", "Page par défaut"],
           [
-            ["citoyen@eadmin.gn", "demo123", "Citoyen", "Portail Citoyen"],
-            ["mairie@eadmin.gn", "demo123", "Agent de Mairie", "Dashboard Mairie"],
-            ["admin@eadmin.gn", "demo123", "Administrateur Général", "Dashboard"],
-            ["agence@eadmin.gn", "demo123", "Agent d'Agence (ANIP)", "Dashboard Agence"],
-            ["ministere@eadmin.gn", "demo123", "Agent Ministériel", "Dashboard"],
-            ["superadmin@eadmin.gn", "admin2026", "Super Administrateur", "Dashboard"],
+            ["citoyen@eadmin.gn", "Eadmin2026!", "Citoyen", "Portail Citoyen"],
+            ["mairie@eadmin.gn", "Eadmin2026!", "Agent de Mairie", "Dashboard Mairie"],
+            ["admin@eadmin.gn", "Eadmin2026!", "Administrateur Général", "Dashboard"],
+            ["agence@eadmin.gn", "Eadmin2026!", "Agent d'Agence (ANIP)", "Dashboard Agence"],
+            ["ministere@eadmin.gn", "Eadmin2026!", "Agent Ministériel", "Dashboard"],
+            ["superadmin@eadmin.gn", "Eadmin2026!", "Super Administrateur", "Dashboard"],
           ]
         ),
 

@@ -202,7 +202,7 @@ async def apply_electronic_stamp(
         raise HTTPException(status_code=404, detail="Document non trouvé")
 
     # Check permissions — only directors+ can apply stamps
-    if current_user.role.value not in ("SUPER_ADMIN", "ADMIN", "DIRECTOR"):
+    if current_user.role.value not in ("SUPER_ADMIN", "ADMIN", "DIRECTEUR"):
         raise HTTPException(status_code=403, detail="Permissions insuffisantes pour apposer un cachet")
 
     # Generate stamp hash (document ID + timestamp + user ID + stamp type)

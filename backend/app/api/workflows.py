@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user
 from app.database import get_db
+from app.middleware.rbac import require_permission
 from app.models.user import User
 from app.models.workflow import (
     Workflow,
@@ -93,7 +94,7 @@ class AdvanceStepRequest(BaseModel):
 
 # --- Endpoints ---
 
-@router.get("", response_model=PaginatedWorkflows, summary="Liste des workflows")
+@router.get("", response_model=PaginatedWorkflows, summary="Liste des workflows", dependencies=[Depends(require_permission("workflows", "read"))])
 async def list_workflows(
     page: int = Query(1, ge=1, description="Numéro de page"),
     page_size: int = Query(20, ge=1, le=100, description="Éléments par page"),
@@ -132,7 +133,7 @@ async def list_workflows(
     )
 
 
-@router.post("", response_model=WorkflowResponse, status_code=status.HTTP_201_CREATED, summary="Créer un workflow")
+@router.post("", response_model=WorkflowResponse, status_code=status.HTTP_201_CREATED, summary="Créer un workflow", dependencies=[Depends(require_permission("workflows", "manage"))])
 async def create_workflow(
     workflow_data: WorkflowCreate,
     db: AsyncSession = Depends(get_db),
@@ -181,7 +182,7 @@ async def create_workflow(
     return workflow
 
 
-@router.get("/{workflow_id}", response_model=WorkflowResponse, summary="Détail d'un workflow")
+@router.get("/{workflow_id}", response_model=WorkflowResponse, summary="Détail d'un workflow", dependencies=[Depends(require_permission("workflows", "read"))])
 async def get_workflow(
     workflow_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -203,7 +204,7 @@ async def get_workflow(
     return workflow
 
 
-@router.post("/{workflow_id}/advance", response_model=WorkflowResponse, summary="Avancer le workflow")
+@router.post("/{workflow_id}/advance", response_model=WorkflowResponse, summary="Avancer le workflow", dependencies=[Depends(require_permission("workflows", "manage"))])
 async def advance_workflow(
     workflow_id: uuid.UUID,
     advance_data: AdvanceStepRequest,

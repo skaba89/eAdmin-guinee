@@ -15,7 +15,7 @@ from app.database import Base
 
 
 class RoleEnum(str, enum.Enum):
-    """Rôles disponibles dans la plateforme."""
+    """Rôles disponibles dans la plateforme — 9 niveaux hiérarchiques."""
     SUPER_ADMIN = "SUPER_ADMIN"
     MINISTRE = "MINISTRE"
     DIRECTEUR = "DIRECTEUR"
@@ -30,13 +30,35 @@ class RoleEnum(str, enum.Enum):
         """Map backend role to frontend role name."""
         mapping = {
             RoleEnum.SUPER_ADMIN: "superadmin",
+            RoleEnum.MINISTRE: "ministre",
+            RoleEnum.DIRECTEUR: "directeur",
+            RoleEnum.CHEF_SERVICE: "chef_service",
             RoleEnum.ADMIN: "admin",
-            RoleEnum.DIRECTOR: "ministere",
-            RoleEnum.CHEF_SERVICE: "mairie",
-            RoleEnum.AGENT: "agence",
-            RoleEnum.LECTEUR: "citoyen",
+            RoleEnum.AGENT: "agent",
+            RoleEnum.MAIRIE: "mairie",
+            RoleEnum.AGENCE: "agence",
+            RoleEnum.CITOYEN: "citoyen",
         }
-        return mapping[self]
+        return mapping.get(self, "citoyen")
+
+    def hierarchy_level(self) -> int:
+        """Return the hierarchy level for this role (0=lowest, 7=highest)."""
+        levels = {
+            RoleEnum.CITOYEN: 0,
+            RoleEnum.MAIRIE: 1,
+            RoleEnum.AGENCE: 1,
+            RoleEnum.AGENT: 2,
+            RoleEnum.CHEF_SERVICE: 3,
+            RoleEnum.ADMIN: 4,
+            RoleEnum.DIRECTEUR: 5,
+            RoleEnum.MINISTRE: 6,
+            RoleEnum.SUPER_ADMIN: 7,
+        }
+        return levels.get(self, 0)
+
+    def can_create_role(self, target_role: 'RoleEnum') -> bool:
+        """Check if this role can create another role."""
+        return self.hierarchy_level() > target_role.hierarchy_level() or self == RoleEnum.SUPER_ADMIN
 
 
 class User(Base):
@@ -56,6 +78,13 @@ class User(Base):
         Enum(RoleEnum), default=RoleEnum.AGENT, nullable=False
     )
     institution: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Multi-tenant fields
+    tenant_id: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, index=True, comment="Tenant identifier for multi-tenant isolation"
+    )
+    institution_id: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, index=True, comment="Institution identifier for RLS"
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     mfa_secret: Mapped[str | None] = mapped_column(String(255), nullable=True)

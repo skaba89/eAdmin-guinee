@@ -1,18 +1,20 @@
 """
 Script de seed des comptes démo - eAdministration Suite Guinea.
-Crée les 6 comptes de démonstration avec des mots de passe conformes.
+Crée les 8 comptes de démonstration avec des mots de passe conformes.
 
 Usage:
     python -m app.seed_demo          # Créer les comptes
     python -m app.seed_demo --reset  # Supprimer et recréer
 
 Comptes créés:
-    1. Super Administrateur — superadmin@eadmin.gn
-    2. Administrateur Général — admin@eadmin.gn
-    3. Agent Ministériel — ministere@eadmin.gn
-    4. Agent de Mairie — mairie@eadmin.gn
-    5. Agent d'Agence (ANIP) — agence@eadmin.gn
-    6. Citoyen — citoyen@eadmin.gn
+    1. Citoyen — citoyen@eadmin.gn
+    2. Agent de Mairie — mairie@eadmin.gn
+    3. Administrateur Général — admin@eadmin.gn
+    4. Agent d'Agence (ANIP) — agence@eadmin.gn
+    5. Ministre — ministere@eadmin.gn
+    6. Super Administrateur — superadmin@eadmin.gn
+    7. Agent de Traitement — agent@eadmin.gn
+    8. Directeur — directeur@eadmin.gn
 
 Mot de passe démo : Eadmin2026! (majuscule + chiffre + spécial + 10 chars)
 """
@@ -32,43 +34,79 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # Mot de passe démo conforme : 10+ chars, majuscule, chiffre, caractère spécial
 DEMO_PASSWORD = "Eadmin2026!"
 
-# Définition des comptes démo
+# Définition des 8 comptes démo
 DEMO_ACCOUNTS = [
     {
-        "email": "superadmin@eadmin.gn",
-        "full_name": "Amadou Oury Bah",
-        "role": RoleEnum.SUPER_ADMIN,
-        "institution": "Présidence de la République de Guinée",
-    },
-    {
-        "email": "admin@eadmin.gn",
+        "email": "citoyen@eadmin.gn",
         "full_name": "Sékou Condé",
-        "role": RoleEnum.ADMIN,
-        "institution": "Ministère de l'Administration du Territoire",
-    },
-    {
-        "email": "ministere@eadmin.gn",
-        "full_name": "Dr. Alpha Diallo",
-        "role": RoleEnum.DIRECTOR,
-        "institution": "Ministère de l'Éducation Nationale",
+        "role": RoleEnum.CITOYEN,
+        "institution": "Portail Citoyen",
+        "tenant_id": None,
+        "institution_id": None,
+        "mfa_enabled": False,
     },
     {
         "email": "mairie@eadmin.gn",
-        "full_name": "Mme Fatoumata Bah",
-        "role": RoleEnum.CHEF_SERVICE,
-        "institution": "Mairie de Conakry — Kaloum",
+        "full_name": "Fatoumata Bah",
+        "role": RoleEnum.MAIRIE,
+        "institution": "Mairie de Kaloum",
+        "tenant_id": "mairie-kaloum",
+        "institution_id": "mairie-kaloum",
+        "mfa_enabled": False,
+    },
+    {
+        "email": "admin@eadmin.gn",
+        "full_name": "Alpha Diallo",
+        "role": RoleEnum.ADMIN,
+        "institution": "Direction Générale de la Modernisation Administrative",
+        "tenant_id": "dgma",
+        "institution_id": "dgma",
+        "mfa_enabled": True,
     },
     {
         "email": "agence@eadmin.gn",
-        "full_name": "M. Mamadou Soumah",
-        "role": RoleEnum.AGENT,
-        "institution": "ANIP — Agence Nationale d'Identification Personnelle",
+        "full_name": "Mamadou Soumah",
+        "role": RoleEnum.AGENCE,
+        "institution": "Agence Nationale d'Identification (ANIP)",
+        "tenant_id": "anip",
+        "institution_id": "anip",
+        "mfa_enabled": False,
     },
     {
-        "email": "citoyen@eadmin.gn",
-        "full_name": "Aminata Diallo",
-        "role": RoleEnum.LECTEUR,
-        "institution": None,
+        "email": "ministere@eadmin.gn",
+        "full_name": "Aissatou Sylla",
+        "role": RoleEnum.MINISTRE,
+        "institution": "Ministère de l'Administration Territoriale et de la Décentralisation",
+        "tenant_id": "ministere-matd",
+        "institution_id": "ministere-matd",
+        "mfa_enabled": True,
+    },
+    {
+        "email": "superadmin@eadmin.gn",
+        "full_name": "Ibrahima Touré",
+        "role": RoleEnum.SUPER_ADMIN,
+        "institution": "Présidence de la République — Service e-Gouvernement",
+        "tenant_id": "presidence",
+        "institution_id": "presidence-e-gouv",
+        "mfa_enabled": True,
+    },
+    {
+        "email": "agent@eadmin.gn",
+        "full_name": "Ibrahim Camara",
+        "role": RoleEnum.AGENT,
+        "institution": "Mairie de Kaloum",
+        "tenant_id": "mairie-kaloum",
+        "institution_id": "mairie-kaloum",
+        "mfa_enabled": False,
+    },
+    {
+        "email": "directeur@eadmin.gn",
+        "full_name": "Mamadou Sylla",
+        "role": RoleEnum.DIRECTEUR,
+        "institution": "Direction Générale de la Modernisation Administrative",
+        "tenant_id": "dgma",
+        "institution_id": "dgma",
+        "mfa_enabled": True,
     },
 ]
 
@@ -97,11 +135,14 @@ async def seed_accounts(reset: bool = False) -> list[User]:
             existing = result.scalar_one_or_none()
 
             if existing:
-                print(f"   ⏭️  {account['email']} existe déjà — mis à jour du mot de passe")
+                print(f"   ⏭️  {account['email']} existe déjà — mis à jour")
                 existing.hashed_password = pwd_context.hash(DEMO_PASSWORD)
                 existing.full_name = account["full_name"]
                 existing.role = account["role"]
                 existing.institution = account["institution"]
+                existing.tenant_id = account.get("tenant_id")
+                existing.institution_id = account.get("institution_id")
+                existing.mfa_enabled = account.get("mfa_enabled", False)
                 existing.is_active = True
                 created.append(existing)
             else:
@@ -111,6 +152,9 @@ async def seed_accounts(reset: bool = False) -> list[User]:
                     full_name=account["full_name"],
                     role=account["role"],
                     institution=account["institution"],
+                    tenant_id=account.get("tenant_id"),
+                    institution_id=account.get("institution_id"),
+                    mfa_enabled=account.get("mfa_enabled", False),
                     is_active=True,
                 )
                 session.add(user)
@@ -142,7 +186,8 @@ async def main():
         print("\n📊 Résumé :")
         print("-" * 60)
         for user in users:
-            print(f"  {user.role.value:20s} | {user.email:30s} | {user.full_name}")
+            mfa = "🔒 MFA" if user.mfa_enabled else "   "
+            print(f"  {user.role.value:20s} | {user.email:30s} | {user.full_name} {mfa}")
         print("-" * 60)
     except Exception as e:
         print(f"\n❌ Erreur lors du seed : {e}")

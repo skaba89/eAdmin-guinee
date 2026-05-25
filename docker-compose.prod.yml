@@ -1,7 +1,6 @@
 # =============================================================================
-# Docker Compose - eAdministration Suite Guinea
-# Plateforme GovTech de nouvelle génération
-# All secrets MUST come from .env file — never hardcoded
+# Docker Compose Production - eAdministration Suite Guinea
+# ⚠️ All secrets MUST come from environment variables or secrets manager
 # =============================================================================
 
 version: "3.9"
@@ -10,39 +9,48 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: eadmin-postgres
-    restart: unless-stopped
+    restart: always
     environment:
-      POSTGRES_DB: eadmin
-      POSTGRES_USER: eadmin
+      POSTGRES_DB: ${POSTGRES_DB:-eadmin}
+      POSTGRES_USER: ${POSTGRES_USER:-eadmin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U eadmin -d eadmin"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-eadmin} -d ${POSTGRES_DB:-eadmin}"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
     networks:
       - eadmin-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   redis:
     image: redis:7-alpine
     container_name: eadmin-redis
-    restart: unless-stopped
+    restart: always
     command: >
       redis-server
       --appendonly yes
-      --maxmemory 256mb
+      --maxmemory 512mb
       --maxmemory-policy allkeys-lru
       --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD required}
+      --save 60 1000
+      --save 300 100
     volumes:
       - redis_data:/data
-    ports:
-      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 10s
@@ -50,20 +58,26 @@ services:
       retries: 5
     networks:
       - eadmin-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   minio:
     image: minio/minio:latest
     container_name: eadmin-minio
-    restart: unless-stopped
+    restart: always
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-eadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD required}
     volumes:
       - minio_data:/data
-    ports:
-      - "9000:9000"
-      - "9001:9001"
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 10s
@@ -71,24 +85,26 @@ services:
       retries: 5
     networks:
       - eadmin-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: eadmin-backend
-    restart: unless-stopped
+    restart: always
     environment:
-      DATABASE_URL: postgresql+asyncpg://eadmin:${POSTGRES_PASSWORD}@postgres:5432/eadmin
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-eadmin}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-eadmin}
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY required}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-eadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
-      ENVIRONMENT: ${ENVIRONMENT:-development}
+      ENVIRONMENT: production
       MFA_ISSUER: eAdmin Guinée
-    ports:
-      - "8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -96,54 +112,74 @@ services:
         condition: service_healthy
     networks:
       - eadmin-network
-
-  prometheus:
-    image: prom/prometheus:v2.51.0
-    container_name: eadmin-prometheus
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.retention.time=30d'
-    restart: unless-stopped
-    networks:
-      - eadmin-network
-
-  grafana:
-    image: grafana/grafana:10.4.0
-    container_name: eadmin-grafana
-    ports:
-      - "3001:3000"
-    environment:
-      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD required}
-      GF_USERS_ALLOW_SIGN_UP: "false"
-    volumes:
-      - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
-      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
-    depends_on:
-      - prometheus
-    restart: unless-stopped
-    networks:
-      - eadmin-network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
 
   frontend:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: eadmin-frontend
-    restart: unless-stopped
+    restart: always
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.eadmin.gouv.gn}
       NEXT_PUBLIC_APP_NAME: eAdministration Suite Guinea
-    ports:
-      - "3000:3000"
     depends_on:
       - backend
+    networks:
+      - eadmin-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: eadmin-prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.retention.size=10GB'
+    restart: always
+    networks:
+      - eadmin-network
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: eadmin-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD required}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-https://monitoring.eadmin.gouv.gn}
+      GF_LOG_MODE: console file
+      GF_LOG_LEVEL: info
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    restart: always
     networks:
       - eadmin-network
 

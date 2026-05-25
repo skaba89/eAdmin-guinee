@@ -12,10 +12,13 @@ class DocumentAccessPolicy:
     ROLE_CLEARANCE = {
         "SUPER_ADMIN": 3,
         "ADMIN": 3,
-        "DIRECTOR": 2,
+        "DIRECTEUR": 2,
         "CHEF_SERVICE": 1,
         "AGENT": 1,
-        "LECTEUR": 0,
+        "CITOYEN": 0,
+        "MAIRIE": 1,
+        "AGENCE": 1,
+        "MINISTRE": 2,
     }
     
     @classmethod
@@ -43,7 +46,7 @@ class DocumentAccessPolicy:
     @classmethod
     def can_upload(cls, role: str) -> bool:
         """Check if a role can upload documents."""
-        return role in ("SUPER_ADMIN", "ADMIN", "DIRECTOR", "CHEF_SERVICE", "AGENT")
+        return role in ("SUPER_ADMIN", "ADMIN", "DIRECTEUR", "CHEF_SERVICE", "AGENT")
     
     @classmethod
     def can_delete(cls, role: str) -> bool:
@@ -53,7 +56,7 @@ class DocumentAccessPolicy:
     @classmethod
     def can_manage_classifications(cls, role: str) -> bool:
         """Check if a role can manage document classifications."""
-        return role in ("SUPER_ADMIN", "ADMIN", "DIRECTOR")
+        return role in ("SUPER_ADMIN", "ADMIN", "DIRECTEUR")
 
 
 class RequestProcessingPolicy:
@@ -65,19 +68,19 @@ class RequestProcessingPolicy:
         """Check if a role can process requests in a given category."""
         if role in ("SUPER_ADMIN", "ADMIN"):
             return True
-        if role == "LECTEUR":
+        if role == "CITOYEN":
             return False
         return tenant.can_access_category(request_category)
     
     @classmethod
     def can_approve(cls, role: str) -> bool:
         """Check if a role can approve requests."""
-        return role in ("SUPER_ADMIN", "ADMIN", "DIRECTOR", "CHEF_SERVICE")
+        return role in ("SUPER_ADMIN", "ADMIN", "DIRECTEUR", "CHEF_SERVICE")
     
     @classmethod
     def can_reject(cls, role: str) -> bool:
         """Check if a role can reject requests."""
-        return role in ("SUPER_ADMIN", "ADMIN", "DIRECTOR", "CHEF_SERVICE")
+        return role in ("SUPER_ADMIN", "ADMIN", "DIRECTEUR", "CHEF_SERVICE")
     
     @classmethod
     def can_delete_request(cls, role: str) -> bool:

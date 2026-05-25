@@ -5,6 +5,7 @@ Utilise pydantic-settings pour la gestion des variables d'environnement.
 
 from typing import Literal
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -50,7 +51,7 @@ class Settings(BaseSettings):
     MINIO_SECURE: bool = False
 
     # --- Cache (Redis) ---
-    REDIS_URL: str = "redis://localhost:6379"
+    REDIS_URL: str = "redis://:CHANGE_ME@localhost:6379"
 
     # --- Application ---
     APP_NAME: str = "eAdministration Suite Guinea"
@@ -71,6 +72,16 @@ class Settings(BaseSettings):
         "https://citoyen.eadmin.gouv.gn",
         "https://api.eadmin.gouv.gn",
     ]
+
+    @model_validator(mode='after')
+    def validate_production_secrets(self):
+        """Vérifie que les secrets ne sont pas des valeurs par défaut en production."""
+        if self.is_production:
+            if self.SECRET_KEY == "dev-secret-key-change-in-production":
+                raise ValueError("SECRET_KEY must be changed in production!")
+            if "CHANGE_ME" in self.DATABASE_URL:
+                raise ValueError("DATABASE_URL must use a strong password in production!")
+        return self
 
     @property
     def is_development(self) -> bool:

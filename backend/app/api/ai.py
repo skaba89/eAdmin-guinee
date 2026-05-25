@@ -130,7 +130,7 @@ async def redact_response(
     Auto-generate a formal administrative response letter.
     Only available for agents and above.
     """
-    if current_user.role.value == "LECTEUR":
+    if current_user.role.value == "CITOYEN":
         raise HTTPException(
             status_code=403,
             detail="Les citoyens ne peuvent pas générer de réponses administratives."

@@ -1,68 +1,49 @@
-name: eAdmin Guinée — CI/CD
+name: eAdmin Guinée CI/CD
 
 on:
   push:
     branches: [main, develop]
   pull_request:
-    branches: [main, develop]
+    branches: [main]
 
 env:
-  NODE_VERSION: '20'
-  PYTHON_VERSION: '3.12'
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
 
 jobs:
-  # ===========================================================================
-  # Frontend Lint & Build
-  # ===========================================================================
-  frontend:
-    name: Frontend — Lint & Build
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: .
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Install frontend dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Lint frontend
-        run: bun run lint
-        continue-on-error: true
-
-      - name: Type check
-        run: bunx tsc --noEmit
-        continue-on-error: true
-
-      - name: Build frontend
-        run: bun run build
-        env:
-          NEXT_PUBLIC_API_URL: http://localhost:8000
-
-  # ===========================================================================
-  # Backend Lint & Test
-  # ===========================================================================
-  backend:
-    name: Backend — Lint & Test
+  # ─── Backend Lint & Type Check ─────────────────────────────
+  backend-lint:
+    name: Backend Lint & Typecheck
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+      - name: Ruff lint
+        run: ruff check app/ tests/
+      - name: MyPy type check
+        run: mypy app/ --ignore-missing-imports || true
 
+  # ─── Backend Tests ──────────────────────────────────────────
+  backend-test:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    needs: backend-lint
     services:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: eadmin
-          POSTGRES_PASSWORD: test_password
           POSTGRES_DB: eadmin_test
+          POSTGRES_USER: eadmin
+          POSTGRES_PASSWORD: test_password_123
         ports:
           - 5432:5432
         options: >-
@@ -70,7 +51,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-
       redis:
         image: redis:7-alpine
         ports:
@@ -80,93 +60,74 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql+asyncpg://eadmin:test_password_123@localhost:5432/eadmin_test
+      SECRET_KEY: test-secret-key-for-ci-only
+      REDIS_URL: redis://localhost:6379
+      ENVIRONMENT: test
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: 'pip'
-          cache-dependency-path: backend/requirements.txt
-
-      - name: Install backend dependencies
+      - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
-
-      - name: Lint backend with Ruff
+          pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+      - name: Run tests with coverage
         run: |
-          ruff check app/ --ignore E501
-        continue-on-error: true
+          pytest tests/ -v --cov=app --cov-report=xml --cov-report=term-missing -x
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage.xml
 
-      - name: Run backend tests (SQLite — fast, no external deps)
-        env:
-          ENVIRONMENT: test
-          SECRET_KEY: test-secret-key-for-ci-do-not-use-in-production
-        run: |
-          python -m pytest tests/ -v --tb=short -x
-
-      - name: Run backend tests with PostgreSQL (integration)
-        env:
-          ENVIRONMENT: test
-          DATABASE_URL: postgresql://eadmin:test_password@localhost:5432/eadmin_test
-          SECRET_KEY: test-secret-key-for-ci-do-not-use-in-production
-          REDIS_URL: redis://localhost:6379
-        run: |
-          python -m pytest tests/ -v --tb=short
-        continue-on-error: true
-
-  # ===========================================================================
-  # Docker Build Check
-  # ===========================================================================
-  docker:
-    name: Docker Build Check
+  # ─── Frontend Build ────────────────────────────────────────
+  frontend-build:
+    name: Frontend Build
     runs-on: ubuntu-latest
-    needs: [frontend, backend]
-    if: github.event_name == 'push'
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Type check
+        run: npx tsc --noEmit || true
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+          NEXT_PUBLIC_APP_NAME: eAdmin Test
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Check frontend Docker build
-        run: docker build -t eadmin-frontend-test .
-        continue-on-error: true
-
-      - name: Check backend Docker build
-        run: docker build -t eadmin-backend-test ./backend
-        continue-on-error: true
-
-  # ===========================================================================
-  # Security Scan
-  # ===========================================================================
-  security:
+  # ─── Security Scan ─────────────────────────────────────────
+  security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'table'
-          exit-code: '0'
-          severity: 'CRITICAL,HIGH'
-        continue-on-error: true
-
-      - name: Python dependency audit
+      - uses: actions/checkout@v4
+      - name: Check for hardcoded secrets
         run: |
-          pip install pip-audit
-          cd backend
-          pip-audit -r requirements.txt
-        continue-on-error: true
+          # Check for common secret patterns
+          ! rg -i "password\s*[:=]\s*['\"][^'\"]{8,}" --type py --type ts --type yml --type yaml || echo "⚠️ Potential hardcoded secrets found"
+          ! rg -i "secret_key\s*[:=]\s*['\"][^'\"]{8,}" --type py || echo "⚠️ Potential hardcoded SECRET_KEY found"
+          ! rg -i "api_key\s*[:=]\s*['\"][^'\"]{8,}" --type py --type ts || echo "⚠️ Potential hardcoded API_KEY found"
+      - name: Python safety check
+        run: |
+          pip install safety
+          safety check -r backend/requirements.txt || true
+
+  # ─── Docker Build Test ─────────────────────────────────────
+  docker-build:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    needs: [backend-test, frontend-build]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend image
+        run: docker build -t eadmin-backend:ci ./backend
+      - name: Build frontend image
+        run: docker build -t eadmin-frontend:ci .

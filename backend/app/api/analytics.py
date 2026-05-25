@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user
 from app.database import get_db
+from app.middleware.rbac import require_permission
 from app.models.courrier import Courrier, CourrierPriorityEnum, CourrierStatusEnum, CourrierTypeEnum
 from app.models.document import Document, DocumentStatusEnum
 from app.models.user import User
@@ -59,7 +60,7 @@ class PerformanceMetrics(BaseModel):
 
 # --- Endpoints ---
 
-@router.get("/dashboard", response_model=DashboardKPIs, summary="KPIs du tableau de bord")
+@router.get("/dashboard", response_model=DashboardKPIs, summary="KPIs du tableau de bord", dependencies=[Depends(require_permission("analytics", "read"))])
 async def get_dashboard_kpis(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -134,7 +135,7 @@ async def get_dashboard_kpis(
     )
 
 
-@router.get("/courriers/stats", response_model=CourrierStats, summary="Statistiques des courriers")
+@router.get("/courriers/stats", response_model=CourrierStats, summary="Statistiques des courriers", dependencies=[Depends(require_permission("analytics", "read"))])
 async def get_courrier_stats(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -186,7 +187,7 @@ async def get_courrier_stats(
     )
 
 
-@router.get("/documents/stats", response_model=DocumentStats, summary="Statistiques des documents")
+@router.get("/documents/stats", response_model=DocumentStats, summary="Statistiques des documents", dependencies=[Depends(require_permission("analytics", "read"))])
 async def get_document_stats(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -224,7 +225,7 @@ async def get_document_stats(
     )
 
 
-@router.get("/performance", response_model=PerformanceMetrics, summary="Métriques de performance")
+@router.get("/performance", response_model=PerformanceMetrics, summary="Métriques de performance", dependencies=[Depends(require_permission("analytics", "read"))])
 async def get_performance_metrics(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),

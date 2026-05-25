@@ -338,12 +338,12 @@ story.append(Spacer(1, 8))
 story.append(make_table(
     ['Email', 'Mot de passe', 'Rôle', 'Institution', 'Page par défaut'],
     [
-        ['citoyen@eadmin.gn', 'demo123', 'Citoyen', 'Citoyen', 'Portail Citoyen'],
-        ['mairie@eadmin.gn', 'demo123', 'Agent de Mairie', 'Mairie de Kaloum', 'Tableau de bord Mairie'],
-        ['admin@eadmin.gn', 'demo123', 'Admin. Général', "Min. Administration Territoriale", 'Tableau de bord'],
-        ['agence@eadmin.gn', 'demo123', "Agent d'Agence", 'ANIP', 'Tableau de bord Agence'],
-        ['ministere@eadmin.gn', 'demo123', 'Agent Ministériel', 'Min. de la Justice', 'Tableau de bord'],
-        ['superadmin@eadmin.gn', 'admin2026', 'Super Admin', 'Primature', 'Tableau de bord'],
+        ['citoyen@eadmin.gn', 'Eadmin2026!', 'Citoyen', 'Citoyen', 'Portail Citoyen'],
+        ['mairie@eadmin.gn', 'Eadmin2026!', 'Agent de Mairie', 'Mairie de Kaloum', 'Tableau de bord Mairie'],
+        ['admin@eadmin.gn', 'Eadmin2026!', 'Admin. Général', "Min. Administration Territoriale", 'Tableau de bord'],
+        ['agence@eadmin.gn', 'Eadmin2026!', "Agent d'Agence", 'ANIP', 'Tableau de bord Agence'],
+        ['ministere@eadmin.gn', 'Eadmin2026!', 'Agent Ministériel', 'Min. de la Justice', 'Tableau de bord'],
+        ['superadmin@eadmin.gn', 'Eadmin2026!', 'Super Admin', 'Primature', 'Tableau de bord'],
     ],
     [0.22, 0.12, 0.14, 0.28, 0.24]
 ))
@@ -393,37 +393,37 @@ for items in [
     tc('AUTH-01', 'Connexion Citoyen', [
         'Accéder à la page d\'accueil de la plateforme',
         'Cliquer sur le bouton "Connexion" dans la barre de navigation',
-        'Saisir l\'email citoyen@eadmin.gn et le mot de passe demo123',
+        'Saisir l\'email citoyen@eadmin.gn et le mot de passe Eadmin2026!',
         'Cliquer sur "Se connecter"',
     ], 'L\'utilisateur est connecté avec le rôle Citoyen. Redirection vers le Portail Citoyen. Le sidebar affiche les modules du citoyen.'),
     
     tc('AUTH-02', 'Connexion Agent de Mairie', [
         'Se déconnecter si connecté',
-        'Saisir mairie@eadmin.gn / demo123',
+        'Saisir mairie@eadmin.gn / Eadmin2026!',
         'Se connecter',
     ], 'Connexion réussie avec le rôle Agent de Mairie. Redirection vers le Tableau de bord Mairie. Le nom "Mme Fatoumata Bah" s\'affiche dans le sidebar.'),
     
     tc('AUTH-03', 'Connexion Administrateur Général', [
         'Se déconnecter si connecté',
-        'Saisir admin@eadmin.gn / demo123',
+        'Saisir admin@eadmin.gn / Eadmin2026!',
         'Se connecter',
     ], 'Connexion réussie. Redirection vers le Tableau de bord Admin. Accès complet aux modules d\'administration.'),
     
     tc('AUTH-04', 'Connexion Agent d\'Agence (ANIP)', [
         'Se déconnecter si connecté',
-        'Saisir agence@eadmin.gn / demo123',
+        'Saisir agence@eadmin.gn / Eadmin2026!',
         'Se connecter',
     ], 'Connexion réussie avec le rôle Agent d\'Agence. Redirection vers le Tableau de bord Agence ANIP.'),
     
     tc('AUTH-05', 'Connexion Agent Ministériel', [
         'Se déconnecter si connecté',
-        'Saisir ministere@eadmin.gn / demo123',
+        'Saisir ministere@eadmin.gn / Eadmin2026!',
         'Se connecter',
     ], 'Connexion réussie avec le rôle Agent Ministériel. Accès aux modules GED, Courriers, Workflows, Signatures.'),
     
     tc('AUTH-06', 'Connexion Super Administrateur', [
         'Se déconnecter si connecté',
-        'Saisir superadmin@eadmin.gn / admin2026',
+        'Saisir superadmin@eadmin.gn / Eadmin2026!',
         'Se connecter',
     ], 'Connexion réussie avec le rôle Super Admin. Accès complet à tous les modules y compris Espace Mairie et Espace Agence.'),
     
@@ -472,7 +472,7 @@ story.append(Spacer(1, 6))
 story.append(section('4.1 Navigation et affichage du portail', 2))
 for items in [
     tc('CIT-01', 'Accès au Portail Citoyen après connexion', [
-        'Se connecter avec citoyen@eadmin.gn / demo123',
+        'Se connecter avec citoyen@eadmin.gn / Eadmin2026!',
         'Vérifier la page affichée par défaut',
     ], 'Le Portail Citoyen s\'affiche avec les sections : Services publics, Mes demandes, Mon profil.'),
     
@@ -592,7 +592,7 @@ story.append(Spacer(1, 6))
 story.append(section('5.1 Tableau de bord Mairie', 2))
 for items in [
     tc('MAI-01', 'Accès au tableau de bord Mairie', [
-        'Se connecter avec mairie@eadmin.gn / demo123',
+        'Se connecter avec mairie@eadmin.gn / Eadmin2026!',
         'Vérifier l\'affichage du tableau de bord',
     ], 'Le tableau de bord Mairie s\'affiche avec les KPIs : demandes reçues, en cours, traitées, rejetées. Les graphiques et statistiques sont visibles.'),
     
@@ -703,7 +703,7 @@ story.append(Spacer(1, 6))
 
 for items in [
     tc('AG-01', 'Accès au tableau de bord ANIP', [
-        'Se connecter avec agence@eadmin.gn / demo123',
+        'Se connecter avec agence@eadmin.gn / Eadmin2026!',
         'Vérifier l\'affichage du tableau de bord',
     ], 'Le tableau de bord Agence s\'affiche avec les KPIs spécifiques ANIP : CNI en production, Passeports en attente, Permis délivrés.'),
     
@@ -754,7 +754,7 @@ story.append(Spacer(1, 6))
 
 for items in [
     tc('MIN-01', 'Connexion et tableau de bord Ministériel', [
-        'Se connecter avec ministere@eadmin.gn / demo123',
+        'Se connecter avec ministere@eadmin.gn / Eadmin2026!',
         'Vérifier le tableau de bord',
     ], 'Le tableau de bord Ministériel s\'affiche avec les statistiques de GED, courriers et workflows.'),
     
@@ -807,7 +807,7 @@ story.append(Spacer(1, 6))
 
 for items in [
     tc('ADM-01', 'Tableau de bord Administrateur', [
-        'Se connecter avec admin@eadmin.gn / demo123',
+        'Se connecter avec admin@eadmin.gn / Eadmin2026!',
         'Vérifier le tableau de bord principal',
     ], 'Le dashboard affiche les KPIs globaux : demandes totales, taux de traitement, performance par service, graphiques mensuels.'),
     
@@ -874,7 +874,7 @@ story.append(Spacer(1, 6))
 
 for items in [
     tc('SA-01', 'Connexion Super Admin', [
-        'Se connecter avec superadmin@eadmin.gn / admin2026',
+        'Se connecter avec superadmin@eadmin.gn / Eadmin2026!',
         'Vérifier l\'accès au tableau de bord',
     ], 'Connexion réussie. Le nom "Amadou Oury Bah" et le rôle "Super Administrateur" s\'affichent.'),
     

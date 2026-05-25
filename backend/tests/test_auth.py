@@ -45,7 +45,7 @@ class TestAuthLogin:
     @pytest.mark.asyncio
     async def test_login_inactive_user(self, client: AsyncClient, db_session):
         """TC-AUTH-004: Échec de connexion pour un compte désactivé."""
-        from app.models.user import User
+        from app.models.user import User, RoleEnum
         from passlib.context import CryptContext
         pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -53,7 +53,7 @@ class TestAuthLogin:
             email="inactive@eadmin.gn",
             hashed_password=pwd_context.hash("Test2026!"),
             full_name="Inactive User",
-            role="AGENT",
+            role=RoleEnum.AGENT,
             is_active=False,
         )
         db_session.add(user)

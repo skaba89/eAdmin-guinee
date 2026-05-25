@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eadmin-frontend
+  namespace: eadmin
+  labels:
+    app: eadmin-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: eadmin-frontend
+  template:
+    metadata:
+      labels:
+        app: eadmin-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: eadmin/frontend:latest
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: eadmin-frontend-config
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eadmin-frontend
+  namespace: eadmin
+spec:
+  selector:
+    app: eadmin-frontend
+  ports:
+    - port: 3000
+      targetPort: 3000
+  type: ClusterIP

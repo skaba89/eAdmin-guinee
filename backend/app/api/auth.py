@@ -350,16 +350,21 @@ async def login(
     )
 
 
-@router.post("/register", response_model=UserResponse, summary="Inscription")
+@router.post("/register", response_model=UserResponse, summary="Inscription publique")
 async def register(
     user_data: UserCreate,
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """
-    Crée un nouveau compte utilisateur.
-    La validation du mot de passe est assurée par le schéma Pydantic.
-    Seul un administrateur peut attribuer des rôles élevés.
+    Inscription publique — crée un compte CITOYEN uniquement.
+    Les rôles élevés (ADMIN, SUPER_ADMIN, MINISTRE, AGENT, etc.)
+    ne peuvent être attribués que via l'endpoint admin sécurisé.
     """
+    # Force CITOYEN role for public registration
+    if user_data.role != RoleEnum.CITOYEN:
+        logger.warning(f"Registration attempt with non-citizen role: {user_data.role.value} for {user_data.email}")
+        user_data.role = RoleEnum.CITOYEN
+
     # Vérifier l'unicité de l'email
     result = await db.execute(select(User).where(User.email == user_data.email))
     existing = result.scalar_one_or_none()
@@ -379,6 +384,88 @@ async def register(
     db.add(user)
     await db.flush()
     await db.refresh(user)
+    return {
+        **{k: getattr(user, k) for k in ['id', 'email', 'full_name', 'role', 'institution', 'is_active', 'created_at']},
+        "frontend_role": user.role.to_frontend_role(),
+    }
+
+
+class AdminUserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: str
+    role: RoleEnum = RoleEnum.AGENT
+    institution: str | None = None
+    institution_id: str | None = None
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Le mot de passe doit contenir au moins 8 caractères.")
+        if not any(c.isupper() for c in v):
+            raise ValueError("Le mot de passe doit contenir au moins une majuscule.")
+        if not any(c.isdigit() for c in v):
+            raise ValueError("Le mot de passe doit contenir au moins un chiffre.")
+        return v
+
+
+# Roles that can only be created by SUPER_ADMIN or ADMIN
+RESTRICTED_ROLES = {RoleEnum.SUPER_ADMIN, RoleEnum.ADMIN, RoleEnum.MINISTRE, RoleEnum.DIRECTEUR, RoleEnum.CHEF_SERVICE}
+
+
+@router.post("/admin/create-user", response_model=UserResponse, summary="Création utilisateur (Admin uniquement)")
+async def admin_create_user(
+    user_data: AdminUserCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """
+    Crée un utilisateur avec un rôle spécifié — réservé aux administrateurs.
+    - ADMIN peut créer: AGENT, MAIRIE, AGENCE, CHEF_SERVICE, CITOYEN
+    - SUPER_ADMIN peut créer tous les rôles
+    - Personne ne peut créer un rôle supérieur au sien
+    """
+    # Check permissions based on current user's role
+    creator_role = current_user.role
+
+    # Only ADMIN and SUPER_ADMIN can access this endpoint
+    if creator_role not in (RoleEnum.ADMIN, RoleEnum.SUPER_ADMIN):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Seuls les administrateurs peuvent créer des comptes internes.",
+        )
+
+    # ADMIN cannot create SUPER_ADMIN or ADMIN accounts
+    if creator_role == RoleEnum.ADMIN and user_data.role in RESTRICTED_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Les administrateurs ne peuvent pas créer de comptes {user_data.role.value}.",
+        )
+
+    # Check email uniqueness
+    result = await db.execute(select(User).where(User.email == user_data.email))
+    existing = result.scalar_one_or_none()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Un compte avec cet email existe déjà.",
+        )
+
+    user = User(
+        email=user_data.email,
+        hashed_password=get_password_hash(user_data.password),
+        full_name=user_data.full_name,
+        role=user_data.role,
+        institution=user_data.institution,
+        institution_id=user_data.institution_id,
+    )
+    db.add(user)
+    await db.flush()
+    await db.refresh(user)
+
+    logger.info(f"Admin {current_user.email} created user {user.email} with role {user.role.value}")
+
     return {
         **{k: getattr(user, k) for k in ['id', 'email', 'full_name', 'role', 'institution', 'is_active', 'created_at']},
         "frontend_role": user.role.to_frontend_role(),

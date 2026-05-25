@@ -22,7 +22,6 @@ node_modules
 
 # misc
 .DS_Store
-*.pem
 
 # debug
 npm-debug.log*
@@ -30,12 +29,14 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# Environment files (contain secrets)
+# Environment & secrets
 .env
 .env.local
 .env.*.local
 backend/.env
 backend/.env.local
+*.pem
+*.key
 
 # Keep .env.example files committed (these are safe templates)
 !.env.example
@@ -43,7 +44,6 @@ backend/.env.local
 
 # vercel
 .vercel
-
 
 # typescript
 *.tsbuildinfo
@@ -58,9 +58,33 @@ test
 prompt
 
 server.log
+
 # Skills directory
 /skills/
-# Python bytecode
+
+# Python
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Prisma remnants
+prisma/
+db/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+
+# Uploads
+upload/
+
+# Test artifacts
+test-results/
+playwright-report/

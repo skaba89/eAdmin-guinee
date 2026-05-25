@@ -7,14 +7,14 @@ import { test, expect } from '@playwright/test'
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────
 const DEMO_ACCOUNTS = {
-  citizen: { email: 'citoyen@eadmin.gn', password: 'demo2026', name: 'Sékou Condé', role: 'Citoyen' },
-  mairie: { email: 'mairie@eadmin.gn', password: 'demo2026', name: 'Fatoumata Bah', role: 'Agent de Mairie' },
-  admin: { email: 'admin@eadmin.gn', password: 'demo2026', name: 'Alpha Diallo', role: 'Administrateur Général' },
-  agence: { email: 'agence@eadmin.gn', password: 'demo2026', name: 'Mamadou Soumah', role: "Agent d'Agence" },
-  ministere: { email: 'ministere@eadmin.gn', password: 'demo2026', name: 'Aissatou Sylla', role: 'Agent Ministériel' },
-  superadmin: { email: 'superadmin@eadmin.gn', password: 'demo2026', name: 'Ibrahima Touré', role: 'Super Administrateur' },
-  agent: { email: 'agent@eadmin.gn', password: 'demo2026', name: 'Ibrahim Camara', role: 'Agent' },
-  directeur: { email: 'directeur@eadmin.gn', password: 'demo2026', name: 'Mamadou Sylla', role: 'Directeur' },
+  citizen: { email: 'citoyen@eadmin.gn', password: 'Eadmin2026!', name: 'Sékou Condé', role: 'Citoyen' },
+  mairie: { email: 'mairie@eadmin.gn', password: 'Eadmin2026!', name: 'Fatoumata Bah', role: 'Agent de Mairie' },
+  admin: { email: 'admin@eadmin.gn', password: 'Eadmin2026!', name: 'Alpha Diallo', role: 'Administrateur Général' },
+  agence: { email: 'agence@eadmin.gn', password: 'Eadmin2026!', name: 'Mamadou Soumah', role: "Agent d'Agence" },
+  ministere: { email: 'ministere@eadmin.gn', password: 'Eadmin2026!', name: 'Aissatou Sylla', role: 'Agent Ministériel' },
+  superadmin: { email: 'superadmin@eadmin.gn', password: 'Eadmin2026!', name: 'Ibrahima Touré', role: 'Super Administrateur' },
+  agent: { email: 'agent@eadmin.gn', password: 'Eadmin2026!', name: 'Ibrahim Camara', role: 'Agent' },
+  directeur: { email: 'directeur@eadmin.gn', password: 'Eadmin2026!', name: 'Mamadou Sylla', role: 'Directeur' },
 }
 
 async function navigateToLoginPage(page) {

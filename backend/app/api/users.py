@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user
 from app.database import get_db
+from app.middleware.rbac import require_permission
 from app.models.user import RoleEnum, User
 
 router = APIRouter()
@@ -61,7 +62,7 @@ class PaginatedUsers(BaseModel):
 
 # --- Endpoints ---
 
-@router.get("", response_model=PaginatedUsers, summary="Liste des utilisateurs")
+@router.get("", response_model=PaginatedUsers, summary="Liste des utilisateurs", dependencies=[Depends(require_permission("users", "read"))])
 async def list_users(
     page: int = Query(1, ge=1, description="Numéro de page"),
     page_size: int = Query(20, ge=1, le=100, description="Éléments par page"),
@@ -105,7 +106,7 @@ async def list_users(
     )
 
 
-@router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED, summary="Créer un utilisateur")
+@router.post("", response_model=UserResponse, status_code=status.HTTP_201_CREATED, summary="Créer un utilisateur", dependencies=[Depends(require_permission("users", "create"))])
 async def create_user(
     user_data: UserCreate,
     db: AsyncSession = Depends(get_db),
@@ -143,7 +144,7 @@ async def create_user(
     return user
 
 
-@router.get("/{user_id}", response_model=UserResponse, summary="Détail d'un utilisateur")
+@router.get("/{user_id}", response_model=UserResponse, summary="Détail d'un utilisateur", dependencies=[Depends(require_permission("users", "read"))])
 async def get_user(
     user_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -163,7 +164,7 @@ async def get_user(
     return user
 
 
-@router.put("/{user_id}", response_model=UserResponse, summary="Mettre à jour un utilisateur")
+@router.put("/{user_id}", response_model=UserResponse, summary="Mettre à jour un utilisateur", dependencies=[Depends(require_permission("users", "update"))])
 async def update_user(
     user_id: uuid.UUID,
     user_data: UserUpdate,
@@ -191,7 +192,7 @@ async def update_user(
     return user
 
 
-@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Désactiver un utilisateur")
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Désactiver un utilisateur", dependencies=[Depends(require_permission("users", "delete"))])
 async def deactivate_user(
     user_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
