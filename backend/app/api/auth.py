@@ -153,6 +153,7 @@ class UserResponse(BaseModel):
     email: str
     full_name: str
     role: RoleEnum
+    frontend_role: str  # Computed from role.to_frontend_role()
     institution: str | None
     is_active: bool
     created_at: datetime
@@ -215,7 +216,7 @@ async def login(
             detail="Compte désactivé. Contactez l'administrateur.",
         )
 
-    token_data = {"sub": str(user.id), "role": user.role.value}
+    token_data = {"sub": str(user.id), "role": user.role.value, "frontend_role": user.role.to_frontend_role()}
     access_token = create_access_token(token_data)
     refresh_token = create_refresh_token(token_data)
 
@@ -267,7 +268,10 @@ async def register(
     db.add(user)
     await db.flush()
     await db.refresh(user)
-    return user
+    return {
+        **{k: getattr(user, k) for k in ['id', 'email', 'full_name', 'role', 'institution', 'is_active', 'created_at']},
+        "frontend_role": user.role.to_frontend_role(),
+    }
 
 
 @router.post("/logout", summary="Déconnexion")
@@ -356,7 +360,7 @@ async def refresh_token(
             pass
 
     # Générer de nouveaux tokens
-    token_data = {"sub": str(user.id), "role": user.role.value}
+    token_data = {"sub": str(user.id), "role": user.role.value, "frontend_role": user.role.to_frontend_role()}
     new_access_token = create_access_token(token_data)
     new_refresh_token = create_refresh_token(token_data)
 
@@ -379,11 +383,14 @@ async def refresh_token(
 
 
 @router.get("/me", response_model=UserResponse, summary="Utilisateur courant")
-async def get_me(current_user: User = Depends(get_current_user)) -> User:
+async def get_me(current_user: User = Depends(get_current_user)) -> dict:
     """
     Retourne les informations de l'utilisateur authentifié.
     """
-    return current_user
+    return {
+        **{k: getattr(current_user, k) for k in ['id', 'email', 'full_name', 'role', 'institution', 'is_active', 'created_at']},
+        "frontend_role": current_user.role.to_frontend_role(),
+    }
 
 
 @router.post("/change-password", summary="Changement de mot de passe")

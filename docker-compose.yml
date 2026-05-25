@@ -107,6 +107,46 @@ services:
       - eadmin-network
 
   # ------------------------------------------------------------------
+  # Monitoring — Prometheus
+  # ------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: eadmin-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=30d'
+    restart: unless-stopped
+    networks:
+      - eadmin-network
+
+  # ------------------------------------------------------------------
+  # Monitoring — Grafana
+  # ------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: eadmin-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: eadmin2026
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - eadmin-network
+
+  # ------------------------------------------------------------------
   # Frontend Next.js
   # ------------------------------------------------------------------
   frontend:
@@ -143,3 +183,7 @@ volumes:
     name: eadmin-redis-data
   minio_data:
     name: eadmin-minio-data
+  prometheus_data:
+    name: eadmin-prometheus-data
+  grafana_data:
+    name: eadmin-grafana-data

@@ -23,6 +23,18 @@ class RoleEnum(str, enum.Enum):
     AGENT = "AGENT"
     LECTEUR = "LECTEUR"
 
+    def to_frontend_role(self) -> str:
+        """Map backend role to frontend role name."""
+        mapping = {
+            RoleEnum.SUPER_ADMIN: "superadmin",
+            RoleEnum.ADMIN: "admin",
+            RoleEnum.DIRECTOR: "ministere",
+            RoleEnum.CHEF_SERVICE: "mairie",
+            RoleEnum.AGENT: "agence",
+            RoleEnum.LECTEUR: "citoyen",
+        }
+        return mapping[self]
+
 
 class User(Base):
     """Modèle utilisateur pour l'administration guinéenne."""

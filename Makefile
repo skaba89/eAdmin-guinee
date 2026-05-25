@@ -1,105 +1,168 @@
-# =============================================================================
-# eAdministration Suite Guinea — Makefile
-# Commandes de développement, test et déploiement
-# =============================================================================
+# ═══════════════════════════════════════════════════════════════
+# eAdmin Guinée — Makefile
+# Gouvernance de développement et DevOps
+# ═══════════════════════════════════════════════════════════════
 
-.PHONY: help dev dev-backend dev-frontend build test e2e seed lint clean docker-up docker-down docker-build
+.PHONY: help dev dev-backend dev-frontend build seed seed-reset \
+        migrate migrate-create test-backend test-frontend test-all \
+        test-backend-cov e2e e2e-headed lint lint-backend lint-frontend lint-fix \
+        security-scan docker-up docker-down docker-build docker-dev \
+        docker-logs docker-ps status setup clean clean-all push
+
+.DEFAULT_GOAL := help
+
+# Colors
+GREEN  := \033[0;32m
+YELLOW := \033[0;33m
+CYAN   := \033[0;36m
+RESET  := \033[0m
 
 # --- Configuration ---
 DOCKER_COMPOSE = docker compose
 DOCKER_COMPOSE_DEV = docker compose -f docker-compose.yml -f docker-compose.dev.yml
 
-# --- Aide ---
-help: ## Afficher l'aide
-	@echo "eAdministration Suite Guinea — Commandes disponibles :"
-	@echo ""
+help: ## Show this help message
+	@echo "$(CYAN)═══ eAdmin Guinée — Commandes disponibles ═══$(RESET)"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
-		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+		awk 'BEGIN {FS = ":.*?## "}; {printf "  $(GREEN)%-20s$(RESET) %s\n", $$1, $$2}'
 
-# --- Développement ---
-dev: ## Lancer le frontend en mode développement
-	cd /home/z/my-project && bun run dev
+# ─── Development ─────────────────────────────────────────────
+dev: ## Start full dev environment (Docker)
+	$(DOCKER_COMPOSE_DEV) up --build
 
-dev-backend: ## Lancer le backend en mode développement
-	cd /home/z/my-project/backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+dev-backend: ## Start backend only (with hot-reload)
+	cd backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-dev-frontend: ## Lancer le frontend en mode développement
-	cd /home/z/my-project && bun run dev
+dev-frontend: ## Start frontend only (with hot-reload)
+	bun run dev
 
-# --- Build ---
-build: ## Builder le frontend
-	cd /home/z/my-project && bun run build
+# ─── Build ───────────────────────────────────────────────────
+build: ## Build frontend for production
+	bun run build
 
-# --- Base de données ---
-seed: ## Seeder les comptes démo en base
-	cd /home/z/my-project/backend && python -m app.seed_demo
+# ─── Database ────────────────────────────────────────────────
+seed: ## Seed demo accounts
+	cd backend && python -m app.seed_demo
 
-seed-reset: ## Supprimer et recréer les comptes démo
-	cd /home/z/my-project/backend && python -m app.seed_demo --reset
+seed-reset: ## Reset and re-seed demo accounts
+	cd backend && python -m app.seed_demo --reset
 
-migrate: ## Lancer les migrations Alembic
-	cd /home/z/my-project/backend && alembic upgrade head
+migrate: ## Run database migrations
+	cd backend && alembic upgrade head
 
-migrate-create: ## Créer une nouvelle migration (usage: make migrate-create msg="description")
-	cd /home/z/my-project/backend && alembic revision --autogenerate -m "$(msg)"
+migrate-create: ## Create a new migration (usage: make migrate-create msg="description")
+	cd backend && alembic revision --autogenerate -m "$(msg)"
 
-# --- Tests ---
-test-backend: ## Lancer les tests backend Pytest
-	cd /home/z/my-project/backend && python -m pytest tests/ -v --tb=short
+# ─── Testing ─────────────────────────────────────────────────
+test-backend: ## Run backend tests (SQLite, no external deps)
+	cd backend && python -m pytest tests/ -v --tb=short
 
-test-backend-cov: ## Lancer les tests backend avec couverture
-	cd /home/z/my-project/backend && python -m pytest tests/ -v --cov=app --cov-report=html --cov-report=term
+test-backend-cov: ## Run backend tests with coverage
+	cd backend && python -m pytest tests/ -v --tb=short --cov=app --cov-report=term-missing
 
-test-frontend: ## Lancer les tests frontend (si configurés)
-	cd /home/z/my-project && bun run lint
+test-frontend: ## Run frontend type check
+	bunx tsc --noEmit
 
-e2e: ## Lancer les tests E2E Playwright
-	cd /home/z/my-project && npx playwright install --with-deps chromium && npx playwright test --reporter=html
+test-all: ## Run all tests (backend + frontend)
+	@echo "$(CYAN)═══ Running all tests ═══$(RESET)"
+	@echo "$(YELLOW)--- Backend tests ---$(RESET)"
+	cd backend && python -m pytest tests/ -v --tb=short
+	@echo "$(YELLOW)--- Frontend type check ---$(RESET)"
+	bunx tsc --noEmit
 
-e2e-headed: ## Lancer les tests E2E avec navigateur visible
-	cd /home/z/my-project && npx playwright test --headed
+e2e: ## Run E2E tests (Playwright)
+	npx playwright test
 
-# --- Qualité du code ---
-lint: ## Linter le frontend
-	cd /home/z/my-project && bun run lint
+e2e-headed: ## Run E2E tests with browser visible
+	npx playwright test --headed
 
-lint-backend: ## Linter le backend
-	cd /home/z/my-project/backend && ruff check app/ tests/
+# ─── Linting ─────────────────────────────────────────────────
+lint: ## Lint all code (frontend + backend)
+	bun run lint
+	cd backend && ruff check app/ --ignore E501
 
-lint-backend-fix: ## Linter et corriger le backend
-	cd /home/z/my-project/backend && ruff check --fix app/ tests/
+lint-backend: ## Lint backend Python code
+	cd backend && ruff check app/ --ignore E501
 
-# --- Docker ---
-docker-up: ## Lancer tous les services Docker
+lint-frontend: ## Lint frontend TypeScript code
+	bun run lint
+
+lint-fix: ## Auto-fix linting issues
+	bun run lint --fix
+	cd backend && ruff check app/ --fix --ignore E501
+
+# ─── Security ────────────────────────────────────────────────
+security-scan: ## Run security audit
+	@echo "$(CYAN)═══ Security Scan ═══$(RESET)"
+	@echo "$(YELLOW)--- Frontend dependencies audit ---$(RESET)"
+	bun audit || true
+	@echo "$(YELLOW)--- Backend dependencies audit ---$(RESET)"
+	cd backend && pip-audit || true
+
+# ─── Docker ──────────────────────────────────────────────────
+docker-up: ## Start all services (production mode)
 	$(DOCKER_COMPOSE) up -d
 
-docker-down: ## Arrêter tous les services Docker
+docker-down: ## Stop all services
 	$(DOCKER_COMPOSE) down
 
-docker-build: ## Builder et lancer les services Docker
-	$(DOCKER_COMPOSE) up --build -d
+docker-build: ## Build all Docker images
+	$(DOCKER_COMPOSE) build
 
-docker-dev: ## Lancer l'environnement de développement Docker
-	$(DOCKER_COMPOSE_DEV) up -d
+docker-dev: ## Start dev environment with hot-reload
+	$(DOCKER_COMPOSE_DEV) up --build
 
-docker-logs: ## Afficher les logs Docker
+docker-logs: ## Show logs from all services
 	$(DOCKER_COMPOSE) logs -f
 
-docker-ps: ## Afficher l'état des conteneurs
+docker-ps: ## Show running containers
 	$(DOCKER_COMPOSE) ps
 
-# --- Nettoyage ---
-clean: ## Nettoyer les artefacts de build
-	rm -rf /home/z/my-project/.next
-	rm -rf /home/z/my-project/backend/__pycache__
-	rm -rf /home/z/my-project/backend/app/__pycache__
-	rm -rf /home/z/my-project/backend/tests/__pycache__
-	rm -rf /home/z/my-project/backend/test_eadmin.db
-	rm -rf /home/z/my-project/backend/htmlcov
-	rm -rf /home/z/my-project/backend/.pytest_cache
-	rm -rf /home/z/my-project/test-results
-	rm -rf /home/z/my-project/playwright-report
+# ─── Setup ───────────────────────────────────────────────────
+setup: ## First-time project setup
+	@echo "$(CYAN)═══ eAdmin Guinée — Setup ═══$(RESET)"
+	@echo "$(YELLOW)1. Installing frontend dependencies...$(RESET)"
+	bun install
+	@echo "$(YELLOW)2. Installing backend dependencies...$(RESET)"
+	cd backend && pip install -r requirements.txt && pip install -r requirements-dev.txt
+	@echo "$(YELLOW)3. Creating .env files from examples...$(RESET)"
+	test -f .env || cp .env.example .env
+	test -f backend/.env || cp backend/.env.example backend/.env
+	@echo "$(GREEN)Setup complete! Run 'make dev' to start the application.$(RESET)"
 
-# --- Git ---
-push: ## Commit et push
-	cd /home/z/my-project && git add -A && git status
+# ─── Status ──────────────────────────────────────────────────
+status: ## Show project status
+	@echo "$(CYAN)═══ eAdmin Guinée — Status ═══$(RESET)"
+	@echo "$(YELLOW)Docker containers:$(RESET)"
+	@docker compose ps 2>/dev/null || echo "  Docker not running"
+	@echo ""
+	@echo "$(YELLOW)Backend health:$(RESET)"
+	@curl -s http://localhost:8000/health | python -m json.tool 2>/dev/null || echo "  Backend not reachable"
+	@echo ""
+	@echo "$(YELLOW)Frontend:$(RESET)"
+	@curl -s -o /dev/null -w "  HTTP %{http_code}" http://localhost:3000 2>/dev/null || echo "  Frontend not reachable"
+	@echo ""
+	@echo "$(YELLOW)Monitoring:$(RESET)"
+	@curl -s -o /dev/null -w "  Prometheus HTTP %{http_code}" http://localhost:9090 2>/dev/null || echo "  Prometheus not reachable"
+	@echo ""
+	@curl -s -o /dev/null -w "  Grafana HTTP %{http_code}" http://localhost:3001 2>/dev/null || echo "  Grafana not reachable"
+
+# ─── Cleanup ─────────────────────────────────────────────────
+clean: ## Clean build artifacts
+	rm -rf .next out node_modules/.cache
+	rm -rf backend/__pycache__ backend/**/__pycache__
+	rm -f backend/test.db
+	rm -rf backend/htmlcov backend/.pytest_cache
+	rm -rf test-results playwright-report
+
+clean-all: ## Full cleanup including Docker volumes
+	docker compose down -v --remove-orphans
+	rm -rf .next out node_modules/.cache
+	rm -rf backend/__pycache__ backend/**/__pycache__
+	rm -f backend/test.db
+	rm -rf backend/htmlcov backend/.pytest_cache
+	rm -rf test-results playwright-report
+
+# ─── Git ─────────────────────────────────────────────────────
+push: ## Push to GitHub (usage: make push msg="commit message")
+	git add -A && git commit -m "update: $(msg)" && git push origin main

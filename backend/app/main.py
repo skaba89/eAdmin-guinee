@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import analytics, audit, auth, courriers, documents, users, workflows
+from app.api import analytics, audit, auth, courriers, documents, metrics, users, workflows
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -77,6 +77,14 @@ app = FastAPI(
 from app.middleware.rate_limit import RateLimitMiddleware
 app.add_middleware(RateLimitMiddleware)
 
+# --- Middleware de Security Headers ---
+from app.middleware.security_headers import SecurityHeadersMiddleware
+app.add_middleware(SecurityHeadersMiddleware)
+
+# --- Middleware d'Audit ---
+from app.middleware.audit import AuditMiddleware
+app.add_middleware(AuditMiddleware)
+
 # --- Middleware CORS ---
 # CORS sécurisé : origines explicites uniquement, jamais "*" avec credentials
 allowed_origins = (
@@ -111,6 +119,9 @@ app.include_router(workflows.router, prefix="/api/v1/workflows", tags=["Workflow
 app.include_router(users.router, prefix="/api/v1/users", tags=["Utilisateurs"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytique"])
 app.include_router(audit.router, prefix="/api/v1/audit", tags=["Audit"])
+
+# --- Métriques Prometheus ---
+app.include_router(metrics.router, tags=["Métriques"])
 
 
 # --- Endpoint de santé ---

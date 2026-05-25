@@ -1099,6 +1099,7 @@ export const useAIAgentStore = create<AIAgentState>()(
       // ═══ AUTO-PROCESSING ═══════════════════════════════════════════════════
 
       startAutoProcessing: () => {
+        if (typeof window === 'undefined') return
         const { isAutoProcessing, autoProcessDelay, isEnabled } = get()
         if (isAutoProcessing || !isEnabled) return
 
@@ -1542,9 +1543,8 @@ export const useAIAgentStore = create<AIAgentState>()(
 
       initAutoProcessing: () => {
         const { isEnabled, isAutoProcessing } = get()
-        if (isEnabled && !isAutoProcessing) {
-          get().startAutoProcessing()
-        }
+        if (!isEnabled || isAutoProcessing) return  // Don't auto-start if disabled or already running
+        get().startAutoProcessing()
       },
 
       // ═══ RETRY LOGIC ════════════════════════════════════════════════════════
@@ -1938,6 +1938,17 @@ export const useAIAgentStore = create<AIAgentState>()(
         processingPriority: state.processingPriority,
         lastHeartbeat: state.lastHeartbeat,
       }),
+      onRehydrateStorage: () => {
+        return (state) => {
+          if (state) {
+            // Reset transient runtime state that should never persist
+            state.isAutoProcessing = false
+            state.autoProcessIntervalId = null
+            state.isProcessing = false
+            state.isTestingAI = false
+          }
+        }
+      },
     }
   )
 )

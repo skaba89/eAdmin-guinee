@@ -17,16 +17,24 @@ import type { CitizenRequest } from '@/store/citizen-requests-store'
 // rbac roles:       'citoyen' | 'mairie' | 'admin'         | 'agence' | 'ministere' | 'superadmin'
 
 const ROLE_MAP: Record<string, UserRole> = {
+  // App-store naming convention
   'citizen': 'citoyen',
   'mairie': 'mairie',
   'admin_general': 'admin',
   'agence': 'agence',
   'ministere': 'ministere',
   'super_admin': 'superadmin',
-  // Identity mappings for rbac role names (in case of direct usage)
+  // RBAC naming (identity mappings)
   'citoyen': 'citoyen',
   'admin': 'admin',
   'superadmin': 'superadmin',
+  // Backend role mapping (from API)
+  'SUPER_ADMIN': 'superadmin',
+  'ADMIN': 'admin',
+  'DIRECTOR': 'ministere',
+  'CHEF_SERVICE': 'mairie',
+  'AGENT': 'agence',
+  'LECTEUR': 'citoyen',
 }
 
 function mapUserRole(user: UserInfo | null): UserRole {
