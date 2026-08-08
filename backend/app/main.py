@@ -19,6 +19,8 @@ from app.api import (
     auth_hardening,
     courriers,
     document_files,
+    document_imports,
+    document_query,
     documents,
     documents_search,
     institutions,
@@ -250,8 +252,21 @@ app.include_router(
     tags=["Demandes citoyennes"],
     dependencies=rls_dependencies,
 )
-# Register server-authoritative GED file mutations before the historical
-# documents router so clients cannot fall through to path/hash based mutations.
+# Register all server-authoritative GED routes before the historical
+# documents router. Import/query/file routes therefore own duplicate method/path
+# combinations and prevent client-authoritative legacy mutations.
+app.include_router(
+    document_imports.router,
+    prefix="/api/v1/documents",
+    tags=["Import GED sécurisé"],
+    dependencies=rls_dependencies,
+)
+app.include_router(
+    document_query.router,
+    prefix="/api/v1/documents",
+    tags=["Consultation GED"],
+    dependencies=rls_dependencies,
+)
 app.include_router(
     document_files.router,
     prefix="/api/v1/documents",
