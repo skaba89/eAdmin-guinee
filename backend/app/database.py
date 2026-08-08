@@ -34,8 +34,6 @@ class Base(DeclarativeBase):
     """Classe de base déclarative pour tous les modèles ORM."""
 
 
-# Async request context. A service that opens a secondary SQLAlchemy session
-# during the same request inherits this value automatically through ContextVar.
 current_rls_scope: ContextVar[dict[str, Any] | None] = ContextVar(
     "eadmin_current_rls_scope",
     default=None,
@@ -52,12 +50,7 @@ def _scope_for_session(session: Session) -> dict[str, Any] | None:
 
 @event.listens_for(Session, "after_begin")
 def _propagate_rls_to_new_transaction(session: Session, transaction, connection) -> None:
-    """Apply trusted RLS variables to every PostgreSQL transaction in a request.
-
-    The main FastAPI session receives the values explicitly after authentication.
-    This hook is especially important for internal services that create their own
-    session/transaction while processing the authenticated request.
-    """
+    """Apply trusted RLS variables to every PostgreSQL transaction in a request."""
 
     scope = _scope_for_session(session)
     if not scope or connection.dialect.name != "postgresql":
@@ -84,11 +77,13 @@ def _propagate_rls_to_new_transaction(session: Session, transaction, connection)
 
 @event.listens_for(Session, "before_flush")
 def _enforce_trusted_scope(session: Session, flush_context, instances) -> None:
-    """Stamp tenant/institution on newly-created ORM entities.
+    """Stamp tenant/institution on new ORM entities from trusted server scope.
 
-    For normal users the authenticated scope always wins, closing mass-assignment
-    attacks through payload fields. SUPER_ADMIN may explicitly target another
-    institution, with trusted defaults applied when fields are omitted.
+    A special case exists for a citizen creating a ServiceRequest: the request
+    must be routed to a target institution. That target is accepted only after
+    the API validates it against the institutions table and stores it in
+    ``session.info['trusted_target_institution_id']``. A payload cannot set this
+    trusted slot directly.
     """
 
     scope = _scope_for_session(session)
@@ -97,7 +92,10 @@ def _enforce_trusted_scope(session: Session, flush_context, instances) -> None:
 
     tenant_id = str(scope.get("tenant_id") or "").strip()
     institution_id = str(scope.get("institution_id") or "").strip() or None
+    role = str(scope.get("role") or "")
     is_super_admin = bool(scope.get("is_super_admin"))
+    trusted_target = session.info.get("trusted_target_institution_id")
+    trusted_target = str(trusted_target).strip() if trusted_target else None
 
     for obj in session.new:
         if hasattr(obj, "tenant_id"):
@@ -108,7 +106,17 @@ def _enforce_trusted_scope(session: Session, flush_context, instances) -> None:
                 setattr(obj, "tenant_id", tenant_id)
 
         if hasattr(obj, "institution_id"):
-            if is_super_admin:
+            # Only ServiceRequest may use a separately validated routing target
+            # for a citizen. All other normal-user entities are forced to the
+            # authenticated user's own institution.
+            is_citizen_request = (
+                role == "CITOYEN"
+                and obj.__class__.__name__ == "ServiceRequest"
+                and trusted_target is not None
+            )
+            if is_citizen_request:
+                setattr(obj, "institution_id", trusted_target)
+            elif is_super_admin:
                 if getattr(obj, "institution_id", None) in (None, ""):
                     setattr(obj, "institution_id", institution_id)
             else:
@@ -127,4 +135,5 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             raise
         finally:
             session.sync_session.info.pop("rls_scope", None)
+            session.sync_session.info.pop("trusted_target_institution_id", None)
             await session.close()
