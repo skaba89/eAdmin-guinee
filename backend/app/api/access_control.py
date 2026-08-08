@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-import uuid
 from typing import Literal
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field, field_validator
@@ -74,6 +74,19 @@ class AuthorizationProbeResponse(BaseModel):
     grant_id: uuid.UUID | None = None
 
 
+def _as_utc(value: datetime) -> datetime:
+    """Normalize database timestamps before Python comparisons.
+
+    PostgreSQL preserves timezone-aware values, while SQLite used by isolated
+    tests may deserialize DateTime(timezone=True) without tzinfo. Treat a naive
+    persisted value as UTC because every write into this module is normalized
+    to UTC before persistence.
+    """
+    if value.tzinfo is None or value.utcoffset() is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def _mfa_verified(request: Request, user: User) -> bool:
     payload = getattr(request.state, "jwt_payload", {}) or {}
     return bool(user.mfa_enabled and payload.get("mfa_verified") is True)
@@ -138,7 +151,7 @@ async def _audit_grant(
             "grantee_id": str(grant.grantee_id),
             "resource": grant.resource,
             "permission_action": grant.action,
-            "valid_until": grant.valid_until.isoformat(),
+            "valid_until": _as_utc(grant.valid_until).isoformat(),
             "ticket_reference": grant.ticket_reference,
         },
         severity=severity,
@@ -208,10 +221,11 @@ async def request_access_grant(
             raise HTTPException(status_code=403, detail="Le bénéficiaire appartient à une autre institution.")
 
     now = datetime.now(timezone.utc)
-    if body.valid_until <= now:
+    valid_until = _as_utc(body.valid_until)
+    if valid_until <= now:
         raise HTTPException(status_code=422, detail="La fin de validité doit être dans le futur.")
     maximum = timedelta(hours=4) if body.grant_type == "break_glass" else timedelta(days=30)
-    if body.valid_until - now > maximum:
+    if valid_until - now > maximum:
         raise HTTPException(
             status_code=422,
             detail="Durée maximale: 4h pour break-glass, 30 jours pour une délégation.",
@@ -232,7 +246,7 @@ async def request_access_grant(
         ticket_reference=(body.ticket_reference or "").strip() or None,
         requires_mfa=True,
         valid_from=now,
-        valid_until=body.valid_until,
+        valid_until=valid_until,
     )
     db.add(grant)
     await db.flush()
@@ -259,15 +273,14 @@ async def approve_access_grant(
         )
     if not _mfa_verified(request, current_user):
         raise HTTPException(status_code=403, detail="MFA vérifié requis pour approuver une habilitation.")
-    if grant.valid_until <= datetime.now(timezone.utc):
+    if _as_utc(grant.valid_until) <= datetime.now(timezone.utc):
         raise HTTPException(status_code=409, detail="La fenêtre d'habilitation est déjà expirée.")
 
     if grant.grant_type == "break_glass":
         if current_user.role != RoleEnum.SUPER_ADMIN:
             raise HTTPException(status_code=403, detail="Break-glass requiert une approbation SUPER_ADMIN.")
-    else:
-        if current_user.role not in (RoleEnum.DIRECTEUR, RoleEnum.MINISTRE, RoleEnum.SUPER_ADMIN):
-            raise HTTPException(status_code=403, detail="Approbation DIRECTEUR+ requise.")
+    elif current_user.role not in (RoleEnum.DIRECTEUR, RoleEnum.MINISTRE, RoleEnum.SUPER_ADMIN):
+        raise HTTPException(status_code=403, detail="Approbation DIRECTEUR+ requise.")
 
     if not authorization_service.has_permanent_permission(current_user, grant.resource, grant.action):
         raise HTTPException(status_code=403, detail="L'approbateur ne détient pas cette permission de façon permanente.")
