@@ -28,6 +28,12 @@ export interface JwtPayload {
   exp?: number
 }
 
+export interface MfaSetupResponse {
+  secret: string
+  qr_code_uri: string
+  backup_codes: string[]
+}
+
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '')
 
 const ACTIVE_ACCESS_KEY = 'eadmin.access_token'
@@ -119,18 +125,14 @@ export async function verifyMfa(accessToken: string, code: string): Promise<Auth
   }
 }
 
-export async function setupMfa(accessToken: string): Promise<{
-  secret: string
-  qr_code_uri: string
-  backup_codes: string[]
-}> {
+export async function setupMfa(accessToken: string): Promise<MfaSetupResponse> {
   const response = await fetch(`${API_URL}/api/v1/auth/setup-mfa`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${accessToken}` },
     credentials: 'include',
   })
 
-  return parseResponse(response, 'Impossible de configurer le MFA.')
+  return parseResponse<MfaSetupResponse>(response, 'Impossible de configurer le MFA.')
 }
 
 export async function logout(accessToken: string | null): Promise<void> {
