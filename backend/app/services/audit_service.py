@@ -379,50 +379,57 @@ class AuditService:
         if since:
             query_base = query_base.where(AuditLog.timestamp >= since)
 
-        # Nombre total d'entrées
+        # Materialize the filtered audit scope once and aggregate only its
+        # columns. Referencing AuditLog columns after select_from(subquery)
+        # would add audit_logs a second time and create a cartesian product.
+        filtered = query_base.subquery("filtered_audit_logs")
+
         count_result = await self.db.execute(
-            select(func.count()).select_from(query_base.subquery())
+            select(func.count()).select_from(filtered)
         )
         total = count_result.scalar() or 0
 
-        # Actions les plus fréquentes
+        actions_count = func.count(filtered.c.id).label("count")
         actions_result = await self.db.execute(
-            select(AuditLog.action, func.count(AuditLog.id).label("count"))
-            .select_from(query_base.subquery())
-            .group_by(AuditLog.action)
-            .order_by(func.count(AuditLog.id).desc())
+            select(filtered.c.action, actions_count)
+            .select_from(filtered)
+            .group_by(filtered.c.action)
+            .order_by(actions_count.desc())
             .limit(10)
         )
         top_actions = [{"action": row[0], "count": row[1]} for row in actions_result.all()]
 
-        # Sévérité
+        severity_count = func.count(filtered.c.id).label("count")
         severity_result = await self.db.execute(
-            select(AuditLog.severity, func.count(AuditLog.id).label("count"))
-            .select_from(query_base.subquery())
-            .group_by(AuditLog.severity)
+            select(filtered.c.severity, severity_count)
+            .select_from(filtered)
+            .group_by(filtered.c.severity)
         )
         severity_stats = {row[0]: row[1] for row in severity_result.all()}
 
-        # Utilisateurs les plus actifs
+        users_count = func.count(filtered.c.id).label("count")
         users_result = await self.db.execute(
-            select(AuditLog.user_id, func.count(AuditLog.id).label("count"))
-            .select_from(query_base.subquery())
-            .where(AuditLog.user_id.isnot(None))
-            .group_by(AuditLog.user_id)
-            .order_by(func.count(AuditLog.id).desc())
+            select(filtered.c.user_id, users_count)
+            .select_from(filtered)
+            .where(filtered.c.user_id.isnot(None))
+            .group_by(filtered.c.user_id)
+            .order_by(users_count.desc())
             .limit(10)
         )
         top_users = [{"user_id": str(row[0]), "count": row[1]} for row in users_result.all()]
 
-        # Types de ressources
+        resources_count = func.count(filtered.c.id).label("count")
         resources_result = await self.db.execute(
-            select(AuditLog.resource_type, func.count(AuditLog.id).label("count"))
-            .select_from(query_base.subquery())
-            .group_by(AuditLog.resource_type)
-            .order_by(func.count(AuditLog.id).desc())
+            select(filtered.c.resource_type, resources_count)
+            .select_from(filtered)
+            .group_by(filtered.c.resource_type)
+            .order_by(resources_count.desc())
             .limit(10)
         )
-        top_resources = [{"resource_type": row[0], "count": row[1]} for row in resources_result.all()]
+        top_resources = [
+            {"resource_type": row[0], "count": row[1]}
+            for row in resources_result.all()
+        ]
 
         return {
             "total_entries": total,
