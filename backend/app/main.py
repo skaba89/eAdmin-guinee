@@ -20,6 +20,7 @@ from app.api import (
     courriers,
     document_files,
     document_imports,
+    document_ocr,
     document_query,
     documents,
     documents_search,
@@ -265,6 +266,12 @@ app.include_router(
     document_query.router,
     prefix="/api/v1/documents",
     tags=["Consultation GED"],
+    dependencies=rls_dependencies,
+)
+app.include_router(
+    document_ocr.router,
+    prefix="/api/v1/documents",
+    tags=["OCR documentaire"],
     dependencies=rls_dependencies,
 )
 app.include_router(
