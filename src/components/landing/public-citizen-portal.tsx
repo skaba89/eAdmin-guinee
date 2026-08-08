@@ -26,110 +26,11 @@ import {
 } from '@/components/ui/dialog'
 import { useCitizenRequestsStore, getInstitutionRoutingOptions, type CitizenRequest, type RequestStatus, type InstitutionRoutingOption } from '@/store/citizen-requests-store'
 import { useAppStore } from '@/store/app-store'
+import { usePublicServiceCatalog, type ServiceItem, type ServiceCategory } from '@/lib/public-service-catalog'
 
 const GUINEA_RED = '#CE1126'
 const GUINEA_YELLOW = '#FCD116'
 const GUINEA_GREEN = '#009460'
-
-interface ServiceItem {
-  id: string
-  name: string
-  description: string
-  icon: React.ElementType
-  price: string
-  delay: string
-  requiredDocs: string[]
-}
-
-interface ServiceCategory {
-  id: string
-  name: string
-  color: string
-  bgColor: string
-  iconBgColor: string
-  textColor: string
-  borderColor: string
-  services: ServiceItem[]
-}
-
-const SERVICE_CATEGORIES: ServiceCategory[] = [
-  {
-    id: 'etat-civil', name: 'État Civil', color: 'bg-blue-600', bgColor: 'bg-blue-50 dark:bg-blue-900/20',
-    iconBgColor: 'bg-blue-100 dark:bg-blue-900/40', textColor: 'text-blue-600 dark:text-blue-400',
-    borderColor: 'border-blue-200 dark:border-blue-800/40',
-    services: [
-      { id: 'ec-1', name: "Extrait d'acte de naissance", description: "Copie intégrale ou extrait d'acte de naissance", icon: Baby, price: 'Gratuit', delay: '48h', requiredDocs: ['Carte d\'identité', 'Acte de naissance original ou numéro d\'acte'] },
-      { id: 'ec-2', name: "Extrait d'acte de mariage", description: "Attestation officielle d'acte de mariage", icon: Heart, price: 'Gratuit', delay: '48h', requiredDocs: ['Carte d\'identité', 'Acte de mariage original ou numéro d\'acte'] },
-      { id: 'ec-3', name: "Extrait d'acte de décès", description: "Document officiel d'acte de décès", icon: Church, price: 'Gratuit', delay: '48h', requiredDocs: ['Carte d\'identité du demandeur', 'Acte de décès original ou numéro'] },
-      { id: 'ec-4', name: 'Certificat de nationalité', description: "Attestation de nationalité guinéenne", icon: Shield, price: '5 000 GNF', delay: '5 jours', requiredDocs: ['Carte d\'identité nationale', 'Extrait d\'acte de naissance', '2 photos d\'identité', 'Certificat de résidence'] },
-      { id: 'ec-5', name: 'Déclaration de naissance', description: "Enregistrement d'une naissance à l'état civil", icon: Baby, price: 'Gratuit', delay: '24h', requiredDocs: ['Certificat médical de naissance', 'Pièce d\'identité d\'un parent', 'Déclaration du père ou de la mère'] },
-    ],
-  },
-  {
-    id: 'justice', name: 'Justice & Légal', color: 'bg-purple-600', bgColor: 'bg-purple-50 dark:bg-purple-900/20',
-    iconBgColor: 'bg-purple-100 dark:bg-purple-900/40', textColor: 'text-purple-600 dark:text-purple-400',
-    borderColor: 'border-purple-200 dark:border-purple-800/40',
-    services: [
-      { id: 'j-1', name: 'Casier judiciaire', description: 'Extrait de casier judiciaire B3', icon: Scale, price: '5 000 GNF', delay: '5 jours', requiredDocs: ['Carte d\'identité nationale', '2 photos d\'identité', 'Timbre fiscal'] },
-      { id: 'j-2', name: 'Certificat de non-poursuite', description: 'Attestation de non-poursuite judiciaire', icon: FileText, price: '3 000 GNF', delay: '3 jours', requiredDocs: ['Carte d\'identité nationale', 'Casier judiciaire récent'] },
-      { id: 'j-3', name: 'Légalisation de documents', description: 'Authentification officielle de documents', icon: Stamp, price: '2 000 GNF', delay: '24h', requiredDocs: ['Document original à légaliser', 'Carte d\'identité nationale', 'Photocopie du document'] },
-    ],
-  },
-  {
-    id: 'identification', name: 'Identification', color: 'bg-green-600', bgColor: 'bg-green-50 dark:bg-green-900/20',
-    iconBgColor: 'bg-green-100 dark:bg-green-900/40', textColor: 'text-green-600 dark:text-green-400',
-    borderColor: 'border-green-200 dark:border-green-800/40',
-    services: [
-      { id: 'id-1', name: "Carte d'identité nationale biométrique", description: "CNI biométrique sécurisée avec puces", icon: IdCard, price: 'Gratuit', delay: '7 jours', requiredDocs: ['Extrait d\'acte de naissance', 'Certificat de nationalité', '4 photos d\'identité', 'Certificat de résidence', 'Témoin avec CNI valide'] },
-      { id: 'id-2', name: 'Passeport biométrique', description: 'Passeport biométrique international', icon: Globe, price: '150 000 GNF', delay: '10 jours', requiredDocs: ['Carte d\'identité nationale', 'Extrait d\'acte de naissance', '4 photos d\'identité récentes', 'Certificat de résidence', 'Ancien passeport (si renouvellement)'] },
-      { id: 'id-3', name: 'Permis de conduire', description: 'Permis de conduire national ou international', icon: Car, price: '25 000 GNF', delay: '10 jours', requiredDocs: ['Carte d\'identité nationale', 'Certificat médical d\'aptitude', 'Attestation de réussite auto-école', '4 photos d\'identité', 'Ancien permis (si renouvellement)'] },
-    ],
-  },
-  {
-    id: 'urbanisme', name: 'Urbanisme & Construction', color: 'bg-orange-600', bgColor: 'bg-orange-50 dark:bg-orange-900/20',
-    iconBgColor: 'bg-orange-100 dark:bg-orange-900/40', textColor: 'text-orange-600 dark:text-orange-400',
-    borderColor: 'border-orange-200 dark:border-orange-800/40',
-    services: [
-      { id: 'u-1', name: 'Permis de construire', description: 'Autorisation de construction immobilière', icon: Building2, price: '50 000 GNF', delay: '15 jours', requiredDocs: ['Plan de construction certifié', 'Titre foncier ou bail', 'Étude d\'impact environnemental', 'Plan de situation du terrain', 'Carte d\'identité'] },
-    ],
-  },
-  {
-    id: 'entreprise', name: 'Entreprise & Commerce', color: 'bg-teal-600', bgColor: 'bg-teal-50 dark:bg-teal-900/20',
-    iconBgColor: 'bg-teal-100 dark:bg-teal-900/40', textColor: 'text-teal-600 dark:text-teal-400',
-    borderColor: 'border-teal-200 dark:border-teal-800/40',
-    services: [
-      { id: 'e-1', name: 'Enregistrement entreprise (APIP)', description: "Création d'entreprise via l'APIP", icon: Briefcase, price: '50 000 GNF', delay: '3 jours', requiredDocs: ['Statuts de l\'entreprise', 'Pièce d\'identité du gérant', 'Casier judiciaire du gérant', 'Attestation de siège social', 'Capital social minimum'] },
-      { id: 'e-2', name: 'Registre de commerce', description: 'Immatriculation au RCCM', icon: BookOpen, price: '100 000 GNF', delay: '7 jours', requiredDocs: ['Statuts enregistrés', 'Carte d\'identité du gérant', 'Certificat de résidence', 'Attestation APIP'] },
-    ],
-  },
-  {
-    id: 'education', name: 'Éducation', color: 'bg-indigo-600', bgColor: 'bg-indigo-50 dark:bg-indigo-900/20',
-    iconBgColor: 'bg-indigo-100 dark:bg-indigo-900/40', textColor: 'text-indigo-600 dark:text-indigo-400',
-    borderColor: 'border-indigo-200 dark:border-indigo-800/40',
-    services: [
-      { id: 'ed-1', name: 'Attestation de scolarité', description: "Certificat de fréquentation scolaire", icon: GraduationCap, price: 'Gratuit', delay: '48h', requiredDocs: ['Carte d\'identité', 'Certificat d\'inscription', 'Dernier bulletin scolaire'] },
-      { id: 'ed-2', name: 'Diplôme et relevé de notes', description: 'Copie certifiée de diplôme et relevé', icon: Award, price: '10 000 GNF', delay: '5 jours', requiredDocs: ['Carte d\'identité', 'Numéro matricule', 'Ancien diplôme (si duplicata)'] },
-    ],
-  },
-  {
-    id: 'sante', name: 'Santé', color: 'bg-red-600', bgColor: 'bg-red-50 dark:bg-red-900/20',
-    iconBgColor: 'bg-red-100 dark:bg-red-900/40', textColor: 'text-red-600 dark:text-red-400',
-    borderColor: 'border-red-200 dark:border-red-800/40',
-    services: [
-      { id: 's-1', name: 'Certificat de vaccination', description: 'Carnet ou certificat de vaccination international', icon: Stethoscope, price: 'Gratuit', delay: '24h', requiredDocs: ['Carte d\'identité', 'Ancien carnet de vaccination (si disponible)'] },
-      { id: 's-2', name: 'Carte sanitaire', description: "Carte nationale d'assurance maladie", icon: Heart, price: '2 000 GNF', delay: '5 jours', requiredDocs: ['Carte d\'identité nationale', 'Photo d\'identité', 'Certificat de résidence', 'Attestation d\'emploi ou de chômage'] },
-    ],
-  },
-  {
-    id: 'residence', name: 'Résidence & Citoyenneté', color: 'bg-amber-600', bgColor: 'bg-amber-50 dark:bg-amber-900/20',
-    iconBgColor: 'bg-amber-100 dark:bg-amber-900/40', textColor: 'text-amber-600 dark:text-amber-400',
-    borderColor: 'border-amber-200 dark:border-amber-800/40',
-    services: [
-      { id: 'r-1', name: 'Certificat de résidence', description: 'Attestation de domicile délivrée par la mairie', icon: Home, price: 'Gratuit', delay: '24h', requiredDocs: ['Carte d\'identité nationale', 'Quittance de loyer ou titre de propriété', 'Témoignage de 2 voisins'] },
-      { id: 'r-2', name: 'Attestation de domicile', description: "Attestation de lieu d'habitation", icon: MapPin, price: '1 000 GNF', delay: '24h', requiredDocs: ['Carte d\'identité', 'Facture d\'eau ou d\'électricité récente'] },
-    ],
-  },
-]
 
 const STATUS_CONFIG: Record<RequestStatus, { label: string; color: string; icon: React.ElementType }> = {
   soumise: { label: 'Soumise', color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400', icon: Send },
@@ -142,10 +43,10 @@ const STATUS_CONFIG: Record<RequestStatus, { label: string; color: string; icon:
 }
 
 const STATS_BANNER = [
-  { value: '124 500', label: 'citoyens inscrits', icon: Users },
-  { value: '8 730', label: 'demandes traitées', icon: CheckCircle2 },
-  { value: '94%', label: 'taux de satisfaction', icon: Heart },
-  { value: '30-45j', label: 'délai légal (jours ouvrés)', icon: Clock },
+  { value: '24/7', label: 'portail numérique', icon: Globe },
+  { value: 'GN-…', label: 'référence officielle', icon: Hash },
+  { value: 'Versionné', label: 'catalogue serveur', icon: Shield },
+  { value: 'Traçable', label: 'suivi des demandes', icon: CheckCircle2 },
 ]
 
 const containerVariants = {
@@ -161,6 +62,7 @@ const itemVariants = {
 export function PublicCitizenPortal() {
   const { requests, addRequest, getRequestByReference } = useCitizenRequestsStore()
   const { isAuth, user, navigate } = useAppStore()
+  const { categories: serviceCategories, isLoading: serviceCatalogLoading, error: serviceCatalogError, reload: reloadServiceCatalog } = usePublicServiceCatalog()
   const [activeTab, setActiveTab] = useState('services')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
@@ -194,6 +96,16 @@ export function PublicCitizenPortal() {
   })
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [acceptedTerms, setAcceptedTerms] = useState(false)
+
+  useEffect(() => {
+    if (
+      selectedCategory !== 'all' &&
+      !serviceCatalogLoading &&
+      !serviceCategories.some((category) => category.id === selectedCategory)
+    ) {
+      setSelectedCategory('all')
+    }
+  }, [selectedCategory, serviceCatalogLoading, serviceCategories])
 
   useEffect(() => {
     if (successToast) {
@@ -325,7 +237,7 @@ export function PublicCitizenPortal() {
   }
 
   // Filter services by search
-  const filteredCategories = SERVICE_CATEGORIES
+  const filteredCategories = serviceCategories
     .filter(cat => selectedCategory === 'all' || cat.id === selectedCategory)
     .map(cat => ({
       ...cat,
@@ -378,7 +290,7 @@ export function PublicCitizenPortal() {
                     </Badge>
                     <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-xs gap-1.5">
                       <CheckCircle2 className="size-3" />
-                      28 services en ligne
+                      {serviceCatalogLoading ? 'Catalogue en cours…' : `${serviceCategories.reduce((total, category) => total + category.services.length, 0)} démarches publiées`}
                     </Badge>
                     <Badge className="bg-white/10 text-white/80 border-white/20 text-xs gap-1.5">
                       <Shield className="size-3" />
@@ -449,6 +361,26 @@ export function PublicCitizenPortal() {
           ═══════════════════════════════════════════════════════ */}
           <TabsContent value="services">
             <div className="space-y-6 mt-6">
+              {serviceCatalogLoading && (
+                <Card className="border-[#0B2E58]/10">
+                  <CardContent className="flex items-center gap-3 p-5 text-sm text-muted-foreground">
+                    <Clock className="size-4 animate-pulse" />
+                    Chargement du catalogue officiel des démarches…
+                  </CardContent>
+                </Card>
+              )}
+              {serviceCatalogError && (
+                <Card className="border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/20">
+                  <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-2 text-sm text-red-700 dark:text-red-300">
+                      <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                      <span>{serviceCatalogError}</span>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={reloadServiceCatalog}>Réessayer</Button>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Category filter */}
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -459,7 +391,7 @@ export function PublicCitizenPortal() {
                 >
                   Tous les services
                 </Button>
-                {SERVICE_CATEGORIES.map(cat => (
+                {serviceCategories.map(cat => (
                   <Button
                     key={cat.id}
                     variant={selectedCategory === cat.id ? 'default' : 'outline'}
@@ -517,7 +449,7 @@ export function PublicCitizenPortal() {
                             <div className="flex items-center justify-between text-xs mb-3">
                               <span className="text-muted-foreground flex items-center gap-1">
                                 <Clock className="h-3 w-3" />
-                                Délai estimé: {service.delay} • Légal: 30-45j ouvrés
+                                {service.policyStatus === 'approved' ? 'Délai approuvé' : 'Délai opérationnel'}: {service.delay}
                               </span>
                               <span className="font-semibold text-[#0B2E58] dark:text-[#3B7DD8]">{service.price}</span>
                             </div>
@@ -537,7 +469,7 @@ export function PublicCitizenPortal() {
                 </motion.div>
               ))}
 
-              {filteredCategories.length === 0 && (
+              {!serviceCatalogLoading && !serviceCatalogError && filteredCategories.length === 0 && (
                 <div className="text-center py-12">
                   <Search className="size-12 text-muted-foreground/30 mx-auto mb-3" />
                   <p className="text-muted-foreground">Aucun service trouvé pour votre recherche</p>
