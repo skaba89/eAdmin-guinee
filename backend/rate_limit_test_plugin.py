@@ -1,4 +1,4 @@
-"""Pytest isolation for process-global Redis and audit middleware resources.
+"""Pytest isolation for process-global Redis, DB health and audit resources.
 
 Keep application imports lazy: this plugin is loaded by pytest itself before
 pytest-cov starts tracing. Importing ``app`` modules at module import time would
@@ -34,6 +34,26 @@ class _TestAuditService:
         self.log_action = AsyncMock(return_value=None)
 
 
+class _TestHealthConnection:
+    async def execute(self, statement):
+        return None
+
+
+class _TestHealthConnectionContext:
+    async def __aenter__(self):
+        return _TestHealthConnection()
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+
+class _TestHealthEngine:
+    """No-network engine seam used only by HTTP health endpoint tests."""
+
+    def connect(self):
+        return _TestHealthConnectionContext()
+
+
 async def _clear_rate_limit_keys() -> None:
     # Lazy import is intentional; see module docstring.
     from app.config import settings
@@ -62,8 +82,9 @@ async def _clear_rate_limit_keys() -> None:
 
 @pytest_asyncio.fixture(autouse=True)
 async def isolate_process_global_test_resources(monkeypatch):
-    """Keep HTTP tests isolated from global Redis and asyncpg resources."""
-    # Lazy import ensures pytest-cov has already started tracing application code.
+    """Keep HTTP tests isolated from process-global asyncpg/Redis resources."""
+    # Lazy imports ensure pytest-cov has already started tracing application code.
+    import app.database as database_module
     import app.middleware.audit as audit_middleware
 
     monkeypatch.setattr(
@@ -72,6 +93,11 @@ async def isolate_process_global_test_resources(monkeypatch):
         lambda: _TestAuditSessionContext(),
     )
     monkeypatch.setattr(audit_middleware, "AuditService", _TestAuditService)
+
+    # /health imports app.database.engine at request time. Point that probe at an
+    # in-memory seam so each pytest event loop never touches the global asyncpg pool.
+    # Alembic clean-migration CI separately verifies the real PostgreSQL connection.
+    monkeypatch.setattr(database_module, "engine", _TestHealthEngine())
 
     await _clear_rate_limit_keys()
     yield
