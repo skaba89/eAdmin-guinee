@@ -1,0 +1,47 @@
+name: Temporary GED Router Wire
+
+on:
+  push:
+    branches:
+      - agent/ged-server-file-authority
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/ged-server-file-authority
+
+      - name: Register secure GED file router before legacy documents routes
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path('backend/app/main.py')
+          text = path.read_text(encoding='utf-8')
+
+          old = '    courriers,\n    documents,\n    documents_search,\n'
+          new = '    courriers,\n    document_files,\n    documents,\n    documents_search,\n'
+          if old not in text:
+              raise SystemExit('api import anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = '''app.include_router(\n    documents.router,\n    prefix="/api/v1/documents",\n    tags=["Documents"],\n    dependencies=rls_dependencies,\n)'''
+          new = '''# Register server-authoritative GED file mutations before the historical\n# documents router so clients cannot fall through to path/hash based mutations.\napp.include_router(\n    document_files.router,\n    prefix="/api/v1/documents",\n    tags=["Fichiers GED sécurisés"],\n    dependencies=rls_dependencies,\n)\napp.include_router(\n    documents.router,\n    prefix="/api/v1/documents",\n    tags=["Documents"],\n    dependencies=rls_dependencies,\n)'''
+          if old not in text:
+              raise SystemExit('documents include anchor not found')
+          text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
+
+      - name: Commit wire-up
+        shell: bash
+        run: |
+          if git diff --quiet -- backend/app/main.py; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add backend/app/main.py
+          git commit -m 'security(ged): prioritize server-authoritative file routes'
+          git push origin HEAD:agent/ged-server-file-authority
