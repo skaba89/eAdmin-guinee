@@ -1,14 +1,12 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useEffect, useState, useRef } from 'react'
+import { motion, AnimatePresence, type Variants } from 'framer-motion'
 import {
   FileText,
   Mail,
   Users,
   Clock,
-  TrendingUp,
-  TrendingDown,
   Shield,
   Building2,
   CheckCircle2,
@@ -31,41 +29,37 @@ import {
   CardDescription,
   CardContent,
 } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
-import { GUINEA_COLORS, DESIGN_TOKENS } from '@/lib/design-system'
+import { GUINEA_COLORS } from '@/lib/design-system'
 import { useAppStore } from '@/store/app-store'
 
-// ─── ANIMATED COUNTER HOOK ────────────────────────────────────────────────────
 function useAnimatedCounter(end: number, duration = 1500, startOnMount = true) {
   const [count, setCount] = useState(0)
   const ref = useRef<number>(0)
   const startTimeRef = useRef<number>(0)
 
-  const animate = useCallback((timestamp: number) => {
-    if (!startTimeRef.current) startTimeRef.current = timestamp
-    const progress = Math.min((timestamp - startTimeRef.current) / duration, 1)
-    // Ease-out cubic
-    const eased = 1 - Math.pow(1 - progress, 3)
-    setCount(Math.floor(eased * end))
-    if (progress < 1) {
-      ref.current = requestAnimationFrame(animate)
-    }
-  }, [end, duration])
-
   useEffect(() => {
-    if (startOnMount) {
-      startTimeRef.current = 0
-      ref.current = requestAnimationFrame(animate)
+    if (!startOnMount) return
+
+    startTimeRef.current = 0
+
+    function animate(timestamp: number) {
+      if (!startTimeRef.current) startTimeRef.current = timestamp
+      const progress = Math.min((timestamp - startTimeRef.current) / duration, 1)
+      const eased = 1 - Math.pow(1 - progress, 3)
+      setCount(Math.floor(eased * end))
+      if (progress < 1) {
+        ref.current = requestAnimationFrame(animate)
+      }
     }
+
+    ref.current = requestAnimationFrame(animate)
     return () => cancelAnimationFrame(ref.current)
-  }, [animate, startOnMount])
+  }, [end, duration, startOnMount])
 
   return count
 }
 
-// ─── ANIMATED COUNTER COMPONENT ───────────────────────────────────────────────
 function AnimatedCounter({ value, suffix = '', prefix = '' }: { value: number; suffix?: string; prefix?: string }) {
   const count = useAnimatedCounter(value)
 
@@ -76,7 +70,6 @@ function AnimatedCounter({ value, suffix = '', prefix = '' }: { value: number; s
   )
 }
 
-// ─── KPI DATA ─────────────────────────────────────────────────────────────────
 const KPI_DATA = [
   {
     id: 'courriers',
@@ -168,7 +161,6 @@ const KPI_DATA = [
   },
 ]
 
-// ─── REAL-TIME ACTIVITY FEED DATA ─────────────────────────────────────────────
 const ACTIVITY_FEED = [
   { id: 1, type: 'decret', label: 'Décret n°D/2026/PRG/SGG signé par le Ministre des Finances', time: '5 min', icon: FileText },
   { id: 2, type: 'courrier', label: 'Courrier interministériel reçu de la Primature', time: '12 min', icon: Mail },
@@ -191,7 +183,6 @@ const activityColorMap: Record<string, string> = {
   approbation: 'text-purple-600 bg-purple-100 dark:text-purple-400 dark:bg-purple-900/30',
 }
 
-// ─── QUICK ACTIONS ────────────────────────────────────────────────────────────
 interface QuickAction {
   label: string
   icon: React.ComponentType<{ className?: string }>
@@ -200,7 +191,6 @@ interface QuickAction {
   onClick: () => void
 }
 
-// ─── STATUS OVERVIEW DATA ─────────────────────────────────────────────────────
 const STATUS_ITEMS = [
   { label: 'En attente', count: 42, total: 200, color: '#F59E0B', bgColor: 'bg-amber-500' },
   { label: 'En cours', count: 67, total: 200, color: '#3B82F6', bgColor: 'bg-blue-500' },
@@ -208,8 +198,7 @@ const STATUS_ITEMS = [
   { label: 'Rejeté', count: 13, total: 200, color: '#EF4444', bgColor: 'bg-red-500' },
 ]
 
-// ─── ANIMATION VARIANTS ──────────────────────────────────────────────────────
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -217,17 +206,15 @@ const containerVariants = {
   },
 }
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 16 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] } },
 }
 
-// ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 export function PremiumDashboard() {
   const navigate = useAppStore((s) => s.navigate)
   const [livePulse, setLivePulse] = useState(false)
 
-  // Simulate real-time activity pulse
   useEffect(() => {
     const interval = setInterval(() => {
       setLivePulse(true)
@@ -252,15 +239,11 @@ export function PremiumDashboard() {
       animate="visible"
       className="space-y-5 p-4 md:p-6 dashboard-bg-v2"
     >
-      {/* ═══════════════════════════════════════════════════════════════════════
-          GUINEA-BRANDED HEADER
-      ═══════════════════════════════════════════════════════════════════════ */}
       <motion.div variants={itemVariants}>
         <Card className="glass-premium overflow-hidden bg-gradient-to-br from-[#0B2E58]/[0.03] via-transparent to-[#C8A45C]/[0.03] dark:from-[#3B7DD8]/[0.06] dark:via-transparent dark:to-[#D4B878]/[0.04]">
           <CardContent className="p-5 relative z-10">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-4">
-                {/* Guinea tricolor ring */}
                 <div className="relative flex size-14 items-center justify-center">
                   <div className="absolute inset-0 rounded-xl p-[2px] shadow-lg animate-glow-pulse"
                     style={{ background: `linear-gradient(135deg, ${GUINEA_COLORS.red}, ${GUINEA_COLORS.yellow}, ${GUINEA_COLORS.green})` }}
@@ -281,7 +264,6 @@ export function PremiumDashboard() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                {/* Live indicator */}
                 <div className="flex items-center gap-2">
                   <div className={`size-2 rounded-full bg-emerald-500 transition-all duration-300 ${livePulse ? 'shadow-[0_0_8px_rgba(16,185,129,0.6)] scale-125' : ''}`} />
                   <span className="text-xs font-medium text-muted-foreground">En direct</span>
@@ -292,7 +274,6 @@ export function PremiumDashboard() {
                 </Badge>
               </div>
             </div>
-            {/* Guinea tricolor bottom bar */}
             <div className="mt-4 flex h-1 w-full overflow-hidden rounded-full">
               <div className="flex-[1] bg-[#CE1126]" />
               <div className="flex-[1] bg-[#FCD116]" />
@@ -302,11 +283,8 @@ export function PremiumDashboard() {
         </Card>
       </motion.div>
 
-      {/* ═══════════════════════════════════════════════════════════════════════
-          KPI CARDS WITH ANIMATED COUNTERS
-      ═══════════════════════════════════════════════════════════════════════ */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:gap-4">
-        {KPI_DATA.map((kpi, index) => {
+        {KPI_DATA.map((kpi) => {
           const Icon = kpi.icon
           const isUp = kpi.trend === 'up'
           const isPositiveChange = kpi.label.includes('Délai') ? !isUp : isUp
@@ -317,7 +295,6 @@ export function PremiumDashboard() {
               whileHover={{ y: -3, transition: { duration: 0.2 } }}
             >
               <Card className="card-interactive overflow-hidden py-0 border-0 relative">
-                {/* Left accent bar with Guinea-inspired gradient */}
                 <div className={`absolute left-0 top-0 bottom-0 w-[3px] bg-gradient-to-b ${kpi.gradient}`} />
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
@@ -342,11 +319,7 @@ export function PremiumDashboard() {
         })}
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════════════════
-          STATUS OVERVIEW + ACTIVITY FEED
-      ═══════════════════════════════════════════════════════════════════════ */}
       <div className="grid gap-4 lg:grid-cols-3">
-        {/* Status Overview */}
         <motion.div variants={itemVariants}>
           <Card className="card-interactive shadow-premium overflow-hidden border-0 h-full">
             <CardHeader className="pb-3">
@@ -355,9 +328,7 @@ export function PremiumDashboard() {
                   <Eye className="size-4 text-white" />
                 </div>
                 <div>
-                  <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
-                    Vue d&apos;ensemble des statuts
-                  </CardTitle>
+                  <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">Vue d&apos;ensemble des statuts</CardTitle>
                   <CardDescription className="text-xs">Répartition des demandes</CardDescription>
                 </div>
               </div>
@@ -388,12 +359,11 @@ export function PremiumDashboard() {
                   </div>
                 )
               })}
-              {/* Total summary */}
               <div className="mt-2 pt-3 border-t border-border">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold text-[#0B2E58] dark:text-white">Total demandes</span>
                   <span className="font-bold tabular-nums text-[#0B2E58] dark:text-white">
-                    {STATUS_ITEMS.reduce((sum, i) => sum + i.count, 0)}
+                    {STATUS_ITEMS.reduce((sum, item) => sum + item.count, 0)}
                   </span>
                 </div>
               </div>
@@ -401,7 +371,6 @@ export function PremiumDashboard() {
           </Card>
         </motion.div>
 
-        {/* Real-time Activity Feed */}
         <motion.div variants={itemVariants} className="lg:col-span-2">
           <Card className="card-interactive shadow-premium overflow-hidden border-0 h-full">
             <CardHeader className="pb-3">
@@ -411,9 +380,7 @@ export function PremiumDashboard() {
                     <Activity className="size-4 text-white" />
                   </div>
                   <div>
-                    <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
-                      Activité en temps réel
-                    </CardTitle>
+                    <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">Activité en temps réel</CardTitle>
                     <CardDescription className="text-xs">Dernières actions interministérielles</CardDescription>
                   </div>
                 </div>
@@ -462,9 +429,6 @@ export function PremiumDashboard() {
         </motion.div>
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════════════════
-          QUICK ACTION CARDS
-      ═══════════════════════════════════════════════════════════════════════ */}
       <motion.div variants={itemVariants}>
         <Card className="card-interactive shadow-premium overflow-hidden border-0">
           <CardHeader className="pb-3">
@@ -473,9 +437,7 @@ export function PremiumDashboard() {
                 <Zap className="size-4 text-white" />
               </div>
               <div>
-                <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
-                  Actions rapides
-                </CardTitle>
+                <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">Actions rapides</CardTitle>
                 <CardDescription className="text-xs">Raccourcis pour les tâches fréquentes</CardDescription>
               </div>
             </div>
@@ -493,7 +455,6 @@ export function PremiumDashboard() {
                     onClick={action.onClick}
                     aria-label={action.label}
                   >
-                    {/* Guinea stripe for special items */}
                     {action.guineaStripe && (
                       <div className="absolute top-0 left-0 right-0 h-[3px]">
                         {action.guineaStripe === 'red' && <div className="h-full bg-[#CE1126]" />}
@@ -511,9 +472,6 @@ export function PremiumDashboard() {
         </Card>
       </motion.div>
 
-      {/* ═══════════════════════════════════════════════════════════════════════
-          GUINEA SOVEREIGNTY BADGE
-      ═══════════════════════════════════════════════════════════════════════ */}
       <motion.div variants={itemVariants}>
         <Card className="glass-premium overflow-hidden bg-gradient-to-r from-[#0B2E58]/[0.03] via-transparent to-[#C8A45C]/[0.03] dark:from-[#3B7DD8]/[0.06] dark:via-transparent dark:to-[#D4B878]/[0.04]">
           <CardContent className="p-4 relative z-10">
@@ -529,9 +487,7 @@ export function PremiumDashboard() {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <p className="text-sm font-semibold text-[#0B2E58] dark:text-white">
-                    Données hébergées en souveraineté nationale
-                  </p>
+                  <p className="text-sm font-semibold text-[#0B2E58] dark:text-white">Données hébergées en souveraineté nationale</p>
                   <Badge variant="outline" className="badge-premium border-0 text-[10px] gap-1">
                     <Building2 className="size-3" />
                     Data Center Conakry
