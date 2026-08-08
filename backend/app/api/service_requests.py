@@ -27,22 +27,10 @@ from app.models.service_request import (
 )
 from app.models.user import RoleEnum, User
 from app.services.object_storage import object_storage
+from app.services.service_catalog import get_active_service
 from app.services.upload_security import upload_security
 
 router = APIRouter()
-
-# Operational SLA defaults. These are not represented as statutory legal limits.
-# A future policy registry will version them with legal/administrative sources.
-CATEGORY_SLA_DAYS: dict[str, int] = {
-    "etat-civil": 30,
-    "justice": 45,
-    "identification": 45,
-    "urbanisme": 45,
-    "entreprise": 30,
-    "education": 30,
-    "sante": 30,
-    "residence": 30,
-}
 
 ALLOWED_TRANSITIONS: dict[ServiceRequestStatusEnum, set[ServiceRequestStatusEnum]] = {
     ServiceRequestStatusEnum.SOUMISE: {
@@ -70,9 +58,11 @@ ALLOWED_TRANSITIONS: dict[ServiceRequestStatusEnum, set[ServiceRequestStatusEnum
 
 class ServiceRequestCreate(BaseModel):
     service_id: str = Field(min_length=1, max_length=100)
-    service_name: str = Field(min_length=1, max_length=255)
-    category: str = Field(min_length=1, max_length=150)
-    category_id: str = Field(min_length=1, max_length=100)
+    # Compatibility-only hints from older clients. The server deliberately
+    # ignores them and resolves authoritative metadata from service_id.
+    service_name: str | None = Field(default=None, max_length=255)
+    category: str | None = Field(default=None, max_length=150)
+    category_id: str | None = Field(default=None, max_length=100)
     target_institution_id: str = Field(min_length=1, max_length=100)
     citizen_name: str = Field(min_length=1, max_length=150)
     citizen_first_name: str = Field(min_length=1, max_length=150)
@@ -177,6 +167,11 @@ def _serialize_request(item: ServiceRequest) -> dict[str, Any]:
         "serviceName": item.service_name,
         "category": item.category,
         "categoryId": item.category_id,
+        "serviceCatalogVersion": item.service_catalog_version,
+        "servicePolicyStatus": item.service_policy_status,
+        "servicePolicySource": item.service_policy_source,
+        "serviceFeeLabel": item.service_fee_label,
+        "expectedProcessingLabel": item.expected_processing_label,
         "citizenName": item.citizen_name,
         "citizenFirstName": item.citizen_first_name,
         "citizenNIN": item.citizen_nin,
@@ -295,6 +290,13 @@ async def create_service_request(
 ) -> dict[str, Any]:
     tenant_id = current_user.tenant_id or settings.TENANT_DEFAULT_ID
 
+    catalog_service = await get_active_service(db, tenant_id, payload.service_id)
+    if not catalog_service:
+        raise HTTPException(
+            status_code=400,
+            detail="Démarche administrative inconnue, inactive ou non encore effective.",
+        )
+
     institution = (
         await db.execute(
             select(Institution).where(
@@ -322,14 +324,19 @@ async def create_service_request(
             )
 
     now = datetime.now(timezone.utc)
-    deadline_days = CATEGORY_SLA_DAYS.get(payload.category_id, 45)
+    deadline_days = catalog_service.sla_business_days
 
     item = ServiceRequest(
         reference=_reference(),
-        service_id=payload.service_id,
-        service_name=payload.service_name,
-        category=payload.category,
-        category_id=payload.category_id,
+        service_id=catalog_service.service_id,
+        service_name=catalog_service.name,
+        category=catalog_service.category_name,
+        category_id=catalog_service.category_id,
+        service_catalog_version=catalog_service.version,
+        service_policy_status=catalog_service.policy_status,
+        service_policy_source=catalog_service.source_reference,
+        service_fee_label=catalog_service.fee_label,
+        expected_processing_label=catalog_service.expected_processing_label,
         citizen_id=current_user.id,
         citizen_name=payload.citizen_name,
         citizen_first_name=payload.citizen_first_name,
@@ -339,7 +346,7 @@ async def create_service_request(
         citizen_email=current_user.email,
         citizen_address=payload.citizen_address,
         motif=payload.motif,
-        required_documents=payload.required_documents,
+        required_documents=list(catalog_service.required_documents or []),
         assigned_service=institution.name,
         timeline=_default_timeline(),
         deadline_days=deadline_days,

@@ -43,6 +43,14 @@ class ServiceRequest(Base):
     category: Mapped[str] = mapped_column(String(150), nullable=False)
     category_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
 
+    # Immutable policy snapshot used for audit/reproducibility. Historical
+    # rows created before the catalog migration legitimately remain NULL.
+    service_catalog_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    service_policy_status: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    service_policy_source: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    service_fee_label: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    expected_processing_label: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
     citizen_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
     )
