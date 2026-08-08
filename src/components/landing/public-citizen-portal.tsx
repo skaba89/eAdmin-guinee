@@ -168,6 +168,8 @@ export function PublicCitizenPortal() {
   const [selectedService, setSelectedService] = useState<ServiceItem | null>(null)
   const [selectedCategoryInfo, setSelectedCategoryInfo] = useState<ServiceCategory | null>(null)
   const [successToast, setSuccessToast] = useState('')
+  const [submissionError, setSubmissionError] = useState('')
+  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false)
   const [submittedRef, setSubmittedRef] = useState('')
 
   // Tracking
@@ -233,33 +235,50 @@ export function PublicCitizenPortal() {
     return Object.keys(errors).length === 0
   }
 
-  const handleSubmitRequest = () => {
-    if (!validateForm() || !selectedService || !selectedCategoryInfo) return
+  const handleSubmitRequest = async () => {
+    if (!validateForm() || !selectedService || !selectedCategoryInfo || isSubmittingRequest) return
 
-    const newRequest = addRequest({
-      serviceId: selectedService.id,
-      serviceName: selectedService.name,
-      category: selectedCategoryInfo.name,
-      categoryId: selectedCategoryInfo.id,
-      citizenName: form.citizenName,
-      citizenFirstName: form.citizenFirstName,
-      citizenNIN: form.citizenNIN,
-      citizenPhone: form.citizenPhone,
-      citizenEmail: form.citizenEmail,
-      citizenAddress: form.citizenAddress,
-      motif: form.motif || `Demande de ${selectedService.name}`,
-      documents: selectedService.requiredDocs,
-      uploadedDocuments: [],
-      createdAt: new Date().toISOString(),
-      deliveryMode: form.deliveryMode,
-    })
+    setSubmissionError('')
+    setIsSubmittingRequest(true)
 
-    setRequestDialogOpen(false)
-    setSubmittedRef(newRequest.reference)
-    setSuccessToast(`Votre demande a été soumise avec succès ! Référence : ${newRequest.reference}`)
-    setActiveTab('suivi')
-    setTrackingNumber(newRequest.reference)
-    setTrackedRequest(newRequest)
+    try {
+      const { request: newRequest, attachmentErrors } = await addRequest({
+        serviceId: selectedService.id,
+        serviceName: selectedService.name,
+        category: selectedCategoryInfo.name,
+        categoryId: selectedCategoryInfo.id,
+        citizenName: form.citizenName,
+        citizenFirstName: form.citizenFirstName,
+        citizenNIN: form.citizenNIN,
+        citizenPhone: form.citizenPhone,
+        citizenEmail: form.citizenEmail,
+        citizenAddress: form.citizenAddress,
+        motif: form.motif || `Demande de ${selectedService.name}`,
+        documents: selectedService.requiredDocs,
+        uploadedDocuments: [],
+        createdAt: new Date().toISOString(),
+        deliveryMode: form.deliveryMode,
+      })
+
+      setRequestDialogOpen(false)
+      setSubmittedRef(newRequest.reference)
+      setSuccessToast(
+        attachmentErrors.length
+          ? `Demande enregistrée sous la référence ${newRequest.reference}. Des pièces restent à transmettre.`
+          : `Votre demande a été soumise avec succès ! Référence officielle : ${newRequest.reference}`,
+      )
+      setActiveTab('suivi')
+      setTrackingNumber(newRequest.reference)
+      setTrackedRequest(newRequest)
+    } catch (error) {
+      setSubmissionError(
+        error instanceof Error
+          ? error.message
+          : 'La demande n’a pas pu être enregistrée. Vérifiez votre connexion puis réessayez.',
+      )
+    } finally {
+      setIsSubmittingRequest(false)
+    }
   }
 
   const handleTrack = () => {
@@ -775,7 +794,14 @@ export function PublicCitizenPortal() {
       {/* ═══════════════════════════════════════════════════════════
           REQUEST FORM DIALOG
       ═══════════════════════════════════════════════════════════ */}
-      <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
+      <Dialog
+        open={requestDialogOpen}
+        onOpenChange={(open) => {
+          if (isSubmittingRequest) return
+          setSubmissionError('')
+          setRequestDialogOpen(open)
+        }}
+      >
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg">
@@ -919,11 +945,32 @@ export function PublicCitizenPortal() {
             {formErrors.terms && <p className="text-[10px] text-red-500">{formErrors.terms}</p>}
           </div>
 
+          {submissionError && (
+            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300" role="alert">
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <span>{submissionError}</span>
+            </div>
+          )}
+
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setRequestDialogOpen(false)}>Annuler</Button>
-            <Button className="bg-[#0B2E58] hover:bg-[#0B2E58]/90 dark:bg-[#3B7DD8] dark:hover:bg-[#3B7DD8]/90 text-white gap-2" onClick={handleSubmitRequest}>
-              <Send className="size-4" />
-              Soumettre la demande
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSubmissionError('')
+                setRequestDialogOpen(false)
+              }}
+              disabled={isSubmittingRequest}
+            >
+              Annuler
+            </Button>
+            <Button
+              className="bg-[#0B2E58] hover:bg-[#0B2E58]/90 dark:bg-[#3B7DD8] dark:hover:bg-[#3B7DD8]/90 text-white gap-2"
+              onClick={() => void handleSubmitRequest()}
+              disabled={isSubmittingRequest}
+              aria-busy={isSubmittingRequest}
+            >
+              <Send className={`size-4 ${isSubmittingRequest ? 'animate-pulse' : ''}`} />
+              {isSubmittingRequest ? 'Enregistrement sécurisé…' : 'Soumettre la demande'}
             </Button>
           </DialogFooter>
         </DialogContent>
