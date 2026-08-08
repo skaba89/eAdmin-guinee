@@ -46,6 +46,16 @@ export interface PaginatedDocuments {
   total_pages: number
 }
 
+export interface GedStatistics {
+  total: number
+  archived: number
+  draft: number
+  pending: number
+  approved: number
+  sensitive: number
+  acts: number
+}
+
 async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getActiveAccessToken()
   if (!token) throw new Error('Session expirée. Veuillez vous reconnecter.')
@@ -92,13 +102,21 @@ export async function listDocuments(params?: {
   pageSize?: number
   search?: string
   status?: DocumentStatus | ''
+  classification?: DocumentClassification | ''
+  documentType?: DocumentType | ''
 }): Promise<PaginatedDocuments> {
   const query = new URLSearchParams()
   query.set('page', String(params?.page || 1))
-  query.set('page_size', String(params?.pageSize || 100))
+  query.set('page_size', String(params?.pageSize || 25))
   if (params?.search) query.set('search', params.search)
   if (params?.status) query.set('status', params.status)
+  if (params?.classification) query.set('classification', params.classification)
+  if (params?.documentType) query.set('document_type', params.documentType)
   return apiFetch<PaginatedDocuments>(`/api/v1/documents?${query.toString()}`)
+}
+
+export async function getGedStatistics(): Promise<GedStatistics> {
+  return apiFetch<GedStatistics>('/api/v1/documents/statistics')
 }
 
 export async function importDocument(input: {
