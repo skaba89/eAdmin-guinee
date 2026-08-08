@@ -20,9 +20,32 @@ jobs:
   trust-boundary:
     name: PKI configuration, evidence and qualification invariants
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: eadmin_test
+          POSTGRES_USER: eadmin
+          POSTGRES_PASSWORD: ci-test-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U eadmin -d eadmin_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       ENVIRONMENT: test
-      DATABASE_URL: sqlite+aiosqlite:///./pki-trust-test.db
+      DATABASE_URL: postgresql+asyncpg://eadmin:ci-test-password@localhost:5432/eadmin_test
       REDIS_URL: redis://localhost:6379
       SECRET_KEY: ci-only-secret-key-not-for-production-0123456789
       ENCRYPTION_KEY: ci-only-encryption-key-0123456789abcdef
