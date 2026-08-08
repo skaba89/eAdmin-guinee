@@ -81,6 +81,20 @@ class Settings(BaseSettings):
     SENTRY_DSN: str = ""
     OTLP_ENDPOINT: str = "http://localhost:4317"
 
+    # External certificate / timestamp trust integration. Enabling the adapter
+    # never means that a signature is qualified. Qualification is an evidence
+    # property established only after certificate-chain, revocation, timestamp,
+    # trust-policy and external-attestation validation.
+    PKI_ENABLED: bool = False
+    PKI_PROVIDER: str = ""
+    PKI_SIGNING_ENDPOINT: str = ""
+    PKI_TRUST_BUNDLE_PATH: str = ""
+    PKI_EXPECTED_POLICY_OID: str = ""
+    PKI_CREDENTIAL_REFERENCE: str = ""
+    PKI_HSM_KEY_REFERENCE: str = ""
+    TSA_URL: str = ""
+    PKI_CONNECT_TIMEOUT_SECONDS: int = 10
+
     CORS_ORIGINS_DEV: list[str] = [
         "http://localhost:3000",
         "http://localhost:3001",
@@ -97,7 +111,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_secrets(self):
-        """Valide les secrets selon le niveau de criticité de l'environnement."""
+        """Valide les secrets et frontières de confiance selon l'environnement."""
         critical_secrets = {
             "SECRET_KEY": self.SECRET_KEY,
             "DATABASE_URL": self.DATABASE_URL,
@@ -142,8 +156,6 @@ class Settings(BaseSettings):
                 self.ENCRYPTION_KEY = f"dev-only-{_secrets.token_urlsafe(32)}"
 
         elif self.is_test:
-            # CI provides explicit deterministic test values. Fail early when the
-            # test job is misconfigured instead of silently generating secrets.
             missing = [
                 name for name, value in critical_secrets.items()
                 if value == _UNCONFIGURED or not value
@@ -163,6 +175,37 @@ class Settings(BaseSettings):
                         f"Set the {name} environment variable before production.",
                         stacklevel=2,
                     )
+
+        if self.PKI_ENABLED:
+            required_pki = {
+                "PKI_PROVIDER": self.PKI_PROVIDER,
+                "PKI_SIGNING_ENDPOINT": self.PKI_SIGNING_ENDPOINT,
+                "PKI_TRUST_BUNDLE_PATH": self.PKI_TRUST_BUNDLE_PATH,
+                "PKI_EXPECTED_POLICY_OID": self.PKI_EXPECTED_POLICY_OID,
+                "PKI_CREDENTIAL_REFERENCE": self.PKI_CREDENTIAL_REFERENCE,
+                "PKI_HSM_KEY_REFERENCE": self.PKI_HSM_KEY_REFERENCE,
+                "TSA_URL": self.TSA_URL,
+            }
+            missing_pki = [name for name, value in required_pki.items() if not value.strip()]
+            if missing_pki:
+                raise ValueError(
+                    "PKI integration is enabled but required trust settings are missing: "
+                    + ", ".join(missing_pki)
+                )
+
+            for name, endpoint in {
+                "PKI_SIGNING_ENDPOINT": self.PKI_SIGNING_ENDPOINT,
+                "TSA_URL": self.TSA_URL,
+            }.items():
+                if not endpoint.lower().startswith("https://"):
+                    raise ValueError(f"{name} must use HTTPS when PKI integration is enabled.")
+
+            key_ref_upper = self.PKI_HSM_KEY_REFERENCE.upper()
+            if "BEGIN PRIVATE KEY" in key_ref_upper or "BEGIN RSA PRIVATE KEY" in key_ref_upper:
+                raise ValueError(
+                    "PKI_HSM_KEY_REFERENCE must reference an external HSM/KMS key; "
+                    "raw private-key material is forbidden in application settings."
+                )
 
         return self
 
