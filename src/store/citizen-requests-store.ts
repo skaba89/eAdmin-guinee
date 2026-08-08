@@ -208,13 +208,24 @@ function normalizeText(value?: string): string {
     .trim()
 }
 
-async function resolveTargetInstitution(req: Pick<CitizenRequest, 'categoryId' | 'mairie' | 'citizenAddress' | 'targetInstitutionId'>): Promise<string> {
-  if (req.targetInstitutionId) return req.targetInstitutionId
+export type InstitutionRoutingOption = serviceRequestsApi.InstitutionOption
 
+const CATEGORY_INSTITUTION_TERMS: Record<string, string[]> = {
+  justice: ['justice'],
+  identification: ['anip', 'identification'],
+  urbanisme: ['urbanisme'],
+  entreprise: ['apip', 'promotion des investissements'],
+  education: ['education'],
+  sante: ['sante'],
+  residence: ['mairie'],
+  'etat-civil': ['mairie'],
+}
+
+export async function getInstitutionRoutingOptions(
+  req: Pick<CitizenRequest, 'categoryId' | 'mairie' | 'citizenAddress'>,
+): Promise<InstitutionRoutingOption[]> {
   const institutions = await serviceRequestsApi.listInstitutions()
-  if (!institutions.length) {
-    throw new Error('Aucune institution active n’est configurée pour recevoir cette demande.')
-  }
+  if (!institutions.length) return []
 
   const mairieHint = normalizeText(req.mairie)
   const addressHint = normalizeText(req.citizenAddress)
@@ -222,37 +233,37 @@ async function resolveTargetInstitution(req: Pick<CitizenRequest, 'categoryId' |
   const commune = communeMatch?.[1]?.trim() || ''
 
   if (mairieHint || commune) {
-    const matches = institutions.filter((institution) => {
+    const mairieMatches = institutions.filter((institution) => {
       const name = normalizeText(institution.name)
       return institution.type === 'mairie' && (
         (mairieHint && (name === mairieHint || name.includes(mairieHint.replace('mairie de ', '')))) ||
         (commune && name.includes(commune))
       )
     })
-    if (matches.length === 1) return matches[0].id
+    if (mairieMatches.length) return mairieMatches
   }
 
-  const terms: Record<string, string[]> = {
-    justice: ['justice'],
-    identification: ['anip', 'identification'],
-    urbanisme: ['urbanisme'],
-    entreprise: ['apip', 'promotion des investissements'],
-    education: ['education'],
-    sante: ['sante'],
-    residence: ['mairie'],
-    'etat-civil': ['mairie'],
-  }
-  const wanted = terms[req.categoryId] || []
-  const matches = institutions.filter((institution) => {
+  const wanted = CATEGORY_INSTITUTION_TERMS[req.categoryId] || []
+  if (!wanted.length) return institutions
+
+  return institutions.filter((institution) => {
     const haystack = normalizeText(`${institution.name} ${institution.code || ''} ${institution.type}`)
     return wanted.some((term) => haystack.includes(normalizeText(term)))
   })
+}
 
+async function resolveTargetInstitution(req: Pick<CitizenRequest, 'categoryId' | 'mairie' | 'citizenAddress' | 'targetInstitutionId'>): Promise<string> {
+  // Explicit selection is still validated by the backend against the current
+  // tenant and active institution catalog. The client never becomes authoritative.
+  if (req.targetInstitutionId) return req.targetInstitutionId
+
+  const matches = await getInstitutionRoutingOptions(req)
   if (matches.length === 1) return matches[0].id
+
   throw new Error(
     matches.length > 1
-      ? 'Plusieurs institutions peuvent traiter cette démarche. Une sélection explicite est nécessaire.'
-      : 'Aucune institution destinataire n’a pu être résolue pour cette démarche.',
+      ? 'Plusieurs institutions peuvent traiter cette démarche. Sélectionnez explicitement le service destinataire.'
+      : 'Aucune institution active n’est configurée pour cette démarche.',
   )
 }
 
