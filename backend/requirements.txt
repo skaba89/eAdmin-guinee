@@ -19,6 +19,9 @@ email-validator==2.1.0
 # --- Sécurité / Auth ---
 python-jose[cryptography]==3.5.0
 passlib[bcrypt]==1.7.4
+# Passlib 1.7.4 is incompatible with bcrypt 5.x backend detection.
+# Keep this explicit until the password hashing layer is migrated to pwdlib/Argon2.
+bcrypt==4.3.0
 python-multipart==0.0.32
 
 # --- Stockage objet ---
