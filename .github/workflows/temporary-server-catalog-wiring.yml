@@ -1,0 +1,127 @@
+name: Temporary Server Catalog Wiring
+
+on:
+  push:
+    branches:
+      - agent/server-service-catalog
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/server-service-catalog
+
+      - name: Wire versioned catalog into request creation
+        shell: python
+        run: |
+          from pathlib import Path
+
+          # Models registry -------------------------------------------------
+          path = Path('backend/app/models/__init__.py')
+          text = path.read_text(encoding='utf-8')
+          import_marker = 'from app.models.audit import AuditLog\n'
+          if 'from app.models.administrative_service import AdministrativeService\n' not in text:
+              text = text.replace(import_marker, 'from app.models.administrative_service import AdministrativeService\n' + import_marker, 1)
+          all_marker = '    "User",\n'
+          if '    "AdministrativeService",\n' not in text:
+              text = text.replace(all_marker, '    "AdministrativeService",\n' + all_marker, 1)
+          path.write_text(text, encoding='utf-8')
+
+          # Service-request snapshots --------------------------------------
+          path = Path('backend/app/models/service_request.py')
+          text = path.read_text(encoding='utf-8')
+          marker = '    category_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)\n\n'
+          snapshot = '''    category_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)\n\n    # Immutable policy snapshot used for audit/reproducibility. Historical\n    # rows created before the catalog migration legitimately remain NULL.\n    service_catalog_version: Mapped[int | None] = mapped_column(Integer, nullable=True)\n    service_policy_status: Mapped[str | None] = mapped_column(String(50), nullable=True)\n    service_policy_source: Mapped[str | None] = mapped_column(String(500), nullable=True)\n    service_fee_label: Mapped[str | None] = mapped_column(String(100), nullable=True)\n    expected_processing_label: Mapped[str | None] = mapped_column(String(100), nullable=True)\n\n'''
+          if 'service_catalog_version:' not in text:
+              if marker not in text:
+                  raise SystemExit('service request category marker missing')
+              text = text.replace(marker, snapshot, 1)
+          path.write_text(text, encoding='utf-8')
+
+          # Service-request API --------------------------------------------
+          path = Path('backend/app/api/service_requests.py')
+          text = path.read_text(encoding='utf-8')
+          import_marker = 'from app.services.object_storage import object_storage\n'
+          if 'from app.services.service_catalog import get_active_service\n' not in text:
+              text = text.replace(import_marker, import_marker + 'from app.services.service_catalog import get_active_service\n', 1)
+
+          start_marker = '# Operational SLA defaults. These are not represented as statutory legal limits.\n'
+          if start_marker in text:
+              start = text.index(start_marker)
+              end = text.index('\nALLOWED_TRANSITIONS:', start)
+              text = text[:start] + text[end + 1:]
+
+          old_schema = '''class ServiceRequestCreate(BaseModel):\n    service_id: str = Field(min_length=1, max_length=100)\n    service_name: str = Field(min_length=1, max_length=255)\n    category: str = Field(min_length=1, max_length=150)\n    category_id: str = Field(min_length=1, max_length=100)\n    target_institution_id: str = Field(min_length=1, max_length=100)\n'''
+          new_schema = '''class ServiceRequestCreate(BaseModel):\n    service_id: str = Field(min_length=1, max_length=100)\n    # Compatibility-only hints from older clients. The server deliberately\n    # ignores them and resolves authoritative metadata from service_id.\n    service_name: str | None = Field(default=None, max_length=255)\n    category: str | None = Field(default=None, max_length=150)\n    category_id: str | None = Field(default=None, max_length=100)\n    target_institution_id: str = Field(min_length=1, max_length=100)\n'''
+          if old_schema in text:
+              text = text.replace(old_schema, new_schema, 1)
+          elif 'service_name: str | None' not in text:
+              raise SystemExit('ServiceRequestCreate schema pattern missing')
+
+          serialize_marker = '        "categoryId": item.category_id,\n'
+          serialize_extra = '''        "categoryId": item.category_id,\n        "serviceCatalogVersion": item.service_catalog_version,\n        "servicePolicyStatus": item.service_policy_status,\n        "servicePolicySource": item.service_policy_source,\n        "serviceFeeLabel": item.service_fee_label,\n        "expectedProcessingLabel": item.expected_processing_label,\n'''
+          if '"serviceCatalogVersion"' not in text:
+              if serialize_marker not in text:
+                  raise SystemExit('serialization marker missing')
+              text = text.replace(serialize_marker, serialize_extra, 1)
+
+          create_marker = '    tenant_id = current_user.tenant_id or settings.TENANT_DEFAULT_ID\n\n    institution = (\n'
+          create_replacement = '''    tenant_id = current_user.tenant_id or settings.TENANT_DEFAULT_ID\n\n    catalog_service = await get_active_service(db, tenant_id, payload.service_id)\n    if not catalog_service:\n        raise HTTPException(\n            status_code=400,\n            detail="Démarche administrative inconnue, inactive ou non encore effective.",\n        )\n\n    institution = (\n'''
+          if 'catalog_service = await get_active_service' not in text:
+              if create_marker not in text:
+                  raise SystemExit('create request tenant marker missing')
+              text = text.replace(create_marker, create_replacement, 1)
+
+          text = text.replace(
+              '    deadline_days = CATEGORY_SLA_DAYS.get(payload.category_id, 45)\n',
+              '    deadline_days = catalog_service.sla_business_days\n',
+              1,
+          )
+
+          old_item = '''        service_id=payload.service_id,\n        service_name=payload.service_name,\n        category=payload.category,\n        category_id=payload.category_id,\n'''
+          new_item = '''        service_id=catalog_service.service_id,\n        service_name=catalog_service.name,\n        category=catalog_service.category_name,\n        category_id=catalog_service.category_id,\n        service_catalog_version=catalog_service.version,\n        service_policy_status=catalog_service.policy_status,\n        service_policy_source=catalog_service.source_reference,\n        service_fee_label=catalog_service.fee_label,\n        expected_processing_label=catalog_service.expected_processing_label,\n'''
+          if old_item in text:
+              text = text.replace(old_item, new_item, 1)
+          elif 'service_catalog_version=catalog_service.version' not in text:
+              raise SystemExit('service metadata creation pattern missing')
+
+          text = text.replace(
+              '        required_documents=payload.required_documents,\n',
+              '        required_documents=list(catalog_service.required_documents or []),\n',
+              1,
+          )
+          path.write_text(text, encoding='utf-8')
+
+          # Main router ----------------------------------------------------
+          path = Path('backend/app/main.py')
+          text = path.read_text(encoding='utf-8')
+          import_marker = '    service_request_files,\n    service_requests,\n'
+          if '    service_catalog,\n' not in text:
+              if import_marker not in text:
+                  raise SystemExit('main api import marker missing')
+              text = text.replace(import_marker, '    service_catalog,\n' + import_marker, 1)
+
+          router_marker = '''app.include_router(\n    service_request_files.router,\n    prefix="/api/v1/service-requests",\n'''
+          catalog_router = '''app.include_router(\n    service_catalog.router,\n    prefix="/api/v1/service-catalog",\n    tags=["Catalogue des démarches"],\n    dependencies=rls_dependencies,\n)\napp.include_router(\n    service_request_files.router,\n    prefix="/api/v1/service-requests",\n'''
+          if 'prefix="/api/v1/service-catalog"' not in text:
+              if router_marker not in text:
+                  raise SystemExit('main service request router marker missing')
+              text = text.replace(router_marker, catalog_router, 1)
+          path.write_text(text, encoding='utf-8')
+
+      - name: Commit wiring
+        shell: bash
+        run: |
+          if git diff --quiet -- backend/app; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add backend/app/models/__init__.py backend/app/models/service_request.py backend/app/api/service_requests.py backend/app/main.py
+          git commit -m 'feat(catalog): make request metadata server-authoritative'
+          git push origin HEAD:agent/server-service-catalog
