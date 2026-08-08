@@ -58,6 +58,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -66,21 +67,43 @@ jobs:
           cache-dependency-path: |
             backend/requirements.txt
             backend/requirements-dev.txt
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
-      - name: Ruff
-        run: ruff check app tests
-      - name: Pytest with coverage gate
-        run: pytest tests -q --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=80
-      - name: Upload coverage
+
+      - name: Run backend diagnostics
+        id: backend_checks
+        shell: bash
+        run: |
+          set +e
+          ruff check app tests --output-format=concise 2>&1 | tee ruff-report.txt
+          ruff_rc=${PIPESTATUS[0]}
+          pytest tests -q --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=80 2>&1 | tee pytest-report.txt
+          pytest_rc=${PIPESTATUS[0]}
+          echo "ruff_rc=$ruff_rc" >> "$GITHUB_OUTPUT"
+          echo "pytest_rc=$pytest_rc" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload backend diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: backend-coverage
-          path: backend/coverage.xml
+          name: backend-quality-diagnostics
+          path: |
+            backend/ruff-report.txt
+            backend/pytest-report.txt
+            backend/coverage.xml
           if-no-files-found: ignore
+
+      - name: Require backend quality
+        env:
+          RUFF_RC: ${{ steps.backend_checks.outputs.ruff_rc }}
+          PYTEST_RC: ${{ steps.backend_checks.outputs.pytest_rc }}
+        run: |
+          test "$RUFF_RC" = 0
+          test "$PYTEST_RC" = 0
 
   migrations:
     name: PostgreSQL migration chain
@@ -113,32 +136,86 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: backend/requirements.txt
+
       - name: Install backend dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
       - name: Inspect Alembic graph
+        shell: bash
         run: |
-          echo '=== migration files ==='
-          ls -1 alembic/versions
-          echo '=== revisions ==='
-          grep -H -E "^(revision|down_revision)[[:space:]]*=" alembic/versions/*.py || true
-          echo '=== heads ==='
-          alembic heads --verbose
-          echo '=== history ==='
-          alembic history --verbose
-      - name: Upgrade database to head
-        run: alembic upgrade head
-      - name: Verify single migration head
+          {
+            echo '=== migration files ==='
+            ls -1 alembic/versions
+            echo '=== revisions ==='
+            python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          for path in sorted(Path('alembic/versions').glob('*.py')):
+              if path.name.startswith('__'):
+                  continue
+              tree = ast.parse(path.read_text(encoding='utf-8'))
+              values = {}
+              for node in tree.body:
+                  if isinstance(node, ast.Assign):
+                      for target in node.targets:
+                          if isinstance(target, ast.Name) and target.id in {'revision', 'down_revision'}:
+                              try:
+                                  values[target.id] = ast.literal_eval(node.value)
+                              except Exception:
+                                  values[target.id] = '<dynamic>'
+              print(f"{path.name}: revision={values.get('revision')} down_revision={values.get('down_revision')}")
+          PY
+            echo '=== heads ==='
+            alembic heads --verbose
+            echo '=== history ==='
+            alembic history --verbose
+          } 2>&1 | tee alembic-graph.txt
+
+      - name: Run clean migration
+        id: migration_checks
+        shell: bash
         run: |
-          heads=$(alembic heads | grep -c '(head)')
-          test "$heads" -eq 1
+          set +e
+          alembic upgrade head 2>&1 | tee alembic-upgrade.txt
+          migration_rc=${PIPESTATUS[0]}
+          alembic heads --verbose 2>&1 | tee alembic-heads.txt
+          heads_rc=${PIPESTATUS[0]}
+          heads_count=$(alembic heads 2>/dev/null | grep -c '(head)')
+          echo "migration_rc=$migration_rc" >> "$GITHUB_OUTPUT"
+          echo "heads_rc=$heads_rc" >> "$GITHUB_OUTPUT"
+          echo "heads_count=$heads_count" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload Alembic diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: alembic-diagnostics
+          path: |
+            backend/alembic-graph.txt
+            backend/alembic-upgrade.txt
+            backend/alembic-heads.txt
+          if-no-files-found: error
+
+      - name: Require valid migration chain
+        env:
+          MIGRATION_RC: ${{ steps.migration_checks.outputs.migration_rc }}
+          HEADS_RC: ${{ steps.migration_checks.outputs.heads_rc }}
+          HEADS_COUNT: ${{ steps.migration_checks.outputs.heads_count }}
+        run: |
+          test "$MIGRATION_RC" = 0
+          test "$HEADS_RC" = 0
+          test "$HEADS_COUNT" = 1
 
   frontend-quality:
     name: Frontend lint, typecheck and build
@@ -146,21 +223,54 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.3.4'
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: ESLint
-        run: bun run lint
-      - name: TypeScript
-        run: bunx tsc --noEmit
-      - name: Production build
-        run: bun run build
+
+      - name: Run frontend diagnostics
+        id: frontend_checks
+        shell: bash
         env:
           NEXT_PUBLIC_API_URL: http://localhost:8000
           NEXT_PUBLIC_APP_NAME: eAdmin CI
+        run: |
+          set +e
+          bun run lint 2>&1 | tee eslint-report.txt
+          eslint_rc=${PIPESTATUS[0]}
+          bunx tsc --noEmit 2>&1 | tee typescript-report.txt
+          tsc_rc=${PIPESTATUS[0]}
+          bun run build 2>&1 | tee frontend-build-report.txt
+          build_rc=${PIPESTATUS[0]}
+          echo "eslint_rc=$eslint_rc" >> "$GITHUB_OUTPUT"
+          echo "tsc_rc=$tsc_rc" >> "$GITHUB_OUTPUT"
+          echo "build_rc=$build_rc" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload frontend diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-quality-diagnostics
+          path: |
+            eslint-report.txt
+            typescript-report.txt
+            frontend-build-report.txt
+          if-no-files-found: error
+
+      - name: Require frontend quality
+        env:
+          ESLINT_RC: ${{ steps.frontend_checks.outputs.eslint_rc }}
+          TSC_RC: ${{ steps.frontend_checks.outputs.tsc_rc }}
+          BUILD_RC: ${{ steps.frontend_checks.outputs.build_rc }}
+        run: |
+          test "$ESLINT_RC" = 0
+          test "$TSC_RC" = 0
+          test "$BUILD_RC" = 0
 
   security:
     name: Dependency and secret security
@@ -170,19 +280,91 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: Gitleaks
+        id: gitleaks
+        continue-on-error: true
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Trivy filesystem scan
+        id: trivy
+        continue-on-error: true
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
           scan-type: fs
           scan-ref: .
-          format: table
+          format: json
+          output: trivy-report.json
           severity: CRITICAL,HIGH
           ignore-unfixed: true
-          exit-code: '1'
+          exit-code: '0'
+
+      - name: Summarize Trivy findings
+        id: trivy_eval
+        shell: bash
+        run: |
+          python - <<'PY' | tee trivy-summary.txt
+          import json
+          from collections import Counter
+          from pathlib import Path
+
+          path = Path('trivy-report.json')
+          if not path.exists():
+              print('TRIVY_REPORT_MISSING')
+              raise SystemExit(2)
+
+          payload = json.loads(path.read_text(encoding='utf-8'))
+          findings = []
+          for result in payload.get('Results') or []:
+              target = result.get('Target', '<unknown>')
+              for vuln in result.get('Vulnerabilities') or []:
+                  severity = vuln.get('Severity', 'UNKNOWN')
+                  if severity in {'HIGH', 'CRITICAL'}:
+                      findings.append((severity, target, vuln.get('PkgName'), vuln.get('InstalledVersion'), vuln.get('FixedVersion'), vuln.get('VulnerabilityID')))
+
+          counts = Counter(row[0] for row in findings)
+          print(f"CRITICAL={counts.get('CRITICAL', 0)} HIGH={counts.get('HIGH', 0)} TOTAL={len(findings)}")
+          for row in findings[:100]:
+              severity, target, pkg, installed, fixed, vuln_id = row
+              print(f"{severity} {vuln_id} target={target} package={pkg} installed={installed} fixed={fixed or '<none>'}")
+          if len(findings) > 100:
+              print(f"... {len(findings) - 100} additional findings in trivy-report.json")
+          PY
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          payload = json.loads(Path('trivy-report.json').read_text(encoding='utf-8'))
+          count = sum(
+              1
+              for result in payload.get('Results') or []
+              for vuln in result.get('Vulnerabilities') or []
+              if vuln.get('Severity') in {'HIGH', 'CRITICAL'}
+          )
+          with open(__import__('os').environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as fh:
+              fh.write(f"finding_count={count}\n")
+          PY
+
+      - name: Upload security diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-diagnostics
+          path: |
+            trivy-report.json
+            trivy-summary.txt
+          if-no-files-found: ignore
+
+      - name: Require security quality
+        env:
+          GITLEAKS_OUTCOME: ${{ steps.gitleaks.outcome }}
+          TRIVY_OUTCOME: ${{ steps.trivy.outcome }}
+          FINDING_COUNT: ${{ steps.trivy_eval.outputs.finding_count }}
+        run: |
+          test "$GITLEAKS_OUTCOME" = success
+          test "$TRIVY_OUTCOME" = success
+          test "${FINDING_COUNT:-999999}" = 0
 
   docker-build:
     name: Reproducible Docker builds
@@ -190,10 +372,37 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Build backend image
-        run: docker build --pull -t eadmin-backend:${{ github.sha }} ./backend
-      - name: Build frontend image
-        run: docker build --pull -t eadmin-frontend:${{ github.sha }} .
+
+      - name: Run Docker build diagnostics
+        id: docker_checks
+        shell: bash
+        run: |
+          set +e
+          docker build --pull -t eadmin-backend:${{ github.sha }} ./backend 2>&1 | tee docker-backend-build.txt
+          backend_rc=${PIPESTATUS[0]}
+          docker build --pull -t eadmin-frontend:${{ github.sha }} . 2>&1 | tee docker-frontend-build.txt
+          frontend_rc=${PIPESTATUS[0]}
+          echo "backend_rc=$backend_rc" >> "$GITHUB_OUTPUT"
+          echo "frontend_rc=$frontend_rc" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload Docker diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-build-diagnostics
+          path: |
+            docker-backend-build.txt
+            docker-frontend-build.txt
+          if-no-files-found: error
+
+      - name: Require reproducible Docker builds
+        env:
+          BACKEND_RC: ${{ steps.docker_checks.outputs.backend_rc }}
+          FRONTEND_RC: ${{ steps.docker_checks.outputs.frontend_rc }}
+        run: |
+          test "$BACKEND_RC" = 0
+          test "$FRONTEND_RC" = 0
 
   p0-gate:
     name: P0 aggregate gate
