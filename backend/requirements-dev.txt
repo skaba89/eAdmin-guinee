@@ -3,7 +3,6 @@
 # =============================================================================
 # Installer avec : pip install -r requirements-dev.txt
 
-# Inclure les dépendances de production (source de vérité pour httpx et autres libs)
 -r requirements.txt
 
 # --- Tests ---
@@ -13,5 +12,6 @@ pytest-cov>=5.0.0
 aiosqlite>=0.20.0
 
 # --- Qualité du code ---
-ruff>=0.4.0
+# Pin exact pour que le quality gate ne change pas au gré d'une nouvelle release.
+ruff==0.15.22
 mypy>=1.10.0
