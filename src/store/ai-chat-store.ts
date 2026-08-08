@@ -184,14 +184,19 @@ export const useAiChatStore = create<AiChatState>((set, get) => ({
         return
       }
 
+      const sources = Array.isArray(data?.sources)
+        ? data.sources.filter((source): source is string => typeof source === 'string')
+        : []
+      const sourcedContent = sources.length > 0
+        ? `${message}\n\nSources :\n${sources.map((source) => `• ${source}`).join('\n')}`
+        : message
+
       addMessage({
         role: 'assistant',
-        content: message,
+        content: sourcedContent,
         grounded: data?.grounded === true,
         confidence: typeof data?.confidence === 'number' ? data.confidence : 0,
-        sources: Array.isArray(data?.sources)
-          ? data.sources.filter((source): source is string => typeof source === 'string')
-          : [],
+        sources,
       })
     } catch (error) {
       addMessage({

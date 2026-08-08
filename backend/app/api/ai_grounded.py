@@ -159,7 +159,7 @@ async def summarize_document(
     current_user: User = Depends(require_permission("ai", "view")),
 ) -> dict[str, Any]:
     try:
-        return await grounded_government_ai.summarize_document(db, str(request.document_id))
+        return await grounded_government_ai.summarize_document(db, request.document_id)
     except ValueError as exc:
         raise _as_http_error(exc) from exc
 
@@ -171,7 +171,7 @@ async def summarize_correspondence(
     current_user: User = Depends(require_permission("ai", "view")),
 ) -> dict[str, Any]:
     try:
-        return await grounded_government_ai.summarize_correspondence(db, str(request.courrier_id))
+        return await grounded_government_ai.summarize_correspondence(db, request.courrier_id)
     except ValueError as exc:
         raise _as_http_error(exc) from exc
 
@@ -185,7 +185,7 @@ async def generate_response_draft(
     try:
         return await grounded_government_ai.draft_correspondence_response(
             db,
-            str(request.courrier_id),
+            request.courrier_id,
             request.instructions,
         )
     except ValueError as exc:
@@ -201,7 +201,7 @@ async def classify_document_by_id(
     try:
         return await grounded_government_ai.classify_document(
             db,
-            str(request.document_id),
+            request.document_id,
             _tenant_id(current_user),
         )
     except ValueError as exc:
@@ -299,7 +299,7 @@ async def extract_data(
     try:
         return await grounded_government_ai.extract_fields(
             db,
-            str(request.document_id),
+            request.document_id,
             request.fields,
         )
     except ValueError as exc:

@@ -25,16 +25,16 @@ interface QuickAction {
 const QUICK_ACTIONS: QuickAction[] = [
   {
     icon: Search,
-    label: 'Vérifier éligibilité',
-    description: 'Vérifiez si vous êtes éligible pour un service',
-    prompt: 'Vérifiez si je suis éligible pour [service]',
+    label: 'Trouver une démarche',
+    description: 'Recherchez une démarche dans le catalogue serveur',
+    prompt: 'Quelle démarche correspond à ce besoin : [décrivez votre besoin] ?',
     color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
   },
   {
     icon: ClipboardList,
-    label: 'Suivi de demande',
-    description: 'Suivez l\'état de votre demande',
-    prompt: 'Je veux suivre ma demande référence [ref]',
+    label: 'Informations sourcées',
+    description: 'Obtenez uniquement les informations présentes au catalogue',
+    prompt: 'Donnez-moi les informations sourcées sur la démarche [nom]',
     color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
   },
   {
@@ -247,12 +247,12 @@ export function AiAssistantPage() {
             )}
             <div>
               <h1 className="text-sm font-bold text-foreground">
-                {activeConv?.title || 'Assistant IA eAdmin Guinée'}
+                {activeConv?.title || 'Assistant administratif sourcé'}
               </h1>
               <p className="text-[10px] text-muted-foreground">
                 {activeConv
                   ? `Conversation · ${activeConv.messages.length} messages`
-                  : 'Posez vos questions sur les démarches administratives'
+                  : 'Réponses fondées sur le catalogue administratif serveur'
                 }
               </p>
             </div>
