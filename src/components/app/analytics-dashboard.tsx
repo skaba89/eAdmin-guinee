@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { motion } from 'framer-motion'
+import { motion, type Variants } from 'framer-motion'
 import {
   FileText,
   TrendingUp,
@@ -24,6 +24,7 @@ import {
   CardContent,
 } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { GUINEA_COLORS } from '@/lib/design-system'
 
 // ─── DATA ─────────────────────────────────────────────────────────────────────
@@ -117,7 +118,6 @@ function SvgLineChart({ data, width = 500, height = 200, color = '#0B2E58' }: {
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="w-full" preserveAspectRatio="xMidYMid meet">
-      {/* Grid lines */}
       {[0, 0.25, 0.5, 0.75, 1].map((pct) => (
         <line
           key={pct}
@@ -131,23 +131,18 @@ function SvgLineChart({ data, width = 500, height = 200, color = '#0B2E58' }: {
           strokeDasharray={pct === 0 || pct === 1 ? '0' : '4 4'}
         />
       ))}
-      {/* Area fill */}
       <path d={areaPath} fill={color} opacity={0.08} />
-      {/* Line */}
       <path d={linePath} fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
-      {/* Data points */}
       {points.map((p, i) => (
         <g key={i}>
           <circle cx={p.x} cy={p.y} r={4} fill={color} stroke="white" strokeWidth={2} className="transition-all duration-200 hover:r-6" />
         </g>
       ))}
-      {/* X labels */}
       {data.map((d, i) => (
         <text key={i} x={padding.left + (i / (data.length - 1)) * chartW} y={height - 8} textAnchor="middle" className="fill-muted-foreground text-[10px]">
           {d.month}
         </text>
       ))}
-      {/* Y labels */}
       {[0, 0.5, 1].map((pct) => (
         <text key={pct} x={padding.left - 8} y={padding.top + chartH * (1 - pct) + 4} textAnchor="end" className="fill-muted-foreground text-[10px]">
           {Math.round(minVal + (maxVal - minVal) * pct)}
@@ -171,7 +166,6 @@ function SvgBarChart({ data, width = 500, height = 200 }: {
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="w-full" preserveAspectRatio="xMidYMid meet">
-      {/* Target line */}
       {data[0] && (
         <line
           x1={padding.left}
@@ -191,7 +185,6 @@ function SvgBarChart({ data, width = 500, height = 200 }: {
 
         return (
           <g key={i}>
-            {/* Bar */}
             <rect
               x={x}
               y={y}
@@ -202,18 +195,15 @@ function SvgBarChart({ data, width = 500, height = 200 }: {
               opacity={0.8}
               className="transition-all duration-200 hover:opacity-100"
             />
-            {/* Value label */}
             <text x={x + barWidth / 2} y={y - 5} textAnchor="middle" className="fill-foreground text-[10px] font-semibold">
               {d.time}j
             </text>
-            {/* X label */}
             <text x={x + barWidth / 2} y={height - 10} textAnchor="middle" className="fill-muted-foreground text-[10px]">
               {d.dept}
             </text>
           </g>
         )
       })}
-      {/* Target label */}
       <text x={width - padding.right} y={padding.top + chartH - (data[0]?.target / maxVal) * chartH - 5} textAnchor="end" className="fill-[#CE1126] text-[10px] font-semibold">
         Objectif: {data[0]?.target}j
       </text>
@@ -233,21 +223,20 @@ function SvgDonutChart({ segments, width = 200, height = 200 }: {
   const total = segments.reduce((s, seg) => s + seg.value, 0)
   const circumference = 2 * Math.PI * radius
 
-  let offset = 0
-  const arcs = segments.map((seg) => {
+  const arcs = segments.map((seg, index) => {
     const pct = seg.value / total
+    const precedingPct = segments
+      .slice(0, index)
+      .reduce((sum, item) => sum + item.value / total, 0)
     const dashArray = `${pct * circumference} ${(1 - pct) * circumference}`
-    const dashOffset = -offset * circumference
-    offset += pct
+    const dashOffset = -precedingPct * circumference
     return { ...seg, dashArray, dashOffset, pct }
   })
 
   return (
     <div className="flex items-center gap-4">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-32 sm:w-40 shrink-0" preserveAspectRatio="xMidYMid meet">
-        {/* Background ring */}
         <circle cx={cx} cy={cy} r={radius} fill="none" stroke="currentColor" className="text-muted/30" strokeWidth={strokeWidth} />
-        {/* Segments */}
         {arcs.map((arc, i) => (
           <circle
             key={i}
@@ -264,7 +253,6 @@ function SvgDonutChart({ segments, width = 200, height = 200 }: {
             transform={`rotate(-90 ${cx} ${cy})`}
           />
         ))}
-        {/* Center text */}
         <text x={cx} y={cy - 6} textAnchor="middle" className="fill-foreground text-lg font-bold">{total}%</text>
         <text x={cx} y={cy + 10} textAnchor="middle" className="fill-muted-foreground text-[10px]">Traité</text>
       </svg>
@@ -314,11 +302,11 @@ function SvgHorizontalBarChart({ data, maxValue = 100 }: {
 }
 
 // ─── ANIMATION VARIANTS ──────────────────────────────────────────────────────
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { staggerChildren: 0.06 } },
 }
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 16 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] } },
 }
@@ -341,7 +329,6 @@ export function AnalyticsDashboard() {
       animate="visible"
       className="space-y-5 p-4 md:p-6 dashboard-bg-v2"
     >
-      {/* Header */}
       <motion.div variants={itemVariants}>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -374,7 +361,6 @@ export function AnalyticsDashboard() {
         </div>
       </motion.div>
 
-      {/* Top metric cards */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
           { label: 'Documents traités', value: docStats.processed.toLocaleString('fr-FR'), change: `+${docStats.trend}%`, trend: 'up' as const, icon: FileText, gradient: 'from-[#009460] to-[#00B870]' },
@@ -407,7 +393,6 @@ export function AnalyticsDashboard() {
         })}
       </div>
 
-      {/* Request volume trends */}
       <motion.div variants={itemVariants}>
         <Card className="card-interactive shadow-premium overflow-hidden border-0">
           <CardHeader className="pb-3">
@@ -416,9 +401,7 @@ export function AnalyticsDashboard() {
                 <TrendingUp className="size-4 text-white" />
               </div>
               <div>
-                <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
-                  Volume de demandes
-                </CardTitle>
+                <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">Volume de demandes</CardTitle>
                 <CardDescription className="text-xs">Évolution mensuelle des demandes reçues</CardDescription>
               </div>
             </div>
@@ -429,7 +412,6 @@ export function AnalyticsDashboard() {
         </Card>
       </motion.div>
 
-      {/* Response time + Processing distribution */}
       <div className="grid gap-4 md:grid-cols-2">
         <motion.div variants={itemVariants}>
           <Card className="card-interactive shadow-premium overflow-hidden border-0 h-full">
@@ -439,9 +421,7 @@ export function AnalyticsDashboard() {
                   <Target className="size-4 text-white" />
                 </div>
                 <div>
-                  <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
-                    Temps de réponse par département
-                  </CardTitle>
+                  <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">Temps de réponse par département</CardTitle>
                   <CardDescription className="text-xs">Objectif: 2 jours ouvrés</CardDescription>
                 </div>
               </div>
@@ -460,9 +440,7 @@ export function AnalyticsDashboard() {
                   <Activity className="size-4 text-white" />
                 </div>
                 <div>
-                  <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
-                    Distribution du temps de traitement
-                  </CardTitle>
+                  <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">Distribution du temps de traitement</CardTitle>
                   <CardDescription className="text-xs">Répartition des délais de traitement</CardDescription>
                 </div>
               </div>
@@ -474,7 +452,6 @@ export function AnalyticsDashboard() {
         </motion.div>
       </div>
 
-      {/* Department performance */}
       <motion.div variants={itemVariants}>
         <Card className="card-interactive shadow-premium overflow-hidden border-0">
           <CardHeader className="pb-3">
@@ -483,9 +460,7 @@ export function AnalyticsDashboard() {
                 <Building2 className="size-4 text-white" />
               </div>
               <div>
-                <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
-                  Performance par département
-                </CardTitle>
+                <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">Performance par département</CardTitle>
                 <CardDescription className="text-xs">Score de conformité et volume de demandes</CardDescription>
               </div>
             </div>
@@ -496,7 +471,6 @@ export function AnalyticsDashboard() {
         </Card>
       </motion.div>
 
-      {/* Citizen satisfaction trend */}
       <motion.div variants={itemVariants}>
         <Card className="card-interactive shadow-premium overflow-hidden border-0">
           <CardHeader className="pb-3">
@@ -506,9 +480,7 @@ export function AnalyticsDashboard() {
                   <Users className="size-4 text-white" />
                 </div>
                 <div>
-                  <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">
-                    Satisfaction citoyenne
-                  </CardTitle>
+                  <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">Satisfaction citoyenne</CardTitle>
                   <CardDescription className="text-xs">Évolution trimestrielle du score de satisfaction</CardDescription>
                 </div>
               </div>
