@@ -1,0 +1,148 @@
+name: Temporary Frontend Remediation
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  patch-frontend:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Apply targeted React and TypeScript fixes
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f"Expected pattern not found in {path}: {old[:80]!r}")
+              p.write_text(text.replace(old, new, 1))
+
+          replace(
+              "src/components/app/analytics-dashboard.tsx",
+              "import { motion } from 'framer-motion'",
+              "import { motion, type Variants } from 'framer-motion'",
+          )
+          replace(
+              "src/components/app/analytics-dashboard.tsx",
+              "import { Badge } from '@/components/ui/badge'\n",
+              "import { Badge } from '@/components/ui/badge'\nimport { Button } from '@/components/ui/button'\n",
+          )
+          replace(
+              "src/components/app/analytics-dashboard.tsx",
+              """  let offset = 0
+  const arcs = segments.map((seg) => {
+    const pct = seg.value / total
+    const dashArray = `${pct * circumference} ${(1 - pct) * circumference}`
+    const dashOffset = -offset * circumference
+    offset += pct
+    return { ...seg, dashArray, dashOffset, pct }
+  })""",
+              """  const arcs = segments.map((seg, index) => {
+    const pct = seg.value / total
+    const precedingPct = segments
+      .slice(0, index)
+      .reduce((sum, item) => sum + item.value / total, 0)
+    const dashArray = `${pct * circumference} ${(1 - pct) * circumference}`
+    const dashOffset = -precedingPct * circumference
+    return { ...seg, dashArray, dashOffset, pct }
+  })""",
+          )
+          replace(
+              "src/components/app/analytics-dashboard.tsx",
+              "const containerVariants = {",
+              "const containerVariants: Variants = {",
+          )
+          replace(
+              "src/components/app/analytics-dashboard.tsx",
+              "const itemVariants = {",
+              "const itemVariants: Variants = {",
+          )
+
+          replace(
+              "src/components/app/premium-dashboard.tsx",
+              "import { useEffect, useState, useCallback, useRef } from 'react'",
+              "import { useEffect, useState, useRef } from 'react'",
+          )
+          replace(
+              "src/components/app/premium-dashboard.tsx",
+              "import { motion, AnimatePresence } from 'framer-motion'",
+              "import { motion, AnimatePresence, type Variants } from 'framer-motion'",
+          )
+          replace(
+              "src/components/app/premium-dashboard.tsx",
+              """  const animate = useCallback((timestamp: number) => {
+    if (!startTimeRef.current) startTimeRef.current = timestamp
+    const progress = Math.min((timestamp - startTimeRef.current) / duration, 1)
+    // Ease-out cubic
+    const eased = 1 - Math.pow(1 - progress, 3)
+    setCount(Math.floor(eased * end))
+    if (progress < 1) {
+      ref.current = requestAnimationFrame(animate)
+    }
+  }, [end, duration])
+
+  useEffect(() => {
+    if (startOnMount) {
+      startTimeRef.current = 0
+      ref.current = requestAnimationFrame(animate)
+    }
+    return () => cancelAnimationFrame(ref.current)
+  }, [animate, startOnMount])""",
+              """  useEffect(() => {
+    if (!startOnMount) return
+
+    startTimeRef.current = 0
+    const animate = (timestamp: number) => {
+      if (!startTimeRef.current) startTimeRef.current = timestamp
+      const progress = Math.min((timestamp - startTimeRef.current) / duration, 1)
+      const eased = 1 - Math.pow(1 - progress, 3)
+      setCount(Math.floor(eased * end))
+      if (progress < 1) {
+        ref.current = requestAnimationFrame(animate)
+      }
+    }
+
+    ref.current = requestAnimationFrame(animate)
+    return () => cancelAnimationFrame(ref.current)
+  }, [end, duration, startOnMount])""",
+          )
+          replace(
+              "src/components/app/premium-dashboard.tsx",
+              "const containerVariants = {",
+              "const containerVariants: Variants = {",
+          )
+          replace(
+              "src/components/app/premium-dashboard.tsx",
+              "const itemVariants = {",
+              "const itemVariants: Variants = {",
+          )
+
+          replace(
+              "src/components/app/database-query-page.tsx",
+              "}, [searchQuery, store.birthRecords])",
+              "}, [searchQuery, store])",
+          )
+
+      - name: Commit fixes
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo 'No frontend changes required'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/components/app/analytics-dashboard.tsx src/components/app/premium-dashboard.tsx src/components/app/database-query-page.tsx
+          git commit -m 'fix(frontend): satisfy React compiler and TypeScript'
+          git push origin HEAD:${{ github.head_ref }}
