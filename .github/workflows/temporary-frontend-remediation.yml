@@ -1,6 +1,9 @@
 name: Temporary Frontend Remediation
 
 on:
+  push:
+    branches:
+      - agent/p0-ci-remediation-2
   pull_request:
 
 permissions:
@@ -8,13 +11,13 @@ permissions:
 
 jobs:
   patch-frontend:
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PR branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref }}
+          ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Apply targeted React and TypeScript fixes
         shell: python
@@ -28,16 +31,8 @@ jobs:
                   raise SystemExit(f"Expected pattern not found in {path}: {old[:80]!r}")
               p.write_text(text.replace(old, new, 1))
 
-          replace(
-              "src/components/app/analytics-dashboard.tsx",
-              "import { motion } from 'framer-motion'",
-              "import { motion, type Variants } from 'framer-motion'",
-          )
-          replace(
-              "src/components/app/analytics-dashboard.tsx",
-              "import { Badge } from '@/components/ui/badge'\n",
-              "import { Badge } from '@/components/ui/badge'\nimport { Button } from '@/components/ui/button'\n",
-          )
+          replace("src/components/app/analytics-dashboard.tsx", "import { motion } from 'framer-motion'", "import { motion, type Variants } from 'framer-motion'")
+          replace("src/components/app/analytics-dashboard.tsx", "import { Badge } from '@/components/ui/badge'\n", "import { Badge } from '@/components/ui/badge'\nimport { Button } from '@/components/ui/button'\n")
           replace(
               "src/components/app/analytics-dashboard.tsx",
               """  let offset = 0
@@ -58,27 +53,11 @@ jobs:
     return { ...seg, dashArray, dashOffset, pct }
   })""",
           )
-          replace(
-              "src/components/app/analytics-dashboard.tsx",
-              "const containerVariants = {",
-              "const containerVariants: Variants = {",
-          )
-          replace(
-              "src/components/app/analytics-dashboard.tsx",
-              "const itemVariants = {",
-              "const itemVariants: Variants = {",
-          )
+          replace("src/components/app/analytics-dashboard.tsx", "const containerVariants = {", "const containerVariants: Variants = {")
+          replace("src/components/app/analytics-dashboard.tsx", "const itemVariants = {", "const itemVariants: Variants = {")
 
-          replace(
-              "src/components/app/premium-dashboard.tsx",
-              "import { useEffect, useState, useCallback, useRef } from 'react'",
-              "import { useEffect, useState, useRef } from 'react'",
-          )
-          replace(
-              "src/components/app/premium-dashboard.tsx",
-              "import { motion, AnimatePresence } from 'framer-motion'",
-              "import { motion, AnimatePresence, type Variants } from 'framer-motion'",
-          )
+          replace("src/components/app/premium-dashboard.tsx", "import { useEffect, useState, useCallback, useRef } from 'react'", "import { useEffect, useState, useRef } from 'react'")
+          replace("src/components/app/premium-dashboard.tsx", "import { motion, AnimatePresence } from 'framer-motion'", "import { motion, AnimatePresence, type Variants } from 'framer-motion'")
           replace(
               "src/components/app/premium-dashboard.tsx",
               """  const animate = useCallback((timestamp: number) => {
@@ -117,22 +96,10 @@ jobs:
     return () => cancelAnimationFrame(ref.current)
   }, [end, duration, startOnMount])""",
           )
-          replace(
-              "src/components/app/premium-dashboard.tsx",
-              "const containerVariants = {",
-              "const containerVariants: Variants = {",
-          )
-          replace(
-              "src/components/app/premium-dashboard.tsx",
-              "const itemVariants = {",
-              "const itemVariants: Variants = {",
-          )
+          replace("src/components/app/premium-dashboard.tsx", "const containerVariants = {", "const containerVariants: Variants = {")
+          replace("src/components/app/premium-dashboard.tsx", "const itemVariants = {", "const itemVariants: Variants = {")
 
-          replace(
-              "src/components/app/database-query-page.tsx",
-              "}, [searchQuery, store.birthRecords])",
-              "}, [searchQuery, store])",
-          )
+          replace("src/components/app/database-query-page.tsx", "}, [searchQuery, store.birthRecords])", "}, [searchQuery, store])")
 
       - name: Commit fixes
         shell: bash
@@ -145,4 +112,4 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add src/components/app/analytics-dashboard.tsx src/components/app/premium-dashboard.tsx src/components/app/database-query-page.tsx
           git commit -m 'fix(frontend): satisfy React compiler and TypeScript'
-          git push origin HEAD:${{ github.head_ref }}
+          git push origin HEAD:${{ github.head_ref || github.ref_name }}
