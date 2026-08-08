@@ -1,0 +1,100 @@
+name: Temporary Institution Routing Remediation
+
+on:
+  push:
+    branches:
+      - agent/citizen-institution-routing
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/citizen-institution-routing
+
+      - name: Add explicit server-backed institution routing
+        shell: python
+        run: |
+          from pathlib import Path
+
+          store_path = Path('src/store/citizen-requests-store.ts')
+          text = store_path.read_text(encoding='utf-8')
+
+          old_start = "async function resolveTargetInstitution(req: Pick<CitizenRequest, 'categoryId' | 'mairie' | 'citizenAddress' | 'targetInstitutionId'>): Promise<string> {\n"
+          start = text.index(old_start)
+          end = text.index('\nfunction replaceRequest(', start)
+          replacement = '''export type InstitutionRoutingOption = serviceRequestsApi.InstitutionOption\n\nconst CATEGORY_INSTITUTION_TERMS: Record<string, string[]> = {\n  justice: ['justice'],\n  identification: ['anip', 'identification'],\n  urbanisme: ['urbanisme'],\n  entreprise: ['apip', 'promotion des investissements'],\n  education: ['education'],\n  sante: ['sante'],\n  residence: ['mairie'],\n  'etat-civil': ['mairie'],\n}\n\nexport async function getInstitutionRoutingOptions(\n  req: Pick<CitizenRequest, 'categoryId' | 'mairie' | 'citizenAddress'>,\n): Promise<InstitutionRoutingOption[]> {\n  const institutions = await serviceRequestsApi.listInstitutions()\n  if (!institutions.length) return []\n\n  const mairieHint = normalizeText(req.mairie)\n  const addressHint = normalizeText(req.citizenAddress)\n  const communeMatch = addressHint.match(/commune de\\s+([^,]+)/)\n  const commune = communeMatch?.[1]?.trim() || ''\n\n  if (mairieHint || commune) {\n    const mairieMatches = institutions.filter((institution) => {\n      const name = normalizeText(institution.name)\n      return institution.type === 'mairie' && (\n        (mairieHint && (name === mairieHint || name.includes(mairieHint.replace('mairie de ', '')))) ||\n        (commune && name.includes(commune))\n      )\n    })\n    if (mairieMatches.length) return mairieMatches\n  }\n\n  const wanted = CATEGORY_INSTITUTION_TERMS[req.categoryId] || []\n  if (!wanted.length) return institutions\n\n  return institutions.filter((institution) => {\n    const haystack = normalizeText(`${institution.name} ${institution.code || ''} ${institution.type}`)\n    return wanted.some((term) => haystack.includes(normalizeText(term)))\n  })\n}\n\nasync function resolveTargetInstitution(req: Pick<CitizenRequest, 'categoryId' | 'mairie' | 'citizenAddress' | 'targetInstitutionId'>): Promise<string> {\n  // Explicit selection is still validated by the backend against the current\n  // tenant and active institution catalog. The client never becomes authoritative.\n  if (req.targetInstitutionId) return req.targetInstitutionId\n\n  const matches = await getInstitutionRoutingOptions(req)\n  if (matches.length === 1) return matches[0].id\n\n  throw new Error(\n    matches.length > 1\n      ? 'Plusieurs institutions peuvent traiter cette démarche. Sélectionnez explicitement le service destinataire.'\n      : 'Aucune institution active n’est configurée pour cette démarche.',\n  )\n}\n'''
+          text = text[:start] + replacement + text[end:]
+          store_path.write_text(text, encoding='utf-8')
+
+          def patch_portal(path_str: str, public: bool) -> None:
+              path = Path(path_str)
+              src = path.read_text(encoding='utf-8')
+
+              if public:
+                  old_import = "import { useCitizenRequestsStore, type CitizenRequest, type RequestStatus } from '@/store/citizen-requests-store'"
+                  new_import = "import { useCitizenRequestsStore, getInstitutionRoutingOptions, type CitizenRequest, type RequestStatus, type InstitutionRoutingOption } from '@/store/citizen-requests-store'"
+              else:
+                  old_import = "import { useCitizenRequestsStore, type CitizenRequest, type RequestStatus, type UploadedDocument, type GeneratedDocument, type SatisfactionRating, getDeadlineDays, isDeadlineExceeded, isDeadlineApproaching, isDeadlineCritical, countRemainingBusinessDays } from '@/store/citizen-requests-store'"
+                  new_import = "import { useCitizenRequestsStore, getInstitutionRoutingOptions, type InstitutionRoutingOption, type CitizenRequest, type RequestStatus, type UploadedDocument, type GeneratedDocument, type SatisfactionRating, getDeadlineDays, isDeadlineExceeded, isDeadlineApproaching, isDeadlineCritical, countRemainingBusinessDays } from '@/store/citizen-requests-store'"
+              if old_import not in src:
+                  raise SystemExit(f'import marker not found in {path_str}')
+              src = src.replace(old_import, new_import, 1)
+
+              state_marker = "  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false)\n"
+              states = """  const [institutionOptions, setInstitutionOptions] = useState<InstitutionRoutingOption[]>([])\n  const [targetInstitutionId, setTargetInstitutionId] = useState('')\n  const [institutionsLoading, setInstitutionsLoading] = useState(false)\n  const [institutionLoadError, setInstitutionLoadError] = useState('')\n"""
+              if state_marker not in src:
+                  raise SystemExit(f'state marker not found in {path_str}')
+              src = src.replace(state_marker, state_marker + states, 1)
+
+              open_marker = "    setAcceptedTerms(false)\n"
+              open_replacement = """    setAcceptedTerms(false)\n    setSubmissionError('')\n    setTargetInstitutionId('')\n    setInstitutionOptions([])\n    setInstitutionLoadError('')\n    setInstitutionsLoading(true)\n    void getInstitutionRoutingOptions({\n      categoryId: category.id,\n      mairie: undefined,\n      citizenAddress: '',\n    })\n      .then((options) => {\n        setInstitutionOptions(options)\n        if (options.length === 1) setTargetInstitutionId(options[0].id)\n        if (!options.length) {\n          setInstitutionLoadError('Aucune institution active n’est configurée pour cette démarche.')\n        }\n      })\n      .catch((error) => {\n        setInstitutionLoadError(\n          error instanceof Error ? error.message : 'Chargement des institutions impossible.',\n        )\n      })\n      .finally(() => setInstitutionsLoading(false))\n"""
+              if open_marker not in src:
+                  raise SystemExit(f'open marker not found in {path_str}')
+              src = src.replace(open_marker, open_replacement, 1)
+
+              validate_marker = "    if (!acceptedTerms) errors.terms = 'Vous devez accepter les conditions'\n"
+              validate_replacement = """    if (!acceptedTerms) errors.terms = 'Vous devez accepter les conditions'\n    if (institutionsLoading) {\n      errors.targetInstitutionId = 'Chargement du service destinataire en cours'\n    } else if (institutionLoadError) {\n      errors.targetInstitutionId = institutionLoadError\n    } else if (institutionOptions.length > 1 && !targetInstitutionId) {\n      errors.targetInstitutionId = 'Sélectionnez l’institution qui traitera cette demande'\n    } else if (institutionOptions.length === 0) {\n      errors.targetInstitutionId = 'Aucune institution destinataire disponible'\n    }\n"""
+              if validate_marker not in src:
+                  raise SystemExit(f'validation marker not found in {path_str}')
+              src = src.replace(validate_marker, validate_replacement, 1)
+
+              submit_marker = "        deliveryMode: form.deliveryMode,\n"
+              submit_replacement = "        deliveryMode: form.deliveryMode,\n        targetInstitutionId: targetInstitutionId || undefined,\n"
+              if submit_marker not in src:
+                  raise SystemExit(f'submit marker not found in {path_str}')
+              src = src.replace(submit_marker, submit_replacement, 1)
+
+              footer_marker = "          {submissionError && (\n"
+              selector = """          <div className=\"space-y-2 rounded-lg border border-border bg-muted/20 p-3\">\n            <Label htmlFor=\"target-institution\">Institution destinataire</Label>\n            {institutionsLoading ? (\n              <p className=\"text-xs text-muted-foreground\">Chargement des institutions autorisées…</p>\n            ) : institutionOptions.length === 1 ? (\n              <div className=\"rounded-md border bg-background px-3 py-2 text-sm font-medium\">\n                {institutionOptions[0].name}\n              </div>\n            ) : institutionOptions.length > 1 ? (\n              <Select value={targetInstitutionId} onValueChange={setTargetInstitutionId}>\n                <SelectTrigger id=\"target-institution\">\n                  <SelectValue placeholder=\"Sélectionner l’institution compétente\" />\n                </SelectTrigger>\n                <SelectContent className=\"max-h-72\">\n                  {institutionOptions.map((institution) => (\n                    <SelectItem key={institution.id} value={institution.id}>\n                      {institution.name}{institution.code ? ` — ${institution.code}` : ''}\n                    </SelectItem>\n                  ))}\n                </SelectContent>\n              </Select>\n            ) : (\n              <p className=\"text-xs text-red-600 dark:text-red-400\">\n                {institutionLoadError || 'Aucune institution destinataire disponible.'}\n              </p>\n            )}\n            {formErrors.targetInstitutionId && (\n              <p className=\"text-[10px] text-red-500\">{formErrors.targetInstitutionId}</p>\n            )}\n            <p className=\"text-[11px] text-muted-foreground\">\n              La liste provient du catalogue serveur de votre périmètre national. Le backend valide à nouveau ce choix lors de la soumission.\n            </p>\n          </div>\n\n"""
+              if footer_marker not in src:
+                  raise SystemExit(f'footer marker not found in {path_str}')
+              src = src.replace(footer_marker, selector + footer_marker, 1)
+
+              # Do not allow submission while the server-backed routing catalog is loading.
+              src = src.replace(
+                  "              disabled={isSubmittingRequest}\n              aria-busy={isSubmittingRequest}\n",
+                  "              disabled={isSubmittingRequest || institutionsLoading || institutionOptions.length === 0}\n              aria-busy={isSubmittingRequest || institutionsLoading}\n",
+                  1,
+              )
+
+              path.write_text(src, encoding='utf-8')
+
+          patch_portal('src/components/app/citizen-portal-page.tsx', False)
+          patch_portal('src/components/landing/public-citizen-portal.tsx', True)
+
+      - name: Commit routing UX
+        shell: bash
+        run: |
+          if git diff --quiet -- src/store/citizen-requests-store.ts src/components/app/citizen-portal-page.tsx src/components/landing/public-citizen-portal.tsx; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/store/citizen-requests-store.ts src/components/app/citizen-portal-page.tsx src/components/landing/public-citizen-portal.tsx
+          git commit -m 'feat(citizen): add server-backed institution routing selection'
+          git push origin HEAD:agent/citizen-institution-routing
