@@ -106,21 +106,18 @@ export interface CitizenRequest {
   targetInstitutionId?: string
 }
 
-/**
- * Indicative calendar helpers retained for UI countdowns only.
- * Official SLA/legal calendars are now computed and versioned server-side.
- */
+/** Indicative UI calendar only. Official SLA policy is server-side. */
 export function GUINEAN_HOLIDAYS(year: number): string[] {
   const mm = (m: number, d: number) => `${year}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
   const fixed = [
     mm(1, 1), mm(3, 8), mm(4, 3), mm(5, 1), mm(5, 25),
     mm(8, 15), mm(10, 2), mm(11, 1), mm(12, 25),
   ]
-  const islamicHolidays: Record<number, string[]> = {
+  const variable: Record<number, string[]> = {
     2026: [mm(3, 30), mm(6, 7), mm(9, 5)],
     2027: [mm(3, 19), mm(5, 27), mm(8, 26)],
   }
-  return [...fixed, ...(islamicHolidays[year] ?? [])]
+  return [...fixed, ...(variable[year] ?? [])]
 }
 
 export function isGuineanHoliday(date: Date): boolean {
@@ -134,8 +131,8 @@ export function addBusinessDays(startDate: Date, days: number): Date {
   let addedDays = 0
   while (addedDays < days) {
     date.setDate(date.getDate() + 1)
-    const dayOfWeek = date.getDay()
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) addedDays += 1
+    const day = date.getDay()
+    if (day !== 0 && day !== 6) addedDays += 1
   }
   return date
 }
@@ -164,8 +161,8 @@ export function countRemainingBusinessDays(deadline: Date): number {
   let remaining = 0
   const d = new Date(now)
   while (d < deadline) {
-    const dayOfWeek = d.getDay()
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) remaining += 1
+    const day = d.getDay()
+    if (day !== 0 && day !== 6) remaining += 1
     d.setDate(d.getDate() + 1)
   }
   return remaining
@@ -252,10 +249,9 @@ async function resolveTargetInstitution(req: Pick<CitizenRequest, 'categoryId' |
   })
 
   if (matches.length === 1) return matches[0].id
-
   throw new Error(
     matches.length > 1
-      ? 'Plusieurs institutions peuvent traiter cette démarche. Sélectionnez explicitement le service destinataire.'
+      ? 'Plusieurs institutions peuvent traiter cette démarche. Une sélection explicite est nécessaire.'
       : 'Aucune institution destinataire n’a pu être résolue pour cette démarche.',
   )
 }
@@ -278,7 +274,7 @@ interface CitizenRequestsState {
   isLoading: boolean
   syncError: string | null
   hydrateRequests: () => Promise<void>
-  addRequest: (req: NewRequestInput) => Promise<CitizenRequest>
+  addRequest: (req: NewRequestInput) => CitizenRequest
   updateRequestStatus: (id: string, status: RequestStatus, note?: string) => void
   addProcessingNote: (id: string, note: Omit<ProcessingNote, 'id' | 'date'>) => void
   advanceTimeline: (id: string) => void
@@ -323,65 +319,81 @@ export const useCitizenRequestsStore = create<CitizenRequestsState>((set, get) =
     }
   },
 
-  addRequest: async (req) => {
-    set({ syncError: null })
-    try {
-      let mairie = req.mairie
-      if ((req.categoryId === 'etat-civil' || req.categoryId === 'residence') && !mairie) {
-        const match = req.citizenAddress.match(/Commune de\s+([^,]+)/i)
-        if (match) mairie = `Mairie de ${match[1].trim()}`
-      }
+  addRequest: (req) => {
+    const now = new Date()
+    const tempId = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    let mairie = req.mairie
+    if ((req.categoryId === 'etat-civil' || req.categoryId === 'residence') && !mairie) {
+      const match = req.citizenAddress.match(/Commune de\s+([^,]+)/i)
+      if (match) mairie = `Mairie de ${match[1].trim()}`
+    }
 
-      const targetInstitutionId = await resolveTargetInstitution({
-        categoryId: req.categoryId,
-        mairie,
-        citizenAddress: req.citizenAddress,
-        targetInstitutionId: req.targetInstitutionId,
-      })
+    // Compatibility object for the existing synchronous dialog. It is memory
+    // only, clearly marked non-official, and is replaced by the API record.
+    const provisional: CitizenRequest = {
+      ...req,
+      mairie,
+      id: tempId,
+      reference: 'ENREGISTREMENT-SERVEUR',
+      status: 'soumise',
+      assignedService: 'Routage en cours',
+      assignedAgent: '',
+      processingNotes: [],
+      timeline: provisionalTimeline(),
+      deadlineDays: getDeadlineDays(req.categoryId),
+      deadlineDate: addBusinessDays(now, getDeadlineDays(req.categoryId)).toISOString(),
+      createdAt: req.createdAt || now.toISOString(),
+      updatedAt: now.toISOString(),
+    }
+    set((state) => ({ requests: [provisional, ...state.requests], syncError: null }))
 
-      const created = await serviceRequestsApi.createRequest({
-        serviceId: req.serviceId,
-        serviceName: req.serviceName,
-        category: req.category,
-        categoryId: req.categoryId,
-        targetInstitutionId,
-        citizenName: req.citizenName,
-        citizenFirstName: req.citizenFirstName,
-        citizenNIN: req.citizenNIN,
-        citizenPhone: req.citizenPhone,
-        citizenEmail: req.citizenEmail,
-        citizenAddress: req.citizenAddress,
-        motif: req.motif,
-        documents: req.documents,
-        mairie,
-        deliveryMode: req.deliveryMode,
-      })
+    void (async () => {
+      try {
+        const targetInstitutionId = await resolveTargetInstitution({
+          categoryId: req.categoryId,
+          mairie,
+          citizenAddress: req.citizenAddress,
+          targetInstitutionId: req.targetInstitutionId,
+        })
 
-      set((state) => ({ requests: replaceRequest(state.requests, created) }))
+        const created = await serviceRequestsApi.createRequest({
+          serviceId: req.serviceId,
+          serviceName: req.serviceName,
+          category: req.category,
+          categoryId: req.categoryId,
+          targetInstitutionId,
+          citizenName: req.citizenName,
+          citizenFirstName: req.citizenFirstName,
+          citizenNIN: req.citizenNIN,
+          citizenPhone: req.citizenPhone,
+          citizenEmail: req.citizenEmail,
+          citizenAddress: req.citizenAddress,
+          motif: req.motif,
+          documents: req.documents,
+          mairie,
+          deliveryMode: req.deliveryMode,
+        })
 
-      for (const document of req.uploadedDocuments || []) {
-        if (document.serverStored) continue
-        const file = await dataUrlToFile(document)
-        const uploaded = await serviceRequestsApi.uploadAttachment(
-          created.id,
-          file,
-          document.requiredDocName,
-        )
         set((state) => ({
-          requests: state.requests.map((item) => item.id === created.id
-            ? { ...item, uploadedDocuments: [...item.uploadedDocuments, uploaded] }
-            : item),
+          requests: [created, ...state.requests.filter((item) => item.id !== tempId && item.id !== created.id)],
+        }))
+
+        for (const document of req.uploadedDocuments || []) {
+          if (document.serverStored) continue
+          const file = await dataUrlToFile(document)
+          await serviceRequestsApi.uploadAttachment(created.id, file, document.requiredDocName)
+        }
+
+        await get().hydrateRequests()
+      } catch (error) {
+        set((state) => ({
+          requests: state.requests.filter((item) => item.id !== tempId),
+          syncError: error instanceof Error ? error.message : 'Soumission de la demande impossible.',
         }))
       }
+    })()
 
-      const serverRequests = await serviceRequestsApi.listRequests()
-      set({ requests: serverRequests })
-      return serverRequests.find((item) => item.id === created.id) || created
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Soumission de la demande impossible.'
-      set({ syncError: message })
-      throw error
-    }
+    return provisional
   },
 
   updateRequestStatus: (id, requestStatus, note) => {
@@ -400,8 +412,6 @@ export const useCitizenRequestsStore = create<CitizenRequestsState>((set, get) =
       .catch((error) => set({ syncError: error instanceof Error ? error.message : 'Ajout de note impossible.' }))
   },
 
-  // Timeline is server-owned. Existing callers can request a refresh without
-  // mutating official workflow state in the browser.
   advanceTimeline: () => {
     void get().hydrateRequests()
   },
@@ -471,28 +481,20 @@ export const useCitizenRequestsStore = create<CitizenRequestsState>((set, get) =
       .catch((error) => set({ syncError: error instanceof Error ? error.message : 'Évaluation impossible.' }))
   },
 
-  // Demo reset is deliberately removed from official state. Refresh from the
-  // server instead so the browser can never replace administrative records.
   resetToDemoData: () => {
     void get().hydrateRequests()
   },
 
-  // A missed SLA is an alert/escalation condition, never an automatic citizen
-  // rejection. This compatibility method now only refreshes official state.
+  // Missed SLA => refresh/escalation signal, never automatic rejection.
   checkAndRejectExpiredRequests: () => {
     void get().hydrateRequests()
   },
 
-  // Client-side AI may assist presentation but may not change an official
-  // administrative decision or status. Decision automation is server-side only.
+  // Client AI can assist display only. It cannot modify official decisions.
   aiAutoProcess: (id) => {
     set((state) => ({
       requests: state.requests.map((item) => item.id === id
-        ? {
-            ...item,
-            aiProcessingStatus: 'ai_assisted',
-            aiProcessingDate: new Date().toISOString(),
-          }
+        ? { ...item, aiProcessingStatus: 'ai_assisted', aiProcessingDate: new Date().toISOString() }
         : item),
     }))
   },
@@ -502,7 +504,6 @@ export const useCitizenRequestsStore = create<CitizenRequestsState>((set, get) =
   },
 
   updateRequestAIFields: (id, fields) => {
-    // Explicitly strip fields that represent authoritative workflow decisions.
     const {
       status: _status,
       assignedAgent: _assignedAgent,
