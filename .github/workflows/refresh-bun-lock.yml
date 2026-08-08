@@ -1,9 +1,7 @@
 name: Temporary Bun Lockfile Refresh
 
 on:
-  push:
-    branches:
-      - agent/p0-ci-gates-main
+  pull_request:
   workflow_dispatch:
 
 permissions:
