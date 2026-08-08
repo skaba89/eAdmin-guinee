@@ -25,6 +25,7 @@ from app.api import (
     security,
     security_events,
     security_hardening,
+    service_request_files,
     service_requests,
     users,
     workflows,
@@ -218,6 +219,12 @@ app.include_router(
     institutions.router,
     prefix="/api/v1/institutions",
     tags=["Institutions"],
+    dependencies=rls_dependencies,
+)
+app.include_router(
+    service_request_files.router,
+    prefix="/api/v1/service-requests",
+    tags=["Pièces des demandes"],
     dependencies=rls_dependencies,
 )
 app.include_router(
