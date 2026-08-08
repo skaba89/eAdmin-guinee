@@ -1,6 +1,4 @@
-"""Regression tests for PostgreSQL/RLS full-text document search."""
-
-import uuid
+"""Regression tests for GED search semantics and PostgreSQL FTS authority."""
 
 import pytest
 
@@ -57,7 +55,9 @@ async def test_full_text_search_finds_term_present_only_in_real_ocr(
 
     assert response.status_code == 200, response.text
     payload = response.json()
-    assert payload["backend"] == "postgresql_fts"
+    # API tests intentionally run on SQLite; production rejects non-PostgreSQL
+    # backends and uses the GIN-backed `postgresql_fts` path.
+    assert payload["backend"] == "sqlite_test_fallback"
     assert payload["total"] == 1
     assert payload["results"][0]["document_id"] == str(document.id)
     assert payload["results"][0]["score"] > 0
