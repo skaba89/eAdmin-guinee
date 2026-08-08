@@ -242,12 +242,14 @@ export function usePublicServiceCatalog() {
   const [error, setError] = useState('')
   const [reloadToken, setReloadToken] = useState(0)
 
-  const reload = useCallback(() => setReloadToken((value) => value + 1), [])
+  const reload = useCallback(() => {
+    setIsLoading(true)
+    setError('')
+    setReloadToken((value) => value + 1)
+  }, [])
 
   useEffect(() => {
     const controller = new AbortController()
-    setIsLoading(true)
-    setError('')
 
     void publicCatalogFetch(controller.signal)
       .then((items) => {
