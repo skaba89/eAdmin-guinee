@@ -78,7 +78,7 @@ def upgrade() -> None:
                         AND (
                             institution_id IS NULL
                             OR institution_id = current_setting('app.current_institution_id', true)
-                            OR current_setting('app.current_role', true) IN ('MINISTRE')
+                            OR current_setting('app.current_role', true) = 'MINISTRE'
                         )
                     )
                 )
@@ -112,9 +112,34 @@ def upgrade() -> None:
         )
         """
     )
+    op.execute(
+        """
+        CREATE POLICY access_grants_scoped_update
+        ON access_grants
+        FOR UPDATE
+        USING (
+            current_setting('app.current_role', true) IN ('DIRECTEUR', 'MINISTRE')
+            AND tenant_id = current_setting('app.current_tenant_id', true)
+            AND (
+                institution_id IS NULL
+                OR institution_id = current_setting('app.current_institution_id', true)
+                OR current_setting('app.current_role', true) = 'MINISTRE'
+            )
+        )
+        WITH CHECK (
+            tenant_id = current_setting('app.current_tenant_id', true)
+            AND (
+                institution_id IS NULL
+                OR institution_id = current_setting('app.current_institution_id', true)
+                OR current_setting('app.current_role', true) = 'MINISTRE'
+            )
+        )
+        """
+    )
 
 
 def downgrade() -> None:
+    op.execute("DROP POLICY IF EXISTS access_grants_scoped_update ON access_grants")
     op.execute("DROP POLICY IF EXISTS access_grants_scoped_insert ON access_grants")
     op.execute("DROP POLICY IF EXISTS access_grants_super_admin_all ON access_grants")
     op.execute("DROP POLICY IF EXISTS access_grants_scoped_read ON access_grants")
