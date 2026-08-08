@@ -4,12 +4,16 @@ on:
   push:
     branches:
       - agent/dynamic-public-service-catalog
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
 
 jobs:
   patch:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,8 +28,8 @@ jobs:
           def patch_component(path_str: str, public: bool) -> None:
               path = Path(path_str)
               text = path.read_text(encoding='utf-8')
+              print(f'Patching {path_str}')
 
-              # Shared dynamic catalog types/hook.
               import_anchor = "import { useAppStore } from '@/store/app-store'\n" if public else "import { useNotificationsStore, type NotificationType, type AppNotification } from '@/store/notifications-store'\n"
               dynamic_import = "import { usePublicServiceCatalog, type ServiceItem, type ServiceCategory } from '@/lib/public-service-catalog'\n"
               if dynamic_import not in text:
@@ -33,93 +37,74 @@ jobs:
                       raise SystemExit(f'import anchor missing: {path_str}')
                   text = text.replace(import_anchor, import_anchor + dynamic_import, 1)
 
-              # Remove duplicated service metadata. Presentation now lives in the
-              # shared adapter; administrative data comes exclusively from API.
               if public:
                   start_marker = 'interface ServiceItem {\n'
                   end_marker = 'const STATUS_CONFIG:'
               else:
                   start_marker = '// ─── SERVICE CATEGORY DEFINITIONS'
                   end_marker = '// ─── STATUS CONFIG'
-              if start_marker in text:
-                  start = text.index(start_marker)
-                  end = text.index(end_marker, start)
-                  text = text[:start] + text[end:]
+              if start_marker not in text:
+                  raise SystemExit(f'static catalog start missing: {path_str}')
+              start = text.index(start_marker)
+              end = text.index(end_marker, start)
+              text = text[:start] + text[end:]
 
-              # Replace unverifiable demo stats with platform capabilities.
               stats_start = 'const STATS_BANNER = [\n'
-              if stats_start in text:
-                  start = text.index(stats_start)
-                  end = text.index(']\n', start) + 2
-                  capabilities = '''const STATS_BANNER = [\n  { value: '24/7', label: 'portail numérique', icon: Globe },\n  { value: 'GN-…', label: 'référence officielle', icon: Hash },\n  { value: 'Versionné', label: 'catalogue serveur', icon: FileCheck },\n  { value: 'Traçable', label: 'suivi des demandes', icon: CheckCircle2 },\n]\n'''
-                  # Public portal does not currently import FileCheck.
-                  if public:
-                      capabilities = capabilities.replace('icon: FileCheck', 'icon: Shield')
-                  text = text[:start] + capabilities + text[end:]
-
-              # Hook must be instantiated inside each client component.
+              if stats_start not in text:
+                  raise SystemExit(f'stats marker missing: {path_str}')
+              start = text.index(stats_start)
+              end = text.index(']\n', start) + 2
+              capabilities = '''const STATS_BANNER = [\n  { value: '24/7', label: 'portail numérique', icon: Globe },\n  { value: 'GN-…', label: 'référence officielle', icon: Hash },\n  { value: 'Versionné', label: 'catalogue serveur', icon: FileCheck },\n  { value: 'Traçable', label: 'suivi des demandes', icon: CheckCircle2 },\n]\n'''
               if public:
-                  hook_anchor = "  const { isAuth, user, navigate } = useAppStore()\n"
-              else:
-                  hook_anchor = "  const { notifications, markAsRead, markAllAsRead, getUnreadCount, getFiltered } = useNotificationsStore()\n"
-              hook_block = "  const { categories: serviceCategories, isLoading: serviceCatalogLoading, error: serviceCatalogError, reload: reloadServiceCatalog } = usePublicServiceCatalog()\n"
-              if hook_block not in text:
-                  if hook_anchor not in text:
-                      raise SystemExit(f'hook anchor missing: {path_str}')
-                  text = text.replace(hook_anchor, hook_anchor + hook_block, 1)
+                  capabilities = capabilities.replace('icon: FileCheck', 'icon: Shield')
+              text = text[:start] + capabilities + text[end:]
 
-              # All category filters now derive from live server data.
+              hook_anchor = "  const { isAuth, user, navigate } = useAppStore()\n" if public else "  const { notifications, markAsRead, markAllAsRead, getUnreadCount, getFiltered } = useNotificationsStore()\n"
+              hook_block = "  const { categories: serviceCategories, isLoading: serviceCatalogLoading, error: serviceCatalogError, reload: reloadServiceCatalog } = usePublicServiceCatalog()\n"
+              if hook_anchor not in text:
+                  raise SystemExit(f'hook anchor missing: {path_str}')
+              text = text.replace(hook_anchor, hook_anchor + hook_block, 1)
               text = text.replace('SERVICE_CATEGORIES', 'serviceCategories')
 
-              # If an active category disappears after a server publication,
-              # reset the filter rather than presenting an empty stale selection.
               toast_effect = "  useEffect(() => {\n    if (successToast) {\n"
               reset_effect = '''  useEffect(() => {\n    if (\n      selectedCategory !== 'all' &&\n      !serviceCatalogLoading &&\n      !serviceCategories.some((category) => category.id === selectedCategory)\n    ) {\n      setSelectedCategory('all')\n    }\n  }, [selectedCategory, serviceCatalogLoading, serviceCategories])\n\n'''
-              if reset_effect not in text:
-                  if toast_effect not in text:
-                      raise SystemExit(f'toast effect marker missing: {path_str}')
-                  text = text.replace(toast_effect, reset_effect + toast_effect, 1)
+              if toast_effect not in text:
+                  raise SystemExit(f'toast effect missing: {path_str}')
+              text = text.replace(toast_effect, reset_effect + toast_effect, 1)
 
-              # Visible fail-closed state with retry. Never silently fall back to
-              # bundled administrative rules in production.
               if public:
-                  catalog_anchor = '''              {/* Category filter */}\n'''
+                  catalog_anchor = '              {/* Category filter */}\n'
                   state_block = '''              {serviceCatalogLoading && (\n                <Card className="border-[#0B2E58]/10">\n                  <CardContent className="flex items-center gap-3 p-5 text-sm text-muted-foreground">\n                    <Clock className="size-4 animate-pulse" />\n                    Chargement du catalogue officiel des démarches…\n                  </CardContent>\n                </Card>\n              )}\n              {serviceCatalogError && (\n                <Card className="border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/20">\n                  <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">\n                    <div className="flex items-start gap-2 text-sm text-red-700 dark:text-red-300">\n                      <AlertCircle className="mt-0.5 size-4 shrink-0" />\n                      <span>{serviceCatalogError}</span>\n                    </div>\n                    <Button variant="outline" size="sm" onClick={reloadServiceCatalog}>Réessayer</Button>\n                  </CardContent>\n                </Card>\n              )}\n\n              {/* Category filter */}\n'''
               else:
-                  catalog_anchor = '''            {/* Search + filter */}\n'''
+                  catalog_anchor = '            {/* Search + filter */}\n'
                   state_block = '''            {serviceCatalogLoading && (\n              <Card className="glass-premium">\n                <CardContent className="flex items-center gap-3 p-5 text-sm text-muted-foreground">\n                  <Clock className="size-4 animate-pulse" />\n                  Chargement du catalogue officiel des démarches…\n                </CardContent>\n              </Card>\n            )}\n            {serviceCatalogError && (\n              <Card className="border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-950/20">\n                <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">\n                  <div className="flex items-start gap-2 text-sm text-red-700 dark:text-red-300">\n                    <AlertCircle className="mt-0.5 size-4 shrink-0" />\n                    <span>{serviceCatalogError}</span>\n                  </div>\n                  <Button variant="outline" size="sm" onClick={reloadServiceCatalog}>Réessayer</Button>\n                </CardContent>\n              </Card>\n            )}\n\n            {/* Search + filter */}\n'''
-              if state_block not in text:
-                  if catalog_anchor not in text:
-                      raise SystemExit(f'catalog UI anchor missing: {path_str}')
-                  text = text.replace(catalog_anchor, state_block, 1)
+              if catalog_anchor not in text:
+                  raise SystemExit(f'catalog UI anchor missing: {path_str}')
+              text = text.replace(catalog_anchor, state_block, 1)
 
-              # Don't render "no results" while loading or when the authoritative
-              # catalog is unavailable.
               text = text.replace(
                   '{filteredCategories.length === 0 && (',
                   '{!serviceCatalogLoading && !serviceCatalogError && filteredCategories.length === 0 && (',
                   1,
               )
+              old_delay = 'Délai estimé: {service.delay} • Légal: 30-45j ouvrés' if public else 'Délai: {service.delay}'
+              new_delay = "{service.policyStatus === 'approved' ? 'Délai approuvé' : 'Délai opérationnel'}: {service.delay}"
+              if old_delay not in text:
+                  raise SystemExit(f'delay marker missing: {path_str}')
+              text = text.replace(old_delay, new_delay, 1)
 
-              # Clearly distinguish approved policy from operational estimates.
               if public:
-                  old_delay = '''Délai estimé: {service.delay} • Légal: 30-45j ouvrés'''
-                  new_delay = '''{service.policyStatus === 'approved' ? 'Délai approuvé' : 'Délai opérationnel'}: {service.delay}'''
-              else:
-                  old_delay = '''Délai: {service.delay}'''
-                  new_delay = '''{service.policyStatus === 'approved' ? 'Délai approuvé' : 'Délai opérationnel'}: {service.delay}'''
-              if old_delay in text:
-                  text = text.replace(old_delay, new_delay, 1)
-
-              # Public hero service count becomes live instead of a hard-coded 28.
-              if public:
+                  old_count = '28 services en ligne'
+                  if old_count not in text:
+                      raise SystemExit('public service count marker missing')
                   text = text.replace(
-                      '28 services en ligne',
+                      old_count,
                       "{serviceCatalogLoading ? 'Catalogue en cours…' : `${serviceCategories.reduce((total, category) => total + category.services.length, 0)} démarches publiées`}",
                       1,
                   )
 
               path.write_text(text, encoding='utf-8')
+              print(f'Patched {path_str}')
 
           patch_component('src/components/app/citizen-portal-page.tsx', False)
           patch_component('src/components/landing/public-citizen-portal.tsx', True)
@@ -127,11 +112,19 @@ jobs:
       - name: Commit dynamic catalog UI
         shell: bash
         run: |
+          git status --short
           if git diff --quiet -- src/components/app/citizen-portal-page.tsx src/components/landing/public-citizen-portal.tsx; then
-            exit 0
+            echo 'No component changes produced'
+            exit 1
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add src/components/app/citizen-portal-page.tsx src/components/landing/public-citizen-portal.tsx
           git commit -m 'feat(catalog): render citizen services from public server catalog'
           git push origin HEAD:agent/dynamic-public-service-catalog
+
+  diagnostics:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Temporary migration workflow is observable; push job performs the patch."
