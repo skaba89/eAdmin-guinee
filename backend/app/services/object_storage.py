@@ -50,6 +50,36 @@ class ObjectStorageService:
         await asyncio.to_thread(_put)
         logger.info("Stored administrative object key=%s size=%s", object_key, len(content))
 
+    async def get_bytes(self, object_key: str, max_bytes: int | None = None) -> bytes:
+        """Read an object into memory with an optional fail-closed size bound."""
+
+        def _get() -> bytes:
+            self._ensure_bucket_sync()
+            client = self._get_client()
+            if max_bytes is not None:
+                stat = client.stat_object(settings.MINIO_BUCKET_NAME, object_key)
+                if stat.size is not None and stat.size > max_bytes:
+                    raise ValueError(
+                        f"Object {object_key!r} exceeds the allowed processing size "
+                        f"({stat.size} > {max_bytes} bytes)."
+                    )
+
+            response = client.get_object(settings.MINIO_BUCKET_NAME, object_key)
+            try:
+                content = response.read(max_bytes + 1 if max_bytes is not None else None)
+                if max_bytes is not None and len(content) > max_bytes:
+                    raise ValueError(
+                        f"Object {object_key!r} exceeds the allowed processing size."
+                    )
+                return content
+            finally:
+                response.close()
+                response.release_conn()
+
+        content = await asyncio.to_thread(_get)
+        logger.info("Read administrative object key=%s size=%s", object_key, len(content))
+        return content
+
     async def delete(self, object_key: str) -> None:
         def _delete() -> None:
             self._ensure_bucket_sync()

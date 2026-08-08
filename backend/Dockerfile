@@ -23,11 +23,15 @@ FROM python:3.12-slim AS production
 
 WORKDIR /app
 
-# Install runtime dependencies only (including postgresql-client for pg_isready)
+# Runtime dependencies include the actual OCR engine used by the API.
+# Tesseract handles raster images and Poppler renders PDF pages before OCR.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     postgresql-client \
     curl \
+    tesseract-ocr \
+    tesseract-ocr-fra \
+    poppler-utils \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -r eadmin && useradd -r -g eadmin eadmin
 
