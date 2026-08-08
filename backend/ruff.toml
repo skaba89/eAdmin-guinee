@@ -1,0 +1,21 @@
+target-version = "py312"
+line-length = 100
+
+[lint]
+# P0 gate: syntax/undefined names, likely bugs, and security-sensitive patterns.
+# Formatting/import-order debt is handled separately so the gate remains stable
+# and focused on defects that can change runtime or security behaviour.
+select = ["E9", "F63", "F7", "F82", "B", "S"]
+ignore = [
+  "B008", # FastAPI Depends/Query calls in parameter defaults are framework idioms.
+  "S110", # Fail-open audit/telemetry blocks are intentional and reviewed separately.
+]
+
+[lint.per-file-ignores]
+"tests/**/*.py" = [
+  "S101", # pytest assert statements
+  "S105", # test-only credential literals
+  "S106",
+  "S107",
+  "S311", # deterministic/non-cryptographic randomness in tests
+]
