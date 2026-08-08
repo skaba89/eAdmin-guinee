@@ -216,6 +216,15 @@ app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentification"]
 
 rls_dependencies = [Depends(set_rls_context)]
 
+# Public administrative-service metadata is readable without authentication.
+# The route installs its own host-derived PUBLIC RLS context and does not accept
+# client tenant/institution headers in non-development environments.
+app.include_router(
+    service_catalog.public_router,
+    prefix="/api/v1/public/service-catalog",
+    tags=["Catalogue public des démarches"],
+)
+
 app.include_router(
     institutions.router,
     prefix="/api/v1/institutions",
