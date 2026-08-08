@@ -3,8 +3,8 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+import app.services.token_blacklist as module
 
-from app.services import token_blacklist as module
 from app.services.token_blacklist import (
     BLACKLIST_PREFIX,
     LOGIN_ATTEMPTS_PREFIX,
