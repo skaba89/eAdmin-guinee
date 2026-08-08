@@ -1,0 +1,107 @@
+groups:
+  - name: eadmin-availability
+    rules:
+      - alert: EAdminBackendDown
+        expr: up{job="eadmin-backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: backend
+          runbook: RB-API-001
+        annotations:
+          summary: "API eAdmin indisponible"
+          description: "Prometheus ne peut plus joindre le backend eAdmin depuis plus de 2 minutes."
+
+      - alert: EAdminHighServerErrorRate
+        expr: |
+          sum(rate(eadmin_requests_total{status=~"5.."}[5m]))
+          /
+          clamp_min(sum(rate(eadmin_requests_total[5m])), 0.001)
+          > 0.05
+        for: 10m
+        labels:
+          severity: critical
+          service: backend
+          runbook: RB-API-002
+        annotations:
+          summary: "Taux d'erreur serveur supérieur à 5 %"
+          description: "Plus de 5 % des requêtes HTTP retournent une erreur 5xx depuis 10 minutes."
+
+      - alert: EAdminHighP95Latency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(eadmin_request_duration_seconds_bucket[5m])) by (le)
+          ) > 2
+        for: 10m
+        labels:
+          severity: warning
+          service: backend
+          runbook: RB-API-003
+        annotations:
+          summary: "Latence p95 supérieure à 2 secondes"
+          description: "Le p95 HTTP dépasse 2 secondes depuis 10 minutes."
+
+  - name: eadmin-dependencies
+    rules:
+      - alert: EAdminPostgresExporterDown
+        expr: up{job="eadmin-postgres"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: postgresql
+          runbook: RB-DB-001
+        annotations:
+          summary: "Supervision PostgreSQL indisponible"
+          description: "Le postgres-exporter est injoignable. Vérifier le cluster PostgreSQL HA et la connectivité."
+
+      - alert: EAdminRedisExporterDown
+        expr: up{job="eadmin-redis"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: redis
+          runbook: RB-CACHE-001
+        annotations:
+          summary: "Supervision Redis indisponible"
+          description: "Le redis-exporter est injoignable. Vérifier Redis HA et la connectivité."
+
+      - alert: EAdminNodeDiskPressure
+        expr: |
+          (
+            node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"}
+            /
+            node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}
+          ) < 0.15
+        for: 15m
+        labels:
+          severity: warning
+          service: infrastructure
+          runbook: RB-INFRA-001
+        annotations:
+          summary: "Espace disque inférieur à 15 %"
+          description: "Un filesystem supervisé dispose de moins de 15 % d'espace libre."
+
+  - name: eadmin-security
+    rules:
+      - alert: EAdminAuthenticationFailureSpike
+        expr: sum(rate(eadmin_auth_attempts_total{result="failure"}[5m])) > 1
+        for: 10m
+        labels:
+          severity: warning
+          service: security
+          runbook: RB-SEC-001
+        annotations:
+          summary: "Hausse des échecs d'authentification"
+          description: "Plus d'un échec d'authentification par seconde en moyenne depuis 10 minutes."
+
+      - alert: EAdminRateLimitSpike
+        expr: sum(rate(eadmin_rate_limit_hits_total[5m])) > 5
+        for: 10m
+        labels:
+          severity: warning
+          service: security
+          runbook: RB-SEC-002
+        annotations:
+          summary: "Hausse des blocages rate-limit"
+          description: "Le rate limiter bloque plus de 5 requêtes par seconde en moyenne depuis 10 minutes."
