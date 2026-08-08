@@ -22,6 +22,7 @@ from app.api import (
     document_imports,
     document_ocr,
     document_query,
+    document_search,
     documents,
     documents_search,
     institutions,
@@ -272,6 +273,12 @@ app.include_router(
     document_ocr.router,
     prefix="/api/v1/documents",
     tags=["OCR documentaire"],
+    dependencies=rls_dependencies,
+)
+app.include_router(
+    document_search.router,
+    prefix="/api/v1/documents",
+    tags=["Recherche Documentaire PostgreSQL"],
     dependencies=rls_dependencies,
 )
 app.include_router(
