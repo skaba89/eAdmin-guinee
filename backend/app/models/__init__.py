@@ -3,6 +3,7 @@ Importation de tous les modèles ORM.
 Nécessaire pour qu'Alembic et SQLAlchemy les détectent.
 """
 
+from app.models.access_grant import AccessGrant
 from app.models.administrative_service import AdministrativeService
 from app.models.audit import AuditLog
 from app.models.courrier import (
@@ -35,6 +36,7 @@ from app.models.workflow import (
 )
 
 __all__ = [
+    "AccessGrant",
     "AdministrativeService",
     "User",
     "RoleEnum",
