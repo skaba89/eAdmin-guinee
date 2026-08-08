@@ -1,7 +1,7 @@
 """Global guard for MFA-pending access tokens.
 
 A password-only login for an MFA-enabled account receives a short-lived access
-JWT with ``mfa_required=true`` and ``mfa_verified=false``.  That token is only
+JWT with ``mfa_required=true`` and ``mfa_verified=false``. That token is only
 allowed to reach the endpoints required to complete or cancel the MFA flow.
 """
 
@@ -24,8 +24,6 @@ class MFAGuardMiddleware(BaseHTTPMiddleware):
         "/api/v1/auth/me",
         "/api/v1/auth/verify-mfa",
         "/api/v1/auth/logout",
-        # Compatibility with the legacy security router during migration.
-        "/api/v1/security/verify-mfa",
     }
 
     async def dispatch(self, request: Request, call_next):
