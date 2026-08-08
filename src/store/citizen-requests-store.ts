@@ -339,6 +339,7 @@ export const useCitizenRequestsStore = create<CitizenRequestsState>((set, get) =
     // Resolve routing before creating anything. If routing is ambiguous, the
     // caller can safely retry because no server-side request exists yet.
     const targetInstitutionId = await resolveTargetInstitution({
+      categoryId: req.categoryId,
       mairie,
       citizenAddress: req.citizenAddress,
       targetInstitutionId: req.targetInstitutionId,
@@ -346,7 +347,6 @@ export const useCitizenRequestsStore = create<CitizenRequestsState>((set, get) =
 
     const created = await serviceRequestsApi.createRequest({
       serviceId: req.serviceId,
-      categoryId: req.categoryId,
       targetInstitutionId,
       citizenName: req.citizenName,
       citizenFirstName: req.citizenFirstName,
