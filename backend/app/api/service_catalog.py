@@ -1,26 +1,29 @@
 """Versioned administrative-service catalog API.
 
-Citizens and staff can read the active catalog for their tenant. Only ADMIN and
-SUPER_ADMIN can publish a new version. Historical versions are never edited in
-place: publishing closes the currently active version and inserts a successor.
+The active catalog is public administrative information, while version history
+and publication remain authenticated governance operations. Public reads still
+install a tenant-scoped PostgreSQL RLS context derived from the trusted host
+resolution; production callers cannot switch tenant scope with request headers.
 """
 
+from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import func, or_, select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user
 from app.config import settings
-from app.database import get_db
+from app.database import current_rls_scope, get_db
 from app.models.administrative_service import AdministrativeService
 from app.models.user import RoleEnum, User
-from app.services.service_catalog import serialize_service
+from app.services.service_catalog import list_active_services, serialize_service
 
 router = APIRouter()
+public_router = APIRouter()
 
 
 class ServiceVersionCreate(BaseModel):
@@ -44,6 +47,94 @@ class ServiceVersionCreate(BaseModel):
         return self
 
 
+async def set_public_catalog_context(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> AsyncGenerator[str, None]:
+    """Install a read-only tenant RLS scope for the unauthenticated catalog.
+
+    Tenant headers are intentionally rejected outside development because the
+    public surface must be routed by trusted deployment host/domain context,
+    not by an arbitrary browser-provided tenant identifier.
+    """
+    if not settings.is_development and (
+        request.headers.get("X-Tenant-ID") or request.headers.get("X-Institution-ID")
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Les en-têtes de périmètre ne sont pas autorisés sur le catalogue public.",
+        )
+
+    tenant_id = getattr(request.state, "tenant_id", None) or settings.TENANT_DEFAULT_ID
+    scope = {
+        "user_id": "",
+        "tenant_id": tenant_id,
+        "institution_id": "",
+        "role": "PUBLIC",
+        "is_super_admin": False,
+    }
+    db.sync_session.info["rls_scope"] = scope
+    context_token = current_rls_scope.set(scope)
+
+    try:
+        bind = db.get_bind()
+        dialect_name = bind.dialect.name if bind is not None else "unknown"
+        if dialect_name == "postgresql":
+            await db.execute(
+                text(
+                    """
+                    SELECT
+                        set_config('app.current_user_id', '', true),
+                        set_config('app.current_tenant_id', :tenant_id, true),
+                        set_config('app.current_institution_id', '', true),
+                        set_config('app.current_role', 'PUBLIC', true)
+                    """
+                ),
+                {"tenant_id": tenant_id},
+            )
+        elif not settings.is_test:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Le catalogue public nécessite le contexte de sécurité PostgreSQL.",
+            )
+
+        yield tenant_id
+    finally:
+        current_rls_scope.reset(context_token)
+        db.sync_session.info.pop("rls_scope", None)
+
+
+async def _catalog_response(
+    db: AsyncSession,
+    tenant_id: str,
+    *,
+    category_id: str | None = None,
+    search: str | None = None,
+) -> dict:
+    items = await list_active_services(
+        db,
+        tenant_id,
+        category_id=category_id,
+        search=search,
+    )
+    return {"items": [serialize_service(item) for item in items]}
+
+
+@public_router.get("", summary="Catalogue public actif des démarches administratives")
+async def public_service_catalog(
+    category_id: str | None = Query(None, max_length=100),
+    search: str | None = Query(None, max_length=100),
+    db: AsyncSession = Depends(get_db),
+    tenant_id: str = Depends(set_public_catalog_context),
+) -> dict:
+    return await _catalog_response(
+        db,
+        tenant_id,
+        category_id=category_id,
+        search=search,
+    )
+
+
 @router.get("", summary="Catalogue actif des démarches administratives")
 async def list_service_catalog(
     category_id: str | None = Query(None, max_length=100),
@@ -52,38 +143,12 @@ async def list_service_catalog(
     current_user: User = Depends(get_current_user),
 ) -> dict:
     tenant_id = current_user.tenant_id or settings.TENANT_DEFAULT_ID
-    now = datetime.now(timezone.utc)
-    query = select(AdministrativeService).where(
-        AdministrativeService.tenant_id == tenant_id,
-        AdministrativeService.is_active.is_(True),
-        AdministrativeService.effective_from <= now,
-        or_(
-            AdministrativeService.effective_to.is_(None),
-            AdministrativeService.effective_to > now,
-        ),
+    return await _catalog_response(
+        db,
+        tenant_id,
+        category_id=category_id,
+        search=search,
     )
-    if category_id:
-        query = query.where(AdministrativeService.category_id == category_id)
-    if search:
-        term = f"%{search.strip()}%"
-        query = query.where(
-            or_(
-                AdministrativeService.name.ilike(term),
-                AdministrativeService.description.ilike(term),
-                AdministrativeService.service_id.ilike(term),
-            )
-        )
-
-    items = (
-        await db.execute(
-            query.order_by(
-                AdministrativeService.category_name,
-                AdministrativeService.name,
-                AdministrativeService.version.desc(),
-            )
-        )
-    ).scalars().all()
-    return {"items": [serialize_service(item) for item in items]}
 
 
 @router.get("/{service_id}/history", summary="Historique des versions d'une démarche")
