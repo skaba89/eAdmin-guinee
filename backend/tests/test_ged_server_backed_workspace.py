@@ -1,6 +1,7 @@
 """Regression tests for the server-backed GED workspace."""
 
 import hashlib
+import uuid
 from unittest.mock import AsyncMock
 
 import pytest
@@ -48,8 +49,9 @@ async def test_atomic_import_persists_exact_hash_and_official_metadata(
     assert payload["tags"]["document_type"] == "Arrêté"
     assert payload["tags"]["classification"] == "CONFIDENTIEL"
 
+    document_id = uuid.UUID(payload["id"])
     document = (
-        await db_session.execute(select(Document).where(Document.id == payload["id"]))
+        await db_session.execute(select(Document).where(Document.id == document_id))
     ).scalar_one()
     version = (
         await db_session.execute(
@@ -96,8 +98,9 @@ async def test_legacy_create_cannot_inject_file_authority(
     assert payload["file_size"] is None
     assert payload["version"] == 0
 
+    document_id = uuid.UUID(payload["id"])
     document = (
-        await db_session.execute(select(Document).where(Document.id == payload["id"]))
+        await db_session.execute(select(Document).where(Document.id == document_id))
     ).scalar_one()
     assert document.file_path is None
     assert document.current_version == 0
