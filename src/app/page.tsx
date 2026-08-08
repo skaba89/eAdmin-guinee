@@ -2,11 +2,10 @@
 
 import { useEffect, useRef } from 'react'
 import dynamic from 'next/dynamic'
-import { useAppStore, ROLE_DEFAULT_PAGE, type AppPage } from '@/store/app-store'
+import { useAppStore, type AppPage } from '@/store/app-store'
 import { useCitizenRequestsStore } from '@/store/citizen-requests-store'
 import { canAccessPage, getDefaultPage } from '@/lib/rbac'
 
-// Lazy load all page components to reduce initial bundle size
 const LandingPage = dynamic(() => import('@/components/landing/landing-page').then(m => ({ default: m.LandingPage })), { ssr: false })
 const AboutPage = dynamic(() => import('@/components/landing/about-page').then(m => ({ default: m.AboutPage })), { ssr: false })
 const ServicesPage = dynamic(() => import('@/components/landing/services-page').then(m => ({ default: m.ServicesPage })), { ssr: false })
@@ -87,20 +86,19 @@ const appPages: Record<string, React.ComponentType> = {
   'ai-assistant': AiAssistantPage,
 }
 
-// RBAC is now centralized in src/lib/rbac.ts — canAccessPage() and getDefaultPage()
-// No more duplicate ROLE_PAGE_ACCESS here.
-
 export default function Home() {
-  const { currentPage, isAuth, user, navigate } = useAppStore()
+  const { currentPage, isAuth, user, navigate, restoreSession } = useAppStore()
   const checkAndRejectExpiredRequests = useCitizenRequestsStore((s) => s.checkAndRejectExpiredRequests)
   const deadlineCheckRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Global deadline enforcement: run on app load + every 30 minutes
   useEffect(() => {
-    // Run immediately on mount
-    checkAndRejectExpiredRequests()
+    void restoreSession()
+  }, [restoreSession])
 
-    // Then periodically every 30 minutes
+  // Existing demo deadline automation is preserved for now; it will be moved
+  // server-side in the dedicated P0 persistence/SLA correction.
+  useEffect(() => {
+    checkAndRejectExpiredRequests()
     deadlineCheckRef.current = setInterval(() => {
       checkAndRejectExpiredRequests()
     }, 30 * 60 * 1000)
@@ -112,22 +110,18 @@ export default function Home() {
     }
   }, [checkAndRejectExpiredRequests])
 
-  // Auth pages (login, register, etc.)
   if (!isAuth && currentPage in authPages) {
     const AuthComponent = authPages[currentPage]
     return <AuthComponent />
   }
 
-  // Authenticated app pages — using unified RBAC from src/lib/rbac.ts
   if (isAuth) {
     const page = currentPage as AppPage
     const defaultPage = getDefaultPage(user)
     const hasAccess = canAccessPage(user, page)
     const effectivePage = hasAccess ? page : defaultPage
 
-    // Redirect if user is on a page they can't access
     if (!hasAccess) {
-      // Use microtask to avoid setState during render
       Promise.resolve().then(() => navigate(defaultPage))
     }
 
@@ -146,7 +140,6 @@ export default function Home() {
     )
   }
 
-  // Public landing pages
   const isPublicPage = currentPage in publicPages
   const PageComponent = isPublicPage ? publicPages[currentPage] : LandingPage
 
