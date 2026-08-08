@@ -82,21 +82,28 @@ async def set_rls_context(
     tenant_id = _normalized(current_user.tenant_id) or settings.TENANT_DEFAULT_ID
     institution_id = _normalized(current_user.institution_id)
     role = current_user.role.value
+    is_super_admin = current_user.role == RoleEnum.SUPER_ADMIN
 
-    # Keep the trusted scope available to application services. Never reuse the
-    # untrusted routing header values after this point.
     request.state.rls_user_id = user_id
     request.state.rls_tenant_id = tenant_id
     request.state.rls_institution_id = institution_id
     request.state.rls_role = role
 
+    # The synchronous session behind AsyncSession owns ORM flush events. This
+    # trusted metadata lets the central before_flush hook stamp every new
+    # tenant-scoped entity, preventing mass-assignment of tenant/institution.
+    db.sync_session.info["rls_scope"] = {
+        "user_id": user_id,
+        "tenant_id": tenant_id,
+        "institution_id": institution_id,
+        "role": role,
+        "is_super_admin": is_super_admin,
+    }
+
     try:
         bind = db.get_bind()
         dialect_name = bind.dialect.name if bind is not None else "unknown"
 
-        # The test suite uses SQLite. RLS is a PostgreSQL enforcement feature;
-        # unit tests still validate scope mismatch behaviour without pretending
-        # SQLite can enforce PostgreSQL policies.
         if dialect_name != "postgresql":
             if settings.is_test:
                 logger.debug("RLS SQL context skipped for test dialect=%s", dialect_name)
@@ -135,6 +142,7 @@ async def set_rls_context(
     except HTTPException:
         raise
     except Exception as exc:
+        db.sync_session.info.pop("rls_scope", None)
         logger.error(
             "RLS context setup failed; request blocked: user=%s tenant=%s error=%s",
             user_id,
@@ -151,8 +159,7 @@ class RLSMiddleware:
     """Legacy ASGI compatibility shim.
 
     RLS must be attached as a FastAPI dependency so it shares the exact same
-    ``AsyncSession``/transaction as the endpoint query. The shim intentionally
-    performs no database work.
+    ``AsyncSession``/transaction as the endpoint query.
     """
 
     def __init__(self, app):
