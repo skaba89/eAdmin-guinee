@@ -248,6 +248,8 @@ export function CitizenPortalPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [successToast, setSuccessToast] = useState('')
+  const [submissionError, setSubmissionError] = useState('')
+  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false)
 
   // Request dialog
   const [requestDialogOpen, setRequestDialogOpen] = useState(false)
@@ -341,32 +343,53 @@ export function CitizenPortalPage() {
     return Object.keys(errors).length === 0
   }
 
-  const handleSubmitRequest = () => {
-    if (!validateForm() || !selectedService || !selectedCategoryInfo) return
+  const handleSubmitRequest = async () => {
+    if (!validateForm() || !selectedService || !selectedCategoryInfo || isSubmittingRequest) return
 
-    const newRequest = addRequest({
-      serviceId: selectedService.id,
-      serviceName: selectedService.name,
-      category: selectedCategoryInfo.name,
-      categoryId: selectedCategoryInfo.id,
-      citizenName: form.citizenName,
-      citizenFirstName: form.citizenFirstName,
-      citizenNIN: form.citizenNIN,
-      citizenPhone: form.citizenPhone,
-      citizenEmail: form.citizenEmail,
-      citizenAddress: form.citizenAddress,
-      motif: form.motif || `Demande de ${selectedService.name}`,
-      documents: selectedService.requiredDocs,
-      uploadedDocuments: Array.from(uploadedFiles.values()),
-      createdAt: new Date().toISOString(),
-      deliveryMode: form.deliveryMode,
-    })
+    setSubmissionError('')
+    setIsSubmittingRequest(true)
 
-    setRequestDialogOpen(false)
-    setUploadedFiles(new Map())
-    setUploadErrors({})
-    setSuccessToast(`Demande soumise avec succès ! Référence : ${newRequest.reference}`)
-    setActiveTab('mes-demandes')
+    try {
+      const { request: newRequest, attachmentErrors } = await addRequest({
+        serviceId: selectedService.id,
+        serviceName: selectedService.name,
+        category: selectedCategoryInfo.name,
+        categoryId: selectedCategoryInfo.id,
+        citizenName: form.citizenName,
+        citizenFirstName: form.citizenFirstName,
+        citizenNIN: form.citizenNIN,
+        citizenPhone: form.citizenPhone,
+        citizenEmail: form.citizenEmail,
+        citizenAddress: form.citizenAddress,
+        motif: form.motif || `Demande de ${selectedService.name}`,
+        documents: selectedService.requiredDocs,
+        uploadedDocuments: Array.from(uploadedFiles.values()),
+        createdAt: new Date().toISOString(),
+        deliveryMode: form.deliveryMode,
+      })
+
+      setRequestDialogOpen(false)
+      setUploadedFiles(new Map())
+      setUploadErrors({})
+      setSubmissionError('')
+      setActiveTab('mes-demandes')
+
+      if (attachmentErrors.length) {
+        setSuccessToast(
+          `Demande enregistrée sous la référence ${newRequest.reference}. ${attachmentErrors.length} pièce(s) restent à transmettre.`,
+        )
+      } else {
+        setSuccessToast(`Demande soumise avec succès ! Référence officielle : ${newRequest.reference}`)
+      }
+    } catch (error) {
+      setSubmissionError(
+        error instanceof Error
+          ? error.message
+          : 'La demande n’a pas pu être enregistrée. Vérifiez votre connexion puis réessayez.',
+      )
+    } finally {
+      setIsSubmittingRequest(false)
+    }
   }
 
   const handleTrack = () => {
@@ -1758,11 +1781,33 @@ export function CitizenPortalPage() {
             </div>
           )}
 
+          {submissionError && (
+            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300" role="alert">
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <span>{submissionError}</span>
+            </div>
+          )}
+
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setRequestDialogOpen(false)} className="focus-ring-premium">Annuler</Button>
-            <Button className="btn-guinea gap-2" onClick={handleSubmitRequest}>
-              <Send className="size-4" />
-              Soumettre la demande
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSubmissionError('')
+                setRequestDialogOpen(false)
+              }}
+              className="focus-ring-premium"
+              disabled={isSubmittingRequest}
+            >
+              Annuler
+            </Button>
+            <Button
+              className="btn-guinea gap-2"
+              onClick={() => void handleSubmitRequest()}
+              disabled={isSubmittingRequest}
+              aria-busy={isSubmittingRequest}
+            >
+              <Send className={`size-4 ${isSubmittingRequest ? 'animate-pulse' : ''}`} />
+              {isSubmittingRequest ? 'Enregistrement sécurisé…' : 'Soumettre la demande'}
             </Button>
           </DialogFooter>
         </DialogContent>

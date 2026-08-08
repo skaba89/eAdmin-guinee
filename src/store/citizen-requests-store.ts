@@ -269,12 +269,17 @@ type NewRequestInput = Omit<
   'assignedService' | 'assignedAgent' | 'deadlineDays' | 'deadlineDate'
 >
 
+export interface RequestSubmissionResult {
+  request: CitizenRequest
+  attachmentErrors: string[]
+}
+
 interface CitizenRequestsState {
   requests: CitizenRequest[]
   isLoading: boolean
   syncError: string | null
   hydrateRequests: () => Promise<void>
-  addRequest: (req: NewRequestInput) => CitizenRequest
+  addRequest: (req: NewRequestInput) => Promise<RequestSubmissionResult>
   updateRequestStatus: (id: string, status: RequestStatus, note?: string) => void
   addProcessingNote: (id: string, note: Omit<ProcessingNote, 'id' | 'date'>) => void
   advanceTimeline: (id: string) => void
@@ -319,81 +324,72 @@ export const useCitizenRequestsStore = create<CitizenRequestsState>((set, get) =
     }
   },
 
-  addRequest: (req) => {
-    const now = new Date()
-    const tempId = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  addRequest: async (req) => {
+    set({ syncError: null })
+
     let mairie = req.mairie
     if ((req.categoryId === 'etat-civil' || req.categoryId === 'residence') && !mairie) {
       const match = req.citizenAddress.match(/Commune de\s+([^,]+)/i)
       if (match) mairie = `Mairie de ${match[1].trim()}`
     }
 
-    // Compatibility object for the existing synchronous dialog. It is memory
-    // only, clearly marked non-official, and is replaced by the API record.
-    const provisional: CitizenRequest = {
-      ...req,
+    // Resolve routing before creating anything. If routing is ambiguous, the
+    // caller can safely retry because no server-side request exists yet.
+    const targetInstitutionId = await resolveTargetInstitution({
+      categoryId: req.categoryId,
       mairie,
-      id: tempId,
-      reference: 'ENREGISTREMENT-SERVEUR',
-      status: 'soumise',
-      assignedService: 'Routage en cours',
-      assignedAgent: '',
-      processingNotes: [],
-      timeline: provisionalTimeline(),
-      deadlineDays: getDeadlineDays(req.categoryId),
-      deadlineDate: addBusinessDays(now, getDeadlineDays(req.categoryId)).toISOString(),
-      createdAt: req.createdAt || now.toISOString(),
-      updatedAt: now.toISOString(),
-    }
-    set((state) => ({ requests: [provisional, ...state.requests], syncError: null }))
+      citizenAddress: req.citizenAddress,
+      targetInstitutionId: req.targetInstitutionId,
+    })
 
-    void (async () => {
+    const created = await serviceRequestsApi.createRequest({
+      serviceId: req.serviceId,
+      serviceName: req.serviceName,
+      category: req.category,
+      categoryId: req.categoryId,
+      targetInstitutionId,
+      citizenName: req.citizenName,
+      citizenFirstName: req.citizenFirstName,
+      citizenNIN: req.citizenNIN,
+      citizenPhone: req.citizenPhone,
+      citizenEmail: req.citizenEmail,
+      citizenAddress: req.citizenAddress,
+      motif: req.motif,
+      documents: req.documents,
+      mairie,
+      deliveryMode: req.deliveryMode,
+    })
+
+    // From this point on the request exists officially. Never remove it from
+    // memory or report a generic submission failure if a later attachment fails;
+    // doing so would encourage duplicate citizen requests on retry.
+    set((state) => ({
+      requests: [created, ...state.requests.filter((item) => item.id !== created.id)],
+      syncError: null,
+    }))
+
+    const attachmentErrors: string[] = []
+    for (const document of req.uploadedDocuments || []) {
+      if (document.serverStored) continue
       try {
-        const targetInstitutionId = await resolveTargetInstitution({
-          categoryId: req.categoryId,
-          mairie,
-          citizenAddress: req.citizenAddress,
-          targetInstitutionId: req.targetInstitutionId,
-        })
-
-        const created = await serviceRequestsApi.createRequest({
-          serviceId: req.serviceId,
-          serviceName: req.serviceName,
-          category: req.category,
-          categoryId: req.categoryId,
-          targetInstitutionId,
-          citizenName: req.citizenName,
-          citizenFirstName: req.citizenFirstName,
-          citizenNIN: req.citizenNIN,
-          citizenPhone: req.citizenPhone,
-          citizenEmail: req.citizenEmail,
-          citizenAddress: req.citizenAddress,
-          motif: req.motif,
-          documents: req.documents,
-          mairie,
-          deliveryMode: req.deliveryMode,
-        })
-
-        set((state) => ({
-          requests: [created, ...state.requests.filter((item) => item.id !== tempId && item.id !== created.id)],
-        }))
-
-        for (const document of req.uploadedDocuments || []) {
-          if (document.serverStored) continue
-          const file = await dataUrlToFile(document)
-          await serviceRequestsApi.uploadAttachment(created.id, file, document.requiredDocName)
-        }
-
-        await get().hydrateRequests()
+        const file = await dataUrlToFile(document)
+        await serviceRequestsApi.uploadAttachment(created.id, file, document.requiredDocName)
       } catch (error) {
-        set((state) => ({
-          requests: state.requests.filter((item) => item.id !== tempId),
-          syncError: error instanceof Error ? error.message : 'Soumission de la demande impossible.',
-        }))
+        const reason = error instanceof Error ? error.message : 'échec de transmission'
+        attachmentErrors.push(`${document.name}: ${reason}`)
       }
-    })()
+    }
 
-    return provisional
+    await get().hydrateRequests()
+    const refreshed = get().requests.find((item) => item.id === created.id) || created
+
+    if (attachmentErrors.length) {
+      set({
+        syncError: `La demande ${created.reference} est enregistrée, mais ${attachmentErrors.length} pièce(s) n’ont pas été transmise(s).`,
+      })
+    }
+
+    return { request: refreshed, attachmentErrors }
   },
 
   updateRequestStatus: (id, requestStatus, note) => {
