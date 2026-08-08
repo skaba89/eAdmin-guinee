@@ -4,8 +4,8 @@ from datetime import timedelta
 from unittest.mock import MagicMock
 
 import pytest
+import app.services.object_storage as module
 
-from app.services import object_storage as module
 from app.services.object_storage import ObjectStorageService
 
 
