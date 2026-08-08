@@ -52,17 +52,19 @@ jobs:
         shell: bash
         run: |
           docker run --rm \
+            --entrypoint /bin/promtool \
             -v "${PWD}/monitoring:/etc/prometheus:ro" \
             prom/prometheus:v2.51.0 \
-            promtool check config /etc/prometheus/prometheus.production.yml
+            check config /etc/prometheus/prometheus.production.yml
 
       - name: Validate eAdmin alert rules
         shell: bash
         run: |
           docker run --rm \
+            --entrypoint /bin/promtool \
             -v "${PWD}/monitoring:/etc/prometheus:ro" \
             prom/prometheus:v2.51.0 \
-            promtool check rules /etc/prometheus/alerts/eadmin.rules.yml
+            check rules /etc/prometheus/alerts/eadmin.rules.yml
 
   backup-restore-drill:
     name: PostgreSQL backup and restore drill
