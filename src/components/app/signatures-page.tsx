@@ -1,399 +1,440 @@
 'use client'
 
-import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
-  PenTool, CheckCircle2, Clock, XCircle, Shield, QrCode,
-  FileText, User, Calendar, Hash, Award, Eye, MoreHorizontal,
-  Fingerprint, FileCheck, Mail, GitBranch, UserCheck
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  FileCheck,
+  FileText,
+  Fingerprint,
+  Hash,
+  KeyRound,
+  Loader2,
+  PenTool,
+  RefreshCw,
+  Shield,
+  Stamp,
+  User,
+  XCircle,
 } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Separator } from '@/components/ui/separator'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from '@/components/ui/dialog'
-import { useAppStore } from '@/store/app-store'
+import * as parapheurApi from '@/lib/parapheur-api'
 
-interface SignatureRequest {
-  id: string
-  documentName: string
-  requestedBy: string
-  requestedByName: string
-  date: string
-  status: 'en_attente' | 'signée' | 'rejetée'
-  type: 'Visa' | 'Signature' | 'Cachet'
-  hash?: string
-  certificate?: string
-  timestamp?: string
-  qrCode?: string
+const ACTION_LABELS: Record<string, string> = {
+  sign: 'Signer',
+  approve: 'Approuver',
+  viser: 'Viser',
+  stamp: 'Apposer le cachet',
+  reject: 'Rejeter',
 }
 
-const FAKE_SIGNATURES: SignatureRequest[] = [
-  { id: '1', documentName: 'Arrêté n°2024-001/AIT', requestedBy: 'cabinet', requestedByName: 'Cabinet du Ministre', date: '2024-12-15', status: 'en_attente', type: 'Signature' },
-  { id: '2', documentName: 'Décret n°D/2024/089/PRG', requestedBy: 'sgg', requestedByName: 'Secrétariat Général du Gouvernement', date: '2024-12-14', status: 'signée', type: 'Signature', hash: 'a7f3b2c9d1e4f5a6b7c8d9e0f1a2b3c4', certificate: 'CN=Certigna/C=GN', timestamp: '2024-12-14 16:42:31 GMT' },
-  { id: '3', documentName: 'Circulaire n°C/2024/045/MAT', requestedBy: 'mat', requestedByName: 'Ministère de l\'Administration Territoriale', date: '2024-12-13', status: 'en_attente', type: 'Visa' },
-  { id: '4', documentName: 'Convention UNDP 2025', requestedBy: 'coop', requestedByName: 'Direction de la Coopération', date: '2024-12-12', status: 'signée', type: 'Signature', hash: 'd4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9', certificate: 'CN=Certigna/C=GN', timestamp: '2024-12-12 11:18:45 GMT' },
-  { id: '5', documentName: 'Marché public MP-2024-567', requestedBy: 'marche', requestedByName: 'Commission des Marchés Publics', date: '2024-12-11', status: 'en_attente', type: 'Cachet' },
-  { id: '6', documentName: 'Budget prévisionnel 2025', requestedBy: 'dgb', requestedByName: 'Direction Générale du Budget', date: '2024-12-10', status: 'signée', type: 'Visa', hash: 'b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6', certificate: 'CN=Certigna/C=GN', timestamp: '2024-12-10 09:55:12 GMT' },
-  { id: '7', documentName: 'Procès-verbal CS-2024-089', requestedBy: 'cs', requestedByName: 'Conseil des Secrétaires', date: '2024-12-09', status: 'rejetée', type: 'Signature' },
-  { id: '8', documentName: 'Ordonnance n°O/2024/023/PRG', requestedBy: 'pres', requestedByName: 'Présidence de la République', date: '2024-12-08', status: 'signée', type: 'Signature', hash: 'e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1', certificate: 'CN=ANSSI/C=GN', timestamp: '2024-12-08 14:22:08 GMT' },
-]
+const ACTION_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  sign: PenTool,
+  approve: CheckCircle2,
+  viser: FileCheck,
+  stamp: Stamp,
+  reject: XCircle,
+}
 
-const STATUS_MAP = {
-  en_attente: { label: 'En attente', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: Clock },
-  signée: { label: 'Signée', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', icon: CheckCircle2 },
-  rejetée: { label: 'Rejetée', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', icon: XCircle },
+function formatDate(value?: string | null) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat('fr-FR', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date)
+}
+
+function shortenHash(value?: string | null) {
+  if (!value) return '—'
+  return value.length > 28 ? `${value.slice(0, 14)}…${value.slice(-10)}` : value
 }
 
 export function SignaturesPage() {
-  const navigate = useAppStore((s) => s.navigate)
-  const [signatures, setSignatures] = useState<SignatureRequest[]>(FAKE_SIGNATURES)
-  const [activeTab, setActiveTab] = useState('en_attente')
-  const [selectedSig, setSelectedSig] = useState<SignatureRequest | null>(null)
-  const [signDialogOpen, setSignDialogOpen] = useState(false)
-  const [verifyResult, setVerifyResult] = useState<SignatureRequest | null>(null)
-  const [verifyDialogOpen, setVerifyDialogOpen] = useState(false)
-  const [successToast, setSuccessToast] = useState('')
+  const [pending, setPending] = useState<parapheurApi.PendingParapheurItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [selected, setSelected] = useState<parapheurApi.PendingParapheurItem | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [comment, setComment] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [lastAction, setLastAction] = useState<parapheurApi.AdvanceParapheurResult | null>(null)
+  const [verifyCircuitId, setVerifyCircuitId] = useState('')
+  const [verifyHash, setVerifyHash] = useState('')
+  const [verifyResult, setVerifyResult] = useState<parapheurApi.VerificationResult | null>(null)
+  const [verifyError, setVerifyError] = useState<string | null>(null)
+  const [isVerifying, setIsVerifying] = useState(false)
+  const [toast, setToast] = useState('')
 
-  const filtered = signatures.filter(s => {
-    if (activeTab === 'en_attente') return s.status === 'en_attente'
-    if (activeTab === 'signees') return s.status === 'signée'
-    return true
-  })
+  const loadPending = useCallback(async () => {
+    setIsLoading(true)
+    setLoadError(null)
+    try {
+      setPending(await parapheurApi.listPending())
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Impossible de charger le parapheur.')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
 
-  const totalSignees = signatures.filter(s => s.status === 'signée').length
-  const totalEnAttente = signatures.filter(s => s.status === 'en_attente').length
-  const tauxConformite = 98.5
+  useEffect(() => {
+    void loadPending()
+  }, [loadPending])
 
-  const stats = [
-    { label: 'Total signées', value: totalSignees, icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
-    { label: 'En attente', value: totalEnAttente, icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
-    { label: 'Taux conformité', value: `${tauxConformite}%`, icon: Shield, color: 'text-brand dark:text-primary', bg: 'bg-brand/5 dark:bg-primary/10' },
-  ]
+  const actionCounts = useMemo(() => {
+    return pending.reduce<Record<string, number>>((acc, item) => {
+      acc[item.action_type] = (acc[item.action_type] || 0) + 1
+      return acc
+    }, {})
+  }, [pending])
+
+  const openAction = (item: parapheurApi.PendingParapheurItem) => {
+    setSelected(item)
+    setComment('')
+    setActionError(null)
+    setDialogOpen(true)
+  }
+
+  const executeAction = async (action: parapheurApi.ParapheurAction) => {
+    if (!selected || isSubmitting) return
+    if (action === 'reject' && !comment.trim()) {
+      setActionError('Une raison de rejet est obligatoire pour assurer la traçabilité.')
+      return
+    }
+
+    setIsSubmitting(true)
+    setActionError(null)
+    try {
+      const result = await parapheurApi.advance(selected, action, comment)
+      setLastAction(result)
+      setDialogOpen(false)
+      setToast(
+        action === 'reject'
+          ? 'Décision de rejet enregistrée dans le parapheur.'
+          : 'Action enregistrée avec une preuve d’approbation interne.',
+      )
+      if (result.signature_hash) {
+        setVerifyCircuitId(result.circuit_id)
+        setVerifyHash(result.signature_hash)
+        try {
+          setVerifyResult(await parapheurApi.verify(result.circuit_id, result.signature_hash))
+          setVerifyError(null)
+        } catch {
+          setVerifyResult(null)
+        }
+      }
+      await loadPending()
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Action impossible.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const verifyEvidence = async () => {
+    if (!verifyCircuitId.trim() || !verifyHash.trim() || isVerifying) return
+    setIsVerifying(true)
+    setVerifyError(null)
+    setVerifyResult(null)
+    try {
+      setVerifyResult(await parapheurApi.verify(verifyCircuitId.trim(), verifyHash.trim()))
+    } catch (error) {
+      setVerifyError(error instanceof Error ? error.message : 'Vérification impossible.')
+    } finally {
+      setIsVerifying(false)
+    }
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {stats.map((stat, i) => (
-          <motion.div key={stat.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}>
-            <Card className="glass-card hover:shadow-lg transition-shadow">
-              <CardContent className="flex items-center gap-4">
-                <div className={`p-3 rounded-xl ${stat.bg} ${stat.color}`}>
-                  <stat.icon className="h-6 w-6" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">{stat.label}</p>
-                  <p className="text-2xl font-bold">{stat.value}</p>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+    <div className="space-y-6 p-4 md:p-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <div className="flex items-center gap-3">
+            <div className="flex size-11 items-center justify-center rounded-xl bg-[#0B2E58] text-white shadow-sm">
+              <PenTool className="size-5" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-[#0B2E58] dark:text-white">Parapheur électronique</h1>
+              <p className="text-sm text-muted-foreground">
+                Visas, approbations, signatures internes et cachets soumis à contrôle serveur.
+              </p>
+            </div>
+          </div>
+        </div>
+        <Button variant="outline" className="gap-2" onClick={() => void loadPending()} disabled={isLoading}>
+          <RefreshCw className={`size-4 ${isLoading ? 'animate-spin' : ''}`} />
+          Actualiser
+        </Button>
+      </div>
+
+      <Card className="border-amber-200 bg-amber-50/60 dark:border-amber-900 dark:bg-amber-950/20">
+        <CardContent className="flex gap-3 p-4">
+          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-600" />
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">Niveau de preuve actuellement disponible</p>
+            <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-300">
+              eAdmin produit une <strong>preuve d’approbation interne SHA-256</strong> liée à la version exacte du document,
+              à l’identité authentifiée, à l’action et au timestamp serveur. La <strong>signature PKI qualifiée avec certificat
+              et horodatage TSA externe n’est pas encore configurée</strong> et n’est donc pas revendiquée par l’application.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          { label: 'À traiter', value: pending.length, icon: Clock },
+          { label: 'Signatures', value: actionCounts.sign || 0, icon: PenTool },
+          { label: 'Visas / approbations', value: (actionCounts.viser || 0) + (actionCounts.approve || 0), icon: FileCheck },
+          { label: 'Cachets', value: actionCounts.stamp || 0, icon: Stamp },
+        ].map((stat) => (
+          <Card key={stat.label}>
+            <CardContent className="flex items-center gap-3 p-4">
+              <div className="flex size-9 items-center justify-center rounded-lg bg-[#0B2E58]/10 text-[#0B2E58] dark:bg-primary/10 dark:text-primary">
+                <stat.icon className="size-4" />
+              </div>
+              <div>
+                <p className="text-xl font-bold tabular-nums">{stat.value}</p>
+                <p className="text-xs text-muted-foreground">{stat.label}</p>
+              </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
-      {/* Quick Actions */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-      >
-        <Card className="shadow-sm border-[#C8A45C]/20 dark:border-[#D4B878]/20 bg-gradient-to-r from-[#0B2E58]/[0.02] to-[#C8A45C]/[0.02] dark:from-[#3B7DD8]/[0.05] dark:to-[#D4B878]/[0.03]">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">Actions rapides</CardTitle>
-            <CardDescription className="text-xs">Raccourcis vers les modules liés</CardDescription>
+      <div className="grid gap-5 xl:grid-cols-[1.5fr_1fr]">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Mes étapes en attente</CardTitle>
+            <CardDescription>Seules les étapes assignées à votre identité authentifiée sont affichées.</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-              {[
-                { label: 'Upload document', icon: FileText, color: 'bg-[#0B2E58] hover:bg-[#0B2E58]/90 text-white', onClick: () => navigate('ged') },
-                { label: 'Nouveau courrier', icon: Mail, color: 'bg-[#3B7DD8] hover:bg-[#3B7DD8]/90 text-white', onClick: () => navigate('courriers') },
-                { label: 'Lancer un workflow', icon: GitBranch, color: 'bg-[#C8A45C] hover:bg-[#C8A45C]/90 text-[#0B2E58]', onClick: () => navigate('workflow') },
-                { label: 'Demandes citoyennes', icon: UserCheck, color: 'bg-emerald-600 hover:bg-emerald-600/90 text-white', onClick: () => navigate('service-requests') },
-              ].map(action => (
-                <Button key={action.label} className={`${action.color} h-auto flex-col gap-2 rounded-xl py-4 text-xs font-semibold shadow-sm transition-all hover:scale-[1.02]`} onClick={action.onClick}>
-                  <action.icon className="size-5" />
-                  {action.label}
-                </Button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="en_attente" className="gap-1">
-            <Clock className="h-3.5 w-3.5" />
-            En attente ({totalEnAttente})
-          </TabsTrigger>
-          <TabsTrigger value="signees" className="gap-1">
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            Signées ({totalSignees})
-          </TabsTrigger>
-          <TabsTrigger value="toutes">
-            Toutes ({signatures.length})
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      {/* Signature Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        <AnimatePresence mode="popLayout">
-          {filtered.map((sig, i) => {
-            const sConfig = STATUS_MAP[sig.status]
-            const StatusIcon = sConfig.icon
-            return (
-              <motion.div
-                key={sig.id}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ delay: i * 0.05 }}
-                layout
-              >
-                <Card className="glass-card hover:shadow-lg transition-all group">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between">
-                      <div className={`p-2 rounded-lg ${sig.status === 'signée' ? 'bg-emerald-50 dark:bg-emerald-900/20' : sig.status === 'en_attente' ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}>
-                        <PenTool className={`h-5 w-5 ${sig.status === 'signée' ? 'text-emerald-600 dark:text-emerald-400' : sig.status === 'en_attente' ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`} />
-                      </div>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${sConfig.color}`}>
-                        <StatusIcon className="h-3 w-3" />
-                        {sConfig.label}
-                      </span>
-                    </div>
-                    <CardTitle className="text-sm mt-2 line-clamp-2 group-hover:text-brand dark:group-hover:text-primary transition-colors">
-                      {sig.documentName}
-                    </CardTitle>
-                    <CardDescription className="text-xs">{sig.type}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <User className="h-3 w-3 shrink-0" />
-                        <span className="truncate">{sig.requestedByName}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Calendar className="h-3 w-3 shrink-0" />
-                        <span>{sig.date}</span>
-                      </div>
-                    </div>
-
-                    {/* QR Code placeholder for signed */}
-                    {sig.status === 'signée' && (
-                      <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/50">
-                        <div className="h-12 w-12 rounded bg-brand/5 dark:bg-primary/10 flex items-center justify-center border border-dashed border-brand/20 dark:border-primary/20">
-                          <QrCode className="h-8 w-8 text-brand/40 dark:text-primary/40" />
-                        </div>
-                        <div className="text-[10px] text-muted-foreground space-y-0.5">
-                          <p>Horodatage: {sig.timestamp}</p>
-                          <p>Hash: {sig.hash?.slice(0, 16)}...</p>
-                          <p>Cert: {sig.certificate}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Electronic Visa Display */}
-                    {sig.status === 'signée' && (
-                      <div className="flex items-center gap-2 p-2 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/10">
-                        <Award className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                        <div>
-                          <p className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">Visa électronique validé</p>
-                          <p className="text-[10px] text-muted-foreground">Certificat conforme ANSSI</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Actions */}
-                    {sig.status === 'en_attente' && (
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white gap-1 h-8 text-xs"
-                          onClick={() => { setSelectedSig(sig); setSignDialogOpen(true) }}
-                        >
-                          <PenTool className="h-3 w-3" />
-                          Signer
-                        </Button>
-                        <Button size="sm" variant="outline" className="flex-1 text-red-600 hover:text-red-700 gap-1 h-8 text-xs" onClick={() => {
-                          setSignatures(prev => prev.map(s => s.id === sig.id ? { ...s, status: 'rejetée' as const } : s))
-                          setSuccessToast('Signature rejetée')
-                        }}>
-                          <XCircle className="h-3 w-3" />
-                          Rejeter
-                        </Button>
-                      </div>
-                    )}
-
-                    {sig.status === 'signée' && (
-                      <Button size="sm" variant="outline" className="w-full gap-1 h-8 text-xs" onClick={() => {
-                        setVerifyResult(sig)
-                        setVerifyDialogOpen(true)
-                      }}>
-                        <Eye className="h-3 w-3" />
-                        Vérifier l&apos;intégrité
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )
-          })}
-        </AnimatePresence>
-      </div>
-
-      {/* Sign Dialog */}
-      <Dialog open={signDialogOpen} onOpenChange={setSignDialogOpen}>
-        <DialogContent className="sm:max-w-[480px] max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <PenTool className="h-5 w-5 text-brand dark:text-primary" />
-              Signature électronique
-            </DialogTitle>
-            <DialogDescription>Confirmer la signature du document</DialogDescription>
-          </DialogHeader>
-          {selectedSig && (
-            <div className="space-y-4 py-4">
-              <div className="p-4 rounded-lg bg-muted/50 space-y-2">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-brand dark:text-primary" />
-                  <span className="font-medium text-sm">{selectedSig.documentName}</span>
-                </div>
-                <p className="text-xs text-muted-foreground">Type: {selectedSig.type}</p>
-                <p className="text-xs text-muted-foreground">Demandé par: {selectedSig.requestedByName}</p>
+            {isLoading ? (
+              <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" /> Chargement du parapheur…
               </div>
-
-              <Separator />
-
-              <div className="space-y-2">
-                <h4 className="text-sm font-medium">Informations de vérification</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                  <div className="flex items-center gap-1.5 text-muted-foreground">
-                    <Fingerprint className="h-3.5 w-3.5" />
-                    Empreinte numérique
-                  </div>
-                  <span className="font-mono text-[10px]">SHA-256</span>
-                  <div className="flex items-center gap-1.5 text-muted-foreground">
-                    <Shield className="h-3.5 w-3.5" />
-                    Certificat
-                  </div>
-                  <span className="font-mono text-[10px]">CN=Certigna/C=GN</span>
-                  <div className="flex items-center gap-1.5 text-muted-foreground">
-                    <Calendar className="h-3.5 w-3.5" />
-                    Horodatage
-                  </div>
-                  <span className="font-mono text-[10px]">{new Date().toISOString()}</span>
-                </div>
+            ) : loadError ? (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/20 dark:text-red-300">
+                {loadError}
               </div>
-
-              <div className="p-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10">
-                <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">
-                  ⚠️ En signant ce document, vous certifiez l\'authenticité et l\'intégrité du contenu.
-                  Cette action est juridiquement contraignante selon la loi guinéenne.
+            ) : pending.length === 0 ? (
+              <div className="flex min-h-48 flex-col items-center justify-center text-center">
+                <CheckCircle2 className="mb-3 size-10 text-emerald-500" />
+                <p className="font-medium">Aucune étape en attente</p>
+                <p className="mt-1 max-w-sm text-xs text-muted-foreground">
+                  Le parapheur serveur ne retourne actuellement aucune décision à traiter pour votre compte.
                 </p>
               </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSignDialogOpen(false)}>Annuler</Button>
-            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2" onClick={() => {
-              if (selectedSig) {
-                const now = new Date()
-                setSignatures(prev => prev.map(s => s.id === selectedSig.id ? {
-                  ...s,
-                  status: 'signée' as const,
-                  hash: Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
-                  certificate: 'CN=Certigna/C=GN',
-                  timestamp: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')} GMT`,
-                } : s))
-              }
-              setSignDialogOpen(false)
-              setSuccessToast('Document signé avec succès')
-            }}>
-              <PenTool className="h-4 w-4" />
-              Confirmer la signature
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Verify Integrity Dialog */}
-      <Dialog open={verifyDialogOpen} onOpenChange={setVerifyDialogOpen}>
-        <DialogContent className="sm:max-w-[480px] max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-              Vérification d&apos;intégrité
-            </DialogTitle>
-            <DialogDescription>Résultat de la vérification du document</DialogDescription>
-          </DialogHeader>
-          {verifyResult && (
-            <div className="space-y-4 py-4">
-              <div className="p-4 rounded-lg bg-muted/50">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-brand dark:text-primary" />
-                  <span className="font-medium text-sm">{verifyResult.documentName}</span>
-                </div>
-              </div>
-
+            ) : (
               <div className="space-y-3">
-                <div className="flex items-center gap-3 p-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/10">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">Hash vérifié</p>
-                    <p className="text-xs text-muted-foreground font-mono">{verifyResult.hash}</p>
-                  </div>
+                {pending.map((item, index) => {
+                  const ActionIcon = ACTION_ICONS[item.action_type] || PenTool
+                  return (
+                    <motion.div
+                      key={item.step_id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.04 }}
+                      className="rounded-xl border p-4 transition-colors hover:bg-muted/30"
+                    >
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0 space-y-2">
+                          <div className="flex items-start gap-2">
+                            <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#0B2E58]/10 text-[#0B2E58] dark:bg-primary/10 dark:text-primary">
+                              <ActionIcon className="size-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-[#0B2E58] dark:text-white">{item.document_title}</p>
+                              <p className="text-xs text-muted-foreground">{item.circuit_name}</p>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 pl-10 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1"><User className="size-3" /> Demandé par {item.requested_by}</span>
+                            <span>Étape {item.order + 1}</span>
+                            <span>{formatDate(item.created_at)}</span>
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <Badge variant="outline">{ACTION_LABELS[item.action_type] || item.action_type}</Badge>
+                          <Button size="sm" onClick={() => openAction(item)}>
+                            Traiter
+                          </Button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="space-y-5">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base"><Fingerprint className="size-4" /> Vérifier une preuve</CardTitle>
+              <CardDescription>La vérification est effectuée par le backend, jamais dans le navigateur.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <label className="block space-y-1.5">
+                <span className="text-xs font-medium">Identifiant du circuit</span>
+                <input
+                  value={verifyCircuitId}
+                  onChange={(event) => setVerifyCircuitId(event.target.value)}
+                  className="h-10 w-full rounded-lg border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+                  placeholder="UUID du circuit"
+                />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-xs font-medium">Hash de preuve</span>
+                <input
+                  value={verifyHash}
+                  onChange={(event) => setVerifyHash(event.target.value)}
+                  className="h-10 w-full rounded-lg border bg-background px-3 font-mono text-xs outline-none focus:ring-2 focus:ring-ring"
+                  placeholder="SHA-256"
+                />
+              </label>
+              <Button className="w-full gap-2" onClick={() => void verifyEvidence()} disabled={isVerifying || !verifyCircuitId.trim() || !verifyHash.trim()}>
+                {isVerifying ? <Loader2 className="size-4 animate-spin" /> : <Shield className="size-4" />}
+                Vérifier côté serveur
+              </Button>
+              {verifyError && <p className="text-xs text-red-600 dark:text-red-400">{verifyError}</p>}
+            </CardContent>
+          </Card>
+
+          {verifyResult && (
+            <Card className={verifyResult.is_valid ? 'border-emerald-200 dark:border-emerald-900' : 'border-red-200 dark:border-red-900'}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  {verifyResult.is_valid ? <CheckCircle2 className="size-5 text-emerald-600" /> : <XCircle className="size-5 text-red-600" />}
+                  {verifyResult.is_valid ? 'Preuve interne valide' : 'Preuve non validée'}
+                </CardTitle>
+                <CardDescription>{verifyResult.reason}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-xs">
+                <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2">
+                  <span className="text-muted-foreground">Signataire</span>
+                  <span className="font-medium">{verifyResult.signer?.name || '—'} {verifyResult.signer?.role ? `(${verifyResult.signer.role})` : ''}</span>
+                  <span className="text-muted-foreground">Action</span>
+                  <span>{ACTION_LABELS[verifyResult.action_type || ''] || verifyResult.action_type || '—'}</span>
+                  <span className="text-muted-foreground">Version</span>
+                  <span>{verifyResult.document_version ?? '—'}</span>
+                  <span className="text-muted-foreground">Hash document</span>
+                  <span className="break-all font-mono">{shortenHash(verifyResult.document_hash)}</span>
+                  <span className="text-muted-foreground">Horodatage interne</span>
+                  <span>{formatDate(verifyResult.evidence_timestamp)}</span>
+                  <span className="text-muted-foreground">Type de preuve</span>
+                  <span>{verifyResult.evidence_type || '—'}</span>
+                  <span className="text-muted-foreground">PKI qualifiée</span>
+                  <span className="font-semibold text-amber-700 dark:text-amber-400">Non configurée</span>
                 </div>
-                <div className="flex items-center gap-3 p-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/10">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">Certificat valide</p>
-                    <p className="text-xs text-muted-foreground font-mono">{verifyResult.certificate}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/10">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">Horodatage vérifié</p>
-                    <p className="text-xs text-muted-foreground font-mono">{verifyResult.timestamp}</p>
-                  </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {lastAction?.signature_hash && (
+            <Card>
+              <CardContent className="space-y-2 p-4 text-xs">
+                <div className="flex items-center gap-2 font-semibold"><Hash className="size-4" /> Dernière preuve générée</div>
+                <p className="break-all font-mono text-muted-foreground">{lastAction.signature_hash}</p>
+                <p className="text-muted-foreground">Circuit: {lastAction.circuit_id}</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+
+      <Dialog open={dialogOpen} onOpenChange={(open) => !isSubmitting && setDialogOpen(open)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Traiter l’étape du parapheur</DialogTitle>
+            <DialogDescription>
+              L’action sera enregistrée par le serveur et liée à la version hashée du document.
+            </DialogDescription>
+          </DialogHeader>
+          {selected && (
+            <div className="space-y-4 py-2">
+              <div className="rounded-xl bg-muted/50 p-4">
+                <p className="font-semibold">{selected.document_title}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{selected.circuit_name}</p>
+                <div className="mt-3 flex gap-2">
+                  <Badge>{ACTION_LABELS[selected.action_type] || selected.action_type}</Badge>
+                  <Badge variant="outline">Étape {selected.order + 1}</Badge>
                 </div>
               </div>
-
-              <div className="p-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/10 flex items-center gap-2">
-                <FileCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Intégrité vérifiée - Document conforme</p>
+              <label className="block space-y-1.5">
+                <span className="text-xs font-medium">Commentaire / motif de décision</span>
+                <textarea
+                  value={comment}
+                  onChange={(event) => setComment(event.target.value)}
+                  rows={4}
+                  className="w-full resize-none rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+                  placeholder="Contexte de la décision. Obligatoire en cas de rejet."
+                  disabled={isSubmitting}
+                />
+              </label>
+              {actionError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900 dark:bg-red-950/20 dark:text-red-300">
+                  {actionError}
+                </div>
+              )}
+              <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3 text-xs text-blue-800 dark:border-blue-900 dark:bg-blue-950/20 dark:text-blue-300">
+                Le navigateur ne génère ni certificat ni hash. La preuve est calculée et vérifiée côté serveur à partir de la version documentaire enregistrée.
               </div>
             </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setVerifyDialogOpen(false)}>Fermer</Button>
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button variant="destructive" onClick={() => void executeAction('reject')} disabled={isSubmitting} className="gap-2">
+              {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <XCircle className="size-4" />}
+              Rejeter
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={isSubmitting}>Annuler</Button>
+              {selected && (
+                <Button onClick={() => void executeAction(selected.action_type)} disabled={isSubmitting} className="gap-2">
+                  {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : (() => {
+                    const Icon = ACTION_ICONS[selected.action_type] || KeyRound
+                    return <Icon className="size-4" />
+                  })()}
+                  {ACTION_LABELS[selected.action_type] || 'Valider'}
+                </Button>
+              )}
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Success Toast */}
       <AnimatePresence>
-        {successToast && (
+        {toast && (
           <motion.div
-            initial={{ opacity: 0, y: 50 }}
+            initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 50 }}
-            className="fixed bottom-6 right-24 z-40 flex items-center gap-2 px-4 py-3 rounded-lg bg-emerald-600 text-white shadow-lg"
-            onAnimationComplete={() => {
-              setTimeout(() => setSuccessToast(''), 4000)
-            }}
+            exit={{ opacity: 0, y: 30 }}
+            className="fixed bottom-6 right-6 z-50 flex max-w-md items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white shadow-lg"
+            onAnimationComplete={() => window.setTimeout(() => setToast(''), 3500)}
           >
-            <CheckCircle2 className="h-5 w-5" />
-            <span className="text-sm font-medium">{successToast}</span>
+            <CheckCircle2 className="size-5 shrink-0" />
+            {toast}
           </motion.div>
         )}
       </AnimatePresence>
     </div>
   )
 }
+
+export default SignaturesPage
