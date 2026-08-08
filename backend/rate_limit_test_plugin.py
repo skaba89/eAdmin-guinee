@@ -1,15 +1,35 @@
-"""Pytest isolation for Redis-backed rate-limit integration tests.
+"""Pytest isolation for process-global Redis and audit middleware resources."""
 
-The application middleware is process-global, while the CI Redis service
-survives for the whole test process. Without per-test cleanup, requests from one
-test consume the next test's security budget and produce unrelated 429
-responses. We remove only eAdmin rate-limit keys; authentication/session keys
-are left untouched.
-"""
+from unittest.mock import AsyncMock
 
 import pytest_asyncio
 
+import app.middleware.audit as audit_middleware
 from app.config import settings
+
+
+class _TestAuditSession:
+    async def commit(self) -> None:
+        return None
+
+
+class _TestAuditSessionContext:
+    def __init__(self) -> None:
+        self.session = _TestAuditSession()
+
+    async def __aenter__(self):
+        return self.session
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+
+class _TestAuditService:
+    """Minimal in-memory seam; AuditService itself has dedicated DB tests."""
+
+    def __init__(self, session) -> None:
+        self.session = session
+        self.log_action = AsyncMock(return_value=None)
 
 
 async def _clear_rate_limit_keys() -> None:
@@ -36,8 +56,15 @@ async def _clear_rate_limit_keys() -> None:
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def isolate_rate_limit_state():
-    """Reset only rate-limit counters before and after every test."""
+async def isolate_process_global_test_resources(monkeypatch):
+    """Keep HTTP tests isolated from global Redis and asyncpg resources."""
+    monkeypatch.setattr(
+        audit_middleware,
+        "audit_session_factory",
+        lambda: _TestAuditSessionContext(),
+    )
+    monkeypatch.setattr(audit_middleware, "AuditService", _TestAuditService)
+
     await _clear_rate_limit_keys()
     yield
     await _clear_rate_limit_keys()
