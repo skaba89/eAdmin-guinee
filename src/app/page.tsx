@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { useAppStore, type AppPage } from '@/store/app-store'
 import { useCitizenRequestsStore } from '@/store/citizen-requests-store'
@@ -88,27 +88,17 @@ const appPages: Record<string, React.ComponentType> = {
 
 export default function Home() {
   const { currentPage, isAuth, user, navigate, restoreSession } = useAppStore()
-  const checkAndRejectExpiredRequests = useCitizenRequestsStore((s) => s.checkAndRejectExpiredRequests)
-  const deadlineCheckRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const hydrateRequests = useCitizenRequestsStore((state) => state.hydrateRequests)
 
   useEffect(() => {
     void restoreSession()
   }, [restoreSession])
 
-  // Existing demo deadline automation is preserved for now; it will be moved
-  // server-side in the dedicated P0 persistence/SLA correction.
   useEffect(() => {
-    checkAndRejectExpiredRequests()
-    deadlineCheckRef.current = setInterval(() => {
-      checkAndRejectExpiredRequests()
-    }, 30 * 60 * 1000)
-
-    return () => {
-      if (deadlineCheckRef.current) {
-        clearInterval(deadlineCheckRef.current)
-      }
+    if (isAuth) {
+      void hydrateRequests()
     }
-  }, [checkAndRejectExpiredRequests])
+  }, [isAuth, hydrateRequests])
 
   if (!isAuth && currentPage in authPages) {
     const AuthComponent = authPages[currentPage]
