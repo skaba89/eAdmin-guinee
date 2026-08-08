@@ -13,7 +13,6 @@ permissions:
 
 jobs:
   patch:
-    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -122,9 +121,3 @@ jobs:
           git add src/components/app/citizen-portal-page.tsx src/components/landing/public-citizen-portal.tsx
           git commit -m 'feat(catalog): render citizen services from public server catalog'
           git push origin HEAD:agent/dynamic-public-service-catalog
-
-  diagnostics:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "Temporary migration workflow is observable; push job performs the patch."
