@@ -1,23 +1,29 @@
-"""
-Service OCR - eAdministration Suite Guinea.
-Reconnaissance optique de caractères pour la numérisation de documents.
-Supporte l'extraction de texte et de données structurées à partir de documents guinéens.
-Dégénération gracieuse si Tesseract ou les APIs cloud ne sont pas disponibles.
+"""Real OCR service for server-stored administrative documents.
+
+The service is deliberately fail-closed: it never fabricates OCR text or a
+confidence score. PDF pages are rendered with Poppler and raster images are
+processed with the Tesseract CLI. Source bytes are read from object storage.
 """
 
+import asyncio
+import csv
 import hashlib
+import io
 import logging
 import re
+import shutil
+import tempfile
 import time
-from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
+from pathlib import Path
+
+from app.config import settings
+from app.services.object_storage import object_storage
 
 logger = logging.getLogger(__name__)
 
 
 class DocumentType(str, Enum):
-    """Types de documents administratifs guinéens supportés pour l'extraction structurée."""
     ACTE_NAISSANCE = "acte_naissance"
     ACTE_MARIAGE = "acte_mariage"
     ACTE_DECES = "acte_deces"
@@ -34,52 +40,19 @@ class DocumentType(str, Enum):
     AUTRE = "autre"
 
 
-@dataclass
-class OCRResult:
-    """Résultat du traitement OCR."""
-    text: str
-    confidence: float  # 0-100
-    language: str
-    page_count: int
-    processing_time_ms: int
-    engine: str
-
-
-@dataclass
-class StructuredExtraction:
-    """Résultat de l'extraction structurée d'un document."""
-    document_type: DocumentType
-    confidence: float
-    fields: dict = field(default_factory=dict)
-    raw_text: str = ""
-    warnings: list[str] = field(default_factory=list)
-
-
 class OCRService:
-    """
-    Service OCR pour l'extraction de texte à partir de documents numérisés.
-
-    En production, ce service peut utiliser :
-    - Tesseract OCR (open source, auto-hébergé)
-    - Google Cloud Vision API
-    - AWS Textract
-    - Azure Form Recognizer
-
-    Pour l'instant, fournit une extraction basée sur les métadonnées
-    et des patterns regex pour les documents guinéens.
-    """
+    """Tesseract/Poppler OCR over immutable objects stored by the GED."""
 
     SUPPORTED_FORMATS = {
-        'application/pdf': 'pdf',
-        'image/jpeg': 'jpeg',
-        'image/png': 'png',
-        'image/tiff': 'tiff',
-        'image/webp': 'webp',
-        'application/msword': 'doc',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+        "application/pdf": ".pdf",
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+        "image/tiff": ".tiff",
+        "image/webp": ".webp",
     }
+    ALLOWED_LANGUAGES = {"fra", "eng", "fra+eng"}
+    PROCESS_TIMEOUT_SECONDS = 120
 
-    # Patterns pour l'extraction structurée des documents guinéens
     GUINEAN_PATTERNS = {
         DocumentType.ACTE_NAISSANCE: {
             "num_acte": r"N[°o]\s*:?\s*([A-Z0-9\-/]+)",
@@ -87,16 +60,12 @@ class OCRService:
             "prenoms": r"(?:Prénoms|PRENOMS|Prénom)\s*:?\s*([A-Za-zÀâéèêëîïôùûü\s\-]+)",
             "date_naissance": r"(?:Date de naissance|Né(?:e)? le)\s*:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
             "lieu_naissance": r"(?:Lieu de naissance|Né(?:e)? à)\s*:?\s*([A-Za-zÀâéèêëîïôùûü\s\-]+)",
-            "sexe": r"(?:Sexe)\s*:?\s*([MF])",
-            "pere": r"(?:Fils|Fille) de\s*:?\s*([A-ZÀÂÉÈÊËÎÏÔÙÛÜ\s\-]+)",
-            "mere": r"(?:et de|Fille de)\s*:?\s*([A-ZÀÂÉÈÊËÎÏÔÙÛÜ\s\-]+)",
         },
         DocumentType.CERTIFICAT_NATIONALITE: {
             "num_certificat": r"N[°o]\s*:?\s*([A-Z0-9\-/]+)",
             "nom": r"(?:Nom|NOM)\s*:?\s*([A-ZÀÂÉÈÊËÎÏÔÙÛÜ\s\-]+)",
             "prenoms": r"(?:Prénoms|PRENOMS)\s*:?\s*([A-Za-zÀâéèêëîïôùûü\s\-]+)",
             "date_naissance": r"(?:Né(?:e)? le)\s*:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
-            "lieu_naissance": r"(?:à)\s+([A-Za-zÀâéèêëîïôùûü\s\-]+)",
         },
         DocumentType.CARTE_IDENTITE: {
             "num_cni": r"(?:N[°o]\s*CNI|CNI)\s*:?\s*([A-Z0-9]+)",
@@ -109,186 +78,287 @@ class OCRService:
             "expediteur": r"(?:De|Expéditeur)\s*:?\s*(.+)",
             "destinataire": r"(?:À|Destinataire)\s*:?\s*(.+)",
             "objet": r"(?:Objet|Réf)\s*:?\s*(.+)",
-            "date": r"(?:Conakry,?\s+le|Fait à .+,?\s+le)\s+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
             "reference": r"(?:Référence|Réf\.)\s*:?\s*([A-Z0-9\-/.]+)",
         },
         DocumentType.ARRETE: {
             "num_arrete": r"(?:Arrêté|ARRETE)\s+N[°o]\s*([A-Z0-9\-/]+)",
             "date_arrete": r"(?:du)\s+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
-            "autorite": r"(?:Le Ministre|Le Directeur|Le Préfet|Le Gouverneur)\s+(.+?)(?:,|arrête)",
             "objet": r"(?:Objet)\s*:?\s*(.+)",
         },
         DocumentType.CERTIFICAT: {
             "type_certificat": r"(?:CERTIFICAT|ATTESTATION)\s+(?:DE|D')\s*(.+?)(?:\n|$)",
             "nom": r"(?:Nom|NOM)\s*:?\s*([A-ZÀÂÉÈÊËÎÏÔÙÛÜ\s\-]+)",
-            "date": r"(?:Fait à|Émis le)\s+.+,?\s+le\s+(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
-            "autorite": r"(?:Le|La|Signé par)\s+(.+?)(?:,|\n)",
         },
     }
 
-    def __init__(self):
-        self.engine = "stub"
-        self._tesseract_available = False
-        self._check_tesseract()
+    def __init__(self) -> None:
+        self._tesseract_path = shutil.which("tesseract")
+        self._pdftoppm_path = shutil.which("pdftoppm")
+        self.engine = "tesseract" if self._tesseract_path else "unavailable"
 
-    def _check_tesseract(self):
-        """Vérifie si Tesseract OCR est disponible sur le système."""
+    @property
+    def available(self) -> bool:
+        return self._tesseract_path is not None
+
+    async def extract_text(
+        self,
+        file_path: str,
+        language: str = "fra",
+        content_type: str | None = None,
+    ) -> dict:
+        """Extract text from the real object bytes. Never returns synthetic text."""
+        start = time.monotonic()
+        language = language.strip().lower()
+        if language not in self.ALLOWED_LANGUAGES:
+            return self._error_result(
+                language,
+                "unsupported_language",
+                "Langue OCR non supportée. Utilisez fra, eng ou fra+eng.",
+                start,
+            )
+        if not self.available:
+            return self._error_result(
+                language,
+                "ocr_unavailable",
+                "Le moteur Tesseract OCR n'est pas disponible sur ce serveur.",
+                start,
+            )
+        if not file_path:
+            return self._error_result(
+                language,
+                "missing_object",
+                "Le document ne possède aucune version fichier exploitable.",
+                start,
+            )
+
+        resolved_type = content_type or self._guess_file_type(file_path)
+        if resolved_type not in self.SUPPORTED_FORMATS:
+            return self._error_result(
+                language,
+                "unsupported_format",
+                f"Format OCR non supporté: {resolved_type}.",
+                start,
+            )
+        if resolved_type == "application/pdf" and not self._pdftoppm_path:
+            return self._error_result(
+                language,
+                "pdf_renderer_unavailable",
+                "Poppler/pdftoppm n'est pas disponible pour rendre les pages PDF.",
+                start,
+            )
+
+        max_bytes = settings.UPLOAD_MAX_SIZE_MB * 1024 * 1024
         try:
-            import pytesseract
-            pytesseract.get_tesseract_version()
-            self._tesseract_available = True
-            self.engine = "tesseract"
-            logger.info("Tesseract OCR détecté et disponible")
-        except Exception:
-            self._tesseract_available = False
-            logger.info("Tesseract OCR non disponible — utilisation du mode stub")
+            content = await object_storage.get_bytes(file_path, max_bytes=max_bytes)
+        except ValueError as exc:
+            return self._error_result(language, "file_too_large", str(exc), start)
+        except Exception as exc:
+            logger.exception("Unable to read OCR source object key=%s", file_path)
+            return self._error_result(
+                language,
+                "storage_read_failed",
+                f"Impossible de lire le fichier GED: {exc}",
+                start,
+            )
 
-    async def extract_text(self, file_path: str, language: str = "fra") -> dict:
-        """
-        Extrait le texte d'un document numérisé (PDF, images).
+        if not content:
+            return self._error_result(language, "empty_file", "Le fichier est vide.", start)
 
-        Args:
-            file_path: Chemin vers le fichier (MinIO/S3 ou local)
-            language: Langue du document (fra=français, en=anglais, nko=N'Ko)
+        try:
+            with tempfile.TemporaryDirectory(prefix="eadmin-ocr-") as temp_dir:
+                temp_root = Path(temp_dir)
+                source = temp_root / f"source{self.SUPPORTED_FORMATS[resolved_type]}"
+                source.write_bytes(content)
 
-        Returns:
-            Dictionnaire avec : text, confidence, pages, language, engine
-        """
-        start = time.time()
+                page_files = await self._materialize_pages(source, resolved_type, temp_root)
+                if not page_files:
+                    return self._error_result(
+                        language,
+                        "no_pages",
+                        "Aucune page exploitable n'a été produite pour l'OCR.",
+                        start,
+                    )
 
-        # Déterminer le type de fichier
-        file_type = self._guess_file_type(file_path)
-        if file_type not in self.SUPPORTED_FORMATS:
-            return {
-                "text": "",
-                "confidence": 0.0,
-                "pages": 0,
-                "language": language,
-                "engine": self.engine,
-                "error": f"Format non supporté: {file_type}",
-            }
+                page_texts: list[str] = []
+                confidences: list[float] = []
+                for page_number, page_file in enumerate(page_files, start=1):
+                    text, page_confidence = await self._ocr_page(page_file, language)
+                    if text.strip():
+                        page_texts.append(
+                            f"--- Page {page_number} ---\n{text.strip()}"
+                            if len(page_files) > 1
+                            else text.strip()
+                        )
+                    if page_confidence is not None:
+                        confidences.append(page_confidence)
 
-        # Si Tesseract est disponible, l'utiliser
-        if self._tesseract_available:
-            try:
-                result = await self._extract_with_tesseract(file_path, language)
-                processing_time = int((time.time() - start) * 1000)
-                result["processing_time_ms"] = processing_time
-                return result
-            except Exception as e:
-                logger.warning(f"Tesseract a échoué, fallback stub: {e}")
-
-        # Fallback : extraction stub
-        processing_time = int((time.time() - start) * 1000)
-        return {
-            "text": self._generate_stub_text(file_path, file_type, language),
-            "confidence": 50.0,
-            "pages": 1,
-            "language": language,
-            "engine": self.engine,
-            "processing_time_ms": processing_time,
-        }
-
-    async def _extract_with_tesseract(self, file_path: str, language: str) -> dict:
-        """Extraction OCR avec Tesseract."""
-        import pytesseract
-        from PIL import Image
-
-        # Support PDF multipage via pdf2image
-        if file_path.lower().endswith('.pdf'):
-            try:
-                from pdf2image import convert_from_path
-                pages = convert_from_path(file_path)
-                all_text = []
-                for i, page in enumerate(pages):
-                    text = pytesseract.image_to_string(page, lang=language)
-                    all_text.append(text)
+                text = "\n\n".join(page_texts).strip()
+                confidence = (
+                    round(sum(confidences) / len(confidences), 2)
+                    if confidences
+                    else 0.0
+                )
                 return {
-                    "text": "\n\n--- Page {} ---\n\n".join(all_text).format(*range(1, len(pages) + 1)),
-                    "confidence": 85.0,
-                    "pages": len(pages),
+                    "text": text,
+                    "confidence": confidence,
+                    "pages": len(page_files),
                     "language": language,
                     "engine": "tesseract",
+                    "synthetic": False,
+                    "processing_time_ms": int((time.monotonic() - start) * 1000),
                 }
-            except ImportError:
-                logger.warning("pdf2image non installé — impossible d'extraire les PDF multipage")
-        else:
-            # Image unique
-            img = Image.open(file_path)
-            text = pytesseract.image_to_string(img, lang=language)
+        except asyncio.TimeoutError:
+            return self._error_result(
+                language,
+                "ocr_timeout",
+                "Le traitement OCR a dépassé le délai maximal autorisé.",
+                start,
+            )
+        except Exception as exc:
+            logger.exception("Real OCR failed for object key=%s", file_path)
+            return self._error_result(
+                language,
+                "ocr_failed",
+                f"Échec du traitement OCR: {exc}",
+                start,
+            )
+
+    async def _materialize_pages(
+        self,
+        source: Path,
+        content_type: str,
+        temp_root: Path,
+    ) -> list[Path]:
+        if content_type != "application/pdf":
+            return [source]
+
+        output_prefix = temp_root / "page"
+        process = await asyncio.create_subprocess_exec(
+            self._pdftoppm_path,
+            "-png",
+            "-r",
+            "200",
+            str(source),
+            str(output_prefix),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _stdout, stderr = await asyncio.wait_for(
+            process.communicate(),
+            timeout=self.PROCESS_TIMEOUT_SECONDS,
+        )
+        if process.returncode != 0:
+            raise RuntimeError(
+                f"pdftoppm a échoué: {stderr.decode('utf-8', errors='replace')[:300]}"
+            )
+        return sorted(
+            temp_root.glob("page-*.png"),
+            key=lambda path: int(path.stem.rsplit("-", 1)[-1]),
+        )
+
+    async def _ocr_page(self, page_file: Path, language: str) -> tuple[str, float | None]:
+        process = await asyncio.create_subprocess_exec(
+            self._tesseract_path,
+            str(page_file),
+            "stdout",
+            "-l",
+            language,
+            "--psm",
+            "6",
+            "tsv",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(
+            process.communicate(),
+            timeout=self.PROCESS_TIMEOUT_SECONDS,
+        )
+        if process.returncode != 0:
+            raise RuntimeError(
+                f"Tesseract a échoué: {stderr.decode('utf-8', errors='replace')[:300]}"
+            )
+        return self._parse_tesseract_tsv(stdout.decode("utf-8", errors="replace"))
+
+    def _parse_tesseract_tsv(self, tsv_text: str) -> tuple[str, float | None]:
+        reader = csv.DictReader(io.StringIO(tsv_text), delimiter="\t")
+        lines: dict[tuple[str, str, str, str], list[str]] = {}
+        confidences: list[float] = []
+
+        for row in reader:
+            word = (row.get("text") or "").strip()
+            if not word:
+                continue
+            key = (
+                row.get("page_num") or "0",
+                row.get("block_num") or "0",
+                row.get("par_num") or "0",
+                row.get("line_num") or "0",
+            )
+            lines.setdefault(key, []).append(word)
             try:
-                data = pytesseract.image_to_data(img, lang=language, output_type=pytesseract.Output.DICT)
-                confidences = [int(c) for c in data['conf'] if int(c) > 0]
-                avg_confidence = sum(confidences) / len(confidences) if confidences else 0
-            except Exception:
-                avg_confidence = 80.0
+                confidence = float(row.get("conf") or -1)
+            except ValueError:
+                confidence = -1
+            if confidence >= 0:
+                confidences.append(confidence)
 
+        text = "\n".join(" ".join(words) for words in lines.values()).strip()
+        average = sum(confidences) / len(confidences) if confidences else None
+        return text, round(average, 2) if average is not None else None
+
+    async def extract_structured_data(
+        self,
+        file_path: str,
+        document_type: str,
+        language: str = "fra",
+        content_type: str | None = None,
+    ) -> dict:
+        ocr_result = await self.extract_text(
+            file_path=file_path,
+            language=language,
+            content_type=content_type,
+        )
+        if ocr_result.get("error"):
             return {
-                "text": text,
-                "confidence": avg_confidence,
-                "pages": 1,
-                "language": language,
-                "engine": "tesseract",
+                "document_type": document_type,
+                "confidence": 0.0,
+                "fields": {},
+                "raw_text": "",
+                "warnings": [ocr_result["error"]],
+                "engine": ocr_result.get("engine", self.engine),
+                "error": ocr_result["error"],
+                "error_code": ocr_result.get("error_code"),
             }
+        return self.extract_structured_text(ocr_result["text"], document_type)
 
-    async def extract_structured_data(self, file_path: str, document_type: str) -> dict:
-        """
-        Extrait des données structurées d'un document de type connu.
-
-        Supporte les types de documents administratifs guinéens :
-        acte_naissance, certificat, lettre_officielle, arrete, carte_identite, etc.
-
-        Args:
-            file_path: Chemin vers le fichier
-            document_type: Type de document (DocumentType value)
-
-        Returns:
-            Dictionnaire avec : document_type, confidence, fields, raw_text, warnings
-        """
-        start = time.time()
-
-        # D'abord extraire le texte brut
-        ocr_result = await self.extract_text(file_path)
-        raw_text = ocr_result.get("text", "")
-
-        # Déterminer le type de document
+    def extract_structured_text(self, raw_text: str, document_type: str) -> dict:
+        """Apply deterministic field extraction to already OCR'd real text."""
         try:
             doc_type = DocumentType(document_type)
         except ValueError:
             doc_type = DocumentType.AUTRE
 
-        # Extraire les champs structurés
-        fields = {}
-        warnings = []
-        confidence = 0.0
-
+        fields: dict = {}
+        warnings: list[str] = []
         patterns = self.GUINEAN_PATTERNS.get(doc_type, {})
-        if patterns and raw_text:
-            matches_found = 0
-            total_fields = len(patterns)
 
-            for field_name, pattern in patterns.items():
-                try:
-                    match = re.search(pattern, raw_text, re.IGNORECASE | re.MULTILINE)
-                    if match:
-                        fields[field_name] = match.group(1).strip()
-                        matches_found += 1
-                    else:
-                        warnings.append(f"Champ '{field_name}' non trouvé dans le document")
-                except re.error as e:
-                    warnings.append(f"Erreur regex pour '{field_name}': {e}")
-
-            confidence = (matches_found / total_fields * 100) if total_fields > 0 else 0
-        elif not raw_text:
-            warnings.append("Aucun texte extrait du document")
+        if not raw_text:
             confidence = 0.0
+            warnings.append("Aucun texte OCR réel n'a été extrait du document.")
+        elif patterns:
+            matches_found = 0
+            for field_name, pattern in patterns.items():
+                match = re.search(pattern, raw_text, re.IGNORECASE | re.MULTILINE)
+                if match:
+                    fields[field_name] = match.group(1).strip()
+                    matches_found += 1
+                else:
+                    warnings.append(f"Champ '{field_name}' non trouvé dans le document")
+            confidence = matches_found / len(patterns) * 100 if patterns else 0.0
         else:
-            # Type AUTRE — extraction générique
-            confidence = 30.0
             fields = self._extract_generic_fields(raw_text)
-            warnings.append("Type de document non reconnu — extraction générique")
-
-        processing_time = int((time.time() - start) * 1000)
+            confidence = 30.0 if fields else 0.0
+            warnings.append("Type non spécialisé: extraction déterministe générique.")
 
         return {
             "document_type": doc_type.value,
@@ -296,77 +366,76 @@ class OCRService:
             "fields": fields,
             "raw_text": raw_text,
             "warnings": warnings,
-            "processing_time_ms": processing_time,
-            "engine": self.engine,
+            "engine": "tesseract",
+            "synthetic": False,
         }
 
     def _extract_generic_fields(self, text: str) -> dict:
-        """Extraction générique de champs à partir d'un texte non structuré."""
-        fields = {}
-
-        # Dates
-        date_pattern = r'\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b'
-        dates = re.findall(date_pattern, text)
+        fields: dict = {}
+        dates = re.findall(r"\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b", text)
         if dates:
             fields["dates"] = dates
 
-        # Noms propres (majuscules)
-        name_pattern = r'\b([A-ZÀÂÉÈÊËÎÏÔÙÛÜ]{2,}(?:\s+[A-ZÀÂÉÈÊËÎÏÔÙÛÜ]+)*)\b'
-        names = re.findall(name_pattern, text)
+        names = re.findall(
+            r"\b([A-ZÀÂÉÈÊËÎÏÔÙÛÜ]{2,}(?:\s+[A-ZÀÂÉÈÊËÎÏÔÙÛÜ]+)*)\b",
+            text,
+        )
         if names:
-            fields["noms_propres"] = list(set(names))[:10]
+            fields["noms_propres"] = list(dict.fromkeys(names))[:10]
 
-        # Numéros de référence
-        ref_pattern = r'(?:N[°o]|Réf\.?|Reference)\s*:?\s*([A-Z0-9\-/.]+)'
-        refs = re.findall(ref_pattern, text, re.IGNORECASE)
-        if refs:
-            fields["references"] = refs
+        references = re.findall(
+            r"(?:N[°o]|Réf\.?|Reference)\s*:?\s*([A-Z0-9\-/.]+)",
+            text,
+            re.IGNORECASE,
+        )
+        if references:
+            fields["references"] = references
 
-        # Montants
-        amount_pattern = r'(\d[\d\s]*(?:,\d{2})?)\s*(?:GNF|FG|francs?\s*guinéens?)'
-        amounts = re.findall(amount_pattern, text, re.IGNORECASE)
+        amounts = re.findall(
+            r"(\d[\d\s]*(?:,\d{2})?)\s*(?:GNF|FG|francs?\s*guinéens?)",
+            text,
+            re.IGNORECASE,
+        )
         if amounts:
             fields["montants"] = amounts
-
         return fields
 
     def _guess_file_type(self, file_path: str) -> str:
-        """Devine le type MIME à partir de l'extension du fichier."""
-        ext = file_path.rsplit('.', 1)[-1].lower() if '.' in file_path else ''
-        mime_map = {
-            'pdf': 'application/pdf',
-            'jpg': 'image/jpeg',
-            'jpeg': 'image/jpeg',
-            'png': 'image/png',
-            'tiff': 'image/tiff',
-            'tif': 'image/tiff',
-            'webp': 'image/webp',
-            'doc': 'application/msword',
-            'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        }
-        return mime_map.get(ext, 'application/octet-stream')
+        extension = Path(file_path).suffix.lower()
+        return {
+            ".pdf": "application/pdf",
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".png": "image/png",
+            ".tiff": "image/tiff",
+            ".tif": "image/tiff",
+            ".webp": "image/webp",
+        }.get(extension, "application/octet-stream")
 
-    def _generate_stub_text(self, file_path: str, file_type: str, language: str) -> str:
-        """Génère un texte stub pour le développement."""
-        return (
-            f"[OCR Stub] Document: {file_path}\n"
-            f"Type: {file_type}\n"
-            f"Langue: {language}\n"
-            f"Note: Connectez un moteur OCR réel (Tesseract, Google Vision, etc.) "
-            f"pour une extraction en production.\n"
-            f"RÉPUBLIQUE DE GUINÉE\n"
-            f"Travail — Justice — Solidarité\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        )
+    def _error_result(
+        self,
+        language: str,
+        error_code: str,
+        error: str,
+        start: float,
+    ) -> dict:
+        return {
+            "text": "",
+            "confidence": 0.0,
+            "pages": 0,
+            "language": language,
+            "engine": self.engine,
+            "synthetic": False,
+            "error": error,
+            "error_code": error_code,
+            "processing_time_ms": int((time.monotonic() - start) * 1000),
+        }
 
     async def compute_file_hash(self, file_content: bytes) -> str:
-        """Calcule le hash SHA-256 du contenu du fichier pour la vérification d'intégrité."""
         return hashlib.sha256(file_content).hexdigest()
 
     def is_format_supported(self, file_type: str) -> bool:
-        """Vérifie si un type de fichier est supporté pour l'OCR."""
         return file_type in self.SUPPORTED_FORMATS
 
 
-# Singleton
 ocr_service = OCRService()
