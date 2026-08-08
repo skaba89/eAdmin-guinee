@@ -20,10 +20,13 @@ from app.api import (
     courriers,
     documents,
     documents_search,
+    institutions,
     metrics,
     security,
     security_events,
     security_hardening,
+    service_request_files,
+    service_requests,
     users,
     workflows,
 )
@@ -80,7 +83,6 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
 @asynccontextmanager
 async def lifespan(application: FastAPI):
-    """Cycle de vie de l'application."""
     logger.info("Starting eAdministration Suite Guinea API...")
     application.state.settings = settings
     logger.info("Démarrage de %s v%s (%s)", settings.APP_NAME, settings.APP_VERSION, settings.ENVIRONMENT)
@@ -207,15 +209,30 @@ app.add_middleware(
     ],
 )
 
-# Security-critical overrides are registered before the legacy routers.
+# Authentication and security overrides are intentionally registered first.
 app.include_router(auth_hardening.router, prefix="/api/v1/auth", tags=["Authentification"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentification"])
 
-# Every authenticated business router establishes PostgreSQL transaction-local
-# RLS variables before any ORM query. FastAPI dependency caching makes this
-# dependency reuse the same get_db() session as the endpoint itself.
 rls_dependencies = [Depends(set_rls_context)]
 
+app.include_router(
+    institutions.router,
+    prefix="/api/v1/institutions",
+    tags=["Institutions"],
+    dependencies=rls_dependencies,
+)
+app.include_router(
+    service_request_files.router,
+    prefix="/api/v1/service-requests",
+    tags=["Pièces des demandes"],
+    dependencies=rls_dependencies,
+)
+app.include_router(
+    service_requests.router,
+    prefix="/api/v1/service-requests",
+    tags=["Demandes citoyennes"],
+    dependencies=rls_dependencies,
+)
 app.include_router(
     documents.router,
     prefix="/api/v1/documents",
@@ -278,7 +295,6 @@ app.include_router(metrics.router, tags=["Métriques"])
 
 @app.get("/health", tags=["Santé"])
 async def health_check():
-    """Vérifie l'état de santé de l'API et de ses dépendances critiques."""
     health_status = {
         "status": "healthy",
         "service": settings.APP_NAME,
@@ -316,13 +332,11 @@ async def health_check():
 
 @app.get("/api/v1/health", tags=["Santé"])
 async def api_v1_health_check():
-    """Alias API v1 pour le health check."""
     return await health_check()
 
 
 @app.get("/metrics", tags=["Métriques"])
 async def get_metrics():
-    """Expose les compteurs applicatifs historiques."""
     avg_response_time = (
         round(total_response_time_ms / request_counter, 2)
         if request_counter > 0
