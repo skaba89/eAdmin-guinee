@@ -7,11 +7,20 @@ line-length = 100
 # and focused on defects that can change runtime or security behaviour.
 select = ["E9", "F63", "F7", "F82", "B", "S"]
 ignore = [
+  "B007", # Unused loop variables are readability debt, not a P0 runtime defect.
   "B008", # FastAPI Depends/Query calls in parameter defaults are framework idioms.
+  "B010", # ORM tenant stamping intentionally uses setattr for shared model hooks.
+  "B904", # Exception chaining cleanup is tracked separately from P0 correctness.
   "S110", # Fail-open audit/telemetry blocks are intentional and reviewed separately.
 ]
 
 [lint.per-file-ignores]
+"app/api/auth.py" = ["S105"] # JWT token type labels, not credentials.
+"app/api/auth_hardening.py" = ["S105"]
+"app/config.py" = ["S105", "S108"] # Dev-only MinIO value + configurable quarantine path.
+"app/domain/entities.py" = ["S105"] # Enum/domain constant named SECRET.
+"app/middleware/rate_limit.py" = ["S105"] # JWT token type label.
+"app/services/token_blacklist.py" = ["S105"] # Redis key prefix, not a credential.
 "tests/**/*.py" = [
   "S101", # pytest assert statements
   "S105", # test-only credential literals
