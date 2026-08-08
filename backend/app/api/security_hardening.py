@@ -1,16 +1,21 @@
-"""Security-critical overrides for the legacy security router."""
+"""Security-critical overrides and trust-boundary endpoints."""
 
 import logging
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user, verify_password
 from app.api.security import _verify_totp_code
 from app.database import get_db
-from app.models.user import User
+from app.middleware.rls import set_rls_context
+from app.models.qualified_signature_evidence import QualifiedSignatureEvidence
+from app.models.user import RoleEnum, User
 from app.services.token_blacklist import token_blacklist
+from app.services.trust_service import trust_service
 
 router = APIRouter()
 logger = logging.getLogger("eadmin.security_hardening")
@@ -70,4 +75,59 @@ async def secure_disable_mfa(
 
     return {
         "message": "MFA désactivé. Toutes les sessions ont été révoquées ; veuillez vous reconnecter."
+    }
+
+
+@router.get("/trust/status", summary="État de préparation de la chaîne de confiance")
+async def trust_status(
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Return non-secret PKI readiness information to administrators only."""
+    if current_user.role.hierarchy_level() < RoleEnum.ADMIN.hierarchy_level():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="État de confiance réservé aux administrateurs habilités.",
+        )
+    return trust_service.status()
+
+
+@router.get(
+    "/trust/evidence/{evidence_id}",
+    summary="Vérifier une preuve externe de signature/horodatage",
+)
+async def verify_external_trust_evidence(
+    evidence_id: uuid.UUID,
+    current_user: User = Depends(set_rls_context),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Evaluate persisted evidence visible through the caller's document RLS scope."""
+    result = await db.execute(
+        select(QualifiedSignatureEvidence).where(QualifiedSignatureEvidence.id == evidence_id)
+    )
+    evidence = result.scalar_one_or_none()
+    if evidence is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Preuve introuvable.")
+
+    assessment = trust_service.evaluate_evidence(evidence)
+    return {
+        "evidence_id": str(evidence.id),
+        "document_id": str(evidence.document_id),
+        "signature_step_id": str(evidence.signature_step_id) if evidence.signature_step_id else None,
+        "document_version": evidence.document_version,
+        "document_hash": evidence.document_hash,
+        "provider": evidence.provider,
+        "certificate_fingerprint_sha256": evidence.signer_certificate_fingerprint_sha256,
+        "certificate_status": evidence.certificate_status,
+        "revocation_checked_at": (
+            evidence.revocation_checked_at.isoformat() if evidence.revocation_checked_at else None
+        ),
+        "timestamp_time": evidence.timestamp_time.isoformat() if evidence.timestamp_time else None,
+        "trust_policy_oid": evidence.trust_policy_oid,
+        "validated_at": evidence.validated_at.isoformat() if evidence.validated_at else None,
+        "qualification_attested_at": (
+            evidence.qualification_attested_at.isoformat()
+            if evidence.qualification_attested_at
+            else None
+        ),
+        **assessment,
     }
