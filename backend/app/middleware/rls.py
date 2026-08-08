@@ -1,112 +1,166 @@
-"""
-Row-Level Security middleware et dépendance - eAdministration Suite Guinea.
-Définit le contexte utilisateur pour les politiques RLS PostgreSQL.
-Lit l'utilisateur depuis request.state.user (défini par get_current_user)
-au lieu de décoder le JWT une deuxième fois.
-Définit les variables de session PostgreSQL : app.current_user_id, app.current_tenant_id, app.current_institution_id.
-Utilise la session de base de données du scope de la requête.
+"""Trusted PostgreSQL Row-Level Security request context.
+
+The authenticated user is the only source of tenant, institution and role data.
+Client supplied tenant/institution headers are treated as routing hints and are
+rejected when they attempt to escape the authenticated user's scope.
 """
 
 import logging
+from collections.abc import AsyncGenerator
 
-from fastapi import Depends, Request
+from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
-from app.models.user import User
 from app.api.auth import get_current_user
 from app.config import settings
+from app.database import current_rls_scope, get_db
+from app.models.user import RoleEnum, User
 
 logger = logging.getLogger("eadmin.rls")
+
+
+class RLSContextError(RuntimeError):
+    """Raised when the database security context cannot be established."""
+
+
+def _normalized(value: str | None) -> str:
+    return (value or "").strip()
+
+
+def _validate_requested_scope(request: Request, current_user: User) -> None:
+    """Reject an explicit tenant/institution that does not belong to the user."""
+
+    if current_user.role == RoleEnum.SUPER_ADMIN:
+        return
+
+    trusted_tenant = _normalized(current_user.tenant_id) or settings.TENANT_DEFAULT_ID
+    trusted_institution = _normalized(current_user.institution_id)
+
+    routed_tenant = _normalized(getattr(request.state, "tenant_id", None))
+    routed_institution = _normalized(getattr(request.state, "institution_id", None))
+
+    if routed_tenant and routed_tenant != trusted_tenant:
+        logger.warning(
+            "RLS tenant mismatch blocked: user=%s trusted=%s requested=%s",
+            current_user.id,
+            trusted_tenant,
+            routed_tenant,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Le périmètre administratif demandé n'est pas autorisé.",
+        )
+
+    if routed_institution and routed_institution != trusted_institution:
+        logger.warning(
+            "RLS institution mismatch blocked: user=%s trusted=%s requested=%s",
+            current_user.id,
+            trusted_institution,
+            routed_institution,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="L'institution demandée n'est pas autorisée pour ce compte.",
+        )
 
 
 async def set_rls_context(
     request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> User:
-    """
-    Dépendance FastAPI qui définit le contexte RLS PostgreSQL pour la requête courante.
+) -> AsyncGenerator[User, None]:
+    """Establish and propagate a fail-closed RLS context for one request."""
 
-    Lit l'utilisateur depuis request.state.user (défini par get_current_user)
-    au lieu de décoder le JWT une deuxième fois.
+    _validate_requested_scope(request, current_user)
 
-    Définit les variables de session PostgreSQL suivantes :
-    - app.current_user_id : UUID de l'utilisateur authentifié
-    - app.current_tenant_id : Identifiant du tenant pour l'isolation multi-tenant
-    - app.current_institution_id : Identifiant de l'institution pour le filtrage RLS
+    scope = {
+        "user_id": str(current_user.id),
+        "tenant_id": _normalized(current_user.tenant_id) or settings.TENANT_DEFAULT_ID,
+        "institution_id": _normalized(current_user.institution_id),
+        "role": current_user.role.value,
+        "is_super_admin": current_user.role == RoleEnum.SUPER_ADMIN,
+    }
 
-    Ces variables sont utilisées par les politiques RLS PostgreSQL pour filtrer
-    les données selon le contexte de l'utilisateur.
+    request.state.rls_user_id = scope["user_id"]
+    request.state.rls_tenant_id = scope["tenant_id"]
+    request.state.rls_institution_id = scope["institution_id"]
+    request.state.rls_role = scope["role"]
 
-    Usage:
-        @router.get("/", dependencies=[Depends(set_rls_context)])
-        async def my_route(...):
-            ...
-
-    Args:
-        request: Requête HTTP courante (contient request.state.user)
-        current_user: Utilisateur authentifié (injecté par get_current_user)
-        db: Session de base de données du scope de la requête
-
-    Returns:
-        L'utilisateur authentifié (pour chaînage de dépendances)
-    """
-    user_id = str(current_user.id)
-    tenant_id = current_user.tenant_id or settings.TENANT_DEFAULT_ID
-    institution_id = current_user.institution_id or ""
+    # Session-local info deliberately survives this dependency's finalizer: the
+    # parent get_db() dependency commits afterwards, and its before_flush hook
+    # still needs the trusted scope. get_db() owns final cleanup of session.info.
+    db.sync_session.info["rls_scope"] = scope
+    context_token = current_rls_scope.set(scope)
 
     try:
-        # Définir les variables de session PostgreSQL pour les politiques RLS
-        # Utilise la session de base de données du scope de la requête
-        await db.execute(
-            text("SET LOCAL app.current_user_id = :user_id"),
-            {"user_id": user_id}
-        )
-        await db.execute(
-            text("SET LOCAL app.current_tenant_id = :tenant_id"),
-            {"tenant_id": tenant_id}
-        )
-        await db.execute(
-            text("SET LOCAL app.current_institution_id = :institution_id"),
-            {"institution_id": institution_id}
-        )
+        bind = db.get_bind()
+        dialect_name = bind.dialect.name if bind is not None else "unknown"
+
+        if dialect_name != "postgresql":
+            if not settings.is_test:
+                raise RLSContextError(
+                    f"RLS requires PostgreSQL; active dialect is {dialect_name}"
+                )
+        else:
+            # get_current_user already queried this session, so its transaction
+            # may have started before the ContextVar existed. Set the variables
+            # explicitly on the request session; secondary sessions inherit them
+            # through the SQLAlchemy after_begin hook in app.database.
+            await db.execute(
+                text(
+                    """
+                    SELECT
+                        set_config('app.current_user_id', :user_id, true),
+                        set_config('app.current_tenant_id', :tenant_id, true),
+                        set_config('app.current_institution_id', :institution_id, true),
+                        set_config('app.current_role', :role, true)
+                    """
+                ),
+                {
+                    "user_id": scope["user_id"],
+                    "tenant_id": scope["tenant_id"],
+                    "institution_id": scope["institution_id"],
+                    "role": scope["role"],
+                },
+            )
 
         logger.debug(
-            f"Contexte RLS défini: user_id={user_id}, "
-            f"tenant_id={tenant_id}, institution_id={institution_id}"
-        )
-    except Exception as e:
-        # Ne pas bloquer la requête si la configuration RLS échoue
-        logger.warning(
-            f"Impossible de définir le contexte RLS: {e}. "
-            f"user_id={user_id}, tenant_id={tenant_id}"
+            "Trusted RLS context established: user=%s tenant=%s institution=%s role=%s",
+            scope["user_id"],
+            scope["tenant_id"],
+            scope["institution_id"] or "<none>",
+            scope["role"],
         )
 
-    return current_user
+        yield current_user
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(
+            "RLS context setup failed; request blocked: user=%s tenant=%s error=%s",
+            scope["user_id"],
+            scope["tenant_id"],
+            exc,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Le contexte de sécurité des données n'a pas pu être établi.",
+        ) from exc
+    finally:
+        current_rls_scope.reset(context_token)
 
 
 class RLSMiddleware:
-    """
-    Middleware RLS legacy — conservé pour compatibilité descendante.
+    """Legacy ASGI compatibility shim.
 
-    NOTE: Ce middleware est remplacé par la dépendance set_rls_context()
-    qui est plus robuste car elle :
-    - Lit l'utilisateur depuis request.state.user au lieu de décoder le JWT
-    - Utilise la session de base de données du scope de la requête
-    - Définit les 3 variables RLS (user_id, tenant_id, institution_id)
-
-    Pour les nouvelles routes, utilisez:
-        dependencies=[Depends(set_rls_context)]
+    RLS is intentionally a FastAPI yield-dependency so the context remains live
+    for the full request and is cleaned deterministically afterwards.
     """
 
     def __init__(self, app):
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        """
-        ASGI3 middleware — ne fait rien, le contexte RLS est maintenant
-        géré par la dépendance set_rls_context().
-        """
         await self.app(scope, receive, send)
