@@ -6,7 +6,6 @@ Supporte les actions : signer, approuver, viser, rejeter, tamponner.
 
 import hashlib
 import logging
-import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -18,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import async_session_factory
 from app.models.electronic_stamp import SignatureCircuit, SignatureStep
 from app.models.document import Document
+from app.models.document_version import DocumentVersion
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -237,8 +237,39 @@ class ParapheurService:
                 if str(step.assignee_id) != user_id:
                     return {"error": "Vous n'êtes pas l'assigné de cette étape"}
 
-                # Traiter l'action
+                # L'action positive doit correspondre exactement à l'action assignée.
+                # Le rejet reste toujours permis à l'assigné comme décision explicite.
+                if action != CircuitAction.REJECT and action != step.action_type:
+                    return {
+                        "error": (
+                            f"Action non autorisée pour cette étape: attendu {step.action_type}, "
+                            f"reçu {action}"
+                        )
+                    }
+
+                # Une preuve interne n'est valide que si elle est liée à une version
+                # immuable/hashée du document. Ne jamais signer un simple chemin fichier.
+                version_result = await session.execute(
+                    select(DocumentVersion)
+                    .where(DocumentVersion.document_id == circuit.document_id)
+                    .order_by(DocumentVersion.version_number.desc())
+                    .limit(1)
+                )
+                signed_version = version_result.scalar_one_or_none()
+                if not signed_version or not signed_version.file_hash:
+                    return {
+                        "error": (
+                            "Le document doit posséder une version hashée avant toute "
+                            "signature, approbation, visa, cachet ou rejet."
+                        )
+                    }
+
                 now = datetime.now(timezone.utc)
+                step.signed_document_version = signed_version.version_number
+                step.signed_document_hash = signed_version.file_hash
+                step.evidence_timestamp = now
+                step.evidence_type = "internal_approval"
+                step.evidence_algorithm = "SHA-256"
 
                 if action == CircuitAction.REJECT:
                     # Rejet : arrêter le circuit
@@ -246,7 +277,15 @@ class ParapheurService:
                     step.comment = comment
                     step.completed_at = now
                     step.signature_hash = self._generate_signature_hash(
-                        circuit_id, step_id, user_id, action, "rejected"
+                        circuit_id=circuit_id,
+                        step_id=step_id,
+                        user_id=user_id,
+                        action=action,
+                        status="rejected",
+                        document_id=str(circuit.document_id),
+                        document_version=signed_version.version_number,
+                        document_hash=signed_version.file_hash,
+                        evidence_timestamp=now,
                     )
 
                     circuit.status = CircuitStatus.REJECTED
@@ -260,7 +299,15 @@ class ParapheurService:
                     step.comment = comment
                     step.completed_at = now
                     step.signature_hash = self._generate_signature_hash(
-                        circuit_id, step_id, user_id, action, "completed"
+                        circuit_id=circuit_id,
+                        step_id=step_id,
+                        user_id=user_id,
+                        action=action,
+                        status="completed",
+                        document_id=str(circuit.document_id),
+                        document_version=signed_version.version_number,
+                        document_hash=signed_version.file_hash,
+                        evidence_timestamp=now,
                     )
 
                     # Vérifier s'il reste des étapes
@@ -412,16 +459,35 @@ class ParapheurService:
 
                 step, circuit = row
 
-                # Vérifier l'intégrité du hash
-                expected_hash = self._generate_signature_hash(
-                    str(circuit.id),
-                    str(step.id),
-                    str(step.assignee_id),
-                    step.action_type,
-                    step.status,
-                )
+                # Les preuves historiques non liées à un hash/version documentaire
+                # restent consultables mais ne sont jamais déclarées valides.
+                evidence_complete = all([
+                    step.signature_hash,
+                    step.signed_document_hash,
+                    step.signed_document_version is not None,
+                    step.evidence_timestamp,
+                    step.evidence_type == "internal_approval",
+                    step.evidence_algorithm == "SHA-256",
+                ])
 
-                is_valid = step.signature_hash == expected_hash and step.status == StepStatus.COMPLETED
+                if evidence_complete:
+                    expected_hash = self._generate_signature_hash(
+                        circuit_id=str(circuit.id),
+                        step_id=str(step.id),
+                        user_id=str(step.assignee_id),
+                        action=step.action_type if step.status == StepStatus.COMPLETED else CircuitAction.REJECT,
+                        status=step.status,
+                        document_id=str(circuit.document_id),
+                        document_version=step.signed_document_version,
+                        document_hash=step.signed_document_hash,
+                        evidence_timestamp=step.evidence_timestamp,
+                    )
+                    is_valid = step.signature_hash == expected_hash and step.status in (
+                        StepStatus.COMPLETED, StepStatus.REJECTED
+                    )
+                else:
+                    expected_hash = None
+                    is_valid = False
 
                 # Récupérer les informations du signataire
                 signer_result = await session.execute(
@@ -440,7 +506,19 @@ class ParapheurService:
                     "circuit_status": circuit.status,
                     "completed_at": step.completed_at.isoformat() if step.completed_at else None,
                     "document_id": str(circuit.document_id),
-                    "reason": "Signature vérifiée avec succès" if is_valid else "Hash de signature invalide",
+                    "document_version": step.signed_document_version,
+                    "document_hash": step.signed_document_hash,
+                    "evidence_timestamp": (
+                        step.evidence_timestamp.isoformat() if step.evidence_timestamp else None
+                    ),
+                    "evidence_type": step.evidence_type,
+                    "evidence_algorithm": step.evidence_algorithm,
+                    "qualified_pki": False,
+                    "reason": (
+                        "Preuve d'approbation interne vérifiée"
+                        if is_valid
+                        else "Preuve absente, historique non lié, ou hash d'intégrité invalide"
+                    ),
                 }
 
         except Exception as e:
@@ -484,6 +562,14 @@ class ParapheurService:
                         "action_type": step.action_type,
                         "status": step.status,
                         "comment": step.comment,
+                        "signature_hash": step.signature_hash,
+                        "signed_document_version": step.signed_document_version,
+                        "signed_document_hash": step.signed_document_hash,
+                        "evidence_timestamp": (
+                            step.evidence_timestamp.isoformat() if step.evidence_timestamp else None
+                        ),
+                        "evidence_type": step.evidence_type,
+                        "qualified_pki": False,
                         "completed_at": step.completed_at.isoformat() if step.completed_at else None,
                     })
 
@@ -550,20 +636,38 @@ class ParapheurService:
 
     def _generate_signature_hash(
         self,
+        *,
         circuit_id: str,
         step_id: str,
         user_id: str,
         action: str,
         status: str,
+        document_id: str,
+        document_version: int,
+        document_hash: str,
+        evidence_timestamp: datetime,
     ) -> str:
-        """
-        Génère un hash de signature électronique pour la vérification d'intégrité.
+        """Generate deterministic internal approval evidence.
 
-        Le hash inclut : circuit_id + step_id + user_id + action + status + timestamp
+        The digest is bound to the exact document version hash, actor, assigned
+        action, resulting status and persisted timestamp. It is intentionally
+        labelled internal approval evidence and is not a certificate-backed PKI
+        signature.
         """
-        timestamp = str(int(time.time()))
-        data = f"eadmin-parapheur:{circuit_id}:{step_id}:{user_id}:{action}:{status}:{timestamp}"
-        return hashlib.sha256(data.encode()).hexdigest()
+        timestamp = evidence_timestamp.astimezone(timezone.utc).isoformat(timespec="microseconds")
+        data = "|".join([
+            "eadmin-parapheur-v2",
+            circuit_id,
+            step_id,
+            user_id,
+            action,
+            status,
+            document_id,
+            str(document_version),
+            document_hash.lower(),
+            timestamp,
+        ])
+        return hashlib.sha256(data.encode("utf-8")).hexdigest()
 
 
 # Singleton
