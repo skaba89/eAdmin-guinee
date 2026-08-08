@@ -6,9 +6,8 @@ Create Date: 2026-08-08
 
 This migration runs immediately after the FORCE-RLS policy replacement. It
 briefly removes FORCE within the Alembic transaction to backfill legacy rows
-from trusted relational data, then re-enables FORCE before the transaction can
-commit. Rows whose institution cannot be inferred are deliberately left with a
-NULL institution and therefore remain invisible to institution-scoped users.
+from trusted relational data, initializes the audit-chain head from the visible
+legacy history, then re-enables FORCE before the transaction can commit.
 """
 
 from alembic import op
@@ -82,17 +81,10 @@ def upgrade() -> None:
         SET tenant_id = '{DEFAULT_TENANT}'
         WHERE tenant_id IS NULL;
 
-        -- Tenant is mandatory on all protected business rows going forward.
         ALTER TABLE documents ALTER COLUMN tenant_id SET NOT NULL;
         ALTER TABLE courriers ALTER COLUMN tenant_id SET NOT NULL;
         ALTER TABLE workflows ALTER COLUMN tenant_id SET NOT NULL;
         ALTER TABLE audit_logs ALTER COLUMN tenant_id SET NOT NULL;
-
-        -- Reinstate owner-proof RLS before this migration transaction commits.
-        ALTER TABLE documents FORCE ROW LEVEL SECURITY;
-        ALTER TABLE courriers FORCE ROW LEVEL SECURITY;
-        ALTER TABLE workflows FORCE ROW LEVEL SECURITY;
-        ALTER TABLE audit_logs FORCE ROW LEVEL SECURITY;
 
         CREATE TABLE IF NOT EXISTS audit_chain_heads (
             tenant_id VARCHAR(100) PRIMARY KEY,
@@ -103,6 +95,9 @@ def upgrade() -> None:
         COMMENT ON TABLE audit_chain_heads IS
             'Internal transactional head for the append-only audit hash chain.';
 
+        -- Seed while audit_logs is still visible to the migration owner. Doing
+        -- this after FORCE would intentionally hide rows when no RLS context is
+        -- set and would break continuity with the existing chain.
         INSERT INTO audit_chain_heads (tenant_id, last_hash, updated_at)
         SELECT DISTINCT ON (tenant_id)
             tenant_id,
@@ -116,6 +111,12 @@ def upgrade() -> None:
             updated_at = EXCLUDED.updated_at;
 
         REVOKE ALL ON TABLE audit_chain_heads FROM PUBLIC;
+
+        -- Reinstate owner-proof RLS before this migration transaction commits.
+        ALTER TABLE documents FORCE ROW LEVEL SECURITY;
+        ALTER TABLE courriers FORCE ROW LEVEL SECURITY;
+        ALTER TABLE workflows FORCE ROW LEVEL SECURITY;
+        ALTER TABLE audit_logs FORCE ROW LEVEL SECURITY;
         """
     )
 
@@ -125,8 +126,6 @@ def downgrade() -> None:
         """
         DROP TABLE IF EXISTS audit_chain_heads;
 
-        -- Restore schema nullability expected by the previous revision. Data is
-        -- intentionally not nulled again; repaired scope is safe to preserve.
         ALTER TABLE documents ALTER COLUMN tenant_id DROP NOT NULL;
         ALTER TABLE courriers ALTER COLUMN tenant_id DROP NOT NULL;
         ALTER TABLE workflows ALTER COLUMN tenant_id DROP NOT NULL;
