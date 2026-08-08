@@ -131,6 +131,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Inspect Alembic graph
+        run: |
+          echo '=== migration files ==='
+          ls -1 alembic/versions
+          echo '=== revisions ==='
+          grep -H -E "^(revision|down_revision)[[:space:]]*=" alembic/versions/*.py || true
+          echo '=== heads ==='
+          alembic heads --verbose
+          echo '=== history ==='
+          alembic history --verbose
+
       - name: Upgrade database to head
         run: alembic upgrade head
 
