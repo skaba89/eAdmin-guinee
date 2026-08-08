@@ -1,0 +1,62 @@
+name: Temporary Public Citizen Submission Fix
+
+on:
+  push:
+    branches:
+      - agent/citizen-submission-authoritative
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/citizen-submission-authoritative
+
+      - name: Align public citizen portal with async submission
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('src/components/landing/public-citizen-portal.tsx')
+          text = path.read_text(encoding='utf-8')
+
+          old = "  const [successToast, setSuccessToast] = useState('')\n  const [submittedRef, setSubmittedRef] = useState('')\n"
+          new = "  const [successToast, setSuccessToast] = useState('')\n  const [submissionError, setSubmissionError] = useState('')\n  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false)\n  const [submittedRef, setSubmittedRef] = useState('')\n"
+          if old not in text:
+              raise SystemExit('state marker not found')
+          text = text.replace(old, new, 1)
+
+          start = text.index('  const handleSubmitRequest = () => {\n')
+          end = text.index('\n  const handleTrack = () => {', start)
+          replacement = '''  const handleSubmitRequest = async () => {\n    if (!validateForm() || !selectedService || !selectedCategoryInfo || isSubmittingRequest) return\n\n    setSubmissionError('')\n    setIsSubmittingRequest(true)\n\n    try {\n      const { request: newRequest, attachmentErrors } = await addRequest({\n        serviceId: selectedService.id,\n        serviceName: selectedService.name,\n        category: selectedCategoryInfo.name,\n        categoryId: selectedCategoryInfo.id,\n        citizenName: form.citizenName,\n        citizenFirstName: form.citizenFirstName,\n        citizenNIN: form.citizenNIN,\n        citizenPhone: form.citizenPhone,\n        citizenEmail: form.citizenEmail,\n        citizenAddress: form.citizenAddress,\n        motif: form.motif || `Demande de ${selectedService.name}`,\n        documents: selectedService.requiredDocs,\n        uploadedDocuments: [],\n        createdAt: new Date().toISOString(),\n        deliveryMode: form.deliveryMode,\n      })\n\n      setRequestDialogOpen(false)\n      setSubmittedRef(newRequest.reference)\n      setSuccessToast(\n        attachmentErrors.length\n          ? `Demande enregistrée sous la référence ${newRequest.reference}. Des pièces restent à transmettre.`\n          : `Votre demande a été soumise avec succès ! Référence officielle : ${newRequest.reference}`,\n      )\n      setActiveTab('suivi')\n      setTrackingNumber(newRequest.reference)\n      setTrackedRequest(newRequest)\n    } catch (error) {\n      setSubmissionError(\n        error instanceof Error\n          ? error.message\n          : 'La demande n’a pas pu être enregistrée. Vérifiez votre connexion puis réessayez.',\n      )\n    } finally {\n      setIsSubmittingRequest(false)\n    }\n  }\n'''
+          text = text[:start] + replacement + text[end:]
+
+          old_dialog = '<Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>'
+          new_dialog = '''<Dialog\n        open={requestDialogOpen}\n        onOpenChange={(open) => {\n          if (isSubmittingRequest) return\n          setSubmissionError('')\n          setRequestDialogOpen(open)\n        }}\n      >'''
+          if old_dialog not in text:
+              raise SystemExit('dialog marker not found')
+          text = text.replace(old_dialog, new_dialog, 1)
+
+          old_footer = '''          <DialogFooter className="gap-2">\n            <Button variant="outline" onClick={() => setRequestDialogOpen(false)}>Annuler</Button>\n            <Button className="bg-[#0B2E58] hover:bg-[#0B2E58]/90 dark:bg-[#3B7DD8] dark:hover:bg-[#3B7DD8]/90 text-white gap-2" onClick={handleSubmitRequest}>\n              <Send className="size-4" />\n              Soumettre la demande\n            </Button>\n          </DialogFooter>'''
+          new_footer = '''          {submissionError && (\n            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300" role="alert">\n              <AlertCircle className="mt-0.5 size-4 shrink-0" />\n              <span>{submissionError}</span>\n            </div>\n          )}\n\n          <DialogFooter className="gap-2">\n            <Button\n              variant="outline"\n              onClick={() => {\n                setSubmissionError('')\n                setRequestDialogOpen(false)\n              }}\n              disabled={isSubmittingRequest}\n            >\n              Annuler\n            </Button>\n            <Button\n              className="bg-[#0B2E58] hover:bg-[#0B2E58]/90 dark:bg-[#3B7DD8] dark:hover:bg-[#3B7DD8]/90 text-white gap-2"\n              onClick={() => void handleSubmitRequest()}\n              disabled={isSubmittingRequest}\n              aria-busy={isSubmittingRequest}\n            >\n              <Send className={`size-4 ${isSubmittingRequest ? 'animate-pulse' : ''}`} />\n              {isSubmittingRequest ? 'Enregistrement sécurisé…' : 'Soumettre la demande'}\n            </Button>\n          </DialogFooter>'''
+          if old_footer not in text:
+              raise SystemExit('footer marker not found')
+          text = text.replace(old_footer, new_footer, 1)
+
+          path.write_text(text, encoding='utf-8')
+
+      - name: Commit fix
+        shell: bash
+        run: |
+          if git diff --quiet -- src/components/landing/public-citizen-portal.tsx; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/components/landing/public-citizen-portal.tsx
+          git commit -m 'fix(citizen): await official reference in public portal'
+          git push origin HEAD:agent/citizen-submission-authoritative
