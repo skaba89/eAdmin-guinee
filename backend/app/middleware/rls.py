@@ -87,6 +87,9 @@ async def set_rls_context(
     request.state.rls_institution_id = scope["institution_id"]
     request.state.rls_role = scope["role"]
 
+    # Session-local info deliberately survives this dependency's finalizer: the
+    # parent get_db() dependency commits afterwards, and its before_flush hook
+    # still needs the trusted scope. get_db() owns final cleanup of session.info.
     db.sync_session.info["rls_scope"] = scope
     context_token = current_rls_scope.set(scope)
 
@@ -146,7 +149,6 @@ async def set_rls_context(
             detail="Le contexte de sécurité des données n'a pas pu être établi.",
         ) from exc
     finally:
-        db.sync_session.info.pop("rls_scope", None)
         current_rls_scope.reset(context_token)
 
 
