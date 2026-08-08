@@ -14,6 +14,11 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # Alembic creates version_num as VARCHAR(32) by default. Keep the already
+    # published revision id stable and enlarge the metadata column before
+    # Alembic records this 33-character revision.
+    op.execute("ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(64)")
+
     op.execute(
         """
         CREATE POLICY "service_requests_citizen_update" ON service_requests
