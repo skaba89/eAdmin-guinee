@@ -6,6 +6,7 @@ rejected when they attempt to escape the authenticated user's scope.
 """
 
 import logging
+from collections.abc import AsyncGenerator
 
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import text
@@ -13,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user
 from app.config import settings
-from app.database import get_db
+from app.database import current_rls_scope, get_db
 from app.models.user import RoleEnum, User
 
 logger = logging.getLogger("eadmin.rls")
@@ -68,98 +69,92 @@ async def set_rls_context(
     request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> User:
-    """Establish the transaction-local PostgreSQL RLS security context.
-
-    The context contains only values derived from the authenticated database
-    user record. Any failure is fail-closed: business endpoints must never run
-    without a valid RLS context in PostgreSQL.
-    """
+) -> AsyncGenerator[User, None]:
+    """Establish and propagate a fail-closed RLS context for one request."""
 
     _validate_requested_scope(request, current_user)
 
-    user_id = str(current_user.id)
-    tenant_id = _normalized(current_user.tenant_id) or settings.TENANT_DEFAULT_ID
-    institution_id = _normalized(current_user.institution_id)
-    role = current_user.role.value
-    is_super_admin = current_user.role == RoleEnum.SUPER_ADMIN
-
-    request.state.rls_user_id = user_id
-    request.state.rls_tenant_id = tenant_id
-    request.state.rls_institution_id = institution_id
-    request.state.rls_role = role
-
-    # The synchronous session behind AsyncSession owns ORM flush events. This
-    # trusted metadata lets the central before_flush hook stamp every new
-    # tenant-scoped entity, preventing mass-assignment of tenant/institution.
-    db.sync_session.info["rls_scope"] = {
-        "user_id": user_id,
-        "tenant_id": tenant_id,
-        "institution_id": institution_id,
-        "role": role,
-        "is_super_admin": is_super_admin,
+    scope = {
+        "user_id": str(current_user.id),
+        "tenant_id": _normalized(current_user.tenant_id) or settings.TENANT_DEFAULT_ID,
+        "institution_id": _normalized(current_user.institution_id),
+        "role": current_user.role.value,
+        "is_super_admin": current_user.role == RoleEnum.SUPER_ADMIN,
     }
+
+    request.state.rls_user_id = scope["user_id"]
+    request.state.rls_tenant_id = scope["tenant_id"]
+    request.state.rls_institution_id = scope["institution_id"]
+    request.state.rls_role = scope["role"]
+
+    db.sync_session.info["rls_scope"] = scope
+    context_token = current_rls_scope.set(scope)
 
     try:
         bind = db.get_bind()
         dialect_name = bind.dialect.name if bind is not None else "unknown"
 
         if dialect_name != "postgresql":
-            if settings.is_test:
-                logger.debug("RLS SQL context skipped for test dialect=%s", dialect_name)
-                return current_user
-            raise RLSContextError(
-                f"RLS requires PostgreSQL; active dialect is {dialect_name}"
+            if not settings.is_test:
+                raise RLSContextError(
+                    f"RLS requires PostgreSQL; active dialect is {dialect_name}"
+                )
+        else:
+            # get_current_user already queried this session, so its transaction
+            # may have started before the ContextVar existed. Set the variables
+            # explicitly on the request session; secondary sessions inherit them
+            # through the SQLAlchemy after_begin hook in app.database.
+            await db.execute(
+                text(
+                    """
+                    SELECT
+                        set_config('app.current_user_id', :user_id, true),
+                        set_config('app.current_tenant_id', :tenant_id, true),
+                        set_config('app.current_institution_id', :institution_id, true),
+                        set_config('app.current_role', :role, true)
+                    """
+                ),
+                {
+                    "user_id": scope["user_id"],
+                    "tenant_id": scope["tenant_id"],
+                    "institution_id": scope["institution_id"],
+                    "role": scope["role"],
+                },
             )
-
-        await db.execute(
-            text(
-                """
-                SELECT
-                    set_config('app.current_user_id', :user_id, true),
-                    set_config('app.current_tenant_id', :tenant_id, true),
-                    set_config('app.current_institution_id', :institution_id, true),
-                    set_config('app.current_role', :role, true)
-                """
-            ),
-            {
-                "user_id": user_id,
-                "tenant_id": tenant_id,
-                "institution_id": institution_id,
-                "role": role,
-            },
-        )
 
         logger.debug(
             "Trusted RLS context established: user=%s tenant=%s institution=%s role=%s",
-            user_id,
-            tenant_id,
-            institution_id or "<none>",
-            role,
+            scope["user_id"],
+            scope["tenant_id"],
+            scope["institution_id"] or "<none>",
+            scope["role"],
         )
-        return current_user
+
+        yield current_user
 
     except HTTPException:
         raise
     except Exception as exc:
-        db.sync_session.info.pop("rls_scope", None)
         logger.error(
             "RLS context setup failed; request blocked: user=%s tenant=%s error=%s",
-            user_id,
-            tenant_id,
+            scope["user_id"],
+            scope["tenant_id"],
             exc,
         )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Le contexte de sécurité des données n'a pas pu être établi.",
         ) from exc
+    finally:
+        db.sync_session.info.pop("rls_scope", None)
+        current_rls_scope.reset(context_token)
 
 
 class RLSMiddleware:
     """Legacy ASGI compatibility shim.
 
-    RLS must be attached as a FastAPI dependency so it shares the exact same
-    ``AsyncSession``/transaction as the endpoint query.
+    RLS is intentionally a FastAPI yield-dependency so the context remains live
+    for the full request and is cleaned deterministically afterwards.
     """
 
     def __init__(self, app):
