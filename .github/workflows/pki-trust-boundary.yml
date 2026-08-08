@@ -1,0 +1,71 @@
+name: PKI Trust Boundary Gate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+      - work/pki-trust-foundation
+  workflow_dispatch:
+
+concurrency:
+  group: pki-trust-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  trust-boundary:
+    name: PKI configuration, evidence and qualification invariants
+    runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: test
+      DATABASE_URL: sqlite+aiosqlite:///./pki-trust-test.db
+      REDIS_URL: redis://localhost:6379
+      SECRET_KEY: ci-only-secret-key-not-for-production-0123456789
+      ENCRYPTION_KEY: ci-only-encryption-key-0123456789abcdef
+      MINIO_ACCESS_KEY: ci-minio
+      MINIO_SECRET_KEY: ci-minio-secret
+      MINIO_ENDPOINT: localhost:9000
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Enforce static trust-boundary policy
+        run: python scripts/ops/check_pki_trust_boundary.py
+
+      - name: Lint PKI trust implementation
+        working-directory: backend
+        run: |
+          ruff check \
+            app/config.py \
+            app/services/trust_service.py \
+            app/models/qualified_signature_evidence.py \
+            app/api/security_hardening.py \
+            tests/test_trust_service.py \
+            tests/test_trust_api.py
+
+      - name: Test fail-closed qualification behavior
+        working-directory: backend
+        run: |
+          pytest -q \
+            tests/test_trust_service.py \
+            tests/test_trust_api.py \
+            tests/test_parapheur_evidence.py
