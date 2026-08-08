@@ -71,6 +71,11 @@ export interface CitizenRequest {
   serviceName: string
   category: string
   categoryId: string
+  serviceCatalogVersion?: number | null
+  servicePolicyStatus?: string | null
+  servicePolicySource?: string | null
+  serviceFeeLabel?: string | null
+  expectedProcessingLabel?: string | null
   citizenName: string
   citizenFirstName: string
   citizenNIN: string
@@ -137,19 +142,6 @@ export function addBusinessDays(startDate: Date, days: number): Date {
   return date
 }
 
-export function getDeadlineDays(categoryId: string): number {
-  const slaDays: Record<string, number> = {
-    'etat-civil': 30,
-    justice: 45,
-    identification: 45,
-    urbanisme: 45,
-    entreprise: 30,
-    education: 30,
-    sante: 30,
-    residence: 30,
-  }
-  return slaDays[categoryId] || 45
-}
 
 export function isDeadlineExceeded(req: CitizenRequest): boolean {
   if (req.status === 'livree' || req.status === 'rejetee') return false
@@ -347,7 +339,6 @@ export const useCitizenRequestsStore = create<CitizenRequestsState>((set, get) =
     // Resolve routing before creating anything. If routing is ambiguous, the
     // caller can safely retry because no server-side request exists yet.
     const targetInstitutionId = await resolveTargetInstitution({
-      categoryId: req.categoryId,
       mairie,
       citizenAddress: req.citizenAddress,
       targetInstitutionId: req.targetInstitutionId,
@@ -355,8 +346,6 @@ export const useCitizenRequestsStore = create<CitizenRequestsState>((set, get) =
 
     const created = await serviceRequestsApi.createRequest({
       serviceId: req.serviceId,
-      serviceName: req.serviceName,
-      category: req.category,
       categoryId: req.categoryId,
       targetInstitutionId,
       citizenName: req.citizenName,
@@ -366,7 +355,6 @@ export const useCitizenRequestsStore = create<CitizenRequestsState>((set, get) =
       citizenEmail: req.citizenEmail,
       citizenAddress: req.citizenAddress,
       motif: req.motif,
-      documents: req.documents,
       mairie,
       deliveryMode: req.deliveryMode,
     })
