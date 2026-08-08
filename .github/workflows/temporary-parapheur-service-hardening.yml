@@ -1,0 +1,85 @@
+name: Temporary Parapheur Service Hardening
+
+on:
+  push:
+    branches:
+      - agent/parapheur-evidence-hardening
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/parapheur-evidence-hardening
+
+      - name: Harden parapheur service
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('backend/app/services/parapheur_service.py')
+          text = path.read_text(encoding='utf-8')
+
+          text = text.replace('import time\n', '')
+          text = text.replace(
+              'from app.models.document import Document\n',
+              'from app.models.document import Document\nfrom app.models.document_version import DocumentVersion\n',
+              1,
+          )
+
+          old = '''                # Traiter l'action\n                now = datetime.now(timezone.utc)\n\n                if action == CircuitAction.REJECT:'''
+          new = '''                # L'action positive doit correspondre exactement à l'action assignée.\n                # Le rejet reste toujours permis à l'assigné comme décision explicite.\n                if action != CircuitAction.REJECT and action != step.action_type:\n                    return {\n                        "error": (\n                            f"Action non autorisée pour cette étape: attendu {step.action_type}, "\n                            f"reçu {action}"\n                        )\n                    }\n\n                # Une preuve interne n'est valide que si elle est liée à une version\n                # immuable/hashée du document. Ne jamais signer un simple chemin fichier.\n                version_result = await session.execute(\n                    select(DocumentVersion)\n                    .where(DocumentVersion.document_id == circuit.document_id)\n                    .order_by(DocumentVersion.version_number.desc())\n                    .limit(1)\n                )\n                signed_version = version_result.scalar_one_or_none()\n                if not signed_version or not signed_version.file_hash:\n                    return {\n                        "error": (\n                            "Le document doit posséder une version hashée avant toute "\n                            "signature, approbation, visa, cachet ou rejet."\n                        )\n                    }\n\n                now = datetime.now(timezone.utc)\n                step.signed_document_version = signed_version.version_number\n                step.signed_document_hash = signed_version.file_hash\n                step.evidence_timestamp = now\n                step.evidence_type = "internal_approval"\n                step.evidence_algorithm = "SHA-256"\n\n                if action == CircuitAction.REJECT:'''
+          if old not in text:
+              raise SystemExit('advance action anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = '''                    step.signature_hash = self._generate_signature_hash(\n                        circuit_id, step_id, user_id, action, "rejected"\n                    )'''
+          new = '''                    step.signature_hash = self._generate_signature_hash(\n                        circuit_id=circuit_id,\n                        step_id=step_id,\n                        user_id=user_id,\n                        action=action,\n                        status="rejected",\n                        document_id=str(circuit.document_id),\n                        document_version=signed_version.version_number,\n                        document_hash=signed_version.file_hash,\n                        evidence_timestamp=now,\n                    )'''
+          if old not in text:
+              raise SystemExit('reject hash anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = '''                    step.signature_hash = self._generate_signature_hash(\n                        circuit_id, step_id, user_id, action, "completed"\n                    )'''
+          new = '''                    step.signature_hash = self._generate_signature_hash(\n                        circuit_id=circuit_id,\n                        step_id=step_id,\n                        user_id=user_id,\n                        action=action,\n                        status="completed",\n                        document_id=str(circuit.document_id),\n                        document_version=signed_version.version_number,\n                        document_hash=signed_version.file_hash,\n                        evidence_timestamp=now,\n                    )'''
+          if old not in text:
+              raise SystemExit('positive hash anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = '''                # Vérifier l'intégrité du hash\n                expected_hash = self._generate_signature_hash(\n                    str(circuit.id),\n                    str(step.id),\n                    str(step.assignee_id),\n                    step.action_type,\n                    step.status,\n                )\n\n                is_valid = step.signature_hash == expected_hash and step.status == StepStatus.COMPLETED'''
+          new = '''                # Les preuves historiques non liées à un hash/version documentaire\n                # restent consultables mais ne sont jamais déclarées valides.\n                evidence_complete = all([\n                    step.signature_hash,\n                    step.signed_document_hash,\n                    step.signed_document_version is not None,\n                    step.evidence_timestamp,\n                    step.evidence_type == "internal_approval",\n                    step.evidence_algorithm == "SHA-256",\n                ])\n\n                if evidence_complete:\n                    expected_hash = self._generate_signature_hash(\n                        circuit_id=str(circuit.id),\n                        step_id=str(step.id),\n                        user_id=str(step.assignee_id),\n                        action=step.action_type if step.status == StepStatus.COMPLETED else CircuitAction.REJECT,\n                        status=step.status,\n                        document_id=str(circuit.document_id),\n                        document_version=step.signed_document_version,\n                        document_hash=step.signed_document_hash,\n                        evidence_timestamp=step.evidence_timestamp,\n                    )\n                    is_valid = step.signature_hash == expected_hash and step.status in (\n                        StepStatus.COMPLETED, StepStatus.REJECTED\n                    )\n                else:\n                    expected_hash = None\n                    is_valid = False'''
+          if old not in text:
+              raise SystemExit('verify anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = '''                    "document_id": str(circuit.document_id),\n                    "reason": "Signature vérifiée avec succès" if is_valid else "Hash de signature invalide",\n                }'''
+          new = '''                    "document_id": str(circuit.document_id),\n                    "document_version": step.signed_document_version,\n                    "document_hash": step.signed_document_hash,\n                    "evidence_timestamp": (\n                        step.evidence_timestamp.isoformat() if step.evidence_timestamp else None\n                    ),\n                    "evidence_type": step.evidence_type,\n                    "evidence_algorithm": step.evidence_algorithm,\n                    "qualified_pki": False,\n                    "reason": (\n                        "Preuve d'approbation interne vérifiée"\n                        if is_valid\n                        else "Preuve absente, historique non lié, ou hash d'intégrité invalide"\n                    ),\n                }'''
+          if old not in text:
+              raise SystemExit('verify response anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = '''                        "comment": step.comment,\n                        "completed_at": step.completed_at.isoformat() if step.completed_at else None,\n                    })'''
+          new = '''                        "comment": step.comment,\n                        "signature_hash": step.signature_hash,\n                        "signed_document_version": step.signed_document_version,\n                        "signed_document_hash": step.signed_document_hash,\n                        "evidence_timestamp": (\n                            step.evidence_timestamp.isoformat() if step.evidence_timestamp else None\n                        ),\n                        "evidence_type": step.evidence_type,\n                        "qualified_pki": False,\n                        "completed_at": step.completed_at.isoformat() if step.completed_at else None,\n                    })'''
+          if old not in text:
+              raise SystemExit('details anchor not found')
+          text = text.replace(old, new, 1)
+
+          start = text.index('    def _generate_signature_hash(')
+          end = text.index('\n\n\n# Singleton', start)
+          replacement = '''    def _generate_signature_hash(\n        self,\n        *,\n        circuit_id: str,\n        step_id: str,\n        user_id: str,\n        action: str,\n        status: str,\n        document_id: str,\n        document_version: int,\n        document_hash: str,\n        evidence_timestamp: datetime,\n    ) -> str:\n        """Generate deterministic internal approval evidence.\n\n        The digest is bound to the exact document version hash, actor, assigned\n        action, resulting status and persisted timestamp. It is intentionally\n        labelled internal approval evidence and is not a certificate-backed PKI\n        signature.\n        """\n        timestamp = evidence_timestamp.astimezone(timezone.utc).isoformat(timespec="microseconds")\n        data = "|".join([\n            "eadmin-parapheur-v2",\n            circuit_id,\n            step_id,\n            user_id,\n            action,\n            status,\n            document_id,\n            str(document_version),\n            document_hash.lower(),\n            timestamp,\n        ])\n        return hashlib.sha256(data.encode("utf-8")).hexdigest()'''
+          text = text[:start] + replacement + text[end:]
+
+          path.write_text(text, encoding='utf-8')
+
+      - name: Commit hardening
+        shell: bash
+        run: |
+          if git diff --quiet -- backend/app/services/parapheur_service.py; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add backend/app/services/parapheur_service.py
+          git commit -m 'security(parapheur): bind evidence to immutable document version'
+          git push origin HEAD:agent/parapheur-evidence-hardening
