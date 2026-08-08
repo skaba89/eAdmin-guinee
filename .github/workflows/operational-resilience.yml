@@ -1,0 +1,164 @@
+name: Operational Resilience Gate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+      - work/national-resilience
+  workflow_dispatch:
+
+concurrency:
+  group: ops-resilience-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  policy-and-manifests:
+    name: Operational policy and Kubernetes manifests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run operational policy checks
+        run: python scripts/ops/check_operational_readiness.py
+
+      - name: Validate shell scripts
+        shell: bash
+        run: |
+          bash -n scripts/ops/backup-postgres.sh
+          bash -n scripts/ops/restore-postgres.sh
+
+      - name: Validate Kubernetes manifests
+        shell: bash
+        run: |
+          docker run --rm \
+            -v "${PWD}/infra/kubernetes/base:/manifests:ro" \
+            ghcr.io/yannh/kubeconform:v0.6.7 \
+            -strict -summary /manifests/platform.yaml
+
+  prometheus-config:
+    name: Prometheus production config and alert rules
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate Prometheus production configuration
+        shell: bash
+        run: |
+          docker run --rm \
+            -v "${PWD}/monitoring:/etc/prometheus:ro" \
+            prom/prometheus:v2.51.0 \
+            promtool check config /etc/prometheus/prometheus.production.yml
+
+      - name: Validate eAdmin alert rules
+        shell: bash
+        run: |
+          docker run --rm \
+            -v "${PWD}/monitoring:/etc/prometheus:ro" \
+            prom/prometheus:v2.51.0 \
+            promtool check rules /etc/prometheus/alerts/eadmin.rules.yml
+
+  backup-restore-drill:
+    name: PostgreSQL backup and restore drill
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: eadmin_backup
+          POSTGRES_USER: eadmin
+          POSTGRES_PASSWORD: ci-backup-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U eadmin -d eadmin_backup"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGPASSWORD: ci-backup-password
+      SOURCE_URL: postgresql://eadmin:ci-backup-password@localhost:5432/eadmin_backup
+      RESTORE_URL: postgresql://eadmin:ci-backup-password@localhost:5432/eadmin_restore
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Seed recovery probe
+        shell: bash
+        run: |
+          psql "$SOURCE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE TABLE resilience_probe (
+            id integer PRIMARY KEY,
+            payload text NOT NULL
+          );
+          INSERT INTO resilience_probe(id, payload)
+          VALUES (1, 'eadmin-national-resilience');
+          SQL
+
+      - name: Create and verify backup
+        id: backup
+        shell: bash
+        run: |
+          mkdir -p .ci-backups
+          dump_path=$(PG_BACKUP_URL="$SOURCE_URL" BACKUP_DIR=.ci-backups BACKUP_RETENTION_DAYS=1 bash scripts/ops/backup-postgres.sh | tail -n1)
+          test -f "$dump_path"
+          test -f "${dump_path}.sha256"
+          test -f "${dump_path}.meta"
+          echo "dump_path=$dump_path" >> "$GITHUB_OUTPUT"
+
+      - name: Restore into isolated database
+        shell: bash
+        env:
+          DUMP_PATH: ${{ steps.backup.outputs.dump_path }}
+        run: |
+          psql postgresql://eadmin:ci-backup-password@localhost:5432/postgres \
+            -v ON_ERROR_STOP=1 \
+            -c 'CREATE DATABASE eadmin_restore;'
+          RESTORE_DATABASE_URL="$RESTORE_URL" \
+            ALLOW_DESTRUCTIVE_RESTORE=YES_I_UNDERSTAND \
+            bash scripts/ops/restore-postgres.sh "$DUMP_PATH"
+
+      - name: Verify restored business probe
+        shell: bash
+        run: |
+          restored=$(psql "$RESTORE_URL" -Atc "SELECT payload FROM resilience_probe WHERE id = 1;")
+          test "$restored" = 'eadmin-national-resilience'
+
+      - name: Upload backup drill evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: postgres-restore-drill-evidence
+          path: .ci-backups
+          if-no-files-found: ignore
+          retention-days: 3
+
+  resilience-gate:
+    name: Operational resilience aggregate gate
+    if: always()
+    needs: [policy-and-manifests, prometheus-config, backup-restore-drill]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every resilience check
+        env:
+          POLICY: ${{ needs.policy-and-manifests.result }}
+          PROMETHEUS: ${{ needs.prometheus-config.result }}
+          BACKUP_RESTORE: ${{ needs.backup-restore-drill.result }}
+        shell: bash
+        run: |
+          echo "policy=$POLICY prometheus=$PROMETHEUS backup_restore=$BACKUP_RESTORE"
+          test "$POLICY" = success
+          test "$PROMETHEUS" = success
+          test "$BACKUP_RESTORE" = success
