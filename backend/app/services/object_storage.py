@@ -80,6 +80,16 @@ class ObjectStorageService:
         logger.info("Read administrative object key=%s size=%s", object_key, len(content))
         return content
 
+    async def healthcheck(self) -> bool:
+        """Check that the configured bucket exists without mutating storage state."""
+
+        def _check() -> bool:
+            return bool(
+                self._get_client().bucket_exists(settings.MINIO_BUCKET_NAME)
+            )
+
+        return await asyncio.to_thread(_check)
+
     async def delete(self, object_key: str) -> None:
         def _delete() -> None:
             self._ensure_bucket_sync()
