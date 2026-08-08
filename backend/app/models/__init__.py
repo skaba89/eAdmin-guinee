@@ -12,6 +12,7 @@ from app.models.courrier import (
     CourrierTypeEnum,
 )
 from app.models.document import Document, DocumentStatusEnum
+from app.models.document_ocr import DocumentOCRResult
 from app.models.document_version import DocumentVersion
 from app.models.electronic_stamp import ElectronicStamp, SignatureCircuit, SignatureStep
 from app.models.institution import Institution
@@ -41,6 +42,7 @@ __all__ = [
     "Document",
     "DocumentStatusEnum",
     "DocumentVersion",
+    "DocumentOCRResult",
     "ElectronicStamp",
     "SignatureCircuit",
     "SignatureStep",
