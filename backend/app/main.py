@@ -7,7 +7,7 @@ import logging
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -31,6 +31,7 @@ from app.config import settings
 from app.middleware.audit import AuditMiddleware
 from app.middleware.mfa_guard import MFAGuardMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
+from app.middleware.rls import set_rls_context
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.middleware.tenant import TenantResolutionMiddleware
 
@@ -209,17 +210,69 @@ app.add_middleware(
 # Security-critical overrides are registered before the legacy routers.
 app.include_router(auth_hardening.router, prefix="/api/v1/auth", tags=["Authentification"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentification"])
-app.include_router(documents.router, prefix="/api/v1/documents", tags=["Documents"])
-app.include_router(documents_search.router, prefix="/api/v1/documents", tags=["Recherche Documentaire"])
-app.include_router(courriers.router, prefix="/api/v1/courriers", tags=["Courriers"])
-app.include_router(workflows.router, prefix="/api/v1/workflows", tags=["Workflows"])
-app.include_router(users.router, prefix="/api/v1/users", tags=["Utilisateurs"])
-app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytique"])
-app.include_router(audit.router, prefix="/api/v1/audit", tags=["Audit"])
-app.include_router(ai.router, prefix="/api/v1/ai", tags=["Intelligence Artificielle"])
+
+# Every authenticated business router establishes PostgreSQL transaction-local
+# RLS variables before any ORM query. FastAPI dependency caching makes this
+# dependency reuse the same get_db() session as the endpoint itself.
+rls_dependencies = [Depends(set_rls_context)]
+
+app.include_router(
+    documents.router,
+    prefix="/api/v1/documents",
+    tags=["Documents"],
+    dependencies=rls_dependencies,
+)
+app.include_router(
+    documents_search.router,
+    prefix="/api/v1/documents",
+    tags=["Recherche Documentaire"],
+    dependencies=rls_dependencies,
+)
+app.include_router(
+    courriers.router,
+    prefix="/api/v1/courriers",
+    tags=["Courriers"],
+    dependencies=rls_dependencies,
+)
+app.include_router(
+    workflows.router,
+    prefix="/api/v1/workflows",
+    tags=["Workflows"],
+    dependencies=rls_dependencies,
+)
+app.include_router(
+    users.router,
+    prefix="/api/v1/users",
+    tags=["Utilisateurs"],
+    dependencies=rls_dependencies,
+)
+app.include_router(
+    analytics.router,
+    prefix="/api/v1/analytics",
+    tags=["Analytique"],
+    dependencies=rls_dependencies,
+)
+app.include_router(
+    audit.router,
+    prefix="/api/v1/audit",
+    tags=["Audit"],
+    dependencies=rls_dependencies,
+)
+app.include_router(
+    ai.router,
+    prefix="/api/v1/ai",
+    tags=["Intelligence Artificielle"],
+    dependencies=rls_dependencies,
+)
+
 app.include_router(security_hardening.router, prefix="/api/v1/security", tags=["Sécurité"])
 app.include_router(security.router, prefix="/api/v1/security", tags=["Sécurité"])
-app.include_router(security_events.router, prefix="/api/v1/security-events", tags=["Événements de Sécurité"])
+app.include_router(
+    security_events.router,
+    prefix="/api/v1/security-events",
+    tags=["Événements de Sécurité"],
+    dependencies=rls_dependencies,
+)
 app.include_router(metrics.router, tags=["Métriques"])
 
 
