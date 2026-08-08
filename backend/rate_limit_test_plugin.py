@@ -1,11 +1,13 @@
-"""Pytest isolation for process-global Redis and audit middleware resources."""
+"""Pytest isolation for process-global Redis and audit middleware resources.
+
+Keep application imports lazy: this plugin is loaded by pytest itself before
+pytest-cov starts tracing. Importing ``app`` modules at module import time would
+make real application coverage look artificially low.
+"""
 
 from unittest.mock import AsyncMock
 
 import pytest_asyncio
-
-import app.middleware.audit as audit_middleware
-from app.config import settings
 
 
 class _TestAuditSession:
@@ -33,6 +35,9 @@ class _TestAuditService:
 
 
 async def _clear_rate_limit_keys() -> None:
+    # Lazy import is intentional; see module docstring.
+    from app.config import settings
+
     if settings.ENVIRONMENT != "test":
         return
 
@@ -58,6 +63,9 @@ async def _clear_rate_limit_keys() -> None:
 @pytest_asyncio.fixture(autouse=True)
 async def isolate_process_global_test_resources(monkeypatch):
     """Keep HTTP tests isolated from global Redis and asyncpg resources."""
+    # Lazy import ensures pytest-cov has already started tracing application code.
+    import app.middleware.audit as audit_middleware
+
     monkeypatch.setattr(
         audit_middleware,
         "audit_session_factory",
