@@ -1,14 +1,25 @@
 """Core invariants for durable citizen service requests."""
 
 import re
+import uuid
 from datetime import datetime, timezone
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+from fastapi import HTTPException
 
 from app.api.service_requests import (
     ALLOWED_TRANSITIONS,
     _add_business_days,
+    _append_note,
+    _default_timeline,
+    _is_staff,
+    _load_request,
     _reference,
 )
 from app.models.service_request import ServiceRequestStatusEnum
+from app.models.user import RoleEnum
 
 
 def test_reference_is_server_generated_and_non_sequential():
@@ -36,3 +47,77 @@ def test_business_day_helper_skips_weekends():
     monday = _add_business_days(friday, 1)
     assert monday.weekday() == 0
     assert monday.date().isoformat() == "2026-08-10"
+
+
+def test_default_timeline_starts_with_submission_and_pending_processing():
+    timeline = _default_timeline()
+
+    assert len(timeline) == 6
+    assert timeline[0]["label"] == "Soumission de la demande"
+    assert timeline[0]["status"] == "completed"
+    assert "date" in timeline[0]
+    assert all(step["status"] == "pending" for step in timeline[1:])
+
+
+def test_staff_detection_keeps_citizen_out_of_backoffice_actions():
+    citizen = SimpleNamespace(role=RoleEnum.CITOYEN)
+    agent = SimpleNamespace(role=RoleEnum.AGENT)
+
+    assert _is_staff(citizen) is False
+    assert _is_staff(agent) is True
+
+
+@pytest.mark.asyncio
+async def test_load_request_returns_scoped_request():
+    expected = SimpleNamespace(id=uuid.uuid4())
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = expected
+    db = MagicMock()
+    db.execute = AsyncMock(return_value=result)
+
+    assert await _load_request(db, expected.id) is expected
+    db.execute.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_load_request_missing_is_fail_closed():
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = None
+    db = MagicMock()
+    db.execute = AsyncMock(return_value=result)
+
+    with pytest.raises(HTTPException) as exc:
+        await _load_request(db, uuid.uuid4())
+
+    assert exc.value.status_code == 404
+    assert "périmètre" in exc.value.detail
+
+
+@pytest.mark.asyncio
+async def test_append_note_uses_authenticated_author_and_flushes():
+    db = MagicMock()
+    db.add = MagicMock()
+    db.flush = AsyncMock()
+    item = SimpleNamespace(id=uuid.uuid4())
+    user = SimpleNamespace(
+        id=uuid.uuid4(),
+        full_name="Agent Test",
+        role=RoleEnum.AGENT,
+    )
+
+    note = await _append_note(
+        db,
+        item,
+        user,
+        "Pièce vérifiée",
+        "decision",
+    )
+
+    assert note.request_id == item.id
+    assert note.author_id == user.id
+    assert note.author_name == "Agent Test"
+    assert note.author_role == RoleEnum.AGENT.value
+    assert note.text == "Pièce vérifiée"
+    assert note.note_type == "decision"
+    db.add.assert_called_once_with(note)
+    db.flush.assert_awaited_once()
