@@ -13,6 +13,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api import (
     ai,
+    ai_grounded,
     analytics,
     audit,
     auth,
@@ -329,10 +330,18 @@ app.include_router(
     tags=["Audit"],
     dependencies=rls_dependencies,
 )
+# Grounded routes intentionally precede the historical AI router. Duplicate
+# paths are therefore handled by the sourced, human-in-the-loop implementation.
+app.include_router(
+    ai_grounded.router,
+    prefix="/api/v1/ai",
+    tags=["Assistant administratif sourcé"],
+    dependencies=rls_dependencies,
+)
 app.include_router(
     ai.router,
     prefix="/api/v1/ai",
-    tags=["Intelligence Artificielle"],
+    tags=["Intelligence Artificielle (compatibilité)"],
     dependencies=rls_dependencies,
 )
 
