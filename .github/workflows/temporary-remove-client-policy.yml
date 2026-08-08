@@ -1,9 +1,9 @@
 name: Temporary Remove Client Policy Logic
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/remove-client-sla-policy
+      - main
 
 permissions:
   contents: write
@@ -16,46 +16,20 @@ jobs:
         with:
           ref: agent/remove-client-sla-policy
 
-      - name: Remove client-authoritative service policy fields
+      - name: Remove remaining client-side SLA authority
         shell: python
         run: |
           from pathlib import Path
 
-          api = Path('src/lib/service-requests-api.ts')
-          text = api.read_text(encoding='utf-8')
-          for line in [
-              '  serviceName: string\n',
-              '  category: string\n',
-              '  categoryId: string\n',
-              '  requiredDocuments?: string[]\n',
-          ]:
-              text = text.replace(line, '', 1)
-
-          api_marker = '  categoryId: string\n'
-          snapshot_api = '''  categoryId: string\n  serviceCatalogVersion?: number | null\n  servicePolicyStatus?: string | null\n  servicePolicySource?: string | null\n  serviceFeeLabel?: string | null\n  expectedProcessingLabel?: string | null\n'''
-          # Insert only in ApiServiceRequest, after the first categoryId remaining.
-          if 'serviceCatalogVersion?: number | null' not in text:
-              idx = text.find(api_marker)
-              if idx < 0:
-                  raise SystemExit('ApiServiceRequest categoryId marker missing')
-              text = text[:idx] + text[idx:].replace(api_marker, snapshot_api, 1)
-
-          map_marker = '    categoryId: item.categoryId,\n'
-          map_snapshot = '''    categoryId: item.categoryId,\n    serviceCatalogVersion: item.serviceCatalogVersion ?? null,\n    servicePolicyStatus: item.servicePolicyStatus ?? null,\n    servicePolicySource: item.servicePolicySource ?? null,\n    serviceFeeLabel: item.serviceFeeLabel ?? null,\n    expectedProcessingLabel: item.expectedProcessingLabel ?? null,\n'''
-          if 'serviceCatalogVersion: item.serviceCatalogVersion' not in text:
-              if map_marker not in text:
-                  raise SystemExit('mapRequest category marker missing')
-              text = text.replace(map_marker, map_snapshot, 1)
-          api.write_text(text, encoding='utf-8')
-
           store = Path('src/store/citizen-requests-store.ts')
           text = store.read_text(encoding='utf-8')
-          store_marker = '  categoryId: string\n'
-          store_snapshot = '''  categoryId: string\n  serviceCatalogVersion?: number | null\n  servicePolicyStatus?: string | null\n  servicePolicySource?: string | null\n  serviceFeeLabel?: string | null\n  expectedProcessingLabel?: string | null\n'''
+
+          marker = '  categoryId: string\n'
+          snapshot = '''  categoryId: string\n  serviceCatalogVersion?: number | null\n  servicePolicyStatus?: string | null\n  servicePolicySource?: string | null\n  serviceFeeLabel?: string | null\n  expectedProcessingLabel?: string | null\n'''
           if 'serviceCatalogVersion?: number | null' not in text:
-              if store_marker not in text:
-                  raise SystemExit('CitizenRequest categoryId marker missing')
-              text = text.replace(store_marker, store_snapshot, 1)
+              if marker not in text:
+                  raise SystemExit('CitizenRequest category marker missing')
+              text = text.replace(marker, snapshot, 1)
 
           fn_start = 'export function getDeadlineDays(categoryId: string): number {\n'
           if fn_start in text:
@@ -63,19 +37,18 @@ jobs:
               end = text.index('\n}\n', start) + 3
               text = text[:start] + text[end:]
 
-          # POST only identifiers and citizen/request inputs. The server resolves
-          # all administrative metadata from serviceId.
           for payload_line in [
               '      serviceName: req.serviceName,\n',
               '      category: req.category,\n',
               '      categoryId: req.categoryId,\n',
-              '      requiredDocuments: req.documents,\n',
+              '      documents: req.documents,\n',
           ]:
               text = text.replace(payload_line, '', 1)
           store.write_text(text, encoding='utf-8')
 
           portal = Path('src/components/app/citizen-portal-page.tsx')
           text = portal.read_text(encoding='utf-8')
+          text = text.replace(' getDeadlineDays,', '', 1)
           text = text.replace('getDeadlineDays, ', '', 1)
           text = text.replace('getDeadlineDays,', '', 1)
           legacy = '''  // Calculate estimated delivery date based on legal deadline\n  const getServiceSLA = (categoryId: string): number => {\n    return getDeadlineDays(categoryId)\n  }\n\n'''
@@ -86,12 +59,12 @@ jobs:
         shell: bash
         run: |
           git diff --check
-          if git diff --quiet -- src/lib/service-requests-api.ts src/store/citizen-requests-store.ts src/components/app/citizen-portal-page.tsx; then
+          if git diff --quiet -- src/store/citizen-requests-store.ts src/components/app/citizen-portal-page.tsx; then
             echo 'No cleanup changes produced'
             exit 1
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/lib/service-requests-api.ts src/store/citizen-requests-store.ts src/components/app/citizen-portal-page.tsx
-          git commit -m 'refactor(citizen): remove client-side service policy authority'
+          git add src/store/citizen-requests-store.ts src/components/app/citizen-portal-page.tsx
+          git commit -m 'refactor(citizen): remove remaining client-side SLA policy'
           git push origin HEAD:agent/remove-client-sla-policy
