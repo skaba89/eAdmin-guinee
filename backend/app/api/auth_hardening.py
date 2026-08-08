@@ -78,7 +78,7 @@ async def secure_admin_create_user(
     user_data: SecureAdminUserCreate,
     current_user: User = Depends(auth_api.get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> User:
+) -> dict:
     """Shadow the legacy admin-create endpoint with hierarchy and scope controls."""
 
     if current_user.role not in (RoleEnum.ADMIN, RoleEnum.SUPER_ADMIN):
@@ -143,7 +143,17 @@ async def secure_admin_create_user(
         tenant_id=tenant_id,
         institution_id=institution_id,
     )
-    return user
+    return {
+        "id": user.id,
+        "email": user.email,
+        "full_name": user.full_name,
+        "role": user.role,
+        "frontend_role": user.role.to_frontend_role(),
+        "institution": user.institution,
+        "is_active": user.is_active,
+        "mfa_enabled": user.mfa_enabled,
+        "created_at": user.created_at,
+    }
 
 
 @router.post("/refresh", response_model=TokenResponse, summary="Rafraîchir le token")
