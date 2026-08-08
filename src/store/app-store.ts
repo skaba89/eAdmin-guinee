@@ -1,9 +1,10 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import * as authClient from '@/lib/auth-client'
 
 export type UserRole = 'citizen' | 'mairie' | 'admin_general' | 'agence' | 'agent' | 'chef_service' | 'directeur' | 'ministre' | 'ministere' | 'super_admin'
 
-export type AppPage = 
+export type AppPage =
   | 'landing' | 'about' | 'services' | 'solutions' | 'pricing'
   | 'contact' | 'blog' | 'faq' | 'demo'
   | 'login' | 'register'
@@ -30,126 +31,13 @@ export interface UserInfo {
   agence?: string
 }
 
-// DEMO ACCOUNTS
-export const DEMO_ACCOUNTS: Record<string, { password: string; user: UserInfo }> = {
-  'citoyen@eadmin.gn': {
-    password: 'Eadmin2026!',
-    user: {
-      id: 'demo-citizen-1',
-      name: 'Aminata Diallo',
-      email: 'citoyen@eadmin.gn',
-      role: 'citizen',
-      institution: 'Citoyen',
-      fonction: 'Citoyenne guinéenne',
-      phone: '+224 622 34 56 78',
-      nin: 'NIN-2019-458723',
-    }
-  },
-  'mairie@eadmin.gn': {
-    password: 'Eadmin2026!',
-    user: {
-      id: 'demo-mairie-1',
-      name: 'Mme Fatoumata Bah',
-      email: 'mairie@eadmin.gn',
-      role: 'mairie',
-      institution: 'Mairie de Kaloum',
-      fonction: 'Secrétaire Générale de la Mairie',
-      mairie: 'Mairie de Kaloum',
-    }
-  },
-  'admin@eadmin.gn': {
-    password: 'Eadmin2026!',
-    user: {
-      id: 'demo-admin-1',
-      name: 'Sékou Condé',
-      email: 'admin@eadmin.gn',
-      role: 'admin_general',
-      institution: "Ministère de l'Administration Territoriale",
-      fonction: 'Directeur de la Modernisation Administrative',
-    }
-  },
-  'agence@eadmin.gn': {
-    password: 'Eadmin2026!',
-    user: {
-      id: 'demo-agence-1',
-      name: 'M. Mamadou Soumah',
-      email: 'agence@eadmin.gn',
-      role: 'agence',
-      institution: "Agence Nationale d'Identification (ANIP)",
-      fonction: 'Chef de Service Passeports & CNI',
-      agence: 'ANIP',
-    }
-  },
-  'ministere@eadmin.gn': {
-    password: 'Eadmin2026!',
-    user: {
-      id: 'demo-ministere-1',
-      name: 'Dr. Alpha Diallo',
-      email: 'ministere@eadmin.gn',
-      role: 'ministere',
-      institution: 'Ministère de la Justice',
-      fonction: 'Secrétaire Général',
-    }
-  },
-  'superadmin@eadmin.gn': {
-    password: 'Eadmin2026!',
-    user: {
-      id: 'demo-superadmin-1',
-      name: 'Amadou Oury Bah',
-      email: 'superadmin@eadmin.gn',
-      role: 'super_admin',
-      institution: 'Primature — Gouvernement de la Guinée',
-      fonction: 'Administrateur Système National',
-    }
-  },
-  'agent@eadmin.gn': {
-    password: 'Eadmin2026!',
-    user: {
-      id: 'demo-agent-1',
-      name: 'Ibrahim Camara',
-      email: 'agent@eadmin.gn',
-      role: 'agent',
-      institution: 'Mairie de Kaloum',
-      fonction: 'Agent de Traitement — État Civil',
-    }
-  },
-  'directeur@eadmin.gn': {
-    password: 'Eadmin2026!',
-    user: {
-      id: 'demo-directeur-1',
-      name: 'Mamadou Sylla',
-      email: 'directeur@eadmin.gn',
-      role: 'directeur',
-      institution: 'Direction Générale de la Modernisation Administrative',
-      fonction: "Directeur des Systèmes d'Information",
-    }
-  },
-  'chef_service@eadmin.gn': {
-    password: 'Eadmin2026!',
-    user: {
-      id: 'demo-chef-service-1',
-      name: 'Aissatou Touré',
-      email: 'chef_service@eadmin.gn',
-      role: 'chef_service',
-      institution: 'Mairie de Kaloum',
-      fonction: 'Chef de Service — État Civil & Résidence',
-      mairie: 'Mairie de Kaloum',
-    }
-  },
-  'ministre@eadmin.gn': {
-    password: 'Eadmin2026!',
-    user: {
-      id: 'demo-ministre-1',
-      name: 'S.E.M. Abdoulaye Condé',
-      email: 'ministre@eadmin.gn',
-      role: 'ministre',
-      institution: "Ministère de l'Administration Territoriale et de la Décentralisation",
-      fonction: "Ministre de l'Administration Territoriale",
-    }
-  },
-}
+/**
+ * Kept only for backward-compatible rendering in the existing login page.
+ * Production credentials must never be embedded in the browser bundle.
+ * Demo users are provisioned server-side with backend/seed_demo.py.
+ */
+export const DEMO_ACCOUNTS: Record<string, { password: string; user: UserInfo }> = {}
 
-// Role labels for UI
 export const ROLE_LABELS: Record<UserRole, string> = {
   citizen: 'Citoyen',
   mairie: 'Agent de Mairie',
@@ -163,7 +51,6 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   super_admin: 'Super Administrateur',
 }
 
-// Role colors for badges
 export const ROLE_COLORS: Record<UserRole, string> = {
   citizen: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
   mairie: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
@@ -177,7 +64,6 @@ export const ROLE_COLORS: Record<UserRole, string> = {
   super_admin: 'bg-[#0B2E58] text-white dark:bg-[#3B7DD8] dark:text-white',
 }
 
-// Default page per role
 export const ROLE_DEFAULT_PAGE: Record<UserRole, AppPage> = {
   citizen: 'citizen-portal',
   mairie: 'mairie-dashboard',
@@ -191,9 +77,42 @@ export const ROLE_DEFAULT_PAGE: Record<UserRole, AppPage> = {
   super_admin: 'dashboard',
 }
 
+function normalizeRole(frontendRole?: string, backendRole?: string): UserRole {
+  const raw = (frontendRole || backendRole || '').trim().toLowerCase()
+  const mapping: Record<string, UserRole> = {
+    citoyen: 'citizen',
+    citizen: 'citizen',
+    agent: 'agent',
+    mairie: 'mairie',
+    agence: 'agence',
+    admin: 'admin_general',
+    admin_general: 'admin_general',
+    chef_service: 'chef_service',
+    directeur: 'directeur',
+    ministre: 'ministre',
+    ministere: 'ministere',
+    superadmin: 'super_admin',
+    super_admin: 'super_admin',
+  }
+  return mapping[raw] || 'citizen'
+}
+
+function mapBackendUser(backendUser: authClient.BackendUser): UserInfo {
+  const role = normalizeRole(backendUser.frontend_role, backendUser.role)
+  return {
+    id: backendUser.id,
+    name: backendUser.full_name,
+    email: backendUser.email,
+    role,
+    institution: backendUser.institution || 'République de Guinée',
+    fonction: ROLE_LABELS[role],
+  }
+}
+
 interface AppState {
   currentPage: AppPage
   isAuth: boolean
+  mfaRequired: boolean
   theme: 'light' | 'dark'
   sidebarOpen: boolean
   sidebarCollapsed: boolean
@@ -204,15 +123,18 @@ interface AppState {
   toggleTheme: () => void
   toggleSidebar: () => void
   toggleSidebarCollapse: () => void
-  login: (email: string, password: string) => boolean
+  login: (email: string, password: string) => Promise<boolean>
+  verifyMfa: (code: string) => Promise<boolean>
+  restoreSession: () => Promise<boolean>
   logout: () => void
 }
 
 export const useAppStore = create<AppState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       currentPage: 'landing' as AppPage,
       isAuth: false,
+      mfaRequired: false,
       theme: 'light' as const,
       sidebarOpen: true,
       sidebarCollapsed: false,
@@ -231,32 +153,136 @@ export const useAppStore = create<AppState>()(
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
       toggleSidebarCollapse: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
 
-      login: (email: string, password: string) => {
-        const account = DEMO_ACCOUNTS[email]
-        if (!account) {
-          set({ loginError: 'Email non reconnu. Utilisez un des comptes démo ci-dessous.' })
+      login: async (email: string, password: string) => {
+        set({ loginError: null, isAuth: false, mfaRequired: false })
+
+        try {
+          const tokens = await authClient.login(email, password)
+          const claims = authClient.decodeJwtPayload(tokens.access_token)
+          const backendUser = await authClient.getCurrentUser(tokens.access_token)
+          const user = mapBackendUser(backendUser)
+
+          if (claims.mfa_required === true && claims.mfa_verified !== true) {
+            authClient.storePendingTokens(tokens)
+            set({
+              isAuth: false,
+              mfaRequired: true,
+              currentPage: 'mfa',
+              user,
+              loginError: null,
+            })
+            return true
+          }
+
+          authClient.storeActiveTokens(tokens)
+          set({
+            isAuth: true,
+            mfaRequired: false,
+            currentPage: ROLE_DEFAULT_PAGE[user.role],
+            user,
+            loginError: null,
+          })
+          return true
+        } catch (error) {
+          authClient.clearAuthTokens()
+          set({
+            isAuth: false,
+            mfaRequired: false,
+            user: null,
+            loginError: error instanceof Error ? error.message : 'Connexion impossible.',
+          })
           return false
         }
-        if (password !== account.password) {
-          set({ loginError: 'Mot de passe incorrect.' })
-          return false
-        }
-        const defaultPage = ROLE_DEFAULT_PAGE[account.user.role]
-        set({
-          isAuth: true,
-          currentPage: defaultPage,
-          user: account.user,
-          loginError: null,
-        })
-        return true
       },
 
-      logout: () => set({
-        isAuth: false,
-        currentPage: 'landing' as AppPage,
-        user: null,
-        loginError: null,
-      }),
+      verifyMfa: async (code: string) => {
+        const pendingToken = authClient.getPendingAccessToken()
+        if (!pendingToken) {
+          set({
+            loginError: 'Session MFA expirée. Veuillez vous reconnecter.',
+            isAuth: false,
+            mfaRequired: false,
+            currentPage: 'login',
+            user: null,
+          })
+          return false
+        }
+
+        try {
+          const tokens = await authClient.verifyMfa(pendingToken, code)
+          const backendUser = await authClient.getCurrentUser(tokens.access_token)
+          const user = mapBackendUser(backendUser)
+          authClient.storeActiveTokens(tokens)
+
+          set({
+            isAuth: true,
+            mfaRequired: false,
+            user,
+            currentPage: ROLE_DEFAULT_PAGE[user.role],
+            loginError: null,
+          })
+          return true
+        } catch (error) {
+          set({
+            loginError: error instanceof Error ? error.message : 'Code MFA invalide.',
+          })
+          return false
+        }
+      },
+
+      restoreSession: async () => {
+        const activeToken = authClient.getActiveAccessToken()
+        if (activeToken) {
+          try {
+            const backendUser = await authClient.getCurrentUser(activeToken)
+            const user = mapBackendUser(backendUser)
+            set({
+              isAuth: true,
+              mfaRequired: false,
+              user,
+              currentPage: get().currentPage === 'landing'
+                ? ROLE_DEFAULT_PAGE[user.role]
+                : get().currentPage,
+              loginError: null,
+            })
+            return true
+          } catch {
+            authClient.clearAuthTokens()
+          }
+        }
+
+        const pendingToken = authClient.getPendingAccessToken()
+        if (pendingToken) {
+          try {
+            const backendUser = await authClient.getCurrentUser(pendingToken)
+            set({
+              isAuth: false,
+              mfaRequired: true,
+              user: mapBackendUser(backendUser),
+              currentPage: 'mfa',
+              loginError: null,
+            })
+            return true
+          } catch {
+            authClient.clearAuthTokens()
+          }
+        }
+
+        return false
+      },
+
+      logout: () => {
+        const accessToken = authClient.getActiveAccessToken() || authClient.getPendingAccessToken()
+        void authClient.logout(accessToken)
+        authClient.clearAuthTokens()
+        set({
+          isAuth: false,
+          mfaRequired: false,
+          currentPage: 'landing' as AppPage,
+          user: null,
+          loginError: null,
+        })
+      },
     }),
     {
       name: 'eadmin-app-store',
