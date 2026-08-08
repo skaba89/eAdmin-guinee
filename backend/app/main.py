@@ -25,6 +25,7 @@ from app.api import (
     security,
     security_events,
     security_hardening,
+    service_catalog,
     service_request_files,
     service_requests,
     users,
@@ -219,6 +220,12 @@ app.include_router(
     institutions.router,
     prefix="/api/v1/institutions",
     tags=["Institutions"],
+    dependencies=rls_dependencies,
+)
+app.include_router(
+    service_catalog.router,
+    prefix="/api/v1/service-catalog",
+    tags=["Catalogue des démarches"],
     dependencies=rls_dependencies,
 )
 app.include_router(
