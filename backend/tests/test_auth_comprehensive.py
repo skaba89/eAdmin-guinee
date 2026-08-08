@@ -34,11 +34,12 @@ class TestRegister:
         data = response.json()
         assert data["email"] == "newuser@eadmin.gn"
         assert data["full_name"] == "Nouvel Utilisateur"
-        assert data["role"] == "AGENT"
+        assert data["role"] == "CITOYEN"
         assert "id" in data
         assert data["is_active"] is True
+        assert data["mfa_enabled"] is False
         assert "frontend_role" in data
-        assert data["frontend_role"] == "agence"
+        assert data["frontend_role"] == "citoyen"
 
     @pytest.mark.asyncio
     async def test_register_duplicate_email(self, client: AsyncClient, test_user):
@@ -47,7 +48,7 @@ class TestRegister:
             "/api/v1/auth/register",
             json={
                 "email": "test@eadmin.gn",
-                "password": "Test2026!",
+                "password": "Duplicate2026!",
                 "full_name": "Duplicate User",
                 "role": "AGENT",
             },
@@ -115,8 +116,8 @@ class TestRegister:
         assert data["institution"] == "Ministère des Finances"
 
     @pytest.mark.asyncio
-    async def test_register_default_role_is_agent(self, client: AsyncClient):
-        """TC-REG-005: Le rôle par défaut est AGENT si non spécifié."""
+    async def test_register_default_role_is_citizen(self, client: AsyncClient):
+        """TC-REG-005: Le rôle public par défaut est CITOYEN."""
         response = await client.post(
             "/api/v1/auth/register",
             json={
@@ -127,7 +128,8 @@ class TestRegister:
         )
         assert response.status_code == 200
         data = response.json()
-        assert data["role"] == "AGENT"
+        assert data["role"] == "CITOYEN"
+        assert data["frontend_role"] == "citoyen"
 
     @pytest.mark.asyncio
     async def test_register_invalid_email(self, client: AsyncClient):
@@ -222,7 +224,7 @@ class TestLogin:
         assert "role" in payload
         assert "frontend_role" in payload
         assert payload["role"] == "AGENT"
-        assert payload["frontend_role"] == "agence"
+        assert payload["frontend_role"] == "agent"
         assert payload["type"] == "access"
         assert "jti" in payload
         assert "exp" in payload
@@ -257,7 +259,7 @@ class TestMe:
         assert data["email"] == "test@eadmin.gn"
         assert data["full_name"] == "Utilisateur Test"
         assert data["role"] == "AGENT"
-        assert data["frontend_role"] == "agence"
+        assert data["frontend_role"] == "agent"
 
     @pytest.mark.asyncio
     async def test_get_me_unauthenticated(self, client: AsyncClient):
@@ -289,7 +291,7 @@ class TestChangePassword:
     async def test_change_password_success(self, client: AsyncClient, auth_headers):
         response = await client.post(
             "/api/v1/auth/change-password",
-            json={"current_password": "Test2026!", "new_password": "NewPassword2026!"},
+            json={"current_password": "Test2026!", "new_password": "NouvelleCle2026!"},
             headers=auth_headers,
         )
         assert response.status_code == 200
@@ -302,7 +304,7 @@ class TestChangePassword:
             json={"current_password": "WrongPassword1!", "new_password": "NewPassword2026!"},
             headers=auth_headers,
         )
-        assert response.status_code == 400
+        assert response.status_code == 401
         assert "incorrect" in response.json()["detail"].lower()
 
     @pytest.mark.asyncio
