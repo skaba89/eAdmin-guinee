@@ -24,7 +24,7 @@ import { Separator } from '@/components/ui/separator'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
 } from '@/components/ui/dialog'
-import { useCitizenRequestsStore, type CitizenRequest, type RequestStatus } from '@/store/citizen-requests-store'
+import { useCitizenRequestsStore, getInstitutionRoutingOptions, type CitizenRequest, type RequestStatus, type InstitutionRoutingOption } from '@/store/citizen-requests-store'
 import { useAppStore } from '@/store/app-store'
 
 const GUINEA_RED = '#CE1126'
@@ -170,6 +170,10 @@ export function PublicCitizenPortal() {
   const [successToast, setSuccessToast] = useState('')
   const [submissionError, setSubmissionError] = useState('')
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false)
+  const [institutionOptions, setInstitutionOptions] = useState<InstitutionRoutingOption[]>([])
+  const [targetInstitutionId, setTargetInstitutionId] = useState('')
+  const [institutionsLoading, setInstitutionsLoading] = useState(false)
+  const [institutionLoadError, setInstitutionLoadError] = useState('')
   const [submittedRef, setSubmittedRef] = useState('')
 
   // Tracking
@@ -220,6 +224,29 @@ export function PublicCitizenPortal() {
     })
     setFormErrors({})
     setAcceptedTerms(false)
+    setSubmissionError('')
+    setTargetInstitutionId('')
+    setInstitutionOptions([])
+    setInstitutionLoadError('')
+    setInstitutionsLoading(true)
+    void getInstitutionRoutingOptions({
+      categoryId: category.id,
+      mairie: undefined,
+      citizenAddress: '',
+    })
+      .then((options) => {
+        setInstitutionOptions(options)
+        if (options.length === 1) setTargetInstitutionId(options[0].id)
+        if (!options.length) {
+          setInstitutionLoadError('Aucune institution active n’est configurée pour cette démarche.')
+        }
+      })
+      .catch((error) => {
+        setInstitutionLoadError(
+          error instanceof Error ? error.message : 'Chargement des institutions impossible.',
+        )
+      })
+      .finally(() => setInstitutionsLoading(false))
     setRequestDialogOpen(true)
   }
 
@@ -231,6 +258,15 @@ export function PublicCitizenPortal() {
     if (!form.citizenPhone.trim()) errors.citizenPhone = 'Le numéro de téléphone est requis'
     if (!form.citizenAddress.trim()) errors.citizenAddress = 'L\'adresse est requise'
     if (!acceptedTerms) errors.terms = 'Vous devez accepter les conditions'
+    if (institutionsLoading) {
+      errors.targetInstitutionId = 'Chargement du service destinataire en cours'
+    } else if (institutionLoadError) {
+      errors.targetInstitutionId = institutionLoadError
+    } else if (institutionOptions.length > 1 && !targetInstitutionId) {
+      errors.targetInstitutionId = 'Sélectionnez l’institution qui traitera cette demande'
+    } else if (institutionOptions.length === 0) {
+      errors.targetInstitutionId = 'Aucune institution destinataire disponible'
+    }
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -258,6 +294,7 @@ export function PublicCitizenPortal() {
         uploadedDocuments: [],
         createdAt: new Date().toISOString(),
         deliveryMode: form.deliveryMode,
+        targetInstitutionId: targetInstitutionId || undefined,
       })
 
       setRequestDialogOpen(false)
@@ -945,6 +982,40 @@ export function PublicCitizenPortal() {
             {formErrors.terms && <p className="text-[10px] text-red-500">{formErrors.terms}</p>}
           </div>
 
+          <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3">
+            <Label htmlFor="target-institution">Institution destinataire</Label>
+            {institutionsLoading ? (
+              <p className="text-xs text-muted-foreground">Chargement des institutions autorisées…</p>
+            ) : institutionOptions.length === 1 ? (
+              <div className="rounded-md border bg-background px-3 py-2 text-sm font-medium">
+                {institutionOptions[0].name}
+              </div>
+            ) : institutionOptions.length > 1 ? (
+              <Select value={targetInstitutionId} onValueChange={setTargetInstitutionId}>
+                <SelectTrigger id="target-institution">
+                  <SelectValue placeholder="Sélectionner l’institution compétente" />
+                </SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {institutionOptions.map((institution) => (
+                    <SelectItem key={institution.id} value={institution.id}>
+                      {institution.name}{institution.code ? ` — ${institution.code}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <p className="text-xs text-red-600 dark:text-red-400">
+                {institutionLoadError || 'Aucune institution destinataire disponible.'}
+              </p>
+            )}
+            {formErrors.targetInstitutionId && (
+              <p className="text-[10px] text-red-500">{formErrors.targetInstitutionId}</p>
+            )}
+            <p className="text-[11px] text-muted-foreground">
+              La liste provient du catalogue serveur de votre périmètre national. Le backend valide à nouveau ce choix lors de la soumission.
+            </p>
+          </div>
+
           {submissionError && (
             <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300" role="alert">
               <AlertCircle className="mt-0.5 size-4 shrink-0" />
@@ -966,8 +1037,8 @@ export function PublicCitizenPortal() {
             <Button
               className="bg-[#0B2E58] hover:bg-[#0B2E58]/90 dark:bg-[#3B7DD8] dark:hover:bg-[#3B7DD8]/90 text-white gap-2"
               onClick={() => void handleSubmitRequest()}
-              disabled={isSubmittingRequest}
-              aria-busy={isSubmittingRequest}
+              disabled={isSubmittingRequest || institutionsLoading || institutionOptions.length === 0}
+              aria-busy={isSubmittingRequest || institutionsLoading}
             >
               <Send className={`size-4 ${isSubmittingRequest ? 'animate-pulse' : ''}`} />
               {isSubmittingRequest ? 'Enregistrement sécurisé…' : 'Soumettre la demande'}
