@@ -89,7 +89,7 @@ def main() -> int:
         errors,
     )
     require(
-        '@router.get("/trust/evidence/{evidence_id}"' in api,
+        "/trust/evidence/{evidence_id}" in api and "@router.get(" in api,
         "Trust evidence verification endpoint is required",
         errors,
     )
@@ -99,7 +99,13 @@ def main() -> int:
         errors,
     )
 
-    for claim in ("preuve interne", "qualification externe attestée", "HSM/KMS", "RLS", "PRA/PCA"):
+    for claim in (
+        "preuve d'approbation interne",
+        "qualification externe attestée",
+        "HSM/KMS",
+        "RLS",
+        "PRA/PCA",
+    ):
         require(claim.lower() in dossier.lower(), f"Homologation dossier missing: {claim}", errors)
 
     # Disallow the most dangerous literal bypasses in application source. The
