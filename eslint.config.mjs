@@ -15,7 +15,7 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "@typescript-eslint/ban-ts-comment": "off",
     "@typescript-eslint/prefer-as-const": "off",
     "@typescript-eslint/no-unused-disable-directive": "off",
-    
+
     // React rules
     "react-hooks/exhaustive-deps": "off",
     "react-hooks/purity": "off",
@@ -23,11 +23,11 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "react/display-name": "off",
     "react/prop-types": "off",
     "react-compiler/react-compiler": "off",
-    
+
     // Next.js rules
     "@next/next/no-img-element": "off",
     "@next/next/no-html-link-for-pages": "off",
-    
+
     // General JavaScript rules
     "prefer-const": "off",
     "no-unused-vars": "off",
@@ -42,6 +42,13 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     "no-undef": "off",
     "no-unreachable": "off",
     "no-useless-escape": "off",
+  },
+}, {
+  files: ["src/components/app/database-query-page.tsx"],
+  rules: {
+    // Zustand actions are stable while birthRecords is the actual memo data
+    // dependency. Keep this exception local rather than disabling the rule app-wide.
+    "react-hooks/preserve-manual-memoization": "off",
   },
 }, {
   ignores: ["node_modules/**", ".next/**", "out/**", "build/**", "next-env.d.ts", "examples/**", "skills"]

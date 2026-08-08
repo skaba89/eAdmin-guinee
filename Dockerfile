@@ -9,7 +9,8 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 COPY package.json bun.lock ./
-RUN npm install -g bun && bun install --frozen-lockfile
+# Keep the container toolchain identical to CI for reproducible frozen installs.
+RUN npm install -g bun@1.3.4 && bun install --frozen-lockfile
 
 # ---- Stage 2: Build ----
 FROM node:20-alpine AS builder

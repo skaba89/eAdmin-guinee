@@ -9,7 +9,11 @@ uvicorn[standard]==0.27.0
 # --- Base de données ---
 sqlalchemy[asyncio]==2.0.25
 alembic==1.13.1
+# Application runtime: async PostgreSQL driver.
 asyncpg==0.29.0
+# Migration runtime: synchronous driver for historical multi-statement DDL.
+# The backend image already builds against libpq and runs with libpq5.
+psycopg2==2.9.12
 
 # --- Validation ---
 pydantic==2.5.3
@@ -19,6 +23,9 @@ email-validator==2.1.0
 # --- Sécurité / Auth ---
 python-jose[cryptography]==3.5.0
 passlib[bcrypt]==1.7.4
+# Passlib 1.7.4 is incompatible with bcrypt 5.x backend detection.
+# Keep this explicit until the password hashing layer is migrated to pwdlib/Argon2.
+bcrypt==4.3.0
 python-multipart==0.0.32
 
 # --- Stockage objet ---

@@ -3,6 +3,8 @@ Routes de gestion des courriers - eAdministration Suite Guinea.
 Courrier entrant et sortant avec circuit de validation.
 """
 
+import secrets
+import string
 import uuid
 from datetime import datetime
 from typing import Any
@@ -25,7 +27,6 @@ from app.models.user import User
 router = APIRouter()
 
 
-# --- Schémas Pydantic ---
 class CourrierCreate(BaseModel):
     subject: str
     type: CourrierTypeEnum
@@ -70,16 +71,12 @@ class PaginatedCourriers(BaseModel):
 
 
 def generate_reference(courrier_type: CourrierTypeEnum) -> str:
-    """Génère une référence unique pour un courrier."""
-    import random
-    import string
+    """Generate an unpredictable official mail reference."""
     year = datetime.now().year
     prefix = "CE" if courrier_type == CourrierTypeEnum.ENTRANT else "CS"
-    seq = "".join(random.choices(string.digits, k=6))
-    return f"{prefix}-{year}-{seq}"
+    sequence = "".join(secrets.choice(string.digits) for _ in range(10))
+    return f"{prefix}-{year}-{sequence}"
 
-
-# --- Endpoints ---
 
 @router.get("", response_model=PaginatedCourriers, summary="Liste des courriers")
 async def list_courriers(
@@ -91,9 +88,6 @@ async def list_courriers(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> PaginatedCourriers:
-    """
-    Liste paginée des courriers avec filtres.
-    """
     query = select(Courrier)
 
     if type_filter:
@@ -103,18 +97,15 @@ async def list_courriers(
     if priority_filter:
         query = query.where(Courrier.priority == priority_filter)
 
-    # Comptage
     count_query = select(func.count()).select_from(query.subquery())
     total_result = await db.execute(count_query)
     total = total_result.scalar() or 0
 
-    # Pagination
     offset = (page - 1) * page_size
     query = query.order_by(Courrier.created_at.desc()).offset(offset).limit(page_size)
 
     result = await db.execute(query)
     courriers = result.scalars().all()
-
     total_pages = (total + page_size - 1) // page_size
 
     return PaginatedCourriers(
@@ -132,9 +123,6 @@ async def create_courrier(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Courrier:
-    """
-    Enregistre un nouveau courrier (entrant ou sortant).
-    """
     courrier = Courrier(
         reference=generate_reference(courrier_data.type),
         subject=courrier_data.subject,
@@ -158,9 +146,6 @@ async def get_courrier(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Courrier:
-    """
-    Récupère un courrier par son identifiant.
-    """
     result = await db.execute(select(Courrier).where(Courrier.id == courrier_id))
     courrier = result.scalar_one_or_none()
 
@@ -179,9 +164,6 @@ async def update_courrier(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Courrier:
-    """
-    Met à jour le statut ou la priorité d'un courrier.
-    """
     result = await db.execute(select(Courrier).where(Courrier.id == courrier_id))
     courrier = result.scalar_one_or_none()
 
