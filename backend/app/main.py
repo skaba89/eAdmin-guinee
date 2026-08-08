@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api import (
+    access_control,
     ai,
     ai_grounded,
     analytics,
@@ -310,6 +311,12 @@ app.include_router(
     workflows.router,
     prefix="/api/v1/workflows",
     tags=["Workflows"],
+    dependencies=rls_dependencies,
+)
+app.include_router(
+    access_control.router,
+    prefix="/api/v1/access-control",
+    tags=["IAM et habilitations"],
     dependencies=rls_dependencies,
 )
 app.include_router(

@@ -8,9 +8,9 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from jose import JWTError, jwt
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,7 +18,9 @@ from app.api import auth as auth_api
 from app.api.auth import TokenResponse, create_access_token, create_refresh_token
 from app.config import settings
 from app.database import get_db
-from app.models.user import User
+from app.models.user import RoleEnum, User
+from app.services.audit_service import AuditService
+from app.services.authorization_service import authorization_service
 from app.services.token_blacklist import REFRESH_TOKEN_PREFIX
 
 router = APIRouter()
@@ -29,13 +31,23 @@ class SecureRefreshRequest(BaseModel):
     refresh_token: str
 
 
-async def _consume_refresh_token(user_id: str, refresh_jti: str) -> bool:
-    """Atomically consume a refresh token in Redis.
+class SecureAdminUserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: str
+    role: RoleEnum = RoleEnum.AGENT
+    institution: str | None = None
+    tenant_id: str | None = None
+    institution_id: str | None = None
 
-    Existing unit-test doubles predate ``SREM``. They expose an in-memory
-    ``_refresh_tokens`` set; the compatibility branch keeps those tests useful
-    without weakening the production Redis path.
-    """
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, value: str) -> str:
+        return auth_api._validate_password_strength(value)
+
+
+async def _consume_refresh_token(user_id: str, refresh_jti: str) -> bool:
+    """Atomically consume a refresh token in Redis."""
 
     service = auth_api.token_blacklist
     redis = await service._get_redis()
@@ -54,6 +66,94 @@ async def _consume_refresh_token(user_id: str, refresh_jti: str) -> bool:
         return False
 
     return False
+
+
+@router.post(
+    "/admin/create-user",
+    response_model=auth_api.UserResponse,
+    summary="Création utilisateur (Admin uniquement)",
+)
+async def secure_admin_create_user(
+    request: Request,
+    user_data: SecureAdminUserCreate,
+    current_user: User = Depends(auth_api.get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Shadow the legacy admin-create endpoint with hierarchy and scope controls."""
+
+    if current_user.role not in (RoleEnum.ADMIN, RoleEnum.SUPER_ADMIN):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Seuls les administrateurs peuvent créer des comptes internes.",
+        )
+    if not authorization_service.can_assign_role(current_user, user_data.role):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Élévation interdite: le rôle cible doit être strictement inférieur au rôle du créateur.",
+        )
+
+    existing = await db.scalar(select(User).where(User.email == user_data.email))
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Un compte avec cet email existe déjà.",
+        )
+
+    if current_user.role == RoleEnum.SUPER_ADMIN:
+        tenant_id = (user_data.tenant_id or settings.TENANT_DEFAULT_ID).strip()
+        institution_id = (user_data.institution_id or "").strip() or None
+    else:
+        tenant_id = (current_user.tenant_id or settings.TENANT_DEFAULT_ID).strip()
+        if user_data.tenant_id and user_data.tenant_id != tenant_id:
+            raise HTTPException(status_code=403, detail="Création inter-tenant interdite.")
+        institution_id = (current_user.institution_id or "").strip() or None
+        if user_data.institution_id and user_data.institution_id != institution_id:
+            raise HTTPException(status_code=403, detail="Création hors institution interdite.")
+
+    user = User(
+        email=user_data.email,
+        hashed_password=auth_api.get_password_hash(user_data.password),
+        full_name=user_data.full_name,
+        role=user_data.role,
+        institution=user_data.institution,
+        tenant_id=tenant_id,
+        institution_id=institution_id,
+    )
+    db.add(user)
+    await db.flush()
+    await db.refresh(user)
+
+    await AuditService(db).log_action(
+        user_id=current_user.id,
+        action="CREATE",
+        resource_type="user",
+        resource_id=str(user.id),
+        category="admin",
+        description="Création utilisateur via endpoint admin durci",
+        details={
+            "created_user_email": user.email,
+            "created_user_role": user.role.value,
+            "creator_role": current_user.role.value,
+            "tenant_id": tenant_id,
+            "institution_id": institution_id,
+        },
+        severity="warning",
+        ip_address=request.client.host if request.client else "unknown",
+        user_agent=request.headers.get("User-Agent", "unknown")[:512],
+        tenant_id=tenant_id,
+        institution_id=institution_id,
+    )
+    return {
+        "id": user.id,
+        "email": user.email,
+        "full_name": user.full_name,
+        "role": user.role,
+        "frontend_role": user.role.to_frontend_role(),
+        "institution": user.institution,
+        "is_active": user.is_active,
+        "mfa_enabled": user.mfa_enabled,
+        "created_at": user.created_at,
+    }
 
 
 @router.post("/refresh", response_model=TokenResponse, summary="Rafraîchir le token")
