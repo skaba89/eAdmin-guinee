@@ -23,6 +23,7 @@ from app.api import (
     metrics,
     security,
     security_events,
+    security_hardening,
     users,
     workflows,
 )
@@ -42,7 +43,6 @@ handler.setFormatter(logging.Formatter(
 if not logger.handlers:
     logger.addHandler(handler)
 
-# --- In-memory metrics counters ---
 request_counter = 0
 error_counter = 0
 total_response_time_ms = 0.0
@@ -102,8 +102,6 @@ async def lifespan(application: FastAPI):
     except Exception as exc:
         logger.warning("Sentry non initialisé: %s", exc)
 
-    # Redis is part of the authentication security boundary (token revocation,
-    # refresh rotation and login lockout). Production must therefore fail closed.
     try:
         from app.services.token_blacklist import token_blacklist
         redis = await token_blacklist._get_redis()
@@ -148,9 +146,8 @@ app = FastAPI(
     redoc_url="/redoc" if settings.is_development else None,
 )
 
-# Middlewares: Starlette executes the last added middleware first.
-# Desired request order:
-# CORS -> Tenant -> Security Headers -> MFA Guard -> Rate Limit -> Audit -> Logging
+# Starlette executes the last added middleware first.
+# Request order: CORS -> Tenant -> Security Headers -> MFA -> Rate -> Audit -> Logging
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(AuditMiddleware)
 app.add_middleware(RateLimitMiddleware)
@@ -209,7 +206,7 @@ app.add_middleware(
     ],
 )
 
-# Security-critical overrides must be registered before the legacy auth router.
+# Security-critical overrides are registered before the legacy routers.
 app.include_router(auth_hardening.router, prefix="/api/v1/auth", tags=["Authentification"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentification"])
 app.include_router(documents.router, prefix="/api/v1/documents", tags=["Documents"])
@@ -220,6 +217,7 @@ app.include_router(users.router, prefix="/api/v1/users", tags=["Utilisateurs"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytique"])
 app.include_router(audit.router, prefix="/api/v1/audit", tags=["Audit"])
 app.include_router(ai.router, prefix="/api/v1/ai", tags=["Intelligence Artificielle"])
+app.include_router(security_hardening.router, prefix="/api/v1/security", tags=["Sécurité"])
 app.include_router(security.router, prefix="/api/v1/security", tags=["Sécurité"])
 app.include_router(security_events.router, prefix="/api/v1/security-events", tags=["Événements de Sécurité"])
 app.include_router(metrics.router, tags=["Métriques"])
