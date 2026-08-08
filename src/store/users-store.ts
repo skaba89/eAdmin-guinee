@@ -1,8 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-// ─── TYPES ───────────────────────────────────────────────────────────────────
-
 export type UserAccountStatus = 'actif' | 'inactif' | 'suspendu' | 'en_attente'
 
 export interface UserAccount {
@@ -20,10 +18,12 @@ export interface UserAccount {
   avatar?: string
   createdAt: string
   lastLogin?: string
-  password: string // En production ce serait haché — ici c'est pour la démo
+  /**
+   * Transitional form compatibility only. Passwords are never persisted in this
+   * store; account creation must be sent to the backend administration API.
+   */
+  password?: string
 }
-
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 function generateId(): string {
   return `user-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
@@ -32,10 +32,7 @@ function generateId(): string {
 const dateAt = (year: number, month: number, day: number, hour = 9, min = 0) =>
   new Date(year, month - 1, day, hour, min).toISOString()
 
-// ─── DEMO SEED DATA — 12 utilisateurs réalistes ─────────────────────────────
-
 const DEMO_USERS: UserAccount[] = [
-  // ── 6 comptes de démo standards ──────────────────────────────────────────
   {
     id: 'user-demo-001',
     email: 'citoyen@eadmin.gn',
@@ -47,7 +44,6 @@ const DEMO_USERS: UserAccount[] = [
     nin: 'NIN-2010-78432',
     createdAt: dateAt(2025, 11, 15, 10, 0),
     lastLogin: dateAt(2026, 3, 10, 8, 30),
-    password: 'Eadmin2026!',
   },
   {
     id: 'user-demo-002',
@@ -61,7 +57,6 @@ const DEMO_USERS: UserAccount[] = [
     mairie: 'Mairie de Conakry',
     createdAt: dateAt(2025, 10, 1, 9, 0),
     lastLogin: dateAt(2026, 3, 10, 9, 15),
-    password: 'Eadmin2026!',
   },
   {
     id: 'user-demo-003',
@@ -75,7 +70,6 @@ const DEMO_USERS: UserAccount[] = [
     institution: 'Direction Générale de la Modernisation Administrative',
     createdAt: dateAt(2025, 9, 1, 8, 0),
     lastLogin: dateAt(2026, 3, 10, 7, 45),
-    password: 'Eadmin2026!',
   },
   {
     id: 'user-demo-004',
@@ -89,7 +83,6 @@ const DEMO_USERS: UserAccount[] = [
     agence: 'ANIP',
     createdAt: dateAt(2025, 10, 15, 10, 30),
     lastLogin: dateAt(2026, 3, 9, 16, 0),
-    password: 'Eadmin2026!',
   },
   {
     id: 'user-demo-005',
@@ -103,7 +96,6 @@ const DEMO_USERS: UserAccount[] = [
     institution: 'MEF',
     createdAt: dateAt(2025, 8, 20, 11, 0),
     lastLogin: dateAt(2026, 3, 10, 10, 0),
-    password: 'Eadmin2026!',
   },
   {
     id: 'user-demo-006',
@@ -117,10 +109,7 @@ const DEMO_USERS: UserAccount[] = [
     institution: 'Présidence de la République',
     createdAt: dateAt(2025, 7, 1, 8, 0),
     lastLogin: dateAt(2026, 3, 10, 6, 30),
-    password: 'Eadmin2026!',
   },
-
-  // ── 6 utilisateurs supplémentaires — statuts variés ─────────────────────
   {
     id: 'user-demo-007',
     email: 'kadiatou.bah@eadmin.gn',
@@ -132,7 +121,6 @@ const DEMO_USERS: UserAccount[] = [
     nin: 'NIN-2012-54321',
     createdAt: dateAt(2026, 1, 10, 14, 0),
     lastLogin: dateAt(2026, 3, 8, 11, 20),
-    password: 'Eadmin2026!',
   },
   {
     id: 'user-demo-008',
@@ -145,7 +133,6 @@ const DEMO_USERS: UserAccount[] = [
     nin: 'NIN-2009-67890',
     mairie: 'Mairie de Kindia',
     createdAt: dateAt(2025, 12, 5, 9, 30),
-    password: 'Eadmin2026!',
   },
   {
     id: 'user-demo-009',
@@ -159,7 +146,6 @@ const DEMO_USERS: UserAccount[] = [
     agence: 'DNE',
     createdAt: dateAt(2025, 11, 20, 15, 0),
     lastLogin: dateAt(2026, 1, 15, 10, 45),
-    password: 'Eadmin2026!',
   },
   {
     id: 'user-demo-010',
@@ -171,7 +157,6 @@ const DEMO_USERS: UserAccount[] = [
     phone: '+224 624 55 66 77',
     nin: 'NIN-2015-24680',
     createdAt: dateAt(2026, 3, 1, 16, 30),
-    password: 'Eadmin2026!',
   },
   {
     id: 'user-demo-011',
@@ -185,7 +170,6 @@ const DEMO_USERS: UserAccount[] = [
     institution: 'MESRS',
     createdAt: dateAt(2025, 9, 15, 10, 0),
     lastLogin: dateAt(2026, 3, 7, 14, 0),
-    password: 'Eadmin2026!',
   },
   {
     id: 'user-demo-012',
@@ -199,15 +183,11 @@ const DEMO_USERS: UserAccount[] = [
     institution: 'Direction Générale de la Modernisation Administrative',
     createdAt: dateAt(2025, 10, 20, 11, 30),
     lastLogin: dateAt(2026, 3, 9, 8, 0),
-    password: 'Eadmin2026!',
   },
 ]
 
-// ─── STORE INTERFACE ─────────────────────────────────────────────────────────
-
 interface UsersStoreState {
   users: UserAccount[]
-
   addUser: (user: Omit<UserAccount, 'id' | 'createdAt'>) => UserAccount
   updateUser: (id: string, updates: Partial<UserAccount>) => void
   deleteUser: (id: string) => void
@@ -218,7 +198,6 @@ interface UsersStoreState {
   changeMultipleRoles: (ids: string[], role: UserAccount['role']) => void
   suspendMultiple: (ids: string[]) => void
   recordLogin: (id: string) => void
-
   getUserById: (id: string) => UserAccount | undefined
   getUserByEmail: (email: string) => UserAccount | undefined
   getFilteredUsers: (
@@ -232,184 +211,114 @@ interface UsersStoreState {
     byRole: Record<string, number>
     recentLogins: number
   }
-
   resetToDemoData: () => void
 }
 
-// ─── STORE ───────────────────────────────────────────────────────────────────
+function stripPassword<T extends { password?: string }>(value: T): Omit<T, 'password'> {
+  const { password: _password, ...safeValue } = value
+  return safeValue
+}
 
 export const useUsersStore = create<UsersStoreState>()(
   persist(
     (set, get) => ({
       users: DEMO_USERS,
 
-      // ── Ajouter un utilisateur ───────────────────────────────────────────
-
       addUser: (userData) => {
+        const safeUserData = stripPassword(userData)
         const newUser: UserAccount = {
-          ...userData,
+          ...safeUserData,
           id: generateId(),
           createdAt: new Date().toISOString(),
         }
-        set((state) => ({
-          users: [...state.users, newUser],
-        }))
+        set((state) => ({ users: [...state.users, newUser] }))
         return newUser
       },
 
-      // ── Mettre à jour un utilisateur ─────────────────────────────────────
-
       updateUser: (id, updates) => {
+        const safeUpdates = stripPassword(updates)
         set((state) => ({
-          users: state.users.map((u) => (u.id === id ? { ...u, ...updates } : u)),
+          users: state.users.map((user) => user.id === id ? { ...user, ...safeUpdates } : user),
         }))
       },
 
-      // ── Supprimer un utilisateur ─────────────────────────────────────────
-
-      deleteUser: (id) => {
-        set((state) => ({
-          users: state.users.filter((u) => u.id !== id),
-        }))
-      },
-
-      // ── Suppression multiple ─────────────────────────────────────────────
-
+      deleteUser: (id) => set((state) => ({ users: state.users.filter((user) => user.id !== id) })),
       deleteMultiple: (ids) => {
         const idSet = new Set(ids)
-        set((state) => ({
-          users: state.users.filter((u) => !idSet.has(u.id)),
-        }))
+        set((state) => ({ users: state.users.filter((user) => !idSet.has(user.id)) }))
       },
-
-      // ── Suspendre un utilisateur ─────────────────────────────────────────
-
-      suspendUser: (id) => {
-        set((state) => ({
-          users: state.users.map((u) =>
-            u.id === id ? { ...u, status: 'suspendu' as UserAccountStatus } : u
-          ),
-        }))
-      },
-
-      // ── Activer un utilisateur ───────────────────────────────────────────
-
-      activateUser: (id) => {
-        set((state) => ({
-          users: state.users.map((u) =>
-            u.id === id ? { ...u, status: 'actif' as UserAccountStatus } : u
-          ),
-        }))
-      },
-
-      // ── Changer le rôle ──────────────────────────────────────────────────
-
-      changeRole: (id, role) => {
-        set((state) => ({
-          users: state.users.map((u) => (u.id === id ? { ...u, role } : u)),
-        }))
-      },
-
-      // ── Changement de rôle multiple ──────────────────────────────────────
-
+      suspendUser: (id) => set((state) => ({
+        users: state.users.map((user) => user.id === id ? { ...user, status: 'suspendu' as const } : user),
+      })),
+      activateUser: (id) => set((state) => ({
+        users: state.users.map((user) => user.id === id ? { ...user, status: 'actif' as const } : user),
+      })),
+      changeRole: (id, role) => set((state) => ({
+        users: state.users.map((user) => user.id === id ? { ...user, role } : user),
+      })),
       changeMultipleRoles: (ids, role) => {
         const idSet = new Set(ids)
         set((state) => ({
-          users: state.users.map((u) => (idSet.has(u.id) ? { ...u, role } : u)),
+          users: state.users.map((user) => idSet.has(user.id) ? { ...user, role } : user),
         }))
       },
-
-      // ── Suspension multiple ──────────────────────────────────────────────
-
       suspendMultiple: (ids) => {
         const idSet = new Set(ids)
         set((state) => ({
-          users: state.users.map((u) =>
-            idSet.has(u.id) ? { ...u, status: 'suspendu' as UserAccountStatus } : u
-          ),
+          users: state.users.map((user) => idSet.has(user.id) ? { ...user, status: 'suspendu' as const } : user),
         }))
       },
-
-      // ── Enregistrer une connexion ────────────────────────────────────────
-
-      recordLogin: (id) => {
-        set((state) => ({
-          users: state.users.map((u) =>
-            u.id === id ? { ...u, lastLogin: new Date().toISOString() } : u
-          ),
-        }))
-      },
-
-      // ── Recherche par identifiant ────────────────────────────────────────
-
-      getUserById: (id) => {
-        return get().users.find((u) => u.id === id)
-      },
-
-      // ── Recherche par email ──────────────────────────────────────────────
-
-      getUserByEmail: (email) => {
-        return get().users.find((u) => u.email.toLowerCase() === email.toLowerCase())
-      },
-
-      // ── Filtrage avancé ──────────────────────────────────────────────────
-
-      getFilteredUsers: (search = '', role = 'all', status = 'all') => {
-        return get().users.filter((u) => {
-          if (role !== 'all' && u.role !== role) return false
-          if (status !== 'all' && u.status !== status) return false
-          if (search.trim()) {
-            const q = search.toLowerCase().trim()
-            const matchesSearch =
-              u.email.toLowerCase().includes(q) ||
-              u.name.toLowerCase().includes(q) ||
-              (u.firstName && u.firstName.toLowerCase().includes(q)) ||
-              (u.phone && u.phone.includes(q)) ||
-              (u.nin && u.nin.toLowerCase().includes(q)) ||
-              (u.institution && u.institution.toLowerCase().includes(q)) ||
-              (u.mairie && u.mairie.toLowerCase().includes(q)) ||
-              (u.agence && u.agence.toLowerCase().includes(q))
-            if (!matchesSearch) return false
-          }
-          return true
-        })
-      },
-
-      // ── Statistiques ─────────────────────────────────────────────────────
-
+      recordLogin: (id) => set((state) => ({
+        users: state.users.map((user) => user.id === id ? { ...user, lastLogin: new Date().toISOString() } : user),
+      })),
+      getUserById: (id) => get().users.find((user) => user.id === id),
+      getUserByEmail: (email) => get().users.find((user) => user.email.toLowerCase() === email.toLowerCase()),
+      getFilteredUsers: (search = '', role = 'all', status = 'all') => get().users.filter((user) => {
+        if (role !== 'all' && user.role !== role) return false
+        if (status !== 'all' && user.status !== status) return false
+        if (!search.trim()) return true
+        const query = search.toLowerCase().trim()
+        return Boolean(
+          user.email.toLowerCase().includes(query) ||
+          user.name.toLowerCase().includes(query) ||
+          user.firstName?.toLowerCase().includes(query) ||
+          user.phone?.includes(query) ||
+          user.nin?.toLowerCase().includes(query) ||
+          user.institution?.toLowerCase().includes(query) ||
+          user.mairie?.toLowerCase().includes(query) ||
+          user.agence?.toLowerCase().includes(query)
+        )
+      }),
       getStats: () => {
-        const { users } = get()
+        const users = get().users
         const byRole: Record<string, number> = {}
+        const sevenDaysAgo = new Date()
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
         let active = 0
         let recentLogins = 0
 
-        // Connexions dans les 7 derniers jours
-        const sevenDaysAgo = new Date()
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-
-        users.forEach((u) => {
-          byRole[u.role] = (byRole[u.role] || 0) + 1
-          if (u.status === 'actif') active++
-          if (u.lastLogin && new Date(u.lastLogin) >= sevenDaysAgo) recentLogins++
+        users.forEach((user) => {
+          byRole[user.role] = (byRole[user.role] || 0) + 1
+          if (user.status === 'actif') active += 1
+          if (user.lastLogin && new Date(user.lastLogin) >= sevenDaysAgo) recentLogins += 1
         })
 
         return { total: users.length, active, byRole, recentLogins }
       },
-
-      // ── Réinitialiser les données de démo ────────────────────────────────
-
-      resetToDemoData: () => {
-        set({ users: DEMO_USERS })
-      },
+      resetToDemoData: () => set({ users: DEMO_USERS }),
     }),
     {
       name: 'eadmin-users-store',
-      version: 1,
+      version: 2,
       migrate: (persistedState: any, version: number) => {
-        if (version < 1) {
+        if (!persistedState || typeof persistedState !== 'object') {
           return { users: DEMO_USERS }
         }
-        return persistedState
+        const state = persistedState as { users?: UserAccount[] }
+        const users = Array.isArray(state.users)
+          ? state.users.map((user) => stripPassword(user))
+          : DEMO_USERS
+        return { ...state, users }
       },
     }
   )
