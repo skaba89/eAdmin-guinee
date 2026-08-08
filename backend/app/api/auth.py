@@ -195,7 +195,7 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     full_name: str
-    role: RoleEnum = RoleEnum.AGENT
+    role: RoleEnum = RoleEnum.CITOYEN
     institution: str | None = None
 
     @field_validator("password")
@@ -504,7 +504,7 @@ async def register(
         pass
 
     return {
-        **{k: getattr(user, k) for k in ['id', 'email', 'full_name', 'role', 'institution', 'is_active', 'created_at']},
+        **{k: getattr(user, k) for k in ['id', 'email', 'full_name', 'role', 'institution', 'is_active', 'mfa_enabled', 'created_at']},
         "frontend_role": user.role.to_frontend_role(),
     }
 
@@ -609,7 +609,7 @@ async def admin_create_user(
         pass
 
     return {
-        **{k: getattr(user, k) for k in ['id', 'email', 'full_name', 'role', 'institution', 'is_active', 'created_at']},
+        **{k: getattr(user, k) for k in ['id', 'email', 'full_name', 'role', 'institution', 'is_active', 'mfa_enabled', 'created_at']},
         "frontend_role": user.role.to_frontend_role(),
     }
 
