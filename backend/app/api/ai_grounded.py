@@ -92,7 +92,11 @@ def _tenant_id(user: User) -> str | None:
 
 def _as_http_error(exc: ValueError) -> HTTPException:
     message = str(exc)
-    code = status.HTTP_409_CONFLICT if "OCR" in message or "version" in message.lower() else status.HTTP_404_NOT_FOUND
+    code = (
+        status.HTTP_409_CONFLICT
+        if "OCR" in message or "version" in message.lower()
+        else status.HTTP_404_NOT_FOUND
+    )
     return HTTPException(status_code=code, detail=message)
 
 
@@ -226,13 +230,11 @@ async def classify_citizen_request(
     )
     if not combined:
         raise HTTPException(status_code=422, detail="Un contenu est requis pour la suggestion.")
-    result = await grounded_government_ai.classify_text(
+    return await grounded_government_ai.classify_text(
         db,
         combined,
         _tenant_id(current_user),
     )
-    result["estimated_processing_days"] = result.get("estimated_processing_days")
-    return result
 
 
 @router.post("/auto-route", summary="Recommandation de routage non exécutée")
@@ -244,7 +246,7 @@ async def recommend_document_route(
     try:
         classification = await grounded_government_ai.classify_document(
             db,
-            str(request.document_id),
+            request.document_id,
             _tenant_id(current_user),
         )
     except ValueError as exc:
@@ -306,10 +308,14 @@ async def extract_data(
         raise _as_http_error(exc) from exc
 
 
-@router.post("/report/generate", status_code=status.HTTP_501_NOT_IMPLEMENTED, summary="Rapport IA désactivé sans source explicite")
+@router.post(
+    "/report/generate",
+    status_code=status.HTTP_501_NOT_IMPLEMENTED,
+    summary="Rapport IA désactivé sans source explicite",
+)
 async def generate_report(
-    request: GenerateReportRequest,
-    current_user: User = Depends(require_permission("reports", "generate")),
+    _request: GenerateReportRequest,
+    _current_user: User = Depends(require_permission("reports", "generate")),
 ) -> dict[str, Any]:
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
