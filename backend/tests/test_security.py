@@ -9,7 +9,6 @@ from httpx import AsyncClient
 
 from app.api.auth import UserCreate
 from app.config import settings
-from app.models.user import RoleEnum
 from pydantic import ValidationError
 
 
@@ -18,26 +17,18 @@ class TestSecurityHeaders:
 
     @pytest.mark.asyncio
     async def test_security_headers_present(self, client: AsyncClient):
-        """TC-SEC-001: Les headers de sécurité sont présents dans toutes les réponses."""
         response = await client.get("/health")
         assert response.status_code == 200
-        assert "x-frame-options" in response.headers
         assert response.headers["x-frame-options"] == "DENY"
-        assert "x-content-type-options" in response.headers
         assert response.headers["x-content-type-options"] == "nosniff"
-        assert "x-xss-protection" in response.headers
         assert response.headers["x-xss-protection"] == "1; mode=block"
-        assert "referrer-policy" in response.headers
         assert response.headers["referrer-policy"] == "strict-origin-when-cross-origin"
-        assert "permissions-policy" in response.headers
         permissions = response.headers["permissions-policy"]
         assert "camera=()" in permissions
         assert "microphone=()" in permissions
         assert "geolocation=()" in permissions
         assert "payment=()" in permissions
-        assert "content-security-policy" in response.headers
-        csp = response.headers["content-security-policy"]
-        assert "frame-ancestors 'none'" in csp
+        assert "frame-ancestors 'none'" in response.headers["content-security-policy"]
 
     @pytest.mark.asyncio
     async def test_api_cache_control_headers(self, client: AsyncClient):
@@ -103,14 +94,13 @@ class TestCORSHeaders:
 
     @pytest.mark.asyncio
     async def test_cors_exposes_request_id(self, client: AsyncClient):
-        response = await client.options(
-            "/api/v1/auth/login",
-            headers={
-                "Origin": self.ALLOWED_ORIGIN,
-                "Access-Control-Request-Method": "POST",
-            },
+        # expose_headers belongs to actual CORS responses, not preflight responses.
+        response = await client.get(
+            "/health",
+            headers={"Origin": self.ALLOWED_ORIGIN},
         )
-        assert response.status_code in (200, 204)
+        assert response.status_code == 200
+        assert response.headers.get("access-control-allow-origin") == self.ALLOWED_ORIGIN
         exposed = response.headers.get("access-control-expose-headers", "")
         assert "X-Request-ID" in exposed
 
@@ -177,7 +167,6 @@ class TestPasswordValidation:
     """Tests de validation des mots de passe."""
 
     def test_password_minimum_length(self):
-        """TC-SEC-013: Le mot de passe doit contenir au moins 12 caractères."""
         with pytest.raises(ValidationError):
             UserCreate(email="test@eadmin.gn", password="Short1!", full_name="Test User")
 
