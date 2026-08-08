@@ -1,1308 +1,728 @@
 'use client'
 
-import { useState, useMemo, useRef, useCallback } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Search, Upload, Filter, MoreHorizontal, FileText, FileCheck,
-  Archive, Download, Eye, Trash2, Plus, ChevronDown, Tag,
-  Lock, Shield, Brain, Building2, Calendar, X, FolderOpen,
-  CheckCircle2, Clock, AlertCircle, BookOpen, FileSignature,
-  ScrollText, BarChart3, MapPin, Library, Mail, GitBranch, PenTool, UserCheck,
-  ChevronLeft, ChevronRight, AlertTriangle, FileImage, FileSpreadsheet, FileType, Paperclip
+  Archive,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Download,
+  FileCheck2,
+  FileText,
+  History,
+  Library,
+  Loader2,
+  Lock,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  Upload,
 } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Progress } from '@/components/ui/progress'
-import { Separator } from '@/components/ui/separator'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator
-} from '@/components/ui/dropdown-menu'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { BRAND } from '@/lib/constants'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { formatFileSize } from '@/lib/document-utils'
+import {
+  archiveDocument,
+  downloadDocumentVersion,
+  getGedStatistics,
+  importDocument,
+  listDocuments,
+  listDocumentVersions,
+  restoreDocumentVersion,
+  updateDocument,
+  type DocumentClassification,
+  type DocumentStatus,
+  type DocumentType,
+  type DocumentVersion,
+  type GedDocument,
+  type GedStatistics,
+} from '@/lib/documents-api'
 import { useAppStore } from '@/store/app-store'
 
-type DocClassification = 'PUBLIC' | 'DIFFUSION LIMITÉE' | 'CONFIDENTIEL' | 'SECRET'
-type DocStatus = 'Signé' | 'En vigueur' | 'En cours' | 'Publié' | 'Diffusée' | 'Classé'
-type DocType = 'Décret' | 'Arrêté' | 'Circulaire' | 'Note de service' | 'Rapport' | 'Ordonnance'
+const PAGE_SIZE = 25
 
-interface Document {
-  id: string
-  reference: string
-  objet: string
-  type: DocType
-  institution: string
-  taille: string
-  classification: DocClassification
-  statut: DocStatus
-  date: string
-  fileName?: string
-  fileType?: string
-  fileData?: string
+const DOCUMENT_TYPES: DocumentType[] = [
+  'Décret',
+  'Arrêté',
+  'Circulaire',
+  'Note de service',
+  'Rapport',
+  'Ordonnance',
+  'Autre',
+]
+
+const CLASSIFICATIONS: DocumentClassification[] = [
+  'PUBLIC',
+  'DIFFUSION LIMITÉE',
+  'CONFIDENTIEL',
+  'SECRET',
+]
+
+const STATUS_LABELS: Record<DocumentStatus, string> = {
+  DRAFT: 'Brouillon',
+  PENDING_REVIEW: 'En validation',
+  APPROVED: 'Approuvé',
+  ARCHIVED: 'Archivé',
+  REJECTED: 'Rejeté',
 }
 
-const DOCUMENTS: Document[] = [
-  { id: '1', reference: 'D/2026/012/PRG/SGG', objet: 'Décret n°D/2026/012/PRG/SGG portant organisation du Ministère des Finances', type: 'Décret', institution: "Ministère de l'Économie et des Finances", taille: '2.4 MB', classification: 'PUBLIC', statut: 'Signé', date: '2026-01-15' },
-  { id: '2', reference: 'A/2026/045/MEF/CAB', objet: 'Arrêté n°A/2026/045/MEF/CAB fixant les modalités d\'exécution du budget 2026', type: 'Arrêté', institution: "Ministère de l'Économie et des Finances", taille: '1.8 MB', classification: 'PUBLIC', statut: 'En vigueur', date: '2026-01-20' },
-  { id: '3', reference: 'C/2026/003/PM/CAB', objet: 'Circulaire n°C/2026/003/PM/CAB relative à la généralisation de l\'administration électronique', type: 'Circulaire', institution: 'Primature', taille: '890 KB', classification: 'PUBLIC', statut: 'Diffusée', date: '2026-02-01' },
-  { id: '4', reference: 'NS/2026/089/MATD/SG', objet: 'Note de service n°NS/2026/089/MATD/SG relative à l\'organisation des élections locales', type: 'Note de service', institution: 'MATD', taille: '456 KB', classification: 'DIFFUSION LIMITÉE', statut: 'En cours', date: '2026-02-10' },
-  { id: '5', reference: 'R/2025/CC/ANN', objet: 'Rapport annuel 2025 — Cour des Comptes', type: 'Rapport', institution: 'Cour des Comptes', taille: '12.4 MB', classification: 'CONFIDENTIEL', statut: 'Classé', date: '2026-03-01' },
-  { id: '6', reference: 'D/2026/008/PRG/SGG', objet: 'Décret n°D/2026/008/PRG/SGG portant nomination des gouverneurs de région', type: 'Décret', institution: 'Présidence', taille: '1.2 MB', classification: 'PUBLIC', statut: 'Signé', date: '2026-01-25' },
-  { id: '7', reference: 'A/2026/112/MPTEN/CAB', objet: 'Arrêté n°A/2026/112/MPTEN/CAB portant attribution de fréquences radioélectriques', type: 'Arrêté', institution: 'MPTEN', taille: '678 KB', classification: 'PUBLIC', statut: 'Publié', date: '2026-02-15' },
-  { id: '8', reference: 'C/2026/007/MEF/CAB', objet: 'Circulaire n°C/2026/007/MEF/CAB sur les marchés publics 2026', type: 'Circulaire', institution: 'MEF', taille: '1.5 MB', classification: 'DIFFUSION LIMITÉE', statut: 'Diffusée', date: '2026-02-20' },
-  { id: '9', reference: 'D/2026/015/PRG/SGG', objet: 'Décret n°D/2026/015/PRG/SGG portant création de l\'Agence Nationale du Numérique', type: 'Décret', institution: 'Présidence', taille: '2.1 MB', classification: 'PUBLIC', statut: 'En vigueur', date: '2026-03-05' },
-  { id: '10', reference: 'NS/2026/134/MS/CAB', objet: 'Note de service n°NS/2026/134/MS/CAB — Campagne de vaccination COVID-19', type: 'Note de service', institution: 'Ministère de la Santé', taille: '320 KB', classification: 'PUBLIC', statut: 'En cours', date: '2026-03-10' },
-  { id: '11', reference: 'A/2026/078/MJ/CAB', objet: 'Arrêté n°A/2026/078/MJ/CAB portant organisation des tribunaux', type: 'Arrêté', institution: 'Ministère de la Justice', taille: '1.9 MB', classification: 'PUBLIC', statut: 'Signé', date: '2026-03-12' },
-  { id: '12', reference: 'R/2025/PND/T3', objet: 'Rapport de suivi PND — 3e trimestre 2025', type: 'Rapport', institution: 'Ministère du Plan', taille: '8.7 MB', classification: 'DIFFUSION LIMITÉE', statut: 'Diffusée', date: '2026-01-30' },
-  { id: '13', reference: 'C/2026/001/MFP/CAB', objet: 'Circulaire n°C/2026/001/MFP/CAB sur la réforme de la fonction publique', type: 'Circulaire', institution: 'MFP', taille: '950 KB', classification: 'PUBLIC', statut: 'En vigueur', date: '2026-01-08' },
-  { id: '14', reference: 'D/2025/198/PRG/SGG', objet: 'Décret n°D/2025/198/PRG/SGG portant budget général de l\'État 2026', type: 'Décret', institution: 'Présidence', taille: '15.3 MB', classification: 'CONFIDENTIEL', statut: 'Signé', date: '2025-12-20' },
-  { id: '15', reference: 'O/2026/003/PRG', objet: 'Ordonnance n°O/2026/003/PRG portant mesure d\'urgence économique', type: 'Ordonnance', institution: 'Présidence', taille: '3.2 MB', classification: 'DIFFUSION LIMITÉE', statut: 'En vigueur', date: '2026-02-28' },
-]
-
-const TYPE_TABS = [
-  { value: 'tous', label: 'Tous' },
-  { value: 'Décret', label: 'Décrets présidentiels' },
-  { value: 'Arrêté', label: 'Arrêtés ministériels' },
-  { value: 'Circulaire', label: 'Circulaires' },
-  { value: 'Note de service', label: 'Notes de service' },
-  { value: 'Rapport', label: 'Rapports officiels' },
-  { value: 'confidentiel', label: 'Documents confidentiels', icon: Shield },
-]
-
-const CLASSIFICATION_CONFIG: Record<DocClassification, { color: string; icon: React.ElementType }> = {
-  'PUBLIC': { color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', icon: BookOpen },
-  'DIFFUSION LIMITÉE': { color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', icon: AlertCircle },
-  'CONFIDENTIEL': { color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', icon: Lock },
-  'SECRET': { color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400', icon: Shield },
+const STATUS_STYLES: Record<DocumentStatus, string> = {
+  DRAFT: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
+  PENDING_REVIEW: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
+  APPROVED: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300',
+  ARCHIVED: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300',
+  REJECTED: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300',
 }
 
-const STATUS_CONFIG: Record<DocStatus, { color: string; icon: React.ElementType }> = {
-  'Signé': { color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400', icon: FileSignature },
-  'En vigueur': { color: 'bg-brand/10 text-brand dark:bg-primary/20 dark:text-primary', icon: CheckCircle2 },
-  'En cours': { color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400', icon: Clock },
-  'Publié': { color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400', icon: FileCheck },
-  'Diffusée': { color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400', icon: Archive },
-  'Classé': { color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400', icon: Lock },
+const CLASSIFICATION_STYLES: Record<DocumentClassification, string> = {
+  PUBLIC: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300',
+  'DIFFUSION LIMITÉE': 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
+  CONFIDENTIEL: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300',
+  SECRET: 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300',
 }
 
-const INSTITUTION_COUNTS = [
-  { name: 'Présidence', count: 4, color: 'bg-brand dark:bg-primary' },
-  { name: 'MEF', count: 3, color: 'bg-gold' },
-  { name: 'Primature', count: 1, color: 'bg-emerald-500' },
-  { name: 'MATD', count: 1, color: 'bg-sky-500' },
-  { name: 'Cour des Comptes', count: 1, color: 'bg-red-500' },
-  { name: 'MPTEN', count: 1, color: 'bg-violet-500' },
-  { name: 'Ministère de la Santé', count: 1, color: 'bg-teal-500' },
-  { name: 'Ministère de la Justice', count: 1, color: 'bg-orange-500' },
-  { name: 'Ministère du Plan', count: 1, color: 'bg-pink-500' },
-  { name: 'MFP', count: 1, color: 'bg-cyan-500' },
-]
+function tagString(document: GedDocument, key: string, fallback = ''): string {
+  const value = document.tags?.[key]
+  return typeof value === 'string' ? value : fallback
+}
 
-const REGIONS = [
-  { value: 'toutes', label: 'Toutes les régions' },
-  { value: 'conakry', label: 'Conakry' },
-  { value: 'kindia', label: 'Kindia' },
-  { value: 'kankan', label: 'Kankan' },
-  { value: 'nzerekore', label: 'Nzérékoré' },
-  { value: 'labe', label: 'Labé' },
-  { value: 'faranah', label: 'Faranah' },
-  { value: 'boke', label: 'Boké' },
-  { value: 'mamou', label: 'Mamou' },
-]
+function documentReference(document: GedDocument): string {
+  return tagString(document, 'reference', `GED-${document.id.slice(0, 8).toUpperCase()}`)
+}
 
-const PAGE_SIZE = 10
+function documentType(document: GedDocument): DocumentType {
+  const value = tagString(document, 'document_type', 'Autre')
+  return DOCUMENT_TYPES.includes(value as DocumentType) ? value as DocumentType : 'Autre'
+}
+
+function documentClassification(document: GedDocument): DocumentClassification {
+  const value = tagString(document, 'classification', 'PUBLIC')
+  return CLASSIFICATIONS.includes(value as DocumentClassification)
+    ? value as DocumentClassification
+    : 'PUBLIC'
+}
+
+function formatDate(value?: string | null): string {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return new Intl.DateTimeFormat('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
+}
 
 export function GedPage() {
-  const [search, setSearch] = useState('')
-  const [activeTab, setActiveTab] = useState('tous')
-  const [classificationFilter, setClassificationFilter] = useState<string>('tous')
-  const [institutionFilter, setInstitutionFilter] = useState<string>('tous')
-  const [regionFilter, setRegionFilter] = useState<string>('toutes')
-  const [dateFrom, setDateFrom] = useState<string>('')
-  const [dateTo, setDateTo] = useState<string>('')
-  const [showFilters, setShowFilters] = useState(false)
-  const [uploadDialog, setUploadDialog] = useState(false)
-  const [documents, setDocuments] = useState(DOCUMENTS)
-  const [newDoc, setNewDoc] = useState({ objet: '', type: 'Note de service' as DocType, institution: '', classification: 'PUBLIC' as DocClassification })
-  const [successToast, setSuccessToast] = useState('')
-  const [currentPage, setCurrentPage] = useState(1)
-  const navigate = useAppStore((s) => s.navigate)
-
-  // File upload state
-  const [uploadFile, setUploadFile] = useState<File | null>(null)
-  const [uploadProgress, setUploadProgress] = useState(0)
-  const [isUploading, setIsUploading] = useState(false)
-  const [dragActive, setDragActive] = useState(false)
+  const user = useAppStore((state) => state.user)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Dialog states
-  const [viewDoc, setViewDoc] = useState<Document | null>(null)
-  const [reclassifyDoc, setReclassifyDoc] = useState<Document | null>(null)
-  const [reclassifyValue, setReclassifyValue] = useState<DocClassification>('PUBLIC')
-  const [deleteDoc, setDeleteDoc] = useState<Document | null>(null)
-  const [exportDialog, setExportDialog] = useState(false)
+  const [documents, setDocuments] = useState<GedDocument[]>([])
+  const [statistics, setStatistics] = useState<GedStatistics>({
+    total: 0,
+    archived: 0,
+    draft: 0,
+    pending: 0,
+    approved: 0,
+    sensitive: 0,
+    acts: 0,
+  })
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [total, setTotal] = useState(0)
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<DocumentStatus | 'ALL'>('ALL')
+  const [classificationFilter, setClassificationFilter] = useState<DocumentClassification | 'ALL'>('ALL')
+  const [typeFilter, setTypeFilter] = useState<DocumentType | 'ALL'>('ALL')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
 
-  const showToast = (msg: string) => {
-    setSuccessToast(msg)
-    setTimeout(() => setSuccessToast(''), 4000)
+  const [importOpen, setImportOpen] = useState(false)
+  const [importBusy, setImportBusy] = useState(false)
+  const [importForm, setImportForm] = useState<{
+    reference: string
+    title: string
+    documentType: DocumentType
+    classification: DocumentClassification
+    description: string
+    file: File | null
+  }>({
+    reference: '',
+    title: '',
+    documentType: 'Note de service',
+    classification: 'PUBLIC',
+    description: '',
+    file: null,
+  })
+
+  const [selectedDocument, setSelectedDocument] = useState<GedDocument | null>(null)
+  const [versions, setVersions] = useState<DocumentVersion[]>([])
+  const [versionsOpen, setVersionsOpen] = useState(false)
+  const [versionsBusy, setVersionsBusy] = useState(false)
+  const [archiveTarget, setArchiveTarget] = useState<GedDocument | null>(null)
+  const [classificationTarget, setClassificationTarget] = useState<GedDocument | null>(null)
+  const [nextClassification, setNextClassification] = useState<DocumentClassification>('PUBLIC')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const [result, stats] = await Promise.all([
+        listDocuments({
+          page,
+          pageSize: PAGE_SIZE,
+          search,
+          status: statusFilter === 'ALL' ? '' : statusFilter,
+          classification: classificationFilter === 'ALL' ? '' : classificationFilter,
+          documentType: typeFilter === 'ALL' ? '' : typeFilter,
+        }),
+        getGedStatistics(),
+      ])
+      setDocuments(result.items)
+      setTotal(result.total)
+      setTotalPages(Math.max(1, result.total_pages))
+      setStatistics(stats)
+      if (page > Math.max(1, result.total_pages)) setPage(Math.max(1, result.total_pages))
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Impossible de charger la GED.')
+    } finally {
+      setLoading(false)
+    }
+  }, [page, search, statusFilter, classificationFilter, typeFilter])
+
+  useEffect(() => {
+    void load()
+  }, [load])
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setPage(1)
+      setSearch(searchInput.trim())
+    }, 350)
+    return () => window.clearTimeout(timeout)
+  }, [searchInput])
+
+  useEffect(() => {
+    if (!notice) return
+    const timeout = window.setTimeout(() => setNotice(''), 4500)
+    return () => window.clearTimeout(timeout)
+  }, [notice])
+
+  const statsCards = useMemo(() => [
+    { label: 'Documents visibles', value: statistics.total, icon: FileText },
+    { label: 'Décrets & arrêtés', value: statistics.acts, icon: FileCheck2 },
+    { label: 'En validation', value: statistics.pending, icon: Clock },
+    { label: 'Approuvés', value: statistics.approved, icon: ShieldCheck },
+    { label: 'Sensibles', value: statistics.sensitive, icon: Lock },
+    { label: 'Archivés', value: statistics.archived, icon: Archive },
+  ], [statistics])
+
+  const resetImport = () => {
+    setImportForm({
+      reference: '',
+      title: '',
+      documentType: 'Note de service',
+      classification: 'PUBLIC',
+      description: '',
+      file: null,
+    })
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  // File type icon helper
-  const getFileIcon = (fileName: string) => {
-    const ext = fileName.split('.').pop()?.toLowerCase()
-    if (ext === 'pdf') return FileText
-    if (['doc', 'docx'].includes(ext || '')) return FileType
-    if (['xls', 'xlsx'].includes(ext || '')) return FileSpreadsheet
-    if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext || '')) return FileImage
-    return FileText
-  }
-
-  // formatFileSize imported from @/lib/document-utils
-
-  // Generate official Republic of Guinea HTML document
-  const generateOfficialDocument = (doc: Document): string => {
-    return `<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${doc.type} n°${doc.reference} — République de Guinée</title>
-  <style>
-    @page { size: A4; margin: 2cm; }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Times New Roman', Georgia, serif; color: #1a1a1a; line-height: 1.6; padding: 2cm; max-width: 21cm; margin: 0 auto; }
-    .tricolor { display: flex; width: 100%; height: 6px; margin-bottom: 20px; }
-    .tricolor-red { flex: 1; background-color: #CE1126; }
-    .tricolor-yellow { flex: 1; background-color: #FCD116; }
-    .tricolor-green { flex: 1; background-color: #009460; }
-    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #0B2E58; padding-bottom: 20px; }
-    .header h1 { font-size: 11pt; letter-spacing: 3px; text-transform: uppercase; color: #0B2E58; margin-bottom: 4px; }
-    .header .motto { font-size: 9pt; color: #666; letter-spacing: 1px; }
-    .header .institution { font-size: 10pt; color: #0B2E58; font-weight: bold; margin-top: 8px; }
-    .doc-title { text-align: center; margin: 30px 0 20px; }
-    .doc-title h2 { font-size: 14pt; color: #0B2E58; text-transform: uppercase; letter-spacing: 1px; }
-    .doc-title .ref { font-size: 11pt; color: #333; margin-top: 4px; }
-    .content { text-align: justify; margin: 20px 0; font-size: 12pt; }
-    .content p { margin-bottom: 12px; text-indent: 1.5cm; }
-    .metadata { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 20px 0; font-size: 10pt; }
-    .metadata .label { color: #666; font-style: italic; }
-    .metadata .value { font-weight: 600; }
-    .signature { margin-top: 60px; text-align: right; }
-    .signature .date { font-size: 10pt; color: #333; }
-    .signature .signataire { font-size: 11pt; font-weight: bold; color: #0B2E58; margin-top: 8px; }
-    .signature .line { width: 200px; border-bottom: 1px dashed #999; margin-top: 40px; margin-left: auto; }
-    .signature .label-sign { font-size: 9pt; color: #666; margin-top: 4px; }
-    .classification { text-align: center; margin-top: 30px; padding: 6px 16px; border: 2px solid #CE1126; display: inline-block; font-size: 10pt; font-weight: bold; color: #CE1126; letter-spacing: 2px; }
-    .footer { margin-top: 40px; border-top: 1px solid #ddd; padding-top: 10px; font-size: 8pt; color: #999; text-align: center; }
-    @media print { body { padding: 0; } .no-print { display: none; } }
-  </style>
-</head>
-<body>
-  <div class="tricolor">
-    <div class="tricolor-red"></div>
-    <div class="tricolor-yellow"></div>
-    <div class="tricolor-green"></div>
-  </div>
-  <div class="header">
-    <h1>République de Guinée</h1>
-    <div class="motto">Travail — Justice — Solidarité</div>
-    <div class="institution">${doc.institution}</div>
-  </div>
-  <div class="doc-title">
-    <h2>${doc.type}</h2>
-    <div class="ref">n°${doc.reference}</div>
-  </div>
-  <div class="content">
-    <p><strong>${doc.objet}</strong></p>
-    <p>Conformément aux dispositions constitutionnelles et aux textes réglementaires en vigueur en République de Guinée, le présent document est émis pour pleine et entière application par l'institution susvisée et tous les services concernés.</p>
-    <p>Les mesures prévues par le présent ${doc.type.toLowerCase()} entrent en vigueur à compter de la date de sa signature. Tous les ministères, institutions et organismes concernés sont tenus de veiller à sa stricte application dans les meilleurs délais.</p>
-    <p>Le présent ${doc.type.toLowerCase()} sera publié au Journal Officiel de la République de Guinée et notifié à toutes les parties prenantes concernées.</p>
-  </div>
-  <div class="metadata">
-    <div><span class="label">Classification :</span> <span class="value">${doc.classification}</span></div>
-    <div><span class="label">Statut :</span> <span class="value">${doc.statut}</span></div>
-    <div><span class="label">Type :</span> <span class="value">${doc.type}</span></div>
-    <div><span class="label">Date :</span> <span class="value">${doc.date}</span></div>
-  </div>
-  <div style="text-align: center;">
-    <div class="classification">${doc.classification}</div>
-  </div>
-  <div class="signature">
-    <div class="date">Fait à Conakry, le ${doc.date}</div>
-    <div class="signataire">${doc.institution}</div>
-    <div class="line"></div>
-    <div class="label-sign">Signature & Cachet officiel</div>
-  </div>
-  <div class="footer">
-    Ce document est généré par le système eAdmin Guinée de la République de Guinée — ${doc.reference} — ${new Date().toLocaleDateString('fr-FR')}
-  </div>
-</body>
-</html>`
-  }
-
-  // Handle file selection
-  const handleFileSelect = useCallback((file: File) => {
-    const allowedTypes = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'image/png',
-      'image/jpeg',
-      'image/jpg',
-    ]
-    if (!allowedTypes.includes(file.type) && !file.name.match(/\.(pdf|doc|docx|xls|xlsx|png|jpg|jpeg)$/i)) {
-      showToast('Format de fichier non supporté. Utilisez PDF, DOC, DOCX, XLS, XLSX, PNG ou JPG.')
+  const submitImport = async () => {
+    if (!importForm.reference.trim() || !importForm.title.trim() || !importForm.file) {
+      setError('Référence officielle, objet et fichier sont obligatoires.')
       return
     }
-    setUploadFile(file)
-    setUploadProgress(0)
-  }, [showToast])
-
-  // Drag and drop handlers
-  const handleDrag = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true)
-    } else if (e.type === 'dragleave') {
-      setDragActive(false)
-    }
-  }, [])
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragActive(false)
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileSelect(e.dataTransfer.files[0])
-    }
-  }, [handleFileSelect])
-
-  const uploadDocument = () => {
-    if (!newDoc.objet || !newDoc.institution) return
-    const id = String(documents.length + 1)
-    const ref = `NS/2026/${134 + documents.length}/NEW/SG`
-
-    if (uploadFile) {
-      setIsUploading(true)
-      setUploadProgress(0)
-      // Simulate upload progress
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval)
-            return 90
-          }
-          return prev + Math.random() * 20
-        })
-      }, 200)
-
-      const reader = new FileReader()
-      reader.onload = () => {
-        clearInterval(progressInterval)
-        setUploadProgress(100)
-        const base64Data = reader.result as string
-        const created: Document = {
-          id,
-          reference: ref,
-          objet: newDoc.objet,
-          type: newDoc.type,
-          institution: newDoc.institution,
-          taille: formatFileSize(uploadFile.size),
-          classification: newDoc.classification,
-          statut: 'En cours',
-          date: new Date().toISOString().slice(0, 10),
-          fileName: uploadFile.name,
-          fileType: uploadFile.type,
-          fileData: base64Data,
-        }
-        setTimeout(() => {
-          setDocuments(prev => [created, ...prev])
-          setNewDoc({ objet: '', type: 'Note de service', institution: '', classification: 'PUBLIC' })
-          setUploadFile(null)
-          setUploadProgress(0)
-          setIsUploading(false)
-          setUploadDialog(false)
-          showToast(`Document ${ref} importé avec succès (${uploadFile.name})`)
-        }, 400)
-      }
-      reader.readAsDataURL(uploadFile)
-    } else {
-      const created: Document = {
-        id,
-        reference: ref,
-        objet: newDoc.objet,
-        type: newDoc.type,
-        institution: newDoc.institution,
-        taille: '256 KB',
-        classification: newDoc.classification,
-        statut: 'En cours',
-        date: new Date().toISOString().slice(0, 10),
-      }
-      setDocuments(prev => [created, ...prev])
-      setNewDoc({ objet: '', type: 'Note de service', institution: '', classification: 'PUBLIC' })
-      setUploadDialog(false)
-      showToast(`Document ${ref} importé avec succès`)
+    setImportBusy(true)
+    setError('')
+    try {
+      const created = await importDocument({
+        file: importForm.file,
+        reference: importForm.reference.trim(),
+        title: importForm.title.trim(),
+        documentType: importForm.documentType,
+        classification: importForm.classification,
+        description: importForm.description.trim(),
+      })
+      setNotice(`Document ${documentReference(created)} importé et hashé côté serveur.`)
+      setImportOpen(false)
+      resetImport()
+      setPage(1)
+      await load()
+    } catch (importError) {
+      setError(importError instanceof Error ? importError.message : 'Import GED impossible.')
+    } finally {
+      setImportBusy(false)
     }
   }
 
-  // Filtered documents with all filters applied
-  const filteredDocs = useMemo(() => {
-    return documents.filter(doc => {
-      const matchSearch = doc.objet.toLowerCase().includes(search.toLowerCase()) ||
-        doc.reference.toLowerCase().includes(search.toLowerCase()) ||
-        doc.institution.toLowerCase().includes(search.toLowerCase())
-      const matchTab = activeTab === 'tous' ||
-        (activeTab === 'confidentiel' && (doc.classification === 'CONFIDENTIEL' || doc.classification === 'SECRET')) ||
-        (activeTab !== 'confidentiel' && doc.type === activeTab)
-      const matchClassification = classificationFilter === 'tous' || doc.classification === classificationFilter
-      const matchInstitution = institutionFilter === 'tous' || doc.institution === institutionFilter
-      const matchDateFrom = !dateFrom || doc.date >= dateFrom
-      const matchDateTo = !dateTo || doc.date <= dateTo
-      return matchSearch && matchTab && matchClassification && matchInstitution && matchDateFrom && matchDateTo
-    })
-  }, [documents, search, activeTab, classificationFilter, institutionFilter, dateFrom, dateTo])
-
-  // Pagination
-  const totalPages = Math.max(1, Math.ceil(filteredDocs.length / PAGE_SIZE))
-  const paginatedDocs = filteredDocs.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
-
-  // Reset to page 1 when filters change
-  const handleFilterChange = (setter: (v: string) => void) => (value: string) => {
-    setter(value)
-    setCurrentPage(1)
-  }
-
-  const handleSearchChange = (value: string) => {
-    setSearch(value)
-    setCurrentPage(1)
-  }
-
-  // Dropdown actions
-  const handleConsulter = (doc: Document) => {
-    setViewDoc(doc)
-  }
-
-  const handleTelecharger = (doc: Document) => {
-    showToast(`Téléchargement de ${doc.reference} en cours...`)
-    setTimeout(() => {
-      const htmlContent = generateOfficialDocument(doc)
-      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${doc.reference.replace(/\//g, '-')}.html`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-    }, 600)
-  }
-
-  // Download original uploaded file
-  const handleDownloadOriginal = (doc: Document) => {
-    if (!doc.fileData || !doc.fileName) return
-    const a = document.createElement('a')
-    a.href = doc.fileData
-    a.download = doc.fileName
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    showToast(`Fichier original ${doc.fileName} téléchargé`)
-  }
-
-  const handleArchiver = (doc: Document) => {
-    setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, statut: 'Classé' as DocStatus } : d))
-    showToast(`Document ${doc.reference} archivé avec succès`)
-  }
-
-  const handleReclassifier = (doc: Document) => {
-    setReclassifyDoc(doc)
-    setReclassifyValue(doc.classification)
-  }
-
-  const confirmReclassify = () => {
-    if (!reclassifyDoc) return
-    setDocuments(prev => prev.map(d => d.id === reclassifyDoc.id ? { ...d, classification: reclassifyValue } : d))
-    showToast(`Document ${reclassifyDoc.reference} reclassifié en ${reclassifyValue}`)
-    setReclassifyDoc(null)
-  }
-
-  const handleSupprimer = (doc: Document) => {
-    setDeleteDoc(doc)
-  }
-
-  const confirmDelete = () => {
-    if (!deleteDoc) return
-    setDocuments(prev => prev.filter(d => d.id !== deleteDoc.id))
-    showToast(`Document ${deleteDoc.reference} supprimé`)
-    setDeleteDoc(null)
-  }
-
-  // AI Classification
-  const handleAiClassification = () => {
-    const classifications: DocClassification[] = ['PUBLIC', 'DIFFUSION LIMITÉE', 'CONFIDENTIEL', 'SECRET']
-    const nonPublicDocs = documents.filter(d => d.classification === 'PUBLIC' || d.classification === 'DIFFUSION LIMITÉE')
-    const count = Math.min(Math.floor(Math.random() * 3) + 1, nonPublicDocs.length)
-    const indicesToReclassify = new Set<number>()
-    while (indicesToReclassify.size < count) {
-      indicesToReclassify.add(Math.floor(Math.random() * nonPublicDocs.length))
+  const openVersions = async (document: GedDocument) => {
+    setSelectedDocument(document)
+    setVersionsOpen(true)
+    setVersionsBusy(true)
+    setError('')
+    try {
+      setVersions(await listDocumentVersions(document.id))
+    } catch (versionError) {
+      setVersions([])
+      setError(versionError instanceof Error ? versionError.message : 'Historique indisponible.')
+    } finally {
+      setVersionsBusy(false)
     }
-    const idsToReclassify = new Set(Array.from(indicesToReclassify).map(i => nonPublicDocs[i].id))
-    setDocuments(prev => prev.map(d => {
-      if (idsToReclassify.has(d.id)) {
-        const newClass = classifications[Math.floor(Math.random() * classifications.length)]
-        return { ...d, classification: newClass }
-      }
-      return d
-    }))
-    showToast(`${count} documents reclassifiés par l'IA`)
   }
 
-  // Export to National Archives
-  const handleExport = () => {
-    setExportDialog(true)
-  }
-
-  const confirmExport = () => {
-    const count = filteredDocs.length
-    showToast(`${count} documents exportés vers les Archives Nationales`)
-    setExportDialog(false)
-  }
-
-  // Reset filters
-  const resetFilters = () => {
-    setClassificationFilter('tous')
-    setInstitutionFilter('tous')
-    setRegionFilter('toutes')
-    setDateFrom('')
-    setDateTo('')
-    setCurrentPage(1)
-  }
-
-  const hasActiveFilters = classificationFilter !== 'tous' || institutionFilter !== 'tous' || regionFilter !== 'toutes' || dateFrom !== '' || dateTo !== ''
-
-  const uniqueInstitutions = [...new Set(DOCUMENTS.map(d => d.institution))]
-
-  const stats = [
-    { label: 'Documents officiels', value: '87 450', icon: FileText, color: 'text-brand dark:text-primary', bg: 'bg-brand/5 dark:bg-primary/10' },
-    { label: 'Décrets & arrêtés', value: '4 230', icon: ScrollText, color: 'text-gold dark:text-gold', bg: 'bg-gold/5 dark:bg-gold/10' },
-    { label: 'Circulaires & notes', value: '12 870', icon: BookOpen, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-900/20' },
-    { label: 'Documents confidentiels', value: '1 340', icon: Lock, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/20' },
-    { label: 'En cours de traitement', value: '2 150', icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
-    { label: 'Taux de numérisation', value: '78.3%', icon: BarChart3, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20', isProgress: true, progressValue: 78.3 },
-  ]
-
-  // Generate page numbers for pagination
-  const getPageNumbers = () => {
-    const pages: number[] = []
-    for (let i = 1; i <= totalPages; i++) {
-      pages.push(i)
+  const downloadCurrent = async (document: GedDocument) => {
+    setError('')
+    try {
+      await downloadDocumentVersion(document.id, document.version)
+      setNotice(`Lien sécurisé généré pour ${documentReference(document)}.`)
+    } catch (downloadError) {
+      setError(downloadError instanceof Error ? downloadError.message : 'Téléchargement indisponible.')
     }
-    return pages
+  }
+
+  const restoreVersion = async (versionNumber: number) => {
+    if (!selectedDocument) return
+    setVersionsBusy(true)
+    setError('')
+    try {
+      await restoreDocumentVersion(selectedDocument.id, versionNumber)
+      setNotice(`Version ${versionNumber} restaurée comme nouvelle version de ${documentReference(selectedDocument)}.`)
+      setVersions(await listDocumentVersions(selectedDocument.id))
+      await load()
+    } catch (restoreError) {
+      setError(restoreError instanceof Error ? restoreError.message : 'Restauration impossible.')
+    } finally {
+      setVersionsBusy(false)
+    }
+  }
+
+  const confirmArchive = async () => {
+    if (!archiveTarget) return
+    setError('')
+    try {
+      await archiveDocument(archiveTarget.id)
+      setNotice(`${documentReference(archiveTarget)} archivé. Le document reste traçable dans la GED.`)
+      setArchiveTarget(null)
+      await load()
+    } catch (archiveError) {
+      setError(archiveError instanceof Error ? archiveError.message : 'Archivage impossible.')
+    }
+  }
+
+  const confirmClassification = async () => {
+    if (!classificationTarget) return
+    setError('')
+    try {
+      await updateDocument(classificationTarget.id, {
+        tags: {
+          ...(classificationTarget.tags || {}),
+          classification: nextClassification,
+        },
+      })
+      setNotice(`${documentReference(classificationTarget)} reclassifié en ${nextClassification}.`)
+      setClassificationTarget(null)
+      await load()
+    } catch (classificationError) {
+      setError(classificationError instanceof Error ? classificationError.message : 'Reclassification impossible.')
+    }
+  }
+
+  const clearFilters = () => {
+    setSearchInput('')
+    setSearch('')
+    setStatusFilter('ALL')
+    setClassificationFilter('ALL')
+    setTypeFilter('ALL')
+    setPage(1)
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="space-y-1"
-      >
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-brand/10 dark:bg-primary/20">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="rounded-xl bg-brand/10 p-2.5 dark:bg-primary/20">
             <Library className="h-6 w-6 text-brand dark:text-primary" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-brand dark:text-primary">Gestion Électronique des Documents Officiels</h2>
-            <p className="text-sm text-muted-foreground">Archivage souverain de la documentation de l&apos;État — Conformément au Code administratif</p>
+            <h2 className="text-2xl font-bold text-brand dark:text-primary">Gestion Électronique des Documents</h2>
+            <p className="text-sm text-muted-foreground">
+              Documents réels du périmètre {user?.institution || 'institutionnel'} — stockage serveur, versions et empreintes SHA-256.
+            </p>
           </div>
         </div>
-      </motion.div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => void load()} disabled={loading}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Actualiser
+          </Button>
+          {user?.role !== 'citizen' && (
+            <Button onClick={() => setImportOpen(true)}>
+              <Upload className="mr-2 h-4 w-4" />
+              Importer un document
+            </Button>
+          )}
+        </div>
+      </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        {stats.map((stat, i) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.06 }}
-          >
-            <Card className="glass-card hover:shadow-lg transition-shadow">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className={`p-2 rounded-lg ${stat.bg} ${stat.color}`}>
-                    <stat.icon className="h-4 w-4" />
-                  </div>
-                  <span className="text-xs text-muted-foreground leading-tight">{stat.label}</span>
-                </div>
-                <p className="text-xl font-bold">{stat.value}</p>
-                {stat.isProgress && (
-                  <Progress value={stat.progressValue} className="h-1.5 mt-2" />
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
+      {error && (
+        <Card className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30">
+          <CardContent className="py-3 text-sm text-red-700 dark:text-red-300">{error}</CardContent>
+        </Card>
+      )}
+      {notice && (
+        <Card className="border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/30">
+          <CardContent className="py-3 text-sm text-emerald-700 dark:text-emerald-300">{notice}</CardContent>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        {statsCards.map(({ label, value, icon: Icon }) => (
+          <Card key={label}>
+            <CardContent className="p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">{label}</span>
+                <Icon className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-2xl font-bold">{value.toLocaleString('fr-FR')}</p>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
-      {/* Quick Actions */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-      >
-        <Card className="shadow-sm border-[#C8A45C]/20 dark:border-[#D4B878]/20 bg-gradient-to-r from-[#0B2E58]/[0.02] to-[#C8A45C]/[0.02] dark:from-[#3B7DD8]/[0.05] dark:to-[#D4B878]/[0.03]">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-[#0B2E58] dark:text-white">Actions rapides</CardTitle>
-            <CardDescription className="text-xs">Raccourcis vers les modules liés</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-              {[
-                { label: 'Nouveau courrier', icon: Mail, color: 'bg-[#0B2E58] hover:bg-[#0B2E58]/90 text-white', onClick: () => navigate('courriers') },
-                { label: 'Lancer un workflow', icon: GitBranch, color: 'bg-[#C8A45C] hover:bg-[#C8A45C]/90 text-[#0B2E58]', onClick: () => navigate('workflow') },
-                { label: 'Demander signature', icon: PenTool, color: 'bg-emerald-600 hover:bg-emerald-600/90 text-white', onClick: () => navigate('signatures') },
-                { label: 'Demandes citoyennes', icon: UserCheck, color: 'bg-[#3B7DD8] hover:bg-[#3B7DD8]/90 text-white', onClick: () => navigate('service-requests') },
-              ].map(action => (
-                <Button key={action.label} className={`${action.color} h-auto flex-col gap-2 rounded-xl py-4 text-xs font-semibold shadow-sm transition-all hover:scale-[1.02]`} onClick={action.onClick}>
-                  <action.icon className="size-5" />
-                  {action.label}
-                </Button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Document Type Tabs */}
       <Card>
-        <CardContent className="p-4">
-          <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setCurrentPage(1) }}>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-              <TabsList className="flex-wrap h-auto gap-1 bg-muted/50 p-1">
-                {TYPE_TABS.map(tab => (
-                  <TabsTrigger key={tab.value} value={tab.value} className="gap-1.5 text-xs data-[state=active]:bg-brand data-[state=active]:text-white dark:data-[state=active]:bg-primary">
-                    {tab.icon && <tab.icon className="h-3 w-3" />}
-                    {tab.label}
-                  </TabsTrigger>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base">Recherche et filtres</CardTitle>
+          <CardDescription>Les filtres sont appliqués côté serveur dans le périmètre RLS de l’utilisateur connecté.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_180px_200px_190px_auto]">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                placeholder="Référence, titre ou description…"
+                className="pl-9"
+              />
+            </div>
+            <Select
+              value={statusFilter}
+              onValueChange={(value) => { setStatusFilter(value as DocumentStatus | 'ALL'); setPage(1) }}
+            >
+              <SelectTrigger><SelectValue placeholder="Statut" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Tous les statuts</SelectItem>
+                {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
                 ))}
-              </TabsList>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="gap-1.5 border-gold/30 text-gold hover:bg-gold/5" onClick={handleAiClassification}>
-                  <Brain className="h-3.5 w-3.5" />
-                  Classification automatique par IA
-                </Button>
-                <Button variant="outline" size="sm" className="gap-1.5 border-brand/30 text-brand hover:bg-brand/5 dark:border-primary/30 dark:text-primary dark:hover:bg-primary/5" onClick={handleExport}>
-                  <Archive className="h-3.5 w-3.5" />
-                  Export vers les Archives Nationales
-                </Button>
-              </div>
-            </div>
-
-            {/* Search & Filters */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <div className="relative flex-1 w-full">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Rechercher par référence, objet, institution..."
-                  value={search}
-                  onChange={e => handleSearchChange(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowFilters(!showFilters)}
-                className="gap-2"
-              >
-                <Filter className="h-4 w-4" />
-                Filtres avancés
-                <ChevronDown className={`h-3 w-3 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
-              </Button>
-              <Button size="sm" className="gap-2 bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90" onClick={() => setUploadDialog(true)}>
-                <Upload className="h-4 w-4" />
-                Importer un document
-              </Button>
-            </div>
-
-            <AnimatePresence>
-              {showFilters && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden"
-                >
-                  <div className="flex flex-wrap gap-3 pt-3 mt-3 border-t">
-                    <Select value={classificationFilter} onValueChange={handleFilterChange(setClassificationFilter)}>
-                      <SelectTrigger className="w-[200px]">
-                        <Shield className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
-                        <SelectValue placeholder="Classification" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="tous">Toutes classifications</SelectItem>
-                        <SelectItem value="PUBLIC">PUBLIC</SelectItem>
-                        <SelectItem value="DIFFUSION LIMITÉE">DIFFUSION LIMITÉE</SelectItem>
-                        <SelectItem value="CONFIDENTIEL">CONFIDENTIEL</SelectItem>
-                        <SelectItem value="SECRET">SECRET</SelectItem>
-                      </SelectContent>
-                    </Select>
-
-                    <Select value={institutionFilter} onValueChange={handleFilterChange(setInstitutionFilter)}>
-                      <SelectTrigger className="w-[220px]">
-                        <Building2 className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
-                        <SelectValue placeholder="Institution" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="tous">Toutes les institutions</SelectItem>
-                        {uniqueInstitutions.map(inst => (
-                          <SelectItem key={inst} value={inst}>{inst}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    <Select value={regionFilter} onValueChange={handleFilterChange(setRegionFilter)}>
-                      <SelectTrigger className="w-[160px]">
-                        <MapPin className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
-                        <SelectValue placeholder="Région" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {REGIONS.map(r => (
-                          <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    <Input type="date" className="w-[160px]" placeholder="Date début" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setCurrentPage(1) }} />
-                    <Input type="date" className="w-[160px]" placeholder="Date fin" value={dateTo} onChange={e => { setDateTo(e.target.value); setCurrentPage(1) }} />
-
-                    {hasActiveFilters && (
-                      <Button variant="ghost" size="sm" onClick={resetFilters}>
-                        <X className="h-3 w-3 mr-1" />
-                        Réinitialiser
-                      </Button>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </Tabs>
+              </SelectContent>
+            </Select>
+            <Select
+              value={classificationFilter}
+              onValueChange={(value) => { setClassificationFilter(value as DocumentClassification | 'ALL'); setPage(1) }}
+            >
+              <SelectTrigger><SelectValue placeholder="Classification" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Toutes classifications</SelectItem>
+                {CLASSIFICATIONS.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select
+              value={typeFilter}
+              onValueChange={(value) => { setTypeFilter(value as DocumentType | 'ALL'); setPage(1) }}
+            >
+              <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Tous les types</SelectItem>
+                {DOCUMENT_TYPES.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Button variant="ghost" onClick={clearFilters}>Réinitialiser</Button>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Main Content: Table + Sidebar */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Documents Table */}
-        <div className="lg:col-span-3">
-          <Card>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/30">
-                      <TableHead className="text-xs font-semibold">Référence</TableHead>
-                      <TableHead className="text-xs font-semibold min-w-[180px] sm:min-w-[300px]">Objet</TableHead>
-                      <TableHead className="text-xs font-semibold">Type</TableHead>
-                      <TableHead className="text-xs font-semibold hidden lg:table-cell">Institution</TableHead>
-                      <TableHead className="text-xs font-semibold hidden md:table-cell">Taille</TableHead>
-                      <TableHead className="text-xs font-semibold">Classification</TableHead>
-                      <TableHead className="text-xs font-semibold">Statut</TableHead>
-                      <TableHead className="text-xs font-semibold w-10">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedDocs.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
-                          <FolderOpen className="h-10 w-10 mx-auto mb-2 opacity-40" />
-                          <p className="text-sm">Aucun document trouvé</p>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <CardTitle>Documents</CardTitle>
+              <CardDescription>{total.toLocaleString('fr-FR')} document(s) correspondant aux critères.</CardDescription>
+            </div>
+            <Badge variant="outline">Page {page} / {totalPages}</Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex min-h-52 items-center justify-center text-muted-foreground">
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Chargement de la GED…
+            </div>
+          ) : documents.length === 0 ? (
+            <div className="flex min-h-52 flex-col items-center justify-center gap-3 text-center">
+              <Library className="h-9 w-9 text-muted-foreground" />
+              <div>
+                <p className="font-medium">Aucun document réel dans ce périmètre</p>
+                <p className="text-sm text-muted-foreground">Importez un premier fichier ou modifiez les filtres.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Référence</TableHead>
+                    <TableHead>Document</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Classification</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead>Version</TableHead>
+                    <TableHead>Taille</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {documents.map((document) => {
+                    const classification = documentClassification(document)
+                    return (
+                      <TableRow key={document.id}>
+                        <TableCell className="font-mono text-xs">{documentReference(document)}</TableCell>
+                        <TableCell className="min-w-72">
+                          <p className="font-medium">{document.title}</p>
+                          {document.description && (
+                            <p className="mt-1 max-w-md truncate text-xs text-muted-foreground">{document.description}</p>
+                          )}
+                        </TableCell>
+                        <TableCell>{documentType(document)}</TableCell>
+                        <TableCell>
+                          <Badge className={CLASSIFICATION_STYLES[classification]}>{classification}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={STATUS_STYLES[document.status]}>{STATUS_LABELS[document.status]}</Badge>
+                        </TableCell>
+                        <TableCell>v{document.version}</TableCell>
+                        <TableCell>{formatFileSize(document.file_size || 0)}</TableCell>
+                        <TableCell className="whitespace-nowrap text-xs">{formatDate(document.updated_at)}</TableCell>
+                        <TableCell>
+                          <div className="flex justify-end gap-1">
+                            <Button size="sm" variant="ghost" onClick={() => void downloadCurrent(document)} title="Télécharger la version courante">
+                              <Download className="h-4 w-4" />
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => void openVersions(document)} title="Historique des versions">
+                              <History className="h-4 w-4" />
+                            </Button>
+                            {user?.role !== 'citizen' && document.status !== 'ARCHIVED' && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setClassificationTarget(document)
+                                  setNextClassification(classification)
+                                }}
+                                title="Reclassifier"
+                              >
+                                <ShieldCheck className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {user?.role !== 'citizen' && document.status !== 'ARCHIVED' && (
+                              <Button size="sm" variant="ghost" onClick={() => setArchiveTarget(document)} title="Archiver">
+                                <Archive className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
-                    ) : (
-                      paginatedDocs.map((doc, i) => {
-                        const classConfig = CLASSIFICATION_CONFIG[doc.classification]
-                        const statusConfig = STATUS_CONFIG[doc.statut]
-                        const ClassIcon = classConfig.icon
-                        const StatusIcon = statusConfig.icon
-                        return (
-                          <motion.tr
-                            key={doc.id}
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: i * 0.02 }}
-                            className="hover:bg-muted/50 transition-colors group"
-                          >
-                            <TableCell>
-                              <span className="font-mono text-xs font-medium text-brand dark:text-primary">{doc.reference}</span>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-start gap-2">
-                                <FileText className="h-4 w-4 text-brand dark:text-primary shrink-0 mt-0.5" />
-                                <span className="text-sm leading-tight line-clamp-2">{doc.objet}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="text-[10px] font-medium">{doc.type}</Badge>
-                            </TableCell>
-                            <TableCell className="hidden lg:table-cell">
-                              <div className="flex items-center gap-1.5">
-                                <Building2 className="h-3 w-3 text-muted-foreground shrink-0" />
-                                <span className="text-xs text-muted-foreground truncate max-w-[120px] sm:max-w-[150px]">{doc.institution}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="hidden md:table-cell">
-                              <span className="text-xs text-muted-foreground">{doc.taille}</span>
-                            </TableCell>
-                            <TableCell>
-                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${classConfig.color}`}>
-                                <ClassIcon className="h-3 w-3" />
-                                {doc.classification}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${statusConfig.color}`}>
-                                <StatusIcon className="h-3 w-3" />
-                                {doc.statut}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem className="gap-2" onClick={() => handleConsulter(doc)}>
-                                    <Eye className="h-4 w-4" /> Consulter
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem className="gap-2" onClick={() => handleTelecharger(doc)}>
-                                    <Download className="h-4 w-4" /> Télécharger
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem className="gap-2" onClick={() => handleArchiver(doc)}>
-                                    <Archive className="h-4 w-4" /> Archiver
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem className="gap-2" onClick={() => handleReclassifier(doc)}>
-                                    <Tag className="h-4 w-4" /> Reclassifier
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem className="gap-2 text-red-600" onClick={() => handleSupprimer(doc)}>
-                                    <Trash2 className="h-4 w-4" /> Supprimer
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </motion.tr>
-                        )
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-              <div className="flex items-center justify-between p-4 border-t">
-                <span className="text-xs text-muted-foreground">
-                  {filteredDocs.length} document(s) affiché(s) sur {documents.length}
-                  {totalPages > 1 && ` — Page ${currentPage} sur ${totalPages}`}
-                </span>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs gap-1"
-                    disabled={currentPage <= 1}
-                    onClick={() => setCurrentPage(p => p - 1)}
-                  >
-                    <ChevronLeft className="h-3 w-3" />
-                    Précédent
-                  </Button>
-                  {getPageNumbers().map(page => (
-                    <Button
-                      key={page}
-                      variant="outline"
-                      size="sm"
-                      className={`text-xs ${page === currentPage ? 'bg-brand text-white dark:bg-primary' : ''}`}
-                      onClick={() => setCurrentPage(page)}
-                    >
-                      {page}
-                    </Button>
-                  ))}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs gap-1"
-                    disabled={currentPage >= totalPages}
-                    onClick={() => setCurrentPage(p => p + 1)}
-                  >
-                    Suivant
-                    <ChevronRight className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
 
-        {/* Sidebar: Document count by institution */}
-        <div className="lg:col-span-1">
-          <Card className="glass-card sticky top-24">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-brand dark:text-primary" />
-                Documents par institution
-              </CardTitle>
-              <CardDescription className="text-xs">Répartition des documents officiels</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {INSTITUTION_COUNTS.map(inst => {
-                const maxCount = Math.max(...INSTITUTION_COUNTS.map(i => i.count))
-                const pct = (inst.count / maxCount) * 100
-                return (
-                  <div key={inst.name} className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium truncate max-w-[160px]">{inst.name}</span>
-                      <span className="text-xs font-bold text-brand dark:text-primary">{inst.count}</span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${pct}%` }}
-                        transition={{ delay: 0.3, duration: 0.6 }}
-                        className={`h-full rounded-full ${inst.color}`}
-                      />
-                    </div>
-                  </div>
-                )
-              })}
-              <Separator className="my-2" />
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold">Total</span>
-                <span className="text-xs font-bold text-brand dark:text-primary">{documents.length}</span>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="mt-4 flex items-center justify-between border-t pt-4">
+            <p className="text-xs text-muted-foreground">{PAGE_SIZE} éléments maximum par page.</p>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" disabled={page <= 1 || loading} onClick={() => setPage((value) => Math.max(1, value - 1))}>
+                <ChevronLeft className="mr-1 h-4 w-4" /> Précédent
+              </Button>
+              <Button size="sm" variant="outline" disabled={page >= totalPages || loading} onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>
+                Suivant <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-          <Card className="glass-card mt-4">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Shield className="h-4 w-4 text-gold" />
-                Classification
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {(['PUBLIC', 'DIFFUSION LIMITÉE', 'CONFIDENTIEL', 'SECRET'] as DocClassification[]).map(cls => {
-                const count = documents.filter(d => d.classification === cls).length
-                const config = CLASSIFICATION_CONFIG[cls]
-                return (
-                  <div key={cls} className="flex items-center justify-between p-2 rounded-lg bg-muted/30">
-                    <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${config.color} px-2 py-0.5 rounded-full`}>
-                      <config.icon className="h-3 w-3" />
-                      {cls}
-                    </span>
-                    <span className="text-xs font-bold">{count}</span>
-                  </div>
-                )
-              })}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Success Toast */}
-      <AnimatePresence>
-        {successToast && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed top-4 right-4 z-[60] flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-white text-sm font-medium shadow-lg"
-          >
-            <CheckCircle2 className="h-4 w-4" />
-            {successToast}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Upload Document Dialog */}
-      <Dialog open={uploadDialog} onOpenChange={(open) => { setUploadDialog(open); if (!open) { setUploadFile(null); setUploadProgress(0); setIsUploading(false) } }}>
-        <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
+      <Dialog open={importOpen} onOpenChange={(open) => { setImportOpen(open); if (!open && !importBusy) resetImport() }}>
+        <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5 text-brand dark:text-primary" />
-              Importer un document réglementaire
-            </DialogTitle>
-            <DialogDescription>Ajouter un nouveau document officiel à la GED</DialogDescription>
+            <DialogTitle>Importer un document officiel</DialogTitle>
+            <DialogDescription>
+              Le fichier sera contrôlé côté serveur, stocké dans le stockage objet et son SHA-256 sera calculé sur les octets réellement reçus.
+            </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            {/* Drag & Drop File Upload Zone */}
-            <div className="space-y-2">
-              <Label>Fichier (optionnel)</Label>
-              <div
-                onDragEnter={handleDrag}
-                onDragLeave={handleDrag}
-                onDragOver={handleDrag}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 transition-all cursor-pointer ${
-                  dragActive
-                    ? 'border-brand bg-brand/5 dark:border-primary dark:bg-primary/10'
-                    : uploadFile
-                      ? 'border-emerald-300 bg-emerald-50/50 dark:border-emerald-700 dark:bg-emerald-900/10'
-                      : 'border-muted-foreground/25 hover:border-brand/50 hover:bg-brand/5 dark:hover:border-primary/50 dark:hover:bg-primary/5'
-                }`}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
-                  className="hidden"
-                  onChange={(e) => {
-                    if (e.target.files?.[0]) handleFileSelect(e.target.files[0])
-                  }}
-                />
-                {uploadFile ? (
-                  <div className="flex items-center gap-3 w-full">
-                    <div className="p-2.5 rounded-lg bg-brand/10 dark:bg-primary/20">
-                      {(() => { const FIcon = getFileIcon(uploadFile.name); return <FIcon className="h-6 w-6 text-brand dark:text-primary" /> })()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{uploadFile.name}</p>
-                      <p className="text-xs text-muted-foreground">{formatFileSize(uploadFile.size)} — {uploadFile.type || 'Type inconnu'}</p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 shrink-0"
-                      onClick={(e) => { e.stopPropagation(); setUploadFile(null); setUploadProgress(0) }}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <>
-                    <Upload className="h-8 w-8 text-muted-foreground/40 mb-2" />
-                    <p className="text-sm font-medium text-muted-foreground">
-                      Glissez-déposez un fichier ici ou <span className="text-brand dark:text-primary underline">parcourir</span>
-                    </p>
-                    <p className="text-xs text-muted-foreground/60 mt-1">PDF, DOC, DOCX, XLS, XLSX, PNG, JPG</p>
-                  </>
-                )}
-              </div>
-              {isUploading && (
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Chargement en cours...</span>
-                    <span className="font-medium text-brand dark:text-primary">{Math.round(uploadProgress)}%</span>
-                  </div>
-                  <Progress value={uploadProgress} className="h-1.5" />
-                </div>
-              )}
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-2">
+              <Label htmlFor="ged-reference">Référence officielle</Label>
+              <Input id="ged-reference" value={importForm.reference} onChange={(event) => setImportForm((value) => ({ ...value, reference: event.target.value }))} placeholder="Ex. A/2026/045/MEF/CAB" />
             </div>
-
-            <div className="space-y-2">
-              <Label>Objet du document</Label>
-              <Input
-                placeholder="Ex: Décret n°D/2026/... portant organisation..."
-                value={newDoc.objet}
-                onChange={e => setNewDoc(prev => ({ ...prev, objet: e.target.value }))}
-              />
+            <div className="grid gap-2">
+              <Label htmlFor="ged-title">Objet / titre</Label>
+              <Input id="ged-title" value={importForm.title} onChange={(event) => setImportForm((value) => ({ ...value, title: event.target.value }))} placeholder="Objet officiel du document" />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Type de document</Label>
-                <Select value={newDoc.type} onValueChange={(v) => setNewDoc(prev => ({ ...prev, type: v as DocType }))}>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <Label>Type</Label>
+                <Select value={importForm.documentType} onValueChange={(value) => setImportForm((form) => ({ ...form, documentType: value as DocumentType }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Décret">Décret</SelectItem>
-                    <SelectItem value="Arrêté">Arrêté</SelectItem>
-                    <SelectItem value="Circulaire">Circulaire</SelectItem>
-                    <SelectItem value="Note de service">Note de service</SelectItem>
-                    <SelectItem value="Rapport">Rapport</SelectItem>
-                    <SelectItem value="Ordonnance">Ordonnance</SelectItem>
-                  </SelectContent>
+                  <SelectContent>{DOCUMENT_TYPES.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
+              <div className="grid gap-2">
                 <Label>Classification</Label>
-                <Select value={newDoc.classification} onValueChange={(v) => setNewDoc(prev => ({ ...prev, classification: v as DocClassification }))}>
+                <Select value={importForm.classification} onValueChange={(value) => setImportForm((form) => ({ ...form, classification: value as DocumentClassification }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="PUBLIC">PUBLIC</SelectItem>
-                    <SelectItem value="DIFFUSION LIMITÉE">DIFFUSION LIMITÉE</SelectItem>
-                    <SelectItem value="CONFIDENTIEL">CONFIDENTIEL</SelectItem>
-                    <SelectItem value="SECRET">SECRET</SelectItem>
-                  </SelectContent>
+                  <SelectContent>{CLASSIFICATIONS.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Institution</Label>
+            <div className="grid gap-2">
+              <Label htmlFor="ged-description">Description</Label>
+              <Input id="ged-description" value={importForm.description} onChange={(event) => setImportForm((value) => ({ ...value, description: event.target.value }))} placeholder="Description facultative" />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="ged-file">Fichier</Label>
               <Input
-                placeholder="Ex: Ministère des Finances, Présidence..."
-                value={newDoc.institution}
-                onChange={e => setNewDoc(prev => ({ ...prev, institution: e.target.value }))}
+                ref={fileInputRef}
+                id="ged-file"
+                type="file"
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp"
+                onChange={(event) => setImportForm((value) => ({ ...value, file: event.target.files?.[0] || null }))}
               />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setUploadDialog(false); setUploadFile(null); setUploadProgress(0) }}>Annuler</Button>
-            <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={uploadDocument} disabled={!newDoc.objet || !newDoc.institution || isUploading}>
-              <Upload className="h-4 w-4" />
-              {isUploading ? 'Chargement...' : 'Importer le document'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Document Consultation Dialog */}
-      <Dialog open={!!viewDoc} onOpenChange={(open) => { if (!open) setViewDoc(null) }}>
-        <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Eye className="h-5 w-5 text-brand dark:text-primary" />
-              Consultation du document
-            </DialogTitle>
-            <DialogDescription>Détails et aperçu du document officiel</DialogDescription>
-          </DialogHeader>
-          {viewDoc && (
-            <div className="space-y-4">
-              {/* Document metadata */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Référence</Label>
-                  <p className="text-sm font-mono font-semibold text-brand dark:text-primary">{viewDoc.reference}</p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Type</Label>
-                  <Badge variant="outline" className="text-xs font-medium">{viewDoc.type}</Badge>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Institution</Label>
-                  <p className="text-sm">{viewDoc.institution}</p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Classification</Label>
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${CLASSIFICATION_CONFIG[viewDoc.classification].color}`}>
-                    {(() => { const Ic = CLASSIFICATION_CONFIG[viewDoc.classification].icon; return <Ic className="h-3 w-3" /> })()}
-                    {viewDoc.classification}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Statut</Label>
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_CONFIG[viewDoc.statut].color}`}>
-                    {(() => { const Ic = STATUS_CONFIG[viewDoc.statut].icon; return <Ic className="h-3 w-3" /> })()}
-                    {viewDoc.statut}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Date</Label>
-                  <p className="text-sm">{viewDoc.date}</p>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Taille</Label>
-                  <p className="text-sm">{viewDoc.taille}</p>
-                </div>
-              </div>
-
-              {/* Uploaded file info */}
-              {viewDoc.fileName && (
-                <div className="rounded-lg border border-brand/20 dark:border-primary/20 bg-brand/5 dark:bg-primary/5 p-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-brand/10 dark:bg-primary/20">
-                      {(() => { const FIcon = getFileIcon(viewDoc.fileName); return <FIcon className="h-5 w-5 text-brand dark:text-primary" /> })()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{viewDoc.fileName}</p>
-                      <p className="text-xs text-muted-foreground">{viewDoc.fileType} — {viewDoc.taille}</p>
-                    </div>
-                    <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
-                  </div>
-                </div>
+              {importForm.file && (
+                <p className="text-xs text-muted-foreground">{importForm.file.name} — {formatFileSize(importForm.file.size)}</p>
               )}
-
-              <Separator />
-
-              {/* Simulated document preview */}
-              <div className="border rounded-lg p-6 bg-white dark:bg-gray-900 shadow-inner">
-                {/* Republic of Guinea header */}
-                <div className="text-center space-y-1 mb-6">
-                  <div className="flex items-center justify-center gap-3 mb-2">
-                    <div className="w-8 h-5 bg-[#CE1126] rounded-sm" />
-                    <div className="w-8 h-5 bg-[#FCD116] rounded-sm" />
-                    <div className="w-8 h-5 bg-[#009460] rounded-sm" />
-                  </div>
-                  <p className="text-xs font-semibold tracking-widest uppercase text-muted-foreground">République de Guinée</p>
-                  <p className="text-[10px] text-muted-foreground">Travail — Justice — Solidarité</p>
-                  <Separator className="my-2" />
-                </div>
-
-                {/* Document content */}
-                <div className="space-y-4 text-sm leading-relaxed">
-                  <div className="text-center">
-                    <p className="font-bold text-base">{viewDoc.type} n°{viewDoc.reference}</p>
-                  </div>
-                  <p className="text-justify first-letter:text-3xl first-letter:font-bold first-letter:float-left first-letter:mr-1 first-letter:mt-1">
-                    {viewDoc.objet}
-                  </p>
-                  <p className="text-justify text-muted-foreground">
-                    Conformément aux dispositions constitutionnelles et aux textes réglementaires en vigueur en République de Guinée, le présent document est émis pour pleine et entière application par l&apos;institution susvisée et tous les services concernés.
-                  </p>
-                  <p className="text-justify text-muted-foreground">
-                    Les mesures prévues par le présent {viewDoc.type.toLowerCase()} entrent en vigueur à compter de la date de sa signature. Tous les ministères, institutions et organismes concernés sont tenus de veiller à sa stricte application dans les meilleurs délais.
-                  </p>
-                </div>
-
-                {/* Signature area */}
-                <div className="mt-8 flex justify-end">
-                  <div className="text-center space-y-1">
-                    <p className="text-xs text-muted-foreground">Fait à Conakry, le {viewDoc.date}</p>
-                    <p className="text-sm font-semibold">{viewDoc.institution}</p>
-                    <div className="w-32 border-b border-dashed border-muted-foreground/30 mx-auto mt-4" />
-                    <p className="text-[10px] text-muted-foreground">Signature & Cachet</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setViewDoc(null)}>Fermer</Button>
-            {viewDoc && viewDoc.fileName && viewDoc.fileData && (
-              <Button variant="outline" className="gap-2 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20" onClick={() => handleDownloadOriginal(viewDoc)}>
-                <Download className="h-4 w-4" />
-                Fichier original
-              </Button>
-            )}
-            {viewDoc && (
-              <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={() => { handleTelecharger(viewDoc); setViewDoc(null) }}>
-                <Download className="h-4 w-4" />
-                Télécharger en PDF
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Reclassify Dialog */}
-      <Dialog open={!!reclassifyDoc} onOpenChange={(open) => { if (!open) setReclassifyDoc(null) }}>
-        <DialogContent className="sm:max-w-[450px] max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Tag className="h-5 w-5 text-gold" />
-              Reclassifier le document
-            </DialogTitle>
-            <DialogDescription>
-              {reclassifyDoc && `Modifier la classification de ${reclassifyDoc.reference}`}
-            </DialogDescription>
-          </DialogHeader>
-          {reclassifyDoc && (
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Classification actuelle</Label>
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${CLASSIFICATION_CONFIG[reclassifyDoc.classification].color}`}>
-                  {(() => { const Ic = CLASSIFICATION_CONFIG[reclassifyDoc.classification].icon; return <Ic className="h-3 w-3" /> })()}
-                  {reclassifyDoc.classification}
-                </span>
-              </div>
-              <div className="space-y-2">
-                <Label>Nouvelle classification</Label>
-                <Select value={reclassifyValue} onValueChange={(v) => setReclassifyValue(v as DocClassification)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="PUBLIC">PUBLIC</SelectItem>
-                    <SelectItem value="DIFFUSION LIMITÉE">DIFFUSION LIMITÉE</SelectItem>
-                    <SelectItem value="CONFIDENTIEL">CONFIDENTIEL</SelectItem>
-                    <SelectItem value="SECRET">SECRET</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setReclassifyDoc(null)}>Annuler</Button>
-            <Button className="bg-gold hover:bg-gold/90 text-[#0B2E58] gap-2" onClick={confirmReclassify}>
-              <CheckCircle2 className="h-4 w-4" />
-              Reclassifier
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={!!deleteDoc} onOpenChange={(open) => { if (!open) setDeleteDoc(null) }}>
-        <DialogContent className="sm:max-w-[450px] max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
-              <AlertTriangle className="h-5 w-5" />
-              Confirmer la suppression
-            </DialogTitle>
-            <DialogDescription>
-              Cette action est irréversible. Le document sera définitivement supprimé de la GED.
-            </DialogDescription>
-          </DialogHeader>
-          {deleteDoc && (
-            <div className="py-4">
-              <div className="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/10 p-4 space-y-2">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-red-600" />
-                  <span className="font-mono text-sm font-semibold text-red-700 dark:text-red-400">{deleteDoc.reference}</span>
-                </div>
-                <p className="text-sm text-red-700/80 dark:text-red-300/80">{deleteDoc.objet}</p>
-                <p className="text-xs text-red-600/60 dark:text-red-400/60">{deleteDoc.type} — {deleteDoc.institution} — {deleteDoc.date}</p>
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDoc(null)}>Annuler</Button>
-            <Button variant="destructive" className="gap-2" onClick={confirmDelete}>
-              <Trash2 className="h-4 w-4" />
-              Supprimer définitivement
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Export to National Archives Dialog */}
-      <Dialog open={exportDialog} onOpenChange={setExportDialog}>
-        <DialogContent className="sm:max-w-[450px] max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Archive className="h-5 w-5 text-brand dark:text-primary" />
-              Export vers les Archives Nationales
-            </DialogTitle>
-            <DialogDescription>
-              Confirmez l&apos;export des documents affichés vers les Archives Nationales de la République de Guinée.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <div className="rounded-lg border border-brand/20 dark:border-primary/20 bg-brand/5 dark:bg-primary/5 p-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Documents à exporter</span>
-                <span className="text-lg font-bold text-brand dark:text-primary">{filteredDocs.length}</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Les {filteredDocs.length} documents actuellement affichés seront transférés aux Archives Nationales conformément au Code administratif.
-              </p>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setExportDialog(false)}>Annuler</Button>
-            <Button className="bg-brand hover:bg-brand/90 dark:bg-primary dark:hover:bg-primary/90 gap-2" onClick={confirmExport}>
-              <Archive className="h-4 w-4" />
-              Confirmer l&apos;export
+            <Button variant="outline" onClick={() => setImportOpen(false)} disabled={importBusy}>Annuler</Button>
+            <Button onClick={() => void submitImport()} disabled={importBusy || !importForm.file || !importForm.reference.trim() || !importForm.title.trim()}>
+              {importBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+              Importer et sécuriser
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={versionsOpen} onOpenChange={setVersionsOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Historique des versions</DialogTitle>
+            <DialogDescription>
+              {selectedDocument ? `${documentReference(selectedDocument)} — ${selectedDocument.title}` : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[55vh] space-y-3 overflow-y-auto py-2">
+            {versionsBusy ? (
+              <div className="flex items-center justify-center py-10 text-muted-foreground"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Chargement…</div>
+            ) : versions.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">Aucune version disponible.</p>
+            ) : versions.map((version) => (
+              <Card key={version.version_id}>
+                <CardContent className="p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">v{version.version_number}</Badge>
+                        <span className="text-sm font-medium">{version.change_summary || version.change_type}</span>
+                      </div>
+                      <p className="mt-2 font-mono text-[11px] text-muted-foreground">SHA-256 {version.file_hash}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {formatFileSize(version.file_size)} · {version.changed_by} · {formatDate(version.created_at)}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => selectedDocument && void downloadDocumentVersion(selectedDocument.id, version.version_number)}>
+                        <Download className="mr-1 h-4 w-4" /> Télécharger
+                      </Button>
+                      {selectedDocument && version.version_number !== selectedDocument.version && user?.role !== 'citizen' && (
+                        <Button size="sm" variant="outline" onClick={() => void restoreVersion(version.version_number)} disabled={versionsBusy}>
+                          Restaurer
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(archiveTarget)} onOpenChange={(open) => { if (!open) setArchiveTarget(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Archiver le document ?</DialogTitle>
+            <DialogDescription>
+              {archiveTarget ? `${documentReference(archiveTarget)} restera conservé et traçable, mais passera au statut Archivé.` : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setArchiveTarget(null)}>Annuler</Button>
+            <Button onClick={() => void confirmArchive()}>Archiver</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(classificationTarget)} onOpenChange={(open) => { if (!open) setClassificationTarget(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modifier la classification</DialogTitle>
+            <DialogDescription>
+              La décision reste humaine et est enregistrée côté serveur. Aucune classification automatique n’est simulée dans le navigateur.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-3">
+            <Select value={nextClassification} onValueChange={(value) => setNextClassification(value as DocumentClassification)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>{CLASSIFICATIONS.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setClassificationTarget(null)}>Annuler</Button>
+            <Button onClick={() => void confirmClassification()}>Enregistrer</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

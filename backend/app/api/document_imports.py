@@ -1,7 +1,8 @@
-"""Atomic server-authoritative import for the government GED.
+"""Server-authoritative creation and atomic import for the government GED.
 
-A document and its first immutable version are created in one request from
-validated bytes. Clients cannot provide an object-storage path or a digest.
+Document metadata may be created independently for compatibility, but clients
+can never provide object-storage paths or digests. Official file versions are
+created only from backend-validated bytes.
 """
 
 import hashlib
@@ -9,8 +10,10 @@ import os
 import tempfile
 import uuid
 from datetime import datetime, timezone
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +31,14 @@ upload_security = UploadSecurityService()
 
 _ALLOWED_CLASSIFICATIONS = {"PUBLIC", "DIFFUSION LIMITÉE", "CONFIDENTIEL", "SECRET"}
 _ALLOWED_TYPES = {"Décret", "Arrêté", "Circulaire", "Note de service", "Rapport", "Ordonnance", "Autre"}
+
+
+class MetadataDocumentCreate(BaseModel):
+    """Compatibility contract that intentionally excludes all file authority."""
+
+    title: str
+    description: str | None = None
+    tags: dict[str, Any] | None = None
 
 
 async def _scan_content_or_fail(content: bytes, sanitized_name: str) -> None:
@@ -59,7 +70,7 @@ async def _scan_content_or_fail(content: bytes, sanitized_name: str) -> None:
             os.unlink(temp_path)
 
 
-def _serialize(document: Document, version: DocumentVersion) -> dict:
+def _serialize_document(document: Document) -> dict:
     return {
         "id": str(document.id),
         "title": document.title,
@@ -74,10 +85,61 @@ def _serialize(document: Document, version: DocumentVersion) -> dict:
         "institution_id": document.institution_id,
         "created_at": document.created_at.isoformat() if document.created_at else None,
         "updated_at": document.updated_at.isoformat() if document.updated_at else None,
+    }
+
+
+def _serialize(document: Document, version: DocumentVersion) -> dict:
+    return {
+        **_serialize_document(document),
         "file_hash": version.file_hash,
         "server_stored": True,
         "digest_source": "server_bytes",
     }
+
+
+@router.post("", status_code=status.HTTP_201_CREATED, summary="Créer les métadonnées d'un document")
+async def create_document_metadata(
+    payload: MetadataDocumentCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Preserve legacy metadata creation without trusting client file fields."""
+    if current_user.role == RoleEnum.CITOYEN:
+        raise HTTPException(status_code=403, detail="Création GED réservée aux agents habilités.")
+
+    title = payload.title.strip()
+    if not title:
+        raise HTTPException(status_code=422, detail="Le titre du document est obligatoire.")
+
+    incoming_tags = payload.tags or {}
+    reference = incoming_tags.get("reference")
+    document_type = incoming_tags.get("document_type", "Autre")
+    classification = incoming_tags.get("classification", "PUBLIC")
+
+    safe_tags: dict[str, str] = {}
+    if isinstance(reference, str) and reference.strip():
+        safe_tags["reference"] = reference.strip()[:160]
+    safe_tags["document_type"] = document_type if document_type in _ALLOWED_TYPES else "Autre"
+    safe_tags["classification"] = classification if classification in _ALLOWED_CLASSIFICATIONS else "PUBLIC"
+
+    document = Document(
+        title=title,
+        description=payload.description.strip() if payload.description else None,
+        file_path=None,
+        file_type=None,
+        file_size=None,
+        version=0,
+        current_version=0,
+        status=DocumentStatusEnum.DRAFT,
+        tags=safe_tags,
+        owner_id=current_user.id,
+        tenant_id=current_user.tenant_id or settings.TENANT_DEFAULT_ID,
+        institution_id=current_user.institution_id,
+    )
+    db.add(document)
+    await db.flush()
+    await db.refresh(document)
+    return _serialize_document(document)
 
 
 @router.post(
@@ -116,7 +178,6 @@ async def import_document(
     if classification not in _ALLOWED_CLASSIFICATIONS:
         raise HTTPException(status_code=422, detail="Classification non reconnue.")
 
-    # Reference uniqueness is enforced within the visible RLS scope.
     existing = (
         await db.execute(
             select(Document).where(Document.tags["reference"].as_string() == reference)
