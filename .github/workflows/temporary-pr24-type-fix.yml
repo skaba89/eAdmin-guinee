@@ -1,0 +1,48 @@
+name: Temporary PR24 Type Fix
+
+on:
+  push:
+    branches:
+      - agent/remove-client-sla-policy
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/remove-client-sla-policy
+
+      - name: Fix citizen routing/create contract mismatch
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path('src/store/citizen-requests-store.ts')
+          text = path.read_text(encoding='utf-8')
+
+          old = """const targetInstitutionId = await resolveTargetInstitution({\n      mairie,\n      citizenAddress: req.citizenAddress,"""
+          new = """const targetInstitutionId = await resolveTargetInstitution({\n      categoryId: req.categoryId,\n      mairie,\n      citizenAddress: req.citizenAddress,"""
+          if old not in text:
+              raise SystemExit('routing pattern not found')
+          text = text.replace(old, new, 1)
+
+          old = """const created = await serviceRequestsApi.createRequest({\n      serviceId: req.serviceId,\n      categoryId: req.categoryId,\n      targetInstitutionId,"""
+          new = """const created = await serviceRequestsApi.createRequest({\n      serviceId: req.serviceId,\n      targetInstitutionId,"""
+          if old not in text:
+              raise SystemExit('create payload pattern not found')
+          text = text.replace(old, new, 1)
+
+          path.write_text(text, encoding='utf-8')
+
+      - name: Commit fix
+        shell: bash
+        run: |
+          if git diff --quiet -- src/store/citizen-requests-store.ts; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/store/citizen-requests-store.ts
+          git commit -m 'fix(citizen): separate routing hints from server request policy'
+          git push origin HEAD:agent/remove-client-sla-policy

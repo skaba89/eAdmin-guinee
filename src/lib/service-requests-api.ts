@@ -20,9 +20,6 @@ export interface InstitutionOption {
 
 export interface CreateServiceRequestInput {
   serviceId: string
-  serviceName: string
-  category: string
-  categoryId: string
   targetInstitutionId: string
   citizenName: string
   citizenFirstName: string
@@ -31,7 +28,6 @@ export interface CreateServiceRequestInput {
   citizenEmail: string
   citizenAddress: string
   motif: string
-  documents: string[]
   mairie?: string
   deliveryMode: CitizenRequest['deliveryMode']
 }
@@ -97,9 +93,6 @@ export async function createRequest(input: CreateServiceRequestInput): Promise<C
     method: 'POST',
     body: JSON.stringify({
       service_id: input.serviceId,
-      service_name: input.serviceName,
-      category: input.category,
-      category_id: input.categoryId,
       target_institution_id: input.targetInstitutionId,
       citizen_name: input.citizenName,
       citizen_first_name: input.citizenFirstName,
@@ -108,7 +101,6 @@ export async function createRequest(input: CreateServiceRequestInput): Promise<C
       citizen_email: input.citizenEmail,
       citizen_address: input.citizenAddress,
       motif: input.motif,
-      required_documents: input.documents,
       mairie: input.mairie || null,
       delivery_mode: input.deliveryMode,
     }),

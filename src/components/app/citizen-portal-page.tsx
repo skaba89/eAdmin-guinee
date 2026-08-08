@@ -28,7 +28,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
 } from '@/components/ui/dialog'
 import { useAppStore } from '@/store/app-store'
-import { useCitizenRequestsStore, getInstitutionRoutingOptions, type InstitutionRoutingOption, type CitizenRequest, type RequestStatus, type UploadedDocument, type GeneratedDocument, type SatisfactionRating, getDeadlineDays, isDeadlineExceeded, isDeadlineApproaching, isDeadlineCritical, countRemainingBusinessDays } from '@/store/citizen-requests-store'
+import { useCitizenRequestsStore, getInstitutionRoutingOptions, type InstitutionRoutingOption, type CitizenRequest, type RequestStatus, type UploadedDocument, type GeneratedDocument, type SatisfactionRating, isDeadlineExceeded, isDeadlineApproaching, isDeadlineCritical, countRemainingBusinessDays } from '@/store/citizen-requests-store'
 import { useNotificationsStore, type NotificationType, type AppNotification } from '@/store/notifications-store'
 import { usePublicServiceCatalog, type ServiceItem, type ServiceCategory } from '@/lib/public-service-catalog'
 import { processFile, formatFileSize, getFileTypeIcon, downloadUploadedFile, downloadCitizenDocument, ACCEPTED_FILE_TYPES, MAX_FILE_SIZE, createGeneratedDocument } from '@/lib/document-utils'
@@ -436,11 +436,6 @@ export function CitizenPortalPage() {
     { label: 'Documents prêts', value: myRequests.filter(r => r.status === 'prete').length, icon: CheckCircle2, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20', gradientBg: 'bg-gradient-to-br from-emerald-100 to-emerald-50 dark:from-emerald-900/30 dark:to-emerald-800/10' },
     { label: 'Livrées', value: myRequests.filter(r => r.status === 'livree').length, icon: Download, color: 'text-[#0B2E58] dark:text-[#3B7DD8]', bg: 'bg-[#0B2E58]/5 dark:bg-[#3B7DD8]/10', gradientBg: 'bg-gradient-to-br from-[#0B2E58]/10 to-[#3B7DD8]/5 dark:from-[#3B7DD8]/20 dark:to-[#0B2E58]/10' },
   ]
-
-  // Calculate estimated delivery date based on legal deadline
-  const getServiceSLA = (categoryId: string): number => {
-    return getDeadlineDays(categoryId)
-  }
 
   const getEstimatedDate = (req: CitizenRequest): Date | null => {
     if (['livree', 'rejetee'].includes(req.status)) return null
