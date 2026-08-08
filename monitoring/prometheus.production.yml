@@ -6,7 +6,7 @@ global:
     environment: production
 
 rule_files:
-  - /etc/prometheus/rules/*.yml
+  - /etc/prometheus/alerts/*.yml
 
 alerting:
   alertmanagers:
