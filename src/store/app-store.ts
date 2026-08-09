@@ -109,6 +109,15 @@ function mapBackendUser(backendUser: authClient.BackendUser): UserInfo {
   }
 }
 
+async function resolveAuthenticatedUser(tokens: authClient.AuthTokens): Promise<{
+  claims: authClient.JwtPayload
+  user: UserInfo
+}> {
+  const claims = authClient.decodeJwtPayload(tokens.access_token)
+  const backendUser = await authClient.getCurrentUser(tokens.access_token)
+  return { claims, user: mapBackendUser(backendUser) }
+}
+
 interface AppState {
   currentPage: AppPage
   isAuth: boolean
@@ -124,6 +133,7 @@ interface AppState {
   toggleSidebar: () => void
   toggleSidebarCollapse: () => void
   login: (email: string, password: string) => Promise<boolean>
+  completeSsoExchange: (exchangeCode: string) => Promise<boolean>
   verifyMfa: (code: string) => Promise<boolean>
   restoreSession: () => Promise<boolean>
   logout: () => void
@@ -158,9 +168,7 @@ export const useAppStore = create<AppState>()(
 
         try {
           const tokens = await authClient.login(email, password)
-          const claims = authClient.decodeJwtPayload(tokens.access_token)
-          const backendUser = await authClient.getCurrentUser(tokens.access_token)
-          const user = mapBackendUser(backendUser)
+          const { claims, user } = await resolveAuthenticatedUser(tokens)
 
           if (claims.mfa_required === true && claims.mfa_verified !== true) {
             authClient.storePendingTokens(tokens)
@@ -190,6 +198,57 @@ export const useAppStore = create<AppState>()(
             mfaRequired: false,
             user: null,
             loginError: error instanceof Error ? error.message : 'Connexion impossible.',
+          })
+          return false
+        }
+      },
+
+      completeSsoExchange: async (exchangeCode: string) => {
+        set({ loginError: null, isAuth: false, mfaRequired: false })
+
+        try {
+          const result = await authClient.exchangeSsoCode(exchangeCode)
+          const tokens: authClient.AuthTokens = {
+            access_token: result.access_token,
+            refresh_token: result.refresh_token,
+            token_type: result.token_type,
+          }
+          const { claims, user } = await resolveAuthenticatedUser(tokens)
+
+          if (
+            result.mfa_required === true
+            || (claims.mfa_required === true && claims.mfa_verified !== true)
+          ) {
+            authClient.storePendingTokens(tokens)
+            set({
+              isAuth: false,
+              mfaRequired: true,
+              currentPage: 'mfa',
+              user,
+              loginError: null,
+            })
+            return true
+          }
+
+          authClient.storeActiveTokens(tokens)
+          set({
+            isAuth: true,
+            mfaRequired: false,
+            currentPage: ROLE_DEFAULT_PAGE[user.role],
+            user,
+            loginError: null,
+          })
+          return true
+        } catch (error) {
+          authClient.clearAuthTokens()
+          set({
+            isAuth: false,
+            mfaRequired: false,
+            currentPage: 'login',
+            user: null,
+            loginError: error instanceof Error
+              ? error.message
+              : 'La connexion SSO n’a pas pu être finalisée.',
           })
           return false
         }

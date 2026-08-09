@@ -78,11 +78,6 @@ class OIDCService:
 
     @staticmethod
     async def _atomic_getdel(redis, key: str) -> str | None:
-        """Consume one-time state atomically on Redis 6.2+.
-
-        Lightweight test doubles may not implement execute_command; the fallback
-        exists only for those isolated tests. Production Redis uses GETDEL.
-        """
         execute_command = getattr(redis, "execute_command", None)
         if callable(execute_command):
             return await execute_command("GETDEL", key)
@@ -91,8 +86,15 @@ class OIDCService:
             await redis.delete(key)
         return value
 
-    async def start_authorization(self, return_to: str | None = None) -> str:
+    async def start_authorization(
+        self,
+        return_to: str | None = None,
+        *,
+        frontend_origin: str,
+    ) -> str:
         self._require_enabled()
+        if not frontend_origin:
+            raise OIDCError("invalid_frontend_origin", "Origine frontend SSO manquante.")
 
         state = secrets.token_urlsafe(32)
         nonce = secrets.token_urlsafe(32)
@@ -102,8 +104,8 @@ class OIDCService:
             "nonce": nonce,
             "code_verifier": verifier,
             "return_to": _safe_return_to(return_to),
+            "frontend_origin": frontend_origin,
         }
-
         redis = await self._redis()
         await redis.setex(
             f"{OIDC_STATE_PREFIX}{state}",
@@ -139,19 +141,20 @@ class OIDCService:
             raise OIDCError("invalid_state", "État OIDC serveur corrompu.") from exc
         nonce = str(payload.get("nonce") or "")
         verifier = str(payload.get("code_verifier") or "")
-        if not nonce or not verifier:
+        frontend_origin = str(payload.get("frontend_origin") or "")
+        if not nonce or not verifier or not frontend_origin:
             raise OIDCError("invalid_state", "État OIDC incomplet.")
         return {
             "nonce": nonce,
             "code_verifier": verifier,
             "return_to": _safe_return_to(payload.get("return_to")),
+            "frontend_origin": frontend_origin,
         }
 
     async def exchange_authorization_code(self, code: str, code_verifier: str) -> str:
         self._require_enabled()
         if not code or len(code) > 4096 or not code_verifier:
             raise OIDCError("invalid_code", "Code d'autorisation OIDC invalide.")
-
         data = {
             "grant_type": "authorization_code",
             "code": code,
@@ -175,7 +178,6 @@ class OIDCService:
                 "token_endpoint_unavailable",
                 "Le fournisseur d'identité est indisponible.",
             ) from exc
-
         if response.status_code != 200:
             raise OIDCError("token_exchange_failed", "Le fournisseur d'identité a refusé le code.")
         try:
@@ -221,7 +223,6 @@ class OIDCService:
             jwks = response.json()
         except ValueError as exc:
             raise OIDCError("jwks_invalid", "Document JWKS invalide.") from exc
-
         keys = jwks.get("keys") if isinstance(jwks, dict) else None
         if not isinstance(keys, list):
             raise OIDCError("jwks_invalid", "Document JWKS invalide.")
@@ -236,7 +237,6 @@ class OIDCService:
                 "key_algorithm_mismatch",
                 "La clé JWKS ne correspond pas à l'algorithme du token.",
             )
-
         try:
             claims = jwt.decode(
                 id_token,
@@ -252,12 +252,10 @@ class OIDCService:
         nonce = str(claims.get("nonce") or "")
         if not expected_nonce or not secrets.compare_digest(nonce, expected_nonce):
             raise OIDCError("nonce_mismatch", "Nonce OIDC invalide.")
-
         subject = str(claims.get("sub") or "").strip()
         issuer = str(claims.get("iss") or "").strip()
         if not subject or issuer != settings.OIDC_ISSUER:
             raise OIDCError("invalid_subject", "Identité OIDC incomplète.")
-
         email_value = claims.get("email")
         email = str(email_value).strip().lower() if email_value else None
         email_verified = claims.get("email_verified") is True
@@ -266,7 +264,6 @@ class OIDCService:
                 "email_not_verified",
                 "Une adresse email vérifiée est requise par la politique SSO.",
             )
-
         acr_value = claims.get("acr")
         acr = str(acr_value) if acr_value is not None else None
         if settings.OIDC_REQUIRED_ACR and acr != settings.OIDC_REQUIRED_ACR:
@@ -274,7 +271,6 @@ class OIDCService:
                 "acr_not_satisfied",
                 "Le niveau d'authentification IdP requis n'est pas satisfait.",
             )
-
         amr_raw = claims.get("amr")
         amr = tuple(str(item) for item in amr_raw) if isinstance(amr_raw, list) else ()
         canonical = json.dumps(
@@ -289,7 +285,6 @@ class OIDCService:
             sort_keys=True,
             separators=(",", ":"),
         )
-        fingerprint = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
         return OIDCClaims(
             issuer=issuer,
             subject=subject,
@@ -297,7 +292,7 @@ class OIDCService:
             email_verified=email_verified,
             acr=acr,
             amr=amr,
-            fingerprint=fingerprint,
+            fingerprint=hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
         )
 
     async def create_local_exchange(

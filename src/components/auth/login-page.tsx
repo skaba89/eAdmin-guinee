@@ -1,11 +1,12 @@
 'use client'
 
-import { FormEvent, useState } from 'react'
-import { AlertCircle, ArrowRight, Eye, EyeOff, Lock, Mail, Shield } from 'lucide-react'
+import { FormEvent, useEffect, useState } from 'react'
+import { AlertCircle, ArrowRight, Eye, EyeOff, Landmark, Lock, Mail, Shield } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import * as authClient from '@/lib/auth-client'
 import { useAppStore } from '@/store/app-store'
 
 const GUINEA_RED = '#CE1126'
@@ -18,6 +19,30 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [ssoEnabled, setSsoEnabled] = useState(false)
+  const [ssoProvider, setSsoProvider] = useState<string | null>(null)
+  const [isStartingSso, setIsStartingSso] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    void authClient.getSsoStatus()
+      .then((status) => {
+        if (!active) return
+        setSsoEnabled(status.enabled === true)
+        setSsoProvider(status.enabled ? status.provider : null)
+      })
+      .catch(() => {
+        if (!active) return
+        // Fail closed in the UI: if readiness cannot be established, do not
+        // display a government SSO option that may not actually be available.
+        setSsoEnabled(false)
+        setSsoProvider(null)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -29,6 +54,14 @@ export function LoginPage() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const handleSsoLogin = () => {
+    if (!ssoEnabled || typeof window === 'undefined') return
+    setIsStartingSso(true)
+    window.location.assign(
+      authClient.getSsoLoginUrl(window.location.origin, '/'),
+    )
   }
 
   return (
@@ -128,7 +161,39 @@ export function LoginPage() {
                 </p>
               </div>
 
-              <form onSubmit={handleSubmit} className="mt-7 space-y-5">
+              {ssoEnabled && (
+                <div className="mt-7">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isStartingSso || isSubmitting}
+                    onClick={handleSsoLogin}
+                    className="h-11 w-full border-[#0B2E58]/20 bg-[#0B2E58]/[0.03] font-semibold text-[#0B2E58] hover:bg-[#0B2E58]/[0.08] dark:border-white/15 dark:bg-white/5 dark:text-white dark:hover:bg-white/10"
+                  >
+                    {isStartingSso ? (
+                      <span className="flex items-center gap-2">
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#0B2E58]/25 border-t-[#0B2E58] dark:border-white/25 dark:border-t-white" />
+                        Redirection sécurisée…
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <Landmark className="h-4 w-4" aria-hidden="true" />
+                        Connexion avec l’identité administrative
+                      </span>
+                    )}
+                  </Button>
+                  <p className="mt-2 text-center text-[11px] text-slate-400 dark:text-white/30">
+                    Fédération OIDC{ ssoProvider ? ` · ${ssoProvider}` : '' } · droits gérés par eAdmin
+                  </p>
+                  <div className="my-5 flex items-center gap-3 text-[10px] uppercase tracking-[0.16em] text-slate-400 dark:text-white/25">
+                    <span className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
+                    ou avec votre compte eAdmin
+                    <span className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
+                  </div>
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} className={ssoEnabled ? 'space-y-5' : 'mt-7 space-y-5'}>
                 <AnimatePresence mode="wait">
                   {loginError && (
                     <motion.div
@@ -192,7 +257,7 @@ export function LoginPage() {
 
                 <Button
                   type="submit"
-                  disabled={isSubmitting || !email.trim() || !password}
+                  disabled={isSubmitting || isStartingSso || !email.trim() || !password}
                   className="h-11 w-full bg-[#009460] font-semibold text-white hover:bg-[#007d51]"
                 >
                   {isSubmitting ? (

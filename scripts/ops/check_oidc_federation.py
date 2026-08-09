@@ -22,6 +22,10 @@ def main() -> int:
         "session": ROOT / "backend/app/middleware/session_validity.py",
         "main": ROOT / "backend/app/main.py",
         "tests": ROOT / "backend/tests/test_oidc_federation.py",
+        "auth_client": ROOT / "src/lib/auth-client.ts",
+        "app_store": ROOT / "src/store/app-store.ts",
+        "page": ROOT / "src/app/page.tsx",
+        "login_page": ROOT / "src/components/auth/login-page.tsx",
     }
     for name, path in paths.items():
         require(path.exists(), f"Missing SSO {name}: {path.relative_to(ROOT)}", errors)
@@ -63,6 +67,7 @@ def main() -> int:
         "audience=settings.OIDC_CLIENT_ID",
         "issuer=settings.OIDC_ISSUER",
         "secrets.compare_digest(nonce, expected_nonce)",
+        '"frontend_origin": frontend_origin',
     ):
         require(claim in oidc, f"OIDC protocol invariant missing: {claim}", errors)
     require("HS256" not in oidc, "OIDC service must not accept symmetric HS256", errors)
@@ -77,6 +82,9 @@ def main() -> int:
     require('"role": "SSO_SERVICE"' in identity, "Federation DB operations must use SSO_SERVICE", errors)
 
     api = text["api"]
+    require("_trusted_frontend_origin" in api, "SSO frontend origin allow-list is required", errors)
+    require("settings.CORS_ORIGINS_PROD" in api, "Trusted SSO origin must derive from server CORS policy", errors)
+    require("frontend_origin=trusted_origin" in api, "Validated frontend origin must be bound to OIDC state", errors)
     require("create_local_exchange" in api, "Callback must create local one-time exchange", errors)
     require("consume_local_exchange" in api, "Token endpoint must consume local exchange", errors)
     require("validate_exchange_binding" in api, "Token exchange must revalidate identity", errors)
@@ -86,6 +94,9 @@ def main() -> int:
     callback_section = api.split("async def oidc_callback", 1)[1].split("async def exchange_sso_code", 1)[0]
     require("access_token" not in callback_section, "OIDC callback must never return eAdmin access tokens", errors)
     require("refresh_token" not in callback_section, "OIDC callback must never return eAdmin refresh tokens", errors)
+    require('urlencode({"sso_exchange": exchange_code})' in callback_section, "Callback must redirect only a one-time local exchange code", errors)
+    require('response.headers["Cache-Control"] = "no-store"' in callback_section, "SSO callback must disable caching", errors)
+    require('response.headers["Referrer-Policy"] = "no-referrer"' in callback_section, "SSO callback must suppress referrer leakage", errors)
     require("sessions_invalid_before" in api, "SSO disable must invalidate existing access JWTs", errors)
     require("revoke_all_user_tokens" in api, "SSO disable must revoke refresh tokens", errors)
     require("@admin_router.delete" not in api, "Federated identity history must not be destructively deleted", errors)
@@ -104,6 +115,7 @@ def main() -> int:
     tests = text["tests"]
     for scenario in (
         "auto_provisioning_is_forbidden",
+        "frontend_origin_must_be_exactly_trusted",
         "state_is_one_time",
         "external_role_claim_is_not_authority",
         "symmetric_id_token_algorithm_is_rejected",
@@ -112,6 +124,37 @@ def main() -> int:
         "session_guard_rejects_cutoff_and_stale_role",
     ):
         require(scenario in tests, f"Adversarial SSO scenario missing: {scenario}", errors)
+
+    auth_client = text["auth_client"]
+    require("getSsoStatus" in auth_client, "Frontend must query server SSO readiness", errors)
+    require("getSsoLoginUrl" in auth_client, "Frontend SSO login URL builder missing", errors)
+    require("frontend_origin" in auth_client, "Frontend origin must be sent to SSO login", errors)
+    require("exchangeSsoCode" in auth_client, "Frontend one-time code exchange missing", errors)
+    require("/api/v1/auth/sso/exchange" in auth_client, "Frontend must use server SSO exchange endpoint", errors)
+
+    app_store = text["app_store"]
+    require("completeSsoExchange" in app_store, "App store must finalize SSO exchange", errors)
+    require("storePendingTokens" in app_store, "SSO must preserve the existing MFA pending flow", errors)
+    require("storeActiveTokens" in app_store, "SSO must use the existing active session store", errors)
+    require("localStorage" not in app_store, "SSO/auth store must not persist tokens in localStorage", errors)
+
+    page = text["page"]
+    require("sso_exchange" in page, "Root page must detect the one-time SSO exchange code", errors)
+    replace_index = page.find("window.history.replaceState")
+    exchange_index = page.find("completeSsoExchange(exchangeCode)")
+    require(replace_index >= 0, "Browser must remove the SSO exchange code from URL history", errors)
+    require(
+        exchange_index >= 0 and replace_index < exchange_index,
+        "Browser must remove the SSO exchange code before sending it to the API",
+        errors,
+    )
+
+    login_page = text["login_page"]
+    require("getSsoStatus" in login_page, "Login page must query SSO readiness", errors)
+    require("ssoEnabled &&" in login_page, "SSO button must render only when backend readiness is enabled", errors)
+    require("window.location.origin" in login_page, "SSO must send the current exact frontend origin", errors)
+    require("getSsoLoginUrl" in login_page, "SSO button must start the governed backend flow", errors)
+    require("localStorage" not in login_page, "Login page must not store SSO tokens in localStorage", errors)
 
     if errors:
         for error in errors:
