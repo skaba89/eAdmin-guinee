@@ -16,6 +16,11 @@ depends_on = None
 
 
 def upgrade() -> None:
+    op.add_column(
+        "users",
+        sa.Column("session_version", sa.Integer(), nullable=False, server_default="0"),
+    )
+
     op.create_table(
         "federated_identities",
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
@@ -87,3 +92,4 @@ def downgrade() -> None:
     op.drop_index("ix_federated_identities_issuer", table_name="federated_identities")
     op.drop_index("ix_federated_identities_user_id", table_name="federated_identities")
     op.drop_table("federated_identities")
+    op.drop_column("users", "session_version")
