@@ -38,6 +38,21 @@ async def get_active_service(
     return (await db.execute(query)).scalar_one_or_none()
 
 
+async def get_service_version(
+    db: AsyncSession,
+    tenant_id: str,
+    service_id: str,
+    version: int,
+) -> AdministrativeService | None:
+    """Load the exact historical catalog version captured by a request."""
+    query = select(AdministrativeService).where(
+        AdministrativeService.tenant_id == tenant_id,
+        AdministrativeService.service_id == service_id,
+        AdministrativeService.version == version,
+    )
+    return (await db.execute(query)).scalar_one_or_none()
+
+
 async def list_active_services(
     db: AsyncSession,
     tenant_id: str,
@@ -73,7 +88,10 @@ async def list_active_services(
 
 
 def serialize_service(item: AdministrativeService) -> dict:
-    """Public, auditable representation of one catalog version."""
+    """Public, auditable representation of one catalog version.
+
+    Template body text is intentionally not exposed on the public catalog.
+    """
     return {
         "id": str(item.id),
         "serviceId": item.service_id,
@@ -90,6 +108,15 @@ def serialize_service(item: AdministrativeService) -> dict:
         "policyStatus": item.policy_status,
         "sourceReference": item.source_reference,
         "sourceUrl": item.source_url,
+        "documentTemplateStatus": item.document_template_status,
+        "documentTemplateTitle": item.document_template_title,
+        "documentTemplateSourceReference": item.document_template_source_reference,
+        "documentTemplateHash": item.document_template_hash,
+        "documentTemplateApprovedAt": (
+            item.document_template_approved_at.isoformat()
+            if item.document_template_approved_at
+            else None
+        ),
         "effectiveFrom": item.effective_from.isoformat() if item.effective_from else None,
         "effectiveTo": item.effective_to.isoformat() if item.effective_to else None,
         "isActive": item.is_active,
