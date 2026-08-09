@@ -6,6 +6,7 @@ Point d'entrée de l'API backend.
 import logging
 import time
 from contextlib import asynccontextmanager
+from urllib.parse import urlsplit
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -199,18 +200,46 @@ ALLOWED_ORIGINS_PROD = [
 allowed_origins = (
     ALLOWED_ORIGINS_DEV + ALLOWED_ORIGINS_PROD
     if settings.is_development
-    else ALLOWED_ORIGINS_PROD
+    else ALLOWED_ORIGINS_PROD.copy()
 )
 
-if settings.is_development and hasattr(settings, "EXTRA_CORS_ORIGINS"):
+
+def _valid_extra_cors_origin(origin: str) -> bool:
+    """Accept only explicit origins; production/staging require HTTPS."""
+    if origin == "*":
+        return False
+    try:
+        parsed = urlsplit(origin)
+    except ValueError:
+        return False
+    if not parsed.hostname or parsed.username or parsed.password:
+        return False
+    if parsed.path not in ("", "/") or parsed.query or parsed.fragment:
+        return False
+    if settings.is_development:
+        return parsed.scheme in {"http", "https"}
+    return parsed.scheme == "https"
+
+
+if hasattr(settings, "EXTRA_CORS_ORIGINS"):
     import json
 
     try:
         extra = json.loads(settings.EXTRA_CORS_ORIGINS)
         if isinstance(extra, list):
-            allowed_origins.extend(str(origin) for origin in extra)
+            for raw_origin in extra:
+                origin = str(raw_origin).strip().rstrip("/")
+                if not origin:
+                    continue
+                if _valid_extra_cors_origin(origin):
+                    allowed_origins.append(origin)
+                else:
+                    logger.warning("Origine CORS supplémentaire refusée: %s", origin)
     except Exception:
         logger.warning("EXTRA_CORS_ORIGINS invalide; valeur ignorée")
+
+# Keep order deterministic while removing duplicate configured origins.
+allowed_origins = list(dict.fromkeys(allowed_origins))
 
 app.add_middleware(
     CORSMiddleware,

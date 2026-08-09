@@ -1,3 +1,4 @@
+import { API_URL } from '@/lib/api-base-url'
 import { getActiveAccessToken } from '@/lib/auth-client'
 import { getStableIdempotencyKey } from '@/lib/idempotency-client'
 import type {
@@ -7,8 +8,6 @@ import type {
   SatisfactionRating,
   UploadedDocument,
 } from '@/store/citizen-requests-store'
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '')
 
 // The current page/store API launches document persistence and the PRETE status
 // mutation back-to-back. Track the authoritative server-side document render per

@@ -1,3 +1,5 @@
+import { API_URL } from '@/lib/api-base-url'
+
 export interface AuthTokens {
   access_token: string
   refresh_token: string
@@ -49,8 +51,6 @@ export interface SsoExchangeResult extends AuthTokens {
   mfa_required: boolean
   return_to: string
 }
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '')
 
 const ACTIVE_ACCESS_KEY = 'eadmin.access_token'
 const ACTIVE_REFRESH_KEY = 'eadmin.refresh_token'

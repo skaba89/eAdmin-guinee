@@ -22,8 +22,7 @@ import {
   Stamp,
   Stethoscope,
 } from 'lucide-react'
-
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '')
+import { API_URL } from '@/lib/api-base-url'
 
 export interface PublicServiceCatalogItem {
   id: string
