@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.access_reviews import router as access_reviews_router
 from app.api.auth import get_current_user
 from app.config import settings
 from app.database import get_db
@@ -398,3 +399,10 @@ async def evaluate_effective_access(
         source=decision.source,
         grant_id=decision.grant_id,
     )
+
+
+router.include_router(
+    access_reviews_router,
+    prefix="/reviews",
+    tags=["IAM - recertification des accès"],
+)
