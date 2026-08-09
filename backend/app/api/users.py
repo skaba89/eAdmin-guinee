@@ -16,7 +16,7 @@ from app.middleware.rbac import require_permission
 from app.models.user import RoleEnum, User
 from app.services.audit_service import AuditService
 from app.services.authorization_service import authorization_service
-from app.services.token_blacklist import token_blacklist
+from app.services.identity_lifecycle_service import identity_lifecycle_service
 
 router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -224,6 +224,11 @@ async def create_user(
     db.add(user)
     await db.flush()
     await db.refresh(user)
+    await identity_lifecycle_service.record_joiner(
+        db=db,
+        actor=current_user,
+        user=user,
+    )
     await _audit_user_change(
         db,
         request,
@@ -303,9 +308,17 @@ async def update_user(
         or old_tenant != user.tenant_id
         or old_institution != user.institution_id
     )
-    await db.flush()
     if security_changed:
-        await token_blacklist.revoke_all_user_tokens(str(user.id))
+        await identity_lifecycle_service.handle_mover(
+            db=db,
+            actor=current_user,
+            user=user,
+            old_role=old_role.value,
+            old_tenant_id=old_tenant,
+            old_institution_id=old_institution,
+        )
+    else:
+        await db.flush()
 
     await _audit_user_change(
         db,
@@ -318,6 +331,7 @@ async def update_user(
             "tenant_id": {"old": old_tenant, "new": user.tenant_id},
             "institution_id": {"old": old_institution, "new": user.institution_id},
             "sessions_revoked": security_changed,
+            "temporary_access_recertification_required": security_changed,
         },
         "critical" if security_changed else "warning",
     )
@@ -343,15 +357,22 @@ async def deactivate_user(
     if not authorization_service.can_administer_user(current_user, user):
         raise HTTPException(status_code=403, detail="Désactivation hors périmètre interdite.")
 
-    user.is_active = False
-    await db.flush()
-    await token_blacklist.revoke_all_user_tokens(str(user.id))
+    await identity_lifecycle_service.offboard_user(
+        db=db,
+        actor=current_user,
+        user=user,
+    )
     await _audit_user_change(
         db,
         request,
         current_user,
         user,
-        "Compte désactivé et sessions révoquées",
-        {"is_active": False, "sessions_revoked": True},
+        "Compte désactivé, sessions/grants/SSO révoqués",
+        {
+            "is_active": False,
+            "sessions_revoked": True,
+            "temporary_grants_revoked": True,
+            "federated_identities_disabled": True,
+        },
         "critical",
     )
