@@ -108,7 +108,8 @@ def _citizen_channels(connection: Connection, request: ServiceRequest) -> list[t
     disabling a channel after submission must stop future status messages.
     """
     if not request.citizen_id:
-        return [("email", (request.citizen_email or "").strip().lower())]
+        email = (request.citizen_email or "").strip().lower()
+        return [("email", email)] if email else []
 
     row = connection.execute(
         select(
@@ -122,11 +123,10 @@ def _citizen_channels(connection: Connection, request: ServiceRequest) -> list[t
         ).where(User.id == request.citizen_id)
     ).mappings().first()
 
+    # A request with a known citizen_id must not keep sending to an old snapshot
+    # after that identity has been removed or made inaccessible.
     if row is None:
-        # Legacy/deleted identity fallback: retain the request's authenticated
-        # email snapshot but never infer mobile consent.
-        email = (request.citizen_email or "").strip().lower()
-        return [("email", email)] if email else []
+        return []
 
     channels: list[tuple[str, str]] = []
     email = str(row["email"] or request.citizen_email or "").strip().lower()
