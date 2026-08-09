@@ -19,9 +19,14 @@ export interface GeneratedDocument {
   id: string
   title: string
   htmlContent: string
+  contentHash?: string
   generatedAt: string
   generatedBy: string
   fileName: string
+  templateServiceVersion?: number | null
+  templateHash?: string | null
+  templateSourceReference?: string | null
+  renderedServerSide?: boolean
 }
 
 export interface SatisfactionRating {
@@ -141,7 +146,6 @@ export function addBusinessDays(startDate: Date, days: number): Date {
   }
   return date
 }
-
 
 export function isDeadlineExceeded(req: CitizenRequest): boolean {
   if (req.status === 'livree' || req.status === 'rejetee') return false
@@ -295,7 +299,7 @@ interface CitizenRequestsState {
   addUploadedDocument: (id: string, doc: UploadedDocument) => void
   removeUploadedDocument: (requestId: string, docId: string) => void
   verifyDocument: (requestId: string, docId: string) => void
-  setGeneratedDocument: (id: string, doc: GeneratedDocument) => void
+  setGeneratedDocument: (id: string, legacyDocument?: unknown) => void
   rateRequest: (id: string, rating: SatisfactionRating) => void
   resetToDemoData: () => void
   checkAndRejectExpiredRequests: () => void
@@ -464,10 +468,13 @@ export const useCitizenRequestsStore = create<CitizenRequestsState>((set, get) =
       .catch((error) => set({ syncError: error instanceof Error ? error.message : 'Vérification impossible.' }))
   },
 
-  setGeneratedDocument: (id, document) => {
-    void serviceRequestsApi.saveGeneratedDocument(id, document)
+  setGeneratedDocument: (id, legacyDocument) => {
+    // Transitional compatibility for institution dashboards that still build a
+    // local object. It is deliberately discarded and never crosses the API.
+    void legacyDocument
+    void serviceRequestsApi.saveGeneratedDocument(id)
       .then((updated) => set((state) => ({ requests: replaceRequest(state.requests, updated) })))
-      .catch((error) => set({ syncError: error instanceof Error ? error.message : 'Enregistrement du document impossible.' }))
+      .catch((error) => set({ syncError: error instanceof Error ? error.message : 'Génération du document impossible.' }))
   },
 
   rateRequest: (id, rating) => {

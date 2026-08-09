@@ -23,7 +23,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
 } from '@/components/ui/dialog'
-import { useCitizenRequestsStore, type CitizenRequest, type RequestStatus, type UploadedDocument, type GeneratedDocument, isDeadlineExceeded, isDeadlineApproaching } from '@/store/citizen-requests-store'
+import { useCitizenRequestsStore, type CitizenRequest, type RequestStatus, type UploadedDocument, isDeadlineExceeded, isDeadlineApproaching } from '@/store/citizen-requests-store'
 import { formatFileSize, getFileTypeIcon, downloadUploadedFile, ACCEPTED_FILE_TYPES, processFile } from '@/lib/document-utils'
 import { filterRequestsByRLS, canProcessRequest, getRLSScopeDescription } from '@/lib/rbac'
 import { useAppStore } from '@/store/app-store'
@@ -37,8 +37,6 @@ const STATUS_CONFIG: Record<RequestStatus, { label: string; color: string; icon:
   livree: { label: 'Livrée', color: 'bg-[#0B2E58]/10 text-[#0B2E58] dark:bg-[#3B7DD8]/20 dark:text-[#3B7DD8]', icon: Download, description: 'Document remis au citoyen' },
   rejetee: { label: 'Rejetée', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', icon: XCircle, description: 'Demande rejetée' },
 }
-
-
 
 export function ServiceRequestsPage() {
   const {
@@ -71,19 +69,18 @@ export function ServiceRequestsPage() {
     }
   }, [successToast])
 
-  // Check for expired requests on mount + periodically
+  // Refresh missed-SLA indicators periodically. The backend never rejects a
+  // request automatically merely because its target date has passed.
   useEffect(() => {
     checkAndRejectExpiredRequests()
     const interval = setInterval(() => {
       checkAndRejectExpiredRequests()
-    }, 60 * 60 * 1000) // Every hour
+    }, 60 * 60 * 1000)
     return () => clearInterval(interval)
   }, [checkAndRejectExpiredRequests])
 
-  // Apply RLS filtering first
   const rlsFilteredRequests = filterRequestsByRLS(requests, user)
 
-  // Filter requests by tab (on the RLS-filtered set)
   const filteredRequests = rlsFilteredRequests.filter(r => {
     const matchTab = activeTab === 'toutes' ||
       (activeTab === 'soumises' && r.status === 'soumise') ||
@@ -105,7 +102,6 @@ export function ServiceRequestsPage() {
     return matchTab && matchSearch && matchCategory
   })
 
-  // Stats (using RLS-filtered data)
   const stats = [
     { label: 'Demandes reçues', value: rlsFilteredRequests.filter(r => r.status === 'soumise').length, icon: Send, color: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-50 dark:bg-sky-900/20' },
     { label: 'En traitement', value: rlsFilteredRequests.filter(r => ['en_cours', 'pieces_complementaires'].includes(r.status)).length, icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
@@ -204,7 +200,6 @@ export function ServiceRequestsPage() {
     }
   }
 
-  // Document helpers
   const getDocIcon = (type: string) => {
     if (type === 'application/pdf') return <FileText className="size-4 text-red-500" />
     if (type.startsWith('image/')) return <ImageIcon className="size-4 text-blue-500" />
@@ -223,105 +218,13 @@ export function ServiceRequestsPage() {
     }
   }
 
-  const generateOfficialDocument = (req: CitizenRequest): GeneratedDocument => {
-    const citizenFullName = `${req.citizenFirstName} ${req.citizenName}`
-    const htmlContent = `<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8">
-  <title>${req.serviceName} — République de Guinée</title>
-  <style>
-    @page { size: A4; margin: 2cm; }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Times New Roman', Georgia, serif; color: #1a1a1a; line-height: 1.6; padding: 2cm; max-width: 21cm; margin: 0 auto; }
-    .tricolor { display: flex; width: 100%; height: 6px; margin-bottom: 20px; }
-    .tricolor-red { flex: 1; background-color: #CE1126; }
-    .tricolor-yellow { flex: 1; background-color: #FCD116; }
-    .tricolor-green { flex: 1; background-color: #009460; }
-    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #0B2E58; padding-bottom: 20px; }
-    .header h1 { font-size: 11pt; letter-spacing: 3px; text-transform: uppercase; color: #0B2E58; }
-    .header .motto { font-size: 9pt; color: #666; letter-spacing: 1px; }
-    .header .institution { font-size: 10pt; color: #0B2E58; font-weight: bold; margin-top: 8px; }
-    .doc-title { text-align: center; margin: 30px 0 20px; }
-    .doc-title h2 { font-size: 14pt; color: #0B2E58; text-transform: uppercase; letter-spacing: 1px; }
-    .doc-title .ref { font-size: 11pt; color: #333; margin-top: 4px; }
-    .content { text-align: justify; margin: 20px 0; font-size: 12pt; }
-    .content p { margin-bottom: 12px; text-indent: 1.5cm; }
-    .info-box { border: 1px solid #0B2E58; padding: 16px; margin: 20px 0; border-radius: 4px; }
-    .info-box h3 { font-size: 10pt; color: #0B2E58; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; border-bottom: 1px solid #ccc; padding-bottom: 6px; }
-    .info-row { display: flex; margin-bottom: 6px; font-size: 11pt; }
-    .info-row .label { width: 180px; color: #666; font-style: italic; }
-    .info-row .value { font-weight: 600; flex: 1; }
-    .signature { margin-top: 60px; text-align: right; }
-    .signature .date { font-size: 10pt; color: #333; }
-    .signature .signataire { font-size: 11pt; font-weight: bold; color: #0B2E58; margin-top: 8px; }
-    .signature .line { width: 200px; border-bottom: 1px dashed #999; margin-top: 40px; margin-left: auto; }
-    .signature .label-sign { font-size: 9pt; color: #666; margin-top: 4px; }
-    .footer { margin-top: 40px; border-top: 1px solid #ddd; padding-top: 10px; font-size: 8pt; color: #999; text-align: center; }
-    .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 48pt; color: rgba(11, 46, 88, 0.04); letter-spacing: 5px; pointer-events: none; white-space: nowrap; }
-    .qr-placeholder { border: 1px solid #ccc; width: 80px; height: 80px; display: flex; align-items: center; justify-content: center; margin-top: 10px; font-size: 8pt; color: #999; }
-    @media print { body { padding: 0; } .watermark { display: block; } }
-  </style>
-</head>
-<body>
-  <div class="watermark">eAdmin Guinée — République de Guinée</div>
-  <div class="tricolor">
-    <div class="tricolor-red"></div>
-    <div class="tricolor-yellow"></div>
-    <div class="tricolor-green"></div>
-  </div>
-  <div class="header">
-    <h1>République de Guinée</h1>
-    <div class="motto">Travail — Justice — Solidarité</div>
-    <div class="institution">${req.assignedService}</div>
-  </div>
-  <div class="doc-title">
-    <h2>${req.serviceName}</h2>
-    <div class="ref">Référence : ${req.reference}</div>
-  </div>
-  <div class="info-box">
-    <h3>Informations du titulaire</h3>
-    <div class="info-row"><span class="label">Nom complet :</span><span class="value">${citizenFullName}</span></div>
-    <div class="info-row"><span class="label">NIN :</span><span class="value">${req.citizenNIN}</span></div>
-    <div class="info-row"><span class="label">Téléphone :</span><span class="value">${req.citizenPhone}</span></div>
-    <div class="info-row"><span class="label">Adresse :</span><span class="value">${req.citizenAddress}</span></div>
-    <div class="info-row"><span class="label">Type de document :</span><span class="value">${req.serviceName}</span></div>
-    <div class="info-row"><span class="label">Mode de livraison :</span><span class="value">${req.deliveryMode === 'en_ligne' ? 'En ligne' : req.deliveryMode === 'guichet' ? 'Au guichet' : 'Par courrier'}</span></div>
-  </div>
-  <div class="content">
-    <p>Par la présente, il est certifié que le(s) document(s) relatif(s) à la demande sus-référencée a/ont été établi(s) conformément aux dispositions légales et réglementaires en vigueur en République de Guinée.</p>
-    <p>Le présent document est délivré pour faire valoir ce que de droit. Toute falsification ou utilisation frauduleuse expose son auteur aux poursuites prévues par la loi guinéenne.</p>
-  </div>
-  <div class="signature">
-    <div class="date">Fait à Conakry, le ${new Date().toLocaleDateString('fr-FR')}</div>
-    <div class="signataire">${req.assignedService}</div>
-    <div class="line"></div>
-    <div class="label-sign">Signature & Cachet officiel</div>
-    <div class="qr-placeholder">QR Code</div>
-  </div>
-  <div class="footer">
-    Ce document est généré par le système eAdmin Guinée de la République de Guinée — ${req.reference} — ${new Date().toLocaleDateString('fr-FR')}
-  </div>
-</body>
-</html>`
-    return {
-      id: `gen-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      title: `${req.serviceName} — République de Guinée`,
-      htmlContent,
-      generatedAt: new Date().toISOString(),
-      generatedBy: req.assignedAgent || 'Agent traitant',
-      fileName: `${req.reference}-${req.serviceName.replace(/\s+/g, '-').toLowerCase()}.html`,
-    }
-  }
-
   const handleGenerateAndMarkReady = () => {
     if (!selectedRequest) return
-    const genDoc = generateOfficialDocument(selectedRequest)
-    setGeneratedDocument(selectedRequest.id, genDoc)
-    updateRequestStatus(selectedRequest.id, 'prete', 'Document officiel généré et prêt pour le retrait')
+    setGeneratedDocument(selectedRequest.id)
+    updateRequestStatus(selectedRequest.id, 'prete', 'Document administratif généré côté serveur et prêt pour la livraison')
     advanceTimeline(selectedRequest.id)
     setGenerateDialogOpen(false)
-    setSuccessToast(`Document officiel généré pour ${selectedRequest.reference}`)
+    setSuccessToast(`Génération serveur déclenchée pour ${selectedRequest.reference}`)
     refreshSelected(selectedRequest.id)
   }
 
@@ -344,7 +247,6 @@ export function ServiceRequestsPage() {
 
   return (
     <div className="space-y-6 dashboard-bg-v2 min-h-screen">
-      {/* Header */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="space-y-1">
         <Card className="glass-premium overflow-hidden">
           <CardContent className="p-5">
@@ -371,7 +273,6 @@ export function ServiceRequestsPage() {
         )}
       </motion.div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, i) => (
           <motion.div key={stat.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}>
@@ -390,7 +291,6 @@ export function ServiceRequestsPage() {
         ))}
       </div>
 
-      {/* Tabs + Filters */}
       <Card className="glass-premium">
         <CardContent className="p-4 space-y-4">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -448,9 +348,7 @@ export function ServiceRequestsPage() {
         </CardContent>
       </Card>
 
-      {/* Main content: List + Detail */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Request List */}
         <div className="lg:col-span-2 space-y-3">
           <AnimatePresence mode="popLayout">
             {filteredRequests.length === 0 ? (
@@ -512,7 +410,6 @@ export function ServiceRequestsPage() {
                             </div>
                           )}
                         </div>
-                        {/* Quick action for soumises — only if user can process this request */}
                         {req.status === 'soumise' && canProcessRequest(user, req) && (
                           <div className="mt-3 flex gap-2">
                             <Button size="sm" className="btn-premium gap-1 h-7 text-xs" onClick={(e) => { e.stopPropagation(); handleTakeCharge(req) }}>
@@ -534,7 +431,6 @@ export function ServiceRequestsPage() {
           </AnimatePresence>
         </div>
 
-        {/* Detail Panel */}
         <div className="lg:col-span-1">
           {selectedRequest ? (
             <motion.div key={selectedRequest.id} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
@@ -549,7 +445,6 @@ export function ServiceRequestsPage() {
                   <CardDescription className="text-xs font-mono">{selectedRequest.reference}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Citizen info */}
                   <div className="p-3 rounded-lg bg-muted/50 space-y-2">
                     <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Informations du citoyen</h4>
                     <div className="grid grid-cols-1 gap-1.5 text-xs">
@@ -561,7 +456,6 @@ export function ServiceRequestsPage() {
                     </div>
                   </div>
 
-                  {/* Uploaded Documents */}
                   <div>
                     <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
                       <Paperclip className="size-3.5" />
@@ -619,7 +513,6 @@ export function ServiceRequestsPage() {
                     </div>
                   </div>
 
-                  {/* Uploaded documents */}
                   {(selectedRequest.uploadedDocuments?.length ?? 0) > 0 && (
                     <div>
                       <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Documents chargés ({selectedRequest.uploadedDocuments?.length ?? 0})</h4>
@@ -651,16 +544,30 @@ export function ServiceRequestsPage() {
                     </div>
                   )}
 
-                  {/* Generated document */}
                   {selectedRequest.generatedDocument && (
                     <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40 space-y-2">
                       <div className="flex items-center gap-2">
                         <Stamp className="size-4 text-emerald-600" />
-                        <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Document officiel généré</span>
+                        <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">Document administratif généré</span>
+                        {selectedRequest.generatedDocument.renderedServerSide && (
+                          <Badge className="ml-auto text-[8px] bg-emerald-100 text-emerald-700 border-0">Rendu serveur</Badge>
+                        )}
                       </div>
-                      <p className="text-[10px] text-muted-foreground ml-6">
-                        Par {selectedRequest.generatedDocument.generatedBy} le {new Date(selectedRequest.generatedDocument.generatedAt).toLocaleDateString('fr-FR')}
-                      </p>
+                      <div className="text-[10px] text-muted-foreground ml-6 space-y-0.5">
+                        <p>Par {selectedRequest.generatedDocument.generatedBy} le {new Date(selectedRequest.generatedDocument.generatedAt).toLocaleDateString('fr-FR')}</p>
+                        {selectedRequest.generatedDocument.templateServiceVersion != null && (
+                          <p>Version de démarche : {selectedRequest.generatedDocument.templateServiceVersion}</p>
+                        )}
+                        {selectedRequest.generatedDocument.templateSourceReference && (
+                          <p>Source du modèle : {selectedRequest.generatedDocument.templateSourceReference}</p>
+                        )}
+                        {selectedRequest.generatedDocument.templateHash && (
+                          <p className="font-mono break-all">Empreinte modèle : {selectedRequest.generatedDocument.templateHash}</p>
+                        )}
+                        {selectedRequest.generatedDocument.contentHash && (
+                          <p className="font-mono break-all">Empreinte document : {selectedRequest.generatedDocument.contentHash}</p>
+                        )}
+                      </div>
                       <Button size="sm" className="gap-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white ml-6" onClick={handleDownloadGeneratedDoc}>
                         <Download className="size-3" />
                         Télécharger le document
@@ -668,7 +575,6 @@ export function ServiceRequestsPage() {
                     </div>
                   )}
 
-                  {/* Assigned service */}
                   <div className="p-3 rounded-lg bg-[#0B2E58]/5 dark:bg-[#3B7DD8]/10">
                     <div className="flex items-center gap-2">
                       <Building2 className="size-4 text-[#0B2E58] dark:text-[#3B7DD8]" />
@@ -682,7 +588,6 @@ export function ServiceRequestsPage() {
                     )}
                   </div>
 
-                  {/* Legal deadline section */}
                   <div className={`p-3 rounded-lg border ${
                     isDeadlineExceeded(selectedRequest)
                       ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800/40'
@@ -697,58 +602,48 @@ export function ServiceRequestsPage() {
                           isDeadlineApproaching(selectedRequest) ? 'text-amber-600 dark:text-amber-400' :
                           'text-[#0B2E58] dark:text-[#3B7DD8]'
                         }`} />
-                        <span className="text-xs font-semibold">Délai légal</span>
+                        <span className="text-xs font-semibold">
+                          {selectedRequest.servicePolicyStatus === 'approved' && selectedRequest.servicePolicySource
+                            ? 'Délai réglementaire sourcé'
+                            : 'Objectif de traitement'}
+                        </span>
                       </div>
                       {isDeadlineExceeded(selectedRequest) && (
-                        <Badge className="text-[9px] bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-0 gap-0.5 px-1.5">
-                          ⚠ Dépassé
-                        </Badge>
+                        <Badge className="text-[9px] bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-0 gap-0.5 px-1.5">⚠ Dépassé</Badge>
                       )}
                       {isDeadlineApproaching(selectedRequest) && !isDeadlineExceeded(selectedRequest) && (
-                        <Badge className="text-[9px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-0 gap-0.5 px-1.5">
-                          Approche
-                        </Badge>
+                        <Badge className="text-[9px] bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-0 gap-0.5 px-1.5">Approche</Badge>
                       )}
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div>
-                        <p className="text-muted-foreground">Délai</p>
+                        <p className="text-muted-foreground">Durée cible</p>
                         <p className="font-semibold">{selectedRequest.deadlineDays} jours ouvrés</p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground">Date limite</p>
-                        <p className={`font-semibold ${
-                          isDeadlineExceeded(selectedRequest) ? 'text-red-600 dark:text-red-400' : ''
-                        }`}>{new Date(selectedRequest.deadlineDate).toLocaleDateString('fr-FR')}</p>
+                        <p className="text-muted-foreground">Échéance</p>
+                        <p className={`font-semibold ${isDeadlineExceeded(selectedRequest) ? 'text-red-600 dark:text-red-400' : ''}`}>{new Date(selectedRequest.deadlineDate).toLocaleDateString('fr-FR')}</p>
                       </div>
                     </div>
+                    {selectedRequest.servicePolicyStatus === 'approved' && selectedRequest.servicePolicySource ? (
+                      <p className="text-[10px] text-muted-foreground mt-2">Source : {selectedRequest.servicePolicySource}</p>
+                    ) : (
+                      <p className="text-[10px] text-muted-foreground mt-2">Valeur opérationnelle interne : aucune portée réglementaire n’est revendiquée sans source approuvée.</p>
+                    )}
                     {isDeadlineExceeded(selectedRequest) && (
                       <div className="mt-2 p-2 rounded-md bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700/50">
                         <p className="text-[10px] text-red-700 dark:text-red-400 font-semibold">
-                          ⚠ Le délai légal a été dépassé. Le système rejettera automatiquement cette demande.
+                          ⚠ Échéance dépassée : la demande doit être priorisée ou escaladée. Aucun rejet automatique n’est effectué.
                         </p>
                       </div>
                     )}
                     {isDeadlineApproaching(selectedRequest) && !isDeadlineExceeded(selectedRequest) && (
                       <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1 font-medium">
-                        ⚠ La date limite approche. Merci de traiter cette demande en priorité.
+                        ⚠ L’échéance approche. Merci de traiter cette demande en priorité.
                       </p>
-                    )}
-                    {/* Show rejection reason for deadline-exceeded rejections */}
-                    {selectedRequest.status === 'rejetee' && selectedRequest.processingNotes.some(n => n.authorRole === 'Automate' && n.text.includes('délai légal')) && (
-                      <div className="mt-2 p-2 rounded-md bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700/50">
-                        <div className="flex items-center gap-1 mb-0.5">
-                          <XCircle className="size-3 text-red-600 dark:text-red-400" />
-                          <span className="text-[10px] font-semibold text-red-700 dark:text-red-400">Rejet automatique</span>
-                        </div>
-                        <p className="text-[10px] text-red-600 dark:text-red-400">
-                          {selectedRequest.processingNotes.find(n => n.authorRole === 'Automate' && n.text.includes('délai légal'))?.text}
-                        </p>
-                      </div>
                     )}
                   </div>
 
-                  {/* Timeline */}
                   <div>
                     <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Avancement</h4>
                     <div className="space-y-0">
@@ -773,7 +668,6 @@ export function ServiceRequestsPage() {
                     </div>
                   </div>
 
-                  {/* Processing notes */}
                   {selectedRequest.processingNotes.length > 0 && (
                     <>
                       <div className="divider-premium" />
@@ -798,13 +692,11 @@ export function ServiceRequestsPage() {
                     </>
                   )}
 
-                  {/* Action buttons */}
                   <div className="divider-premium" />
                   <div className="flex flex-wrap gap-2">
-                    {/* Check deadline button */}
-                    <Button size="sm" variant="outline" className="gap-1 w-full" onClick={() => { checkAndRejectExpiredRequests(); setSuccessToast('Vérification des délais effectuée'); refreshSelected(selectedRequest.id) }}>
+                    <Button size="sm" variant="outline" className="gap-1 w-full" onClick={() => { checkAndRejectExpiredRequests(); setSuccessToast('Échéances actualisées'); refreshSelected(selectedRequest.id) }}>
                       <Clock className="size-3.5" />
-                      Vérifier les délais légaux
+                      Actualiser les échéances
                     </Button>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -852,11 +744,10 @@ export function ServiceRequestsPage() {
                     )}
                   </div>
 
-                  {/* Download Generated Document (only if no generatedDocument section already shown above) */}
                   {(selectedRequest.status === 'prete' || selectedRequest.status === 'livree') && selectedRequest.generatedDocument && (
                     <Button size="sm" className="btn-premium w-full gap-2" onClick={handleDownloadGeneratedDoc}>
                       <Download className="size-4" />
-                      Télécharger le document officiel
+                      Télécharger le document
                     </Button>
                   )}
                 </CardContent>
@@ -874,7 +765,6 @@ export function ServiceRequestsPage() {
         </div>
       </div>
 
-      {/* Note Dialog */}
       <Dialog open={noteDialogOpen} onOpenChange={setNoteDialogOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
@@ -903,7 +793,6 @@ export function ServiceRequestsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delivery Dialog */}
       <Dialog open={deliveryDialogOpen} onOpenChange={setDeliveryDialogOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
@@ -961,15 +850,16 @@ export function ServiceRequestsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Generate Document Dialog */}
       <Dialog open={generateDialogOpen} onOpenChange={setGenerateDialogOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Stamp className="size-5 text-emerald-600" />
-              Générer le document officiel
+              Générer le document administratif
             </DialogTitle>
-            <DialogDescription>Un document officiel sera généré et la demande passera au statut « Prêt »</DialogDescription>
+            <DialogDescription>
+              Le serveur utilisera exclusivement le modèle approuvé lié à la version de démarche de cette demande. La génération échoue si aucun modèle approuvé et sourcé n’est disponible.
+            </DialogDescription>
           </DialogHeader>
           {selectedRequest && (
             <div className="space-y-4 py-2">
@@ -977,16 +867,16 @@ export function ServiceRequestsPage() {
                 <p><strong>Référence :</strong> <span className="font-mono">{selectedRequest.reference}</span></p>
                 <p><strong>Service :</strong> {selectedRequest.serviceName}</p>
                 <p><strong>Citoyen :</strong> {selectedRequest.citizenFirstName} {selectedRequest.citizenName}</p>
-                <p><strong>NIN :</strong> {selectedRequest.citizenNIN}</p>
+                <p><strong>Version de démarche :</strong> {selectedRequest.serviceCatalogVersion ?? 'non disponible'}</p>
               </div>
               <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40">
-                <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Le document contiendra :</p>
+                <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Garanties de génération :</p>
                 <ul className="text-xs text-muted-foreground mt-1 space-y-1 ml-4 list-disc">
-                  <li>En-tête officiel de la République de Guinée</li>
-                  <li>Informations du titulaire</li>
-                  <li>Référence unique du document</li>
-                  <li>Filigrane de sécurité eAdmin Guinée</li>
-                  <li>Emplacement pour signature et cachet</li>
+                  <li>modèle texte approuvé et versionné côté serveur ;</li>
+                  <li>source institutionnelle obligatoire pour un modèle approuvé ;</li>
+                  <li>données citoyennes échappées avant le rendu HTML ;</li>
+                  <li>empreintes du modèle et du document conservées ;</li>
+                  <li>la signature, le cachet et leur valeur juridique restent un circuit de confiance séparé.</li>
                 </ul>
               </div>
             </div>
@@ -995,13 +885,12 @@ export function ServiceRequestsPage() {
             <Button variant="outline" onClick={() => setGenerateDialogOpen(false)}>Annuler</Button>
             <Button className="btn-gold gap-2" onClick={handleGenerateAndMarkReady}>
               <Stamp className="size-4" />
-              Générer et marquer prêt
+              Générer côté serveur et marquer prêt
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Reject Dialog */}
       <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
@@ -1024,7 +913,6 @@ export function ServiceRequestsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Success Toast */}
       <AnimatePresence>
         {successToast && (
           <motion.div
