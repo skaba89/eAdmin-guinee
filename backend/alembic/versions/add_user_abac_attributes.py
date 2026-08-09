@@ -1,7 +1,7 @@
 """Add server-authoritative ABAC attributes to governed user accounts.
 
 Revision ID: add_user_abac_attributes
-Revises: qualified_signature_evidence
+Revises: iam_jml_recertification
 Create Date: 2026-08-09
 """
 
@@ -9,7 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = "add_user_abac_attributes"
-down_revision = "qualified_signature_evidence"
+down_revision = "iam_jml_recertification"
 branch_labels = None
 depends_on = None
 
