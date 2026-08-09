@@ -13,6 +13,7 @@ from app.api.auth import _validate_password_strength, get_current_user
 from app.config import settings
 from app.database import get_db
 from app.middleware.rbac import require_permission
+from app.models.institution import Institution
 from app.models.user import RoleEnum, User
 from app.services.audit_service import AuditService
 from app.services.authorization_service import authorization_service
@@ -20,6 +21,20 @@ from app.services.identity_lifecycle_service import identity_lifecycle_service
 
 router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Every operational role below ministry level is bound to one institution.
+# This is especially important for municipalities: tenant_id is the national
+# tenant, while institution_id is the hard municipality boundary.
+INSTITUTION_BOUND_ROLES: frozenset[RoleEnum] = frozenset(
+    {
+        RoleEnum.AGENT,
+        RoleEnum.MAIRIE,
+        RoleEnum.AGENCE,
+        RoleEnum.ADMIN,
+        RoleEnum.CHEF_SERVICE,
+        RoleEnum.DIRECTEUR,
+    }
+)
 
 
 class UserCreate(BaseModel):
@@ -70,6 +85,7 @@ class PaginatedUsers(BaseModel):
 
 
 def _target_scope_for_create(actor: User, data: UserCreate) -> tuple[str, str | None]:
+    """Resolve tenant/institution only from the authenticated administrative scope."""
     if actor.role == RoleEnum.SUPER_ADMIN:
         return (
             (data.tenant_id or settings.TENANT_DEFAULT_ID).strip(),
@@ -77,7 +93,7 @@ def _target_scope_for_create(actor: User, data: UserCreate) -> tuple[str, str | 
         )
 
     actor_tenant = (actor.tenant_id or settings.TENANT_DEFAULT_ID).strip()
-    if data.tenant_id and data.tenant_id != actor_tenant:
+    if data.tenant_id and data.tenant_id.strip() != actor_tenant:
         raise HTTPException(status_code=403, detail="Création inter-tenant interdite.")
 
     if actor.role == RoleEnum.MINISTRE:
@@ -85,10 +101,118 @@ def _target_scope_for_create(actor: User, data: UserCreate) -> tuple[str, str | 
 
     actor_institution = (actor.institution_id or "").strip()
     if not actor_institution:
-        raise HTTPException(status_code=403, detail="Périmètre institutionnel absent du compte administrateur.")
-    if data.institution_id and data.institution_id != actor_institution:
+        raise HTTPException(
+            status_code=403,
+            detail="Périmètre institutionnel absent du compte administrateur.",
+        )
+    if data.institution_id and data.institution_id.strip() != actor_institution:
         raise HTTPException(status_code=403, detail="Création hors institution interdite.")
     return actor_tenant, actor_institution
+
+
+async def _load_governed_institution(
+    db: AsyncSession,
+    *,
+    tenant_id: str,
+    institution_id: str,
+    lock: bool = False,
+) -> Institution:
+    query = select(Institution).where(
+        Institution.id == institution_id,
+        Institution.tenant_id == tenant_id,
+        Institution.is_active.is_(True),
+    )
+    if lock:
+        query = query.with_for_update()
+    institution = await db.scalar(query)
+    if not institution:
+        raise HTTPException(
+            status_code=422,
+            detail="Institution inconnue, inactive ou hors du tenant sélectionné.",
+        )
+    return institution
+
+
+async def _ensure_single_active_mairie_admin(
+    db: AsyncSession,
+    *,
+    tenant_id: str,
+    institution: Institution,
+    exclude_user_id: uuid.UUID | None = None,
+) -> None:
+    """Guarantee one active ADMIN account per mairie.
+
+    The institution row is locked by the caller before this check, which makes
+    concurrent admin creation for the same mairie deterministic.
+    """
+    if institution.type.lower() != "mairie":
+        return
+
+    query = select(User.id).where(
+        User.tenant_id == tenant_id,
+        User.institution_id == institution.id,
+        User.role == RoleEnum.ADMIN,
+        User.is_active.is_(True),
+    )
+    if exclude_user_id is not None:
+        query = query.where(User.id != exclude_user_id)
+    existing = await db.scalar(query.limit(1))
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"La mairie « {institution.name} » possède déjà un administrateur actif. "
+                "Désactivez ou réaffectez ce compte avant d'en créer un autre."
+            ),
+        )
+
+
+async def _validate_target_assignment(
+    db: AsyncSession,
+    *,
+    tenant_id: str,
+    institution_id: str | None,
+    role: RoleEnum,
+    exclude_user_id: uuid.UUID | None = None,
+) -> tuple[str | None, Institution | None]:
+    """Validate organizational assignment and return the canonical institution name."""
+    if role in INSTITUTION_BOUND_ROLES and not institution_id:
+        raise HTTPException(
+            status_code=422,
+            detail="Ce rôle doit obligatoirement être rattaché à une institution.",
+        )
+
+    if not institution_id:
+        return None, None
+
+    # ADMIN needs a row lock so the "one active admin per mairie" rule is safe
+    # under concurrent requests.
+    institution = await _load_governed_institution(
+        db,
+        tenant_id=tenant_id,
+        institution_id=institution_id,
+        lock=role == RoleEnum.ADMIN,
+    )
+
+    if role == RoleEnum.MAIRIE and institution.type.lower() != "mairie":
+        raise HTTPException(
+            status_code=422,
+            detail="Un compte MAIRIE doit être rattaché à une institution de type mairie.",
+        )
+    if role == RoleEnum.AGENCE and institution.type.lower() != "agence":
+        raise HTTPException(
+            status_code=422,
+            detail="Un compte AGENCE doit être rattaché à une institution de type agence.",
+        )
+    if role == RoleEnum.ADMIN:
+        await _ensure_single_active_mairie_admin(
+            db,
+            tenant_id=tenant_id,
+            institution=institution,
+            exclude_user_id=exclude_user_id,
+        )
+
+    return institution.name, institution
 
 
 def _can_view_user(actor: User, target: User) -> bool:
@@ -167,7 +291,10 @@ async def list_users(
             current_user.role != RoleEnum.SUPER_ADMIN
             and role_filter.hierarchy_level() >= current_user.role.hierarchy_level()
         ):
-            raise HTTPException(status_code=403, detail="Filtre de rôle hors de votre périmètre administratif.")
+            raise HTTPException(
+                status_code=403,
+                detail="Filtre de rôle hors de votre périmètre administratif.",
+            )
         query = query.where(User.role == role_filter)
     if search:
         query = query.where(
@@ -207,23 +334,32 @@ async def create_user(
             detail="Élévation interdite: vous ne pouvez créer qu'un rôle strictement inférieur au vôtre.",
         )
 
-    existing = await db.execute(select(User).where(User.email == user_data.email))
-    if existing.scalar_one_or_none():
+    email = str(user_data.email).strip().lower()
+    existing = await db.scalar(select(User).where(func.lower(User.email) == email))
+    if existing:
         raise HTTPException(status_code=409, detail="Un compte avec cet email existe déjà")
 
     tenant_id, institution_id = _target_scope_for_create(current_user, user_data)
-    user = User(
-        email=user_data.email,
-        hashed_password=pwd_context.hash(user_data.password),
-        full_name=user_data.full_name,
+    canonical_institution, _ = await _validate_target_assignment(
+        db,
+        tenant_id=tenant_id,
+        institution_id=institution_id,
         role=user_data.role,
-        institution=user_data.institution,
+    )
+
+    user = User(
+        email=email,
+        hashed_password=pwd_context.hash(user_data.password),
+        full_name=user_data.full_name.strip(),
+        role=user_data.role,
+        # The institution label is server-authoritative when an institution id
+        # exists; browser-provided labels never define authorization scope.
+        institution=canonical_institution if institution_id else (user_data.institution or None),
         tenant_id=tenant_id,
         institution_id=institution_id,
     )
     db.add(user)
     await db.flush()
-    await db.refresh(user)
     await identity_lifecycle_service.record_joiner(
         db=db,
         actor=current_user,
@@ -234,9 +370,15 @@ async def create_user(
         request,
         current_user,
         user,
-        "Compte administratif créé dans un périmètre gouverné",
+        "Compte administratif créé et persisté dans un périmètre gouverné",
         {"role": user.role.value, "tenant_id": tenant_id, "institution_id": institution_id},
     )
+
+    # A 201 response now means the row is already durable in PostgreSQL. This
+    # prevents the frontend from reporting success while a later transaction
+    # finalizer still has the possibility to roll the insert back.
+    await db.commit()
+    await db.refresh(user)
     return user
 
 
@@ -276,7 +418,10 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
     if not authorization_service.can_administer_user(current_user, user):
-        raise HTTPException(status_code=403, detail="Compte hors de votre niveau ou périmètre administratif.")
+        raise HTTPException(
+            status_code=403,
+            detail="Compte hors de votre niveau ou périmètre administratif.",
+        )
 
     update_data = user_data.model_dump(exclude_unset=True)
     old_role = user.role
@@ -293,15 +438,49 @@ async def update_user(
             raise HTTPException(status_code=403, detail="Changement de tenant réservé au SUPER_ADMIN.")
         requested_institution = update_data.get("institution_id", user.institution_id)
         if current_user.role != RoleEnum.MINISTRE and requested_institution != user.institution_id:
-            raise HTTPException(status_code=403, detail="Changement d'institution hors périmètre interdit.")
+            raise HTTPException(
+                status_code=403,
+                detail="Changement d'institution hors périmètre interdit.",
+            )
         if current_user.role == RoleEnum.MINISTRE and requested_institution is not None:
             if (current_user.tenant_id or settings.TENANT_DEFAULT_ID) != (
                 user.tenant_id or settings.TENANT_DEFAULT_ID
             ):
-                raise HTTPException(status_code=403, detail="Changement institutionnel inter-tenant interdit.")
+                raise HTTPException(
+                    status_code=403,
+                    detail="Changement institutionnel inter-tenant interdit.",
+                )
+
+    target_role = update_data.get("role") or user.role
+    target_tenant = (update_data.get("tenant_id", user.tenant_id) or settings.TENANT_DEFAULT_ID).strip()
+    target_institution = update_data.get("institution_id", user.institution_id)
+    if isinstance(target_institution, str):
+        target_institution = target_institution.strip() or None
+
+    canonical_institution, _ = await _validate_target_assignment(
+        db,
+        tenant_id=target_tenant,
+        institution_id=target_institution,
+        role=target_role,
+        exclude_user_id=user.id,
+    )
+
+    if "email" in update_data and update_data["email"] is not None:
+        normalized_email = str(update_data["email"]).strip().lower()
+        duplicate = await db.scalar(
+            select(User.id).where(func.lower(User.email) == normalized_email, User.id != user.id).limit(1)
+        )
+        if duplicate:
+            raise HTTPException(status_code=409, detail="Un compte avec cet email existe déjà")
+        update_data["email"] = normalized_email
 
     for field, value in update_data.items():
         setattr(user, field, value)
+
+    user.tenant_id = target_tenant
+    user.institution_id = target_institution
+    if target_institution:
+        user.institution = canonical_institution
 
     security_changed = (
         old_role != user.role
@@ -335,6 +514,7 @@ async def update_user(
         },
         "critical" if security_changed else "warning",
     )
+    await db.commit()
     await db.refresh(user)
     return user
 
@@ -376,3 +556,4 @@ async def deactivate_user(
         },
         "critical",
     )
+    await db.commit()
