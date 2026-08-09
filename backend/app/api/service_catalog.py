@@ -21,6 +21,10 @@ from app.database import current_rls_scope, get_db
 from app.models.administrative_service import AdministrativeService
 from app.models.user import RoleEnum, User
 from app.services.service_catalog import list_active_services, serialize_service
+from app.services.service_document_templates import (
+    document_template_fingerprint,
+    validate_document_template,
+)
 
 router = APIRouter()
 public_router = APIRouter()
@@ -40,10 +44,37 @@ class ServiceVersionCreate(BaseModel):
     source_reference: str | None = Field(default=None, max_length=500)
     source_url: str | None = Field(default=None, max_length=1000)
 
+    document_template_status: Literal["not_configured", "draft", "approved"] = "not_configured"
+    document_template_title: str | None = Field(default=None, max_length=500)
+    document_template_body: str | None = Field(default=None, max_length=20_000)
+    document_template_source_reference: str | None = Field(default=None, max_length=500)
+
     @model_validator(mode="after")
-    def approved_policy_requires_source(self):
+    def validate_governed_version(self):
         if self.policy_status == "approved" and not self.source_reference:
             raise ValueError("Une politique approuvée doit référencer sa source officielle.")
+
+        template_values = (self.document_template_title, self.document_template_body)
+        if self.document_template_status == "not_configured":
+            if any(value for value in template_values) or self.document_template_source_reference:
+                raise ValueError(
+                    "Un modèle non configuré ne doit pas contenir de contenu documentaire."
+                )
+            return self
+
+        if not self.document_template_title or not self.document_template_body:
+            raise ValueError("Un modèle documentaire doit contenir un titre et un corps.")
+        if self.document_template_status == "approved" and not self.document_template_source_reference:
+            raise ValueError(
+                "Un modèle documentaire approuvé doit référencer sa source institutionnelle."
+            )
+        try:
+            validate_document_template(
+                self.document_template_title,
+                self.document_template_body,
+            )
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
         return self
 
 
@@ -208,6 +239,14 @@ async def publish_service_version(
             current.is_active = False
             current.effective_to = now
 
+    template_hash = None
+    if payload.document_template_title and payload.document_template_body:
+        template_hash = document_template_fingerprint(
+            payload.document_template_title,
+            payload.document_template_body,
+        )
+
+    template_is_approved = payload.document_template_status == "approved"
     item = AdministrativeService(
         tenant_id=tenant_id,
         service_id=service_id,
@@ -224,6 +263,13 @@ async def publish_service_version(
         policy_status=payload.policy_status,
         source_reference=payload.source_reference,
         source_url=payload.source_url,
+        document_template_status=payload.document_template_status,
+        document_template_title=payload.document_template_title,
+        document_template_body=payload.document_template_body,
+        document_template_source_reference=payload.document_template_source_reference,
+        document_template_hash=template_hash,
+        document_template_approved_by=current_user.id if template_is_approved else None,
+        document_template_approved_at=now if template_is_approved else None,
         effective_from=now,
         is_active=True,
         created_by=current_user.id,

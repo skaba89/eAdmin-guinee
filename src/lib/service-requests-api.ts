@@ -2,7 +2,6 @@ import { getActiveAccessToken } from '@/lib/auth-client'
 import { getStableIdempotencyKey } from '@/lib/idempotency-client'
 import type {
   CitizenRequest,
-  GeneratedDocument,
   ProcessingNote,
   RequestStatus,
   SatisfactionRating,
@@ -12,9 +11,10 @@ import type {
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '')
 
 // The current page/store API launches document persistence and the PRETE status
-// mutation back-to-back. Track the authoritative document write per request so
-// PRETE is never sent before that write has succeeded. A rejected write is
-// deliberately propagated and prevents the status request from leaving the browser.
+// mutation back-to-back. Track the authoritative server-side document render per
+// request so PRETE is never sent before that write has succeeded. A rejected
+// render is deliberately propagated and prevents the status request from leaving
+// the browser.
 const pendingGeneratedDocumentWrites = new Map<string, Promise<CitizenRequest>>()
 
 export interface InstitutionOption {
@@ -168,14 +168,15 @@ export async function completeRequest(
   })
 }
 
-export async function saveGeneratedDocument(id: string, document: GeneratedDocument): Promise<CitizenRequest> {
+export async function saveGeneratedDocument(
+  id: string,
+  legacyDocument?: unknown,
+): Promise<CitizenRequest> {
+  // Compatibility only: an older component may still pass a browser-composed
+  // document object. It is deliberately discarded and never crosses the API.
+  void legacyDocument
   const write = apiFetch<CitizenRequest>(`/api/v1/service-requests/${id}/generated-document`, {
     method: 'POST',
-    body: JSON.stringify({
-      title: document.title,
-      html_content: document.htmlContent,
-      file_name: document.fileName,
-    }),
   })
 
   pendingGeneratedDocumentWrites.set(id, write)

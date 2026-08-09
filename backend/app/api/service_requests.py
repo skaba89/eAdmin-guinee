@@ -28,7 +28,8 @@ from app.models.service_request import (
 )
 from app.models.user import RoleEnum, User
 from app.services.object_storage import object_storage
-from app.services.service_catalog import get_active_service
+from app.services.service_catalog import get_active_service, get_service_version
+from app.services.service_document_templates import render_approved_document
 from app.services.upload_security import upload_security
 
 router = APIRouter()
@@ -100,6 +101,8 @@ class CompletionRequest(BaseModel):
 
 
 class GeneratedDocumentCreate(BaseModel):
+    """Legacy client payload accepted for compatibility but never trusted."""
+
     title: str = Field(min_length=1, max_length=500)
     html_content: str = Field(min_length=1, max_length=2_000_000)
     file_name: str = Field(min_length=1, max_length=255)
@@ -175,9 +178,14 @@ def _serialize_request(item: ServiceRequest) -> dict[str, Any]:
             "id": str(item.generated_document.id),
             "title": item.generated_document.title,
             "htmlContent": item.generated_document.html_content,
+            "contentHash": item.generated_document.content_hash,
             "generatedAt": item.generated_document.generated_at.isoformat(),
             "generatedBy": item.generated_document.generated_by_name,
             "fileName": item.generated_document.file_name,
+            "templateServiceVersion": item.generated_document.template_service_version,
+            "templateHash": item.generated_document.template_hash,
+            "templateSourceReference": item.generated_document.template_source_reference,
+            "renderedServerSide": item.generated_document.rendered_server_side,
         }
 
     satisfaction = None
@@ -508,40 +516,67 @@ async def complete_service_request(
     return _serialize_request(item)
 
 
-@router.post("/{request_id}/generated-document", summary="Enregistrer le document administratif validé")
+@router.post("/{request_id}/generated-document", summary="Générer le document administratif depuis un modèle approuvé")
 async def save_generated_document(
     request_id: uuid.UUID,
-    payload: GeneratedDocumentCreate,
+    payload: GeneratedDocumentCreate | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("requests", "approve")),
 ) -> dict[str, Any]:
+    # Legacy clients may still send HTML/title/file_name. The server accepts
+    # the shape for compatibility but never reads it as an authority source.
+    del payload
+
     item = await _load_request(db, request_id)
     if item.status != ServiceRequestStatusEnum.VALIDEE:
         raise HTTPException(
             status_code=409,
-            detail="Le document ne peut être enregistré que lorsque la demande est validée.",
+            detail="Le document ne peut être généré que lorsque la demande est validée.",
         )
-    digest = hashlib.sha256(payload.html_content.encode("utf-8")).hexdigest()
-    if item.generated_document:
-        generated = item.generated_document
-        generated.title = payload.title
-        generated.html_content = payload.html_content
-        generated.content_hash = digest
-        generated.file_name = payload.file_name
-        generated.generated_by = current_user.id
-        generated.generated_by_name = current_user.full_name
-        generated.generated_at = datetime.now(timezone.utc)
-    else:
-        generated = GeneratedServiceDocument(
-            request_id=item.id,
-            title=payload.title,
-            html_content=payload.html_content,
-            content_hash=digest,
-            file_name=payload.file_name,
-            generated_by=current_user.id,
-            generated_by_name=current_user.full_name,
+    if item.service_catalog_version is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Cette demande historique ne référence aucune version de catalogue vérifiable.",
         )
+
+    catalog_service = await get_service_version(
+        db,
+        item.tenant_id,
+        item.service_id,
+        item.service_catalog_version,
+    )
+    if not catalog_service:
+        raise HTTPException(
+            status_code=409,
+            detail="La version de démarche utilisée par cette demande est introuvable.",
+        )
+
+    generated_at = datetime.now(timezone.utc)
+    title, html_content, file_name, template_hash = render_approved_document(
+        request=item,
+        service=catalog_service,
+        generated_by_name=current_user.full_name,
+        generated_at=generated_at,
+    )
+    digest = hashlib.sha256(html_content.encode("utf-8")).hexdigest()
+
+    generated = item.generated_document
+    if generated is None:
+        generated = GeneratedServiceDocument(request_id=item.id)
         db.add(generated)
+
+    generated.title = title
+    generated.html_content = html_content
+    generated.content_hash = digest
+    generated.file_name = file_name
+    generated.generated_by = current_user.id
+    generated.generated_by_name = current_user.full_name
+    generated.generated_at = generated_at
+    generated.template_service_version = catalog_service.version
+    generated.template_hash = template_hash
+    generated.template_source_reference = catalog_service.document_template_source_reference
+    generated.rendered_server_side = True
+
     await db.flush()
     await db.refresh(item)
     return _serialize_request(item)
