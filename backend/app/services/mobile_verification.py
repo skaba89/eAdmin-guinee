@@ -12,6 +12,7 @@ import hmac
 import re
 import secrets
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 import redis.asyncio as aioredis
@@ -35,8 +36,19 @@ class MobileVerificationError(ValueError):
     pass
 
 
+class MobileVerificationRateLimitError(MobileVerificationError):
+    pass
+
+
 class MobileProviderUnavailableError(RuntimeError):
     pass
+
+
+@dataclass(frozen=True)
+class ConfirmationResult:
+    success: bool
+    challenge: PhoneVerificationChallenge
+    error: str | None = None
 
 
 def normalize_phone_e164(raw: str, *, default_country_code: str = "+224") -> str:
@@ -99,6 +111,11 @@ class MobileVerificationService:
             )
         return self._redis
 
+    async def close(self) -> None:
+        if self._redis is not None:
+            await self._redis.aclose()
+            self._redis = None
+
     @staticmethod
     def redis_key(challenge_id: uuid.UUID | str) -> str:
         return f"{OTP_REDIS_PREFIX}{challenge_id}"
@@ -123,7 +140,12 @@ class MobileVerificationService:
         if channel not in {"sms", "whatsapp"}:
             raise MobileVerificationError("Le canal de vérification doit être sms ou whatsapp.")
 
-        provider = ProviderRegistry.from_environment().get(channel)
+        try:
+            provider = ProviderRegistry.from_environment().get(channel)
+        except ValueError as exc:
+            raise MobileProviderUnavailableError(
+                f"Configuration du fournisseur {channel} invalide."
+            ) from exc
         if provider is None:
             raise MobileProviderUnavailableError(
                 f"Le fournisseur {channel} n'est pas configuré pour la vérification mobile."
@@ -139,7 +161,9 @@ class MobileVerificationService:
             )
         )
         if last_created and last_created > now - timedelta(seconds=OTP_RESEND_COOLDOWN_SECONDS):
-            raise MobileVerificationError("Un code vient déjà d'être demandé. Réessayez dans une minute.")
+            raise MobileVerificationRateLimitError(
+                "Un code vient déjà d'être demandé. Réessayez dans une minute."
+            )
 
         hourly_count = await db.scalar(
             select(func.count()).select_from(PhoneVerificationChallenge).where(
@@ -148,7 +172,9 @@ class MobileVerificationService:
             )
         )
         if int(hourly_count or 0) >= OTP_MAX_REQUESTS_PER_HOUR:
-            raise MobileVerificationError("Trop de demandes de vérification. Réessayez plus tard.")
+            raise MobileVerificationRateLimitError(
+                "Trop de demandes de vérification. Réessayez plus tard."
+            )
 
         code = generate_otp()
         salt_hex = secrets.token_bytes(16).hex()
@@ -167,9 +193,6 @@ class MobileVerificationService:
         db.add(challenge)
         await db.flush()
 
-        # Redis is mandatory for production session security already; OTP starts
-        # fail closed as well. If this set fails, the surrounding DB transaction
-        # rolls back and no unusable challenge remains committed.
         redis = await self._get_redis()
         await redis.setex(self.redis_key(challenge.id), OTP_TTL_SECONDS, code)
 
@@ -197,7 +220,7 @@ class MobileVerificationService:
         user: User,
         challenge_id: uuid.UUID,
         code: str,
-    ) -> PhoneVerificationChallenge:
+    ) -> ConfirmationResult:
         now = datetime.now(timezone.utc)
         challenge = await db.scalar(
             select(PhoneVerificationChallenge)
@@ -223,7 +246,13 @@ class MobileVerificationService:
             if challenge.attempt_count >= challenge.max_attempts:
                 challenge.consumed_at = now
             await db.flush()
-            raise MobileVerificationError("Code de vérification incorrect.")
+            # Return instead of raising so the request-scoped DB dependency can
+            # commit the consumed attempt while the API still returns HTTP 400.
+            return ConfirmationResult(
+                success=False,
+                challenge=challenge,
+                error="Code de vérification incorrect.",
+            )
 
         challenge.consumed_at = now
         user.phone_e164 = challenge.phone_e164
@@ -239,10 +268,8 @@ class MobileVerificationService:
         try:
             await self._delete_delivery_code(challenge.id)
         except Exception:
-            # Confirmation is validated against the durable digest. Redis cleanup
-            # is best-effort; the key has a hard TTL and cannot be used twice.
             pass
-        return challenge
+        return ConfirmationResult(success=True, challenge=challenge)
 
 
 mobile_verification_service = MobileVerificationService()
