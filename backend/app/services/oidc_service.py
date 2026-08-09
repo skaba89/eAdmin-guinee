@@ -135,7 +135,7 @@ class OIDCService:
             raise OIDCError("invalid_state", "État OIDC expiré, inconnu ou déjà utilisé.")
         try:
             payload = json.loads(raw)
-        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        except (TypeError, ValueError) as exc:
             raise OIDCError("invalid_state", "État OIDC serveur corrompu.") from exc
         nonce = str(payload.get("nonce") or "")
         verifier = str(payload.get("code_verifier") or "")
@@ -171,7 +171,10 @@ class OIDCService:
                     headers={"Accept": "application/json"},
                 )
         except httpx.HTTPError as exc:
-            raise OIDCError("token_endpoint_unavailable", "Le fournisseur d'identité est indisponible.") from exc
+            raise OIDCError(
+                "token_endpoint_unavailable",
+                "Le fournisseur d'identité est indisponible.",
+            ) from exc
 
         if response.status_code != 200:
             raise OIDCError("token_exchange_failed", "Le fournisseur d'identité a refusé le code.")
@@ -222,11 +225,17 @@ class OIDCService:
         keys = jwks.get("keys") if isinstance(jwks, dict) else None
         if not isinstance(keys, list):
             raise OIDCError("jwks_invalid", "Document JWKS invalide.")
-        key = next((candidate for candidate in keys if str(candidate.get("kid") or "") == kid), None)
+        key = next(
+            (candidate for candidate in keys if str(candidate.get("kid") or "") == kid),
+            None,
+        )
         if key is None:
             raise OIDCError("unknown_kid", "Clé de signature OIDC inconnue.")
         if str(key.get("alg") or algorithm) != algorithm:
-            raise OIDCError("key_algorithm_mismatch", "La clé JWKS ne correspond pas à l'algorithme du token.")
+            raise OIDCError(
+                "key_algorithm_mismatch",
+                "La clé JWKS ne correspond pas à l'algorithme du token.",
+            )
 
         try:
             claims = jwt.decode(
@@ -253,12 +262,18 @@ class OIDCService:
         email = str(email_value).strip().lower() if email_value else None
         email_verified = claims.get("email_verified") is True
         if settings.OIDC_REQUIRE_VERIFIED_EMAIL and (not email or not email_verified):
-            raise OIDCError("email_not_verified", "Une adresse email vérifiée est requise par la politique SSO.")
+            raise OIDCError(
+                "email_not_verified",
+                "Une adresse email vérifiée est requise par la politique SSO.",
+            )
 
         acr_value = claims.get("acr")
         acr = str(acr_value) if acr_value is not None else None
         if settings.OIDC_REQUIRED_ACR and acr != settings.OIDC_REQUIRED_ACR:
-            raise OIDCError("acr_not_satisfied", "Le niveau d'authentification IdP requis n'est pas satisfait.")
+            raise OIDCError(
+                "acr_not_satisfied",
+                "Le niveau d'authentification IdP requis n'est pas satisfait.",
+            )
 
         amr_raw = claims.get("amr")
         amr = tuple(str(item) for item in amr_raw) if isinstance(amr_raw, list) else ()
@@ -285,7 +300,14 @@ class OIDCService:
             fingerprint=fingerprint,
         )
 
-    async def create_local_exchange(self, *, user_id: str, return_to: str, mfa_required: bool) -> str:
+    async def create_local_exchange(
+        self,
+        *,
+        identity_id: str,
+        user_id: str,
+        return_to: str,
+        mfa_required: bool,
+    ) -> str:
         code = secrets.token_urlsafe(32)
         redis = await self._redis()
         await redis.setex(
@@ -293,6 +315,7 @@ class OIDCService:
             OIDC_EXCHANGE_TTL_SECONDS,
             json.dumps(
                 {
+                    "identity_id": identity_id,
                     "user_id": user_id,
                     "return_to": _safe_return_to(return_to),
                     "mfa_required": bool(mfa_required),
@@ -311,12 +334,14 @@ class OIDCService:
             raise OIDCError("invalid_exchange", "Code d'échange SSO expiré ou déjà utilisé.")
         try:
             payload = json.loads(raw)
-        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        except (TypeError, ValueError) as exc:
             raise OIDCError("invalid_exchange", "Code d'échange SSO corrompu.") from exc
+        identity_id = str(payload.get("identity_id") or "")
         user_id = str(payload.get("user_id") or "")
-        if not user_id:
+        if not identity_id or not user_id:
             raise OIDCError("invalid_exchange", "Code d'échange SSO incomplet.")
         return {
+            "identity_id": identity_id,
             "user_id": user_id,
             "return_to": _safe_return_to(payload.get("return_to")),
             "mfa_required": bool(payload.get("mfa_required")),
