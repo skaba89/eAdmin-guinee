@@ -7,7 +7,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, String, func
+from sqlalchemy import Boolean, DateTime, Enum, Integer, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -75,7 +75,7 @@ class RoleEnum(str, enum.Enum):
         }
         return levels.get(self, 0)
 
-    def can_create_role(self, target_role: 'RoleEnum') -> bool:
+    def can_create_role(self, target_role: "RoleEnum") -> bool:
         """Check if this role can create another role."""
         return self.hierarchy_level() > target_role.hierarchy_level() or self == RoleEnum.SUPER_ADMIN
 
@@ -97,7 +97,6 @@ class User(Base):
         Enum(RoleEnum), default=RoleEnum.AGENT, nullable=False
     )
     institution: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    # Multi-tenant fields
     tenant_id: Mapped[str | None] = mapped_column(
         String(100), nullable=True, index=True, comment="Tenant identifier for multi-tenant isolation"
     )
@@ -107,6 +106,10 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     mfa_secret: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Every security-sensitive lifecycle change increments this value. Access
+    # and refresh JWTs carry the version and become unusable as soon as it no
+    # longer matches the database value.
+    session_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_login_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -117,7 +120,6 @@ class User(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
-    # Relations
     documents = relationship("Document", back_populates="owner", lazy="selectin")
     audit_logs = relationship("AuditLog", back_populates="user", lazy="selectin")
 
