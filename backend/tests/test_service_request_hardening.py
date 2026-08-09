@@ -11,12 +11,15 @@ from fastapi import HTTPException
 
 from app.api.service_requests import (
     ALLOWED_TRANSITIONS,
+    AssignmentUpdate,
     _add_business_days,
     _append_note,
     _default_timeline,
     _is_staff,
     _load_request,
     _reference,
+    _status_permission_action,
+    assign_service_request,
 )
 from app.models.service_request import ServiceRequestStatusEnum
 from app.models.user import RoleEnum
@@ -40,6 +43,15 @@ def test_workflow_does_not_auto_reject_when_sla_date_passes():
     """The backend models SLA dates but has no automatic rejection transition."""
     assert ServiceRequestStatusEnum.REJETEE not in ALLOWED_TRANSITIONS[ServiceRequestStatusEnum.PRETE]
     assert ServiceRequestStatusEnum.REJETEE not in ALLOWED_TRANSITIONS[ServiceRequestStatusEnum.LIVREE]
+
+
+def test_status_decisions_map_to_explicit_iam_permissions():
+    assert _status_permission_action(ServiceRequestStatusEnum.VALIDEE) == "approve"
+    assert _status_permission_action(ServiceRequestStatusEnum.REJETEE) == "reject"
+    assert _status_permission_action(ServiceRequestStatusEnum.EN_COURS) == "process"
+    assert _status_permission_action(ServiceRequestStatusEnum.PIECES_COMPLEMENTAIRES) == "process"
+    assert _status_permission_action(ServiceRequestStatusEnum.PRETE) == "process"
+    assert _status_permission_action(ServiceRequestStatusEnum.LIVREE) == "process"
 
 
 def test_business_day_helper_skips_weekends():
@@ -120,4 +132,56 @@ async def test_append_note_uses_authenticated_author_and_flushes():
     assert note.text == "Pièce vérifiée"
     assert note.note_type == "decision"
     db.add.assert_called_once_with(note)
+    db.flush.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_assignment_uses_authenticated_agent_not_client_identity(monkeypatch):
+    request_id = uuid.uuid4()
+    spoofed_agent_id = uuid.uuid4()
+    authenticated_agent_id = uuid.uuid4()
+    item = SimpleNamespace(
+        id=request_id,
+        status=ServiceRequestStatusEnum.SOUMISE,
+        assigned_agent_id=None,
+        assigned_agent_name=None,
+    )
+    user = SimpleNamespace(
+        id=authenticated_agent_id,
+        full_name="Agent Authentifié",
+        role=RoleEnum.AGENT,
+    )
+    db = MagicMock()
+    db.flush = AsyncMock()
+
+    load_request = AsyncMock(return_value=item)
+    append_note = AsyncMock()
+    monkeypatch.setattr("app.api.service_requests._load_request", load_request)
+    monkeypatch.setattr("app.api.service_requests._append_note", append_note)
+    monkeypatch.setattr(
+        "app.api.service_requests._serialize_request",
+        lambda request: {
+            "assignedAgentId": str(request.assigned_agent_id),
+            "assignedAgent": request.assigned_agent_name,
+        },
+    )
+
+    result = await assign_service_request(
+        request_id=request_id,
+        payload=AssignmentUpdate(
+            agent_id=spoofed_agent_id,
+            agent_name="Identité fournie par le navigateur",
+        ),
+        db=db,
+        current_user=user,
+    )
+
+    assert item.assigned_agent_id == authenticated_agent_id
+    assert item.assigned_agent_name == "Agent Authentifié"
+    assert result == {
+        "assignedAgentId": str(authenticated_agent_id),
+        "assignedAgent": "Agent Authentifié",
+    }
+    append_note.assert_awaited_once()
+    assert "Agent Authentifié" in append_note.await_args.args[3]
     db.flush.assert_awaited_once()
