@@ -136,6 +136,20 @@ class FederatedIdentityService:
                 ) from exc
             return identity
 
+    async def get_identity(
+        self,
+        *,
+        db: AsyncSession,
+        identity_id: uuid.UUID,
+    ) -> FederatedIdentity:
+        async with self._sso_service_scope(db):
+            identity = await db.scalar(
+                select(FederatedIdentity).where(FederatedIdentity.id == identity_id)
+            )
+            if identity is None:
+                raise FederatedIdentityError("identity_not_found", "Liaison d'identité introuvable.")
+            return identity
+
     async def list_for_user(
         self,
         *,
@@ -216,6 +230,34 @@ class FederatedIdentityService:
                 identity.email_snapshot = claims.email
             await db.flush()
             return identity, user
+
+    async def validate_exchange_binding(
+        self,
+        *,
+        db: AsyncSession,
+        identity_id: uuid.UUID,
+        user_id: uuid.UUID,
+    ) -> User:
+        """Recheck lifecycle state immediately before issuing local eAdmin tokens."""
+        async with self._sso_service_scope(db):
+            identity = await db.scalar(
+                select(FederatedIdentity).where(
+                    FederatedIdentity.id == identity_id,
+                    FederatedIdentity.user_id == user_id,
+                )
+            )
+            if identity is None or identity.status != "active":
+                raise FederatedIdentityError(
+                    "identity_disabled",
+                    "La liaison SSO a été supprimée ou désactivée avant l'échange.",
+                )
+            user = await db.scalar(select(User).where(User.id == user_id))
+            if user is None or not user.is_active:
+                raise FederatedIdentityError(
+                    "local_account_inactive",
+                    "Le compte eAdmin lié est absent ou désactivé.",
+                )
+            return user
 
 
 federated_identity_service = FederatedIdentityService()
