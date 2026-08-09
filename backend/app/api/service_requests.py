@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Reques
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql import Select
 
 from app.api.auth import get_current_user
 from app.config import settings
@@ -130,7 +131,11 @@ def _reference() -> str:
 
 def _default_timeline() -> list[dict[str, Any]]:
     return [
-        {"label": "Soumission de la demande", "status": "completed", "date": datetime.now(timezone.utc).isoformat()},
+        {
+            "label": "Soumission de la demande",
+            "status": "completed",
+            "date": datetime.now(timezone.utc).isoformat(),
+        },
         {"label": "Vérification des pièces justificatives", "status": "pending"},
         {"label": "Traitement par le service compétent", "status": "pending"},
         {"label": "Validation par le responsable", "status": "pending"},
@@ -158,19 +163,56 @@ def _ensure_transition_business_invariants(
     target_status: ServiceRequestStatusEnum,
 ) -> None:
     """Reject workflow states whose required business evidence is absent."""
-    if (
-        target_status == ServiceRequestStatusEnum.PRETE
-        and item.generated_document is None
-    ):
+    if target_status == ServiceRequestStatusEnum.PRETE and item.generated_document is None:
         raise HTTPException(
             status_code=409,
             detail="Un document administratif enregistré est requis avant le passage au statut 'prete'.",
         )
 
 
+def _apply_request_scope(query: Select, current_user: User) -> Select:
+    """Apply the authoritative dossier visibility boundary in application code.
+
+    PostgreSQL RLS remains the database-level barrier. This explicit predicate is
+    defense in depth and makes the municipality rule visible/testable in the API:
+    - SUPER_ADMIN: global visibility;
+    - MINISTRE: tenant-wide visibility;
+    - operational staff (including mairie admins): their institution only;
+    - CITOYEN: only requests they personally own.
+
+    A municipality therefore cannot read or mutate another municipality's
+    dossier even if a client tampers with IDs, headers or frontend state.
+    """
+    if current_user.role == RoleEnum.SUPER_ADMIN:
+        return query
+
+    tenant_id = (current_user.tenant_id or settings.TENANT_DEFAULT_ID).strip()
+    scoped = query.where(ServiceRequest.tenant_id == tenant_id)
+
+    if current_user.role == RoleEnum.CITOYEN:
+        return scoped.where(ServiceRequest.citizen_id == current_user.id)
+
+    if current_user.role == RoleEnum.MINISTRE:
+        return scoped
+
+    institution_id = (current_user.institution_id or "").strip()
+    if not institution_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Périmètre institutionnel absent du compte administratif.",
+        )
+    return scoped.where(ServiceRequest.institution_id == institution_id)
+
+
 def _serialize_request(item: ServiceRequest) -> dict[str, Any]:
-    notes = sorted(item.notes or [], key=lambda note: note.created_at or datetime.min.replace(tzinfo=timezone.utc))
-    attachments = sorted(item.attachments or [], key=lambda att: att.uploaded_at or datetime.min.replace(tzinfo=timezone.utc))
+    notes = sorted(
+        item.notes or [],
+        key=lambda note: note.created_at or datetime.min.replace(tzinfo=timezone.utc),
+    )
+    attachments = sorted(
+        item.attachments or [],
+        key=lambda att: att.uploaded_at or datetime.min.replace(tzinfo=timezone.utc),
+    )
 
     generated = None
     if item.generated_document:
@@ -193,7 +235,11 @@ def _serialize_request(item: ServiceRequest) -> dict[str, Any]:
         satisfaction = {
             "rating": item.satisfaction_rating,
             "comment": item.satisfaction_comment or "",
-            "ratedAt": item.satisfaction_rated_at.isoformat() if item.satisfaction_rated_at else None,
+            "ratedAt": (
+                item.satisfaction_rated_at.isoformat()
+                if item.satisfaction_rated_at
+                else None
+            ),
         }
 
     return {
@@ -257,18 +303,32 @@ def _serialize_request(item: ServiceRequest) -> dict[str, Any]:
         "deliveryLocation": item.delivery_location,
         "aiProcessingStatus": item.ai_processing_status,
         "aiConfidence": item.ai_confidence,
-        "aiProcessingDate": item.ai_processing_date.isoformat() if item.ai_processing_date else None,
+        "aiProcessingDate": (
+            item.ai_processing_date.isoformat() if item.ai_processing_date else None
+        ),
         "aiProcessingDetails": item.ai_processing_details,
         "tenantId": item.tenant_id,
         "institutionId": item.institution_id,
     }
 
 
-async def _load_request(db: AsyncSession, request_id: uuid.UUID) -> ServiceRequest:
-    result = await db.execute(select(ServiceRequest).where(ServiceRequest.id == request_id))
+async def _load_request(
+    db: AsyncSession,
+    request_id: uuid.UUID,
+    current_user: User,
+) -> ServiceRequest:
+    query = _apply_request_scope(
+        select(ServiceRequest).where(ServiceRequest.id == request_id),
+        current_user,
+    )
+    result = await db.execute(query)
     item = result.scalar_one_or_none()
     if not item:
-        raise HTTPException(status_code=404, detail="Demande introuvable ou hors de votre périmètre.")
+        # 404 intentionally hides whether a dossier exists outside this scope.
+        raise HTTPException(
+            status_code=404,
+            detail="Demande introuvable ou hors de votre périmètre.",
+        )
     return item
 
 
@@ -301,14 +361,20 @@ async def list_service_requests(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    query = select(ServiceRequest)
+    query = _apply_request_scope(select(ServiceRequest), current_user)
     if status_filter:
         query = query.where(ServiceRequest.status == status_filter)
     if category_id:
         query = query.where(ServiceRequest.category_id == category_id)
 
-    total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar() or 0
-    query = query.order_by(ServiceRequest.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
+    total = (
+        await db.execute(select(func.count()).select_from(query.subquery()))
+    ).scalar() or 0
+    query = (
+        query.order_by(ServiceRequest.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
     items = (await db.execute(query)).scalars().unique().all()
     return {
         "items": [_serialize_request(item) for item in items],
@@ -347,7 +413,10 @@ async def create_service_request(
 
     if current_user.role not in (RoleEnum.CITOYEN, RoleEnum.SUPER_ADMIN):
         if current_user.institution_id != institution.id:
-            raise HTTPException(status_code=403, detail="Vous ne pouvez créer que dans votre institution.")
+            raise HTTPException(
+                status_code=403,
+                detail="Vous ne pouvez créer que dans votre institution.",
+            )
 
     # The RLS/ORM layer accepts a citizen routing institution only through this
     # trusted server-side slot and matching transaction-local PostgreSQL setting.
@@ -355,7 +424,9 @@ async def create_service_request(
         db.sync_session.info["trusted_target_institution_id"] = institution.id
         if db.get_bind().dialect.name == "postgresql":
             await db.execute(
-                text("SELECT set_config('app.current_target_institution_id', :institution_id, true)"),
+                text(
+                    "SELECT set_config('app.current_target_institution_id', :institution_id, true)"
+                ),
                 {"institution_id": institution.id},
             )
 
@@ -412,7 +483,7 @@ async def get_service_request(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    return _serialize_request(await _load_request(db, request_id))
+    return _serialize_request(await _load_request(db, request_id, current_user))
 
 
 @router.post("/{request_id}/status", summary="Changer le statut")
@@ -427,7 +498,7 @@ async def update_service_request_status(
     permission_checker = require_permission("requests", action)
     await permission_checker(request=request, current_user=current_user, db=db)
 
-    item = await _load_request(db, request_id)
+    item = await _load_request(db, request_id, current_user)
     if payload.status not in ALLOWED_TRANSITIONS[item.status]:
         raise HTTPException(
             status_code=409,
@@ -462,9 +533,12 @@ async def assign_service_request(
     # Never trust agent_id/agent_name from the browser. This compatibility
     # endpoint means "take charge": the authenticated principal becomes owner.
     del payload
-    item = await _load_request(db, request_id)
+    item = await _load_request(db, request_id, current_user)
     if item.status in {ServiceRequestStatusEnum.LIVREE, ServiceRequestStatusEnum.REJETEE}:
-        raise HTTPException(status_code=409, detail="Une demande terminée ne peut plus être affectée.")
+        raise HTTPException(
+            status_code=409,
+            detail="Une demande terminée ne peut plus être affectée.",
+        )
     item.assigned_agent_id = current_user.id
     item.assigned_agent_name = current_user.full_name
     await _append_note(
@@ -485,7 +559,7 @@ async def add_service_request_note(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("requests", "process")),
 ) -> dict[str, Any]:
-    item = await _load_request(db, request_id)
+    item = await _load_request(db, request_id, current_user)
     note = await _append_note(db, item, current_user, payload.text, payload.note_type)
     return {
         "id": str(note.id),
@@ -504,19 +578,31 @@ async def complete_service_request(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("requests", "process")),
 ) -> dict[str, Any]:
-    item = await _load_request(db, request_id)
+    item = await _load_request(db, request_id, current_user)
     if item.status != ServiceRequestStatusEnum.PRETE:
-        raise HTTPException(status_code=409, detail="La demande doit être au statut 'prete' avant livraison.")
+        raise HTTPException(
+            status_code=409,
+            detail="La demande doit être au statut 'prete' avant livraison.",
+        )
     item.delivery_mode = payload.delivery_mode
     item.delivery_location = payload.delivery_location
     item.status = ServiceRequestStatusEnum.LIVREE
     item.delivered_at = datetime.now(timezone.utc)
-    await _append_note(db, item, current_user, "Document livré au citoyen.", "decision")
+    await _append_note(
+        db,
+        item,
+        current_user,
+        "Document livré au citoyen.",
+        "decision",
+    )
     await db.flush()
     return _serialize_request(item)
 
 
-@router.post("/{request_id}/generated-document", summary="Générer le document administratif depuis un modèle approuvé")
+@router.post(
+    "/{request_id}/generated-document",
+    summary="Générer le document administratif depuis un modèle approuvé",
+)
 async def save_generated_document(
     request_id: uuid.UUID,
     payload: GeneratedDocumentCreate | None = None,
@@ -527,7 +613,7 @@ async def save_generated_document(
     # the shape for compatibility but never reads it as an authority source.
     del payload
 
-    item = await _load_request(db, request_id)
+    item = await _load_request(db, request_id, current_user)
     if item.status != ServiceRequestStatusEnum.VALIDEE:
         raise HTTPException(
             status_code=409,
@@ -582,7 +668,11 @@ async def save_generated_document(
     return _serialize_request(item)
 
 
-@router.post("/{request_id}/attachments", status_code=201, summary="Téléverser une pièce justificative")
+@router.post(
+    "/{request_id}/attachments",
+    status_code=201,
+    summary="Téléverser une pièce justificative",
+)
 async def upload_service_request_attachment(
     request_id: uuid.UUID,
     file: UploadFile = File(...),
@@ -590,10 +680,16 @@ async def upload_service_request_attachment(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    item = await _load_request(db, request_id)
+    item = await _load_request(db, request_id, current_user)
     validation = await upload_security.validate_upload(file)
     if not validation.get("valid"):
-        raise HTTPException(status_code=400, detail={"message": "Fichier rejeté", "errors": validation.get("errors", [])})
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Fichier rejeté",
+                "errors": validation.get("errors", []),
+            },
+        )
 
     content = await file.read()
     sanitized = validation["sanitized_name"]
@@ -601,12 +697,18 @@ async def upload_service_request_attachment(
 
     # National production is fail-closed for malware scanning.
     if settings.is_production and not settings.UPLOAD_ANTIVIRUS_ENABLED:
-        raise HTTPException(status_code=503, detail="Le scan antivirus doit être activé en production avant tout upload.")
+        raise HTTPException(
+            status_code=503,
+            detail="Le scan antivirus doit être activé en production avant tout upload.",
+        )
 
     if settings.UPLOAD_ANTIVIRUS_ENABLED:
         temp_path = ""
         try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(sanitized)[1]) as temp:
+            with tempfile.NamedTemporaryFile(
+                delete=False,
+                suffix=os.path.splitext(sanitized)[1],
+            ) as temp:
                 temp.write(content)
                 temp_path = temp.name
             scan = await upload_security.scan_for_virus(temp_path)
@@ -617,7 +719,10 @@ async def upload_service_request_attachment(
                 or "timeout" in str(scan.get("details", "")).lower()
             )
             if scan_failed:
-                raise HTTPException(status_code=400, detail="Fichier refusé par le contrôle antivirus.")
+                raise HTTPException(
+                    status_code=400,
+                    detail="Fichier refusé par le contrôle antivirus.",
+                )
         finally:
             if temp_path and os.path.exists(temp_path):
                 os.unlink(temp_path)
@@ -656,14 +761,17 @@ async def upload_service_request_attachment(
     }
 
 
-@router.get("/{request_id}/attachments/{attachment_id}/download", summary="URL temporaire de téléchargement")
+@router.get(
+    "/{request_id}/attachments/{attachment_id}/download",
+    summary="URL temporaire de téléchargement",
+)
 async def download_service_request_attachment(
     request_id: uuid.UUID,
     attachment_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, str]:
-    await _load_request(db, request_id)
+    await _load_request(db, request_id, current_user)
     attachment = (
         await db.execute(
             select(ServiceRequestAttachment).where(
@@ -674,17 +782,25 @@ async def download_service_request_attachment(
     ).scalar_one_or_none()
     if not attachment:
         raise HTTPException(status_code=404, detail="Pièce jointe introuvable.")
-    return {"url": await object_storage.presigned_get_url(attachment.object_key, expires_minutes=5)}
+    return {
+        "url": await object_storage.presigned_get_url(
+            attachment.object_key,
+            expires_minutes=5,
+        )
+    }
 
 
-@router.post("/{request_id}/attachments/{attachment_id}/verify", summary="Vérifier une pièce")
+@router.post(
+    "/{request_id}/attachments/{attachment_id}/verify",
+    summary="Vérifier une pièce",
+)
 async def verify_service_request_attachment(
     request_id: uuid.UUID,
     attachment_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_permission("requests", "process")),
 ) -> dict[str, bool]:
-    await _load_request(db, request_id)
+    await _load_request(db, request_id, current_user)
     attachment = (
         await db.execute(
             select(ServiceRequestAttachment).where(
@@ -707,11 +823,17 @@ async def rate_service_request(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    item = await _load_request(db, request_id)
+    item = await _load_request(db, request_id, current_user)
     if current_user.role != RoleEnum.CITOYEN or item.citizen_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Seul le citoyen propriétaire peut noter cette demande.")
+        raise HTTPException(
+            status_code=403,
+            detail="Seul le citoyen propriétaire peut noter cette demande.",
+        )
     if item.status != ServiceRequestStatusEnum.LIVREE:
-        raise HTTPException(status_code=409, detail="Une demande doit être livrée avant notation.")
+        raise HTTPException(
+            status_code=409,
+            detail="Une demande doit être livrée avant notation.",
+        )
     item.satisfaction_rating = payload.rating
     item.satisfaction_comment = payload.comment
     item.satisfaction_rated_at = datetime.now(timezone.utc)
