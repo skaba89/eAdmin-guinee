@@ -8,7 +8,7 @@ Ce document définit les formulations qui peuvent être utilisées lors d'une pr
 
 ## 1. Positionnement recommandé
 
-eAdmin Guinée doit être présenté comme une **plateforme GovTech souverainisable, multi-institution, auditable et industrialisable**, disposant déjà de fondations techniques fortes : authentification renforcée, IAM RBAC/ABAC, isolation PostgreSQL RLS, journalisation, stockage documentaire serveur, catalogue de démarches versionné, résilience, SSO OIDC, PRA/PCA, PWA faible débit et traitements IA assistés avec sources et validation humaine.
+eAdmin Guinée doit être présenté comme une **plateforme GovTech souverainisable, multi-institution, auditable et industrialisable**, disposant déjà de fondations techniques fortes : authentification renforcée, IAM RBAC/ABAC, isolation PostgreSQL RLS, journalisation, stockage documentaire serveur, catalogue de démarches versionné, modèles documentaires approuvables et rendus côté serveur, résilience, SSO OIDC, PRA/PCA, PWA faible débit et traitements IA assistés avec sources et validation humaine.
 
 La plateforme ne doit pas être présentée comme « déjà homologuée par l'État », « juridiquement certifiée », « qualifiée PKI » ou « conforme à tous les textes » tant qu'un dossier d'homologation et des validations externes n'ont pas été obtenus.
 
@@ -32,6 +32,7 @@ La République de Guinée ne doit pas être présentée comme un État membre de
 | Isolation | « Isolation tenant/institution renforcée par PostgreSQL RLS et contrôles applicatifs » | « impossibilité absolue de fuite de données » |
 | MFA | « MFA et politiques d'accès renforcé disponibles » | « conformité réglementaire garantie par le MFA » |
 | SSO | « Fédération OIDC intégrée avec configuration d'un fournisseur d'identité » | « connexion déjà fédérée à tous les annuaires gouvernementaux » |
+| Documents générés | « modèles texte versionnés, approuvables, sourcés, rendus côté serveur avec empreintes et provenance » | « document juridiquement authentique » sans circuit de confiance/homologation |
 | Signature | « parapheur, preuve interne liée au contenu et frontière PKI fail-closed » | « signature qualifiée », « certificat gouvernemental », « non-répudiation légale garantie » |
 | Archivage | « conservation versionnée et auditable » | « archivage légal certifié » |
 | IA | « assistance sourcée, traçable et soumise à validation humaine » | « décision administrative autonome par IA » |
@@ -39,22 +40,35 @@ La République de Guinée ne doit pas être présentée comme un État membre de
 | Portail citoyen | « soumission, pièces, suivi et satisfaction persistés côté serveur » | « identité citoyenne officiellement vérifiée » tant qu'aucune autorité d'identité n'est intégrée |
 | Démarches | « catalogue serveur versionné avec statut de politique et source » | présenter des délais/frais internes comme des délais/frais légaux sans source approuvée |
 
-## 4. Point bloquant à corriger avant démonstration officielle
+## 4. Génération documentaire — verrou technique résolu
 
-Le module de traitement des demandes contient encore un générateur HTML côté navigateur qui compose un document générique avec en-tête « République de Guinée », mention de conformité légale, « Signature & Cachet officiel » et emplacement QR. Ce rendu ne doit pas devenir une source d'autorité.
+Le générateur HTML historique côté navigateur n'est plus une source d'autorité. Le flux de génération administratif est désormais gouverné côté serveur :
 
-La cible est :
+1. le modèle documentaire est versionné avec la version de démarche ;
+2. le modèle est du texte avec une liste fermée de variables autorisées, et non du HTML arbitraire ;
+3. le statut du modèle distingue `not_configured`, `draft` et `approved` ;
+4. un modèle `approved` doit référencer une source institutionnelle ;
+5. une empreinte SHA-256 du modèle est calculée et vérifiée avant rendu ;
+6. la génération recharge la version historique exacte de la démarche capturée lors de la soumission ;
+7. toutes les données injectées sont échappées avant le rendu HTML ;
+8. le document conserve la version de démarche, l'empreinte du modèle, sa source, son propre hash et la preuve `rendered_server_side` ;
+9. la génération est bloquée si le modèle n'est pas approuvé, n'est pas sourcé ou si son empreinte ne correspond plus ;
+10. le passage au statut `prete` reste bloqué si aucun document n'a réellement été persisté.
 
-1. modèles administratifs versionnés côté serveur ;
-2. modèle lié à un service et à une institution ;
-3. approbation explicite du modèle avant activation ;
-4. données injectées côté serveur avec échappement ;
-5. hash du contenu produit côté serveur ;
-6. référence de version du modèle conservée avec le document généré ;
-7. blocage de la génération lorsqu'aucun modèle approuvé n'est disponible ;
-8. signature/PKI séparée de la génération documentaire et fail-closed si la confiance externe n'est pas configurée.
+L'interface agent ne compose plus de document administratif dans React et ne présente plus de faux emplacement « signature/cachet » ou de mention juridique fabriquée côté client.
 
-## 5. Éléments de preuve à préparer pour le gouvernement
+**Ce verrou technique ne vaut pas qualification juridique.** La signature, le cachet, le certificat, l'horodatage qualifié éventuel et l'archivage probant restent des circuits de confiance séparés à intégrer et homologuer selon les exigences retenues.
+
+## 5. Gestion des échéances — formulation contrôlée
+
+L'interface distingue désormais :
+
+- un **objectif de traitement interne** lorsqu'aucune source officielle approuvée n'est attachée à la politique ;
+- un **délai réglementaire sourcé** uniquement lorsque la version de démarche est marquée approuvée et référence sa source.
+
+Le dépassement d'une échéance produit un signal de priorité/escalade. Il ne provoque pas de rejet automatique de la demande.
+
+## 6. Éléments de preuve à préparer pour le gouvernement
 
 Avant une présentation de décision ou un pilote institutionnel, préparer :
 
@@ -75,13 +89,13 @@ Avant une présentation de décision ou un pilote institutionnel, préparer :
 - procédure SOC/gestion d'incident et responsabilités ;
 - plan pilote avec indicateurs mesurables.
 
-## 6. Pilote recommandé
+## 7. Pilote recommandé
 
 Le premier pilote doit rester limité et mesurable : quelques démarches de 1 à 3 institutions, un nombre contrôlé d'agents, une population citoyenne pilote et des critères d'acceptation explicites.
 
 Les KPI proposés : taux de demandes abouties, délai médian de traitement, taux de dossiers incomplets, disponibilité, erreurs 5xx, taux de synchronisation après coupure réseau, satisfaction citoyenne, incidents IAM/RLS, temps de reprise PRA, consommation infrastructure et taux de traitement manuel évité.
 
-## 7. Règle de communication
+## 8. Règle de communication
 
 Toute affirmation de conformité, valeur légale, qualification de signature, identité officielle, délai réglementaire ou disponibilité nationale doit être accompagnée de sa **preuve externe ou de son statut** : `implémenté`, `testé`, `pilote`, `à homologuer`, `dépend d'un partenaire`, ou `non disponible`.
 
