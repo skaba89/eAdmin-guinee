@@ -151,17 +151,19 @@ def upgrade() -> None:
     op.execute("ALTER TABLE security_signals FORCE ROW LEVEL SECURITY")
 
     op.execute(
-        """
+        f"""
         CREATE POLICY security_incidents_scoped_read
         ON security_incidents FOR SELECT
-        USING (""" + _SCOPED_ADMIN_READ + ")"
+        USING ({_SCOPED_ADMIN_READ})
+        """
     )
     op.execute(
-        """
+        f"""
         CREATE POLICY security_incidents_scoped_update
         ON security_incidents FOR UPDATE
-        USING (""" + _SCOPED_DIRECTOR_WRITE + ")
-        WITH CHECK (" + _SCOPED_DIRECTOR_WRITE + ")"
+        USING ({_SCOPED_DIRECTOR_WRITE})
+        WITH CHECK ({_SCOPED_DIRECTOR_WRITE})
+        """
     )
     op.execute(
         """
@@ -173,10 +175,11 @@ def upgrade() -> None:
     )
 
     op.execute(
-        """
+        f"""
         CREATE POLICY security_signals_scoped_read
         ON security_signals FOR SELECT
-        USING (""" + _SCOPED_ADMIN_READ + ")"
+        USING ({_SCOPED_ADMIN_READ})
+        """
     )
     op.execute(
         """
