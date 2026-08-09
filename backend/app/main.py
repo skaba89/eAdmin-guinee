@@ -33,6 +33,7 @@ from app.api import (
     security,
     security_events,
     security_hardening,
+    soc,
     service_catalog,
     service_request_files,
     service_requests,
@@ -229,6 +230,11 @@ app.include_router(
     prefix="/api/v1/auth/sso",
     tags=["SSO OIDC"],
 )
+app.include_router(
+    soc.ingest_router,
+    prefix="/api/v1/soc",
+    tags=["SOC - ingestion machine"],
+)
 # Authentication and security overrides are intentionally registered first.
 app.include_router(auth_hardening.router, prefix="/api/v1/auth", tags=["Authentification"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentification"])
@@ -368,6 +374,12 @@ app.include_router(
     security_events.router,
     prefix="/api/v1/security-events",
     tags=["Événements de Sécurité"],
+    dependencies=rls_dependencies,
+)
+app.include_router(
+    soc.router,
+    prefix="/api/v1/soc",
+    tags=["SOC et réponse à incident"],
     dependencies=rls_dependencies,
 )
 app.include_router(metrics.router, tags=["Métriques"])
