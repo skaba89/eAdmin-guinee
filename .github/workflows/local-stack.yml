@@ -1,0 +1,161 @@
+name: Local Stack Gate
+
+on:
+  pull_request:
+    paths:
+      - 'Dockerfile.local'
+      - 'docker-compose.local.yml'
+      - 'package.json'
+      - 'bun.lock'
+      - 'backend/**'
+      - 'scripts/local.ps1'
+      - 'local-*.bat'
+      - 'docs/LOCAL_DEVELOPMENT.md'
+      - '.github/workflows/local-stack.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'Dockerfile.local'
+      - 'docker-compose.local.yml'
+      - 'package.json'
+      - 'bun.lock'
+      - 'backend/**'
+      - 'scripts/local.ps1'
+      - 'local-*.bat'
+      - '.github/workflows/local-stack.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  local-stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create isolated local CI environment
+        run: |
+          cat > .env.local.ci <<'EOF'
+          POSTGRES_PASSWORD=ci_postgres_password_2026
+          REDIS_PASSWORD=ci_redis_password_2026
+          MINIO_ROOT_USER=eadmin
+          MINIO_ROOT_PASSWORD=ci_minio_password_2026
+          SECRET_KEY=ci_secret_key_0123456789abcdef0123456789abcdef0123456789abcdef
+          ENCRYPTION_KEY=ci_encryption_key_0123456789abcdef0123456789abcdef
+          NEXT_PUBLIC_ENCRYPTION_KEY=ci_frontend_encryption_0123456789abcdef
+          GRAFANA_ADMIN_USER=admin
+          GRAFANA_ADMIN_PASSWORD=Grafana!2026Aa-ci-password
+          LOCAL_TEST_PASSWORD=CiLocal!2026Aa-test-password
+          LOCAL_TEST_DOMAIN=eadmin.test
+          LOCAL_SUPERADMIN_EMAIL=superadmin@eadmin.test
+          LOCAL_FRONTEND_PORT=3000
+          LOCAL_BACKEND_PORT=8000
+          LOCAL_POSTGRES_PORT=5433
+          LOCAL_REDIS_PORT=6380
+          LOCAL_MINIO_API_PORT=9000
+          LOCAL_MINIO_CONSOLE_PORT=9001
+          LOCAL_MAILPIT_SMTP_PORT=1025
+          LOCAL_MAILPIT_UI_PORT=8025
+          LOCAL_PROMETHEUS_PORT=9090
+          LOCAL_GRAFANA_PORT=3001
+          EOF
+
+      - name: Validate Compose model
+        run: |
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml config > /tmp/eadmin-local-compose.yml
+          grep -q 'eadmin-local-backend' /tmp/eadmin-local-compose.yml
+          grep -q 'eadmin-local-frontend' /tmp/eadmin-local-compose.yml
+
+      - name: Build local backend and frontend images
+        run: |
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml build backend frontend notification-worker
+
+      - name: Start local core services
+        run: |
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml up -d postgres redis minio minio-init mailpit backend
+
+      - name: Wait for backend health
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 90); do
+            if curl -fsS http://localhost:8000/health >/tmp/backend-health.json; then
+              cat /tmp/backend-health.json
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml logs --tail 200 backend
+          exit 1
+
+      - name: Verify bootstrapped portal accounts
+        run: |
+          set -euo pipefail
+          login() {
+            local email="$1"
+            curl -fsS -X POST http://localhost:8000/api/v1/auth/login \
+              -H 'Content-Type: application/x-www-form-urlencoded' \
+              --data-urlencode "username=${email}" \
+              --data-urlencode 'password=CiLocal!2026Aa-test-password'
+          }
+
+          login superadmin@eadmin.test > /tmp/superadmin-login.json
+          login citoyen@eadmin.test > /tmp/citizen-login.json
+
+          SUPERADMIN_TOKEN="$(python - <<'PY'
+          import json
+          with open('/tmp/superadmin-login.json', encoding='utf-8') as handle:
+              print(json.load(handle)['access_token'])
+          PY
+          )"
+
+          curl -fsS \
+            -H "Authorization: Bearer ${SUPERADMIN_TOKEN}" \
+            'http://localhost:8000/api/v1/users?page=1&page_size=100' \
+            > /tmp/users.json
+
+          python - <<'PY'
+          import json
+          with open('/tmp/users.json', encoding='utf-8') as handle:
+              payload = json.load(handle)
+          emails = {item['email'] for item in payload['items']}
+          required = {
+              'citoyen@eadmin.test',
+              'agent@eadmin.test',
+              'mairie@eadmin.test',
+              'agence@eadmin.test',
+              'admin@eadmin.test',
+              'chef-service@eadmin.test',
+              'directeur@eadmin.test',
+              'ministre@eadmin.test',
+          }
+          missing = required - emails
+          assert not missing, f'Missing local portal accounts: {sorted(missing)}'
+          assert payload['total'] >= 9, payload
+          PY
+
+      - name: Start and verify frontend and notification worker
+        run: |
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml up -d frontend notification-worker
+          for attempt in $(seq 1 90); do
+            if curl -fsS http://localhost:3000 >/tmp/frontend.html; then
+              test -s /tmp/frontend.html
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml logs --tail 200 frontend
+          exit 1
+
+      - name: Show local service state
+        if: always()
+        run: docker compose --env-file .env.local.ci -f docker-compose.local.yml ps || true
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose --env-file .env.local.ci -f docker-compose.local.yml logs --tail 250 || true
+
+      - name: Cleanup
+        if: always()
+        run: docker compose --env-file .env.local.ci -f docker-compose.local.yml down -v --remove-orphans || true
