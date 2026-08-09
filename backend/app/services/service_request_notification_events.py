@@ -1,12 +1,8 @@
 """Transactional notification events for citizen service requests.
 
-This module registers SQLAlchemy mapper listeners. The listeners only persist an
-email delivery intent in ``notification_outbox`` using the same PostgreSQL
-transaction as the administrative request. They never contact SMTP, SMS or
-WhatsApp providers directly.
-
-Mobile channels intentionally remain disabled here until eAdmin has an explicit
-verified-phone/opt-in policy. The outbox itself already supports those channels.
+Mapper listeners persist delivery intents in ``notification_outbox`` using the
+same PostgreSQL transaction as the administrative request. They never contact
+SMTP, SMS or WhatsApp providers directly.
 """
 
 from __future__ import annotations
@@ -14,11 +10,13 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 
-from sqlalchemy import event, inspect
+from sqlalchemy import event, inspect, select
 from sqlalchemy.engine import Connection
 
 from app.models.notification_outbox import NotificationOutbox
 from app.models.service_request import ServiceRequest, ServiceRequestStatusEnum
+from app.models.user import User
+from app.services.mobile_verification import MOBILE_CONSENT_VERSION
 from app.services.notification_outbox import build_idempotency_key
 
 
@@ -48,11 +46,7 @@ def build_request_notification_spec(
     *,
     submitted: bool = False,
 ) -> RequestNotificationSpec:
-    """Build a privacy-minimized transactional citizen email.
-
-    Deliberately excluded from email payloads: NIN, postal address, motif,
-    attachments and free-text processing notes/rejection reasons.
-    """
+    """Build privacy-minimized content shared by enabled delivery channels."""
     label = _STATUS_LABELS[status]
     reference = request.reference
     service_name = request.service_name
@@ -107,54 +101,99 @@ def build_request_notification_spec(
     )
 
 
-def _insert_email_intent(
+def _citizen_channels(connection: Connection, request: ServiceRequest) -> list[tuple[str, str]]:
+    """Resolve currently consented destinations from the citizen account.
+
+    The request snapshot is intentionally not authoritative for mobile consent:
+    disabling a channel after submission must stop future status messages.
+    """
+    if not request.citizen_id:
+        return [("email", (request.citizen_email or "").strip().lower())]
+
+    row = connection.execute(
+        select(
+            User.email,
+            User.phone_e164,
+            User.phone_verified_at,
+            User.notification_email_enabled,
+            User.notification_sms_enabled,
+            User.notification_whatsapp_enabled,
+            User.notification_consent_version,
+        ).where(User.id == request.citizen_id)
+    ).mappings().first()
+
+    if row is None:
+        # Legacy/deleted identity fallback: retain the request's authenticated
+        # email snapshot but never infer mobile consent.
+        email = (request.citizen_email or "").strip().lower()
+        return [("email", email)] if email else []
+
+    channels: list[tuple[str, str]] = []
+    email = str(row["email"] or request.citizen_email or "").strip().lower()
+    if row["notification_email_enabled"] and email:
+        channels.append(("email", email))
+
+    phone = str(row["phone_e164"] or "").strip()
+    mobile_consent_current = (
+        bool(phone)
+        and row["phone_verified_at"] is not None
+        and row["notification_consent_version"] == MOBILE_CONSENT_VERSION
+    )
+    if mobile_consent_current and row["notification_sms_enabled"]:
+        channels.append(("sms", phone))
+    if mobile_consent_current and row["notification_whatsapp_enabled"]:
+        channels.append(("whatsapp", phone))
+    return channels
+
+
+def _insert_delivery_intent(
     connection: Connection,
     request: ServiceRequest,
     spec: RequestNotificationSpec,
     *,
+    channel: str,
+    recipient: str,
     dedupe_key: str,
 ) -> None:
-    recipient = (request.citizen_email or "").strip().lower()
+    recipient = recipient.strip()
     tenant_id = (request.tenant_id or "").strip()
     if not recipient or not tenant_id:
-        # A valid persisted request should always have both. Fail closed on the
-        # notification side rather than jeopardising the administrative write.
         return
 
     key = build_idempotency_key(
         tenant_id=tenant_id,
         event_type=spec.event_type,
-        channel="email",
+        channel=channel,
         recipient=recipient,
         request_id=str(request.id),
         dedupe_key=dedupe_key,
     )
+    payload = {
+        "text": spec.text,
+        "reference": request.reference,
+        "service_name": request.service_name,
+        "status": request.status.value,
+        "status_label": spec.status_label,
+    }
+    if channel == "email":
+        payload["subject"] = spec.subject
+
     values = {
         "id": uuid.uuid4(),
         "tenant_id": tenant_id,
         "institution_id": request.institution_id,
         "request_id": request.id,
         "event_type": spec.event_type,
-        "channel": "email",
+        "channel": channel,
         "recipient": recipient,
         "template_key": spec.template_key,
-        "payload": {
-            "subject": spec.subject,
-            "text": spec.text,
-            "reference": request.reference,
-            "service_name": request.service_name,
-            "status": request.status.value,
-            "status_label": spec.status_label,
-        },
+        "payload": payload,
         "idempotency_key": key,
         "status": "pending",
         "attempt_count": 0,
         "max_attempts": 5,
     }
 
-    # Administrative status transitions are monotonic in the workflow, so a
-    # duplicate key should be exceptional. PostgreSQL still gets an explicit
-    # ON CONFLICT guard to make reconnect/retry behaviour deterministic.
     if connection.dialect.name == "postgresql":
         from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -168,15 +207,34 @@ def _insert_email_intent(
     connection.execute(statement)
 
 
+def _enqueue_enabled_channels(
+    connection: Connection,
+    request: ServiceRequest,
+    spec: RequestNotificationSpec,
+    *,
+    dedupe_key: str,
+) -> None:
+    for channel, recipient in _citizen_channels(connection, request):
+        _insert_delivery_intent(
+            connection,
+            request,
+            spec,
+            channel=channel,
+            recipient=recipient,
+            dedupe_key=dedupe_key,
+        )
+
+
 @event.listens_for(ServiceRequest, "after_insert")
 def enqueue_request_submitted_email(mapper, connection: Connection, target: ServiceRequest) -> None:
+    """Compatibility name retained; now emits every currently consented channel."""
     del mapper
     spec = build_request_notification_spec(
         target,
         ServiceRequestStatusEnum.SOUMISE,
         submitted=True,
     )
-    _insert_email_intent(
+    _enqueue_enabled_channels(
         connection,
         target,
         spec,
@@ -186,6 +244,7 @@ def enqueue_request_submitted_email(mapper, connection: Connection, target: Serv
 
 @event.listens_for(ServiceRequest, "after_update")
 def enqueue_request_status_email(mapper, connection: Connection, target: ServiceRequest) -> None:
+    """Compatibility name retained; now emits every currently consented channel."""
     del mapper
     history = inspect(target).attrs.status.history
     if not history.has_changes() or not history.added:
@@ -195,13 +254,11 @@ def enqueue_request_status_email(mapper, connection: Connection, target: Service
     if not isinstance(new_status, ServiceRequestStatusEnum):
         new_status = ServiceRequestStatusEnum(str(new_status))
 
-    # Submission is handled by after_insert. A later transition back to
-    # SOUMISE is not part of the authorised workflow and should not emit mail.
     if new_status == ServiceRequestStatusEnum.SOUMISE:
         return
 
     spec = build_request_notification_spec(target, new_status)
-    _insert_email_intent(
+    _enqueue_enabled_channels(
         connection,
         target,
         spec,
