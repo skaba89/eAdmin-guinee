@@ -111,15 +111,15 @@ function Assert-Docker {
 }
 
 function Invoke-LocalCompose {
-    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$ComposeArgs)
+    param([string[]]$ComposeArgs)
 
-    $args = @("compose", "--env-file", $EnvFile, "-f", $ComposeFile)
+    $dockerArgs = @("compose", "--env-file", $EnvFile, "-f", $ComposeFile)
     if ($Observability) {
-        $args += @("--profile", "observability")
+        $dockerArgs += @("--profile", "observability")
     }
-    $args += $ComposeArgs
+    $dockerArgs += $ComposeArgs
 
-    & docker @args
+    & docker @dockerArgs
     if ($LASTEXITCODE -ne 0) {
         throw "La commande Docker Compose a échoué (code $LASTEXITCODE)."
     }
@@ -149,7 +149,7 @@ function Wait-Http {
     }
 
     Write-Host "Logs backend récents:" -ForegroundColor Yellow
-    try { Invoke-LocalCompose logs --tail 120 backend } catch { }
+    try { Invoke-LocalCompose -ComposeArgs @("logs", "--tail", "120", "backend") } catch { }
     throw "$Label n'a pas répondu dans le délai prévu: $Url"
 }
 
@@ -192,30 +192,30 @@ Ensure-LocalEnv
 switch ($Action) {
     "up" {
         Write-Host "Construction et démarrage de la stack locale..." -ForegroundColor Cyan
-        Invoke-LocalCompose up -d --build --remove-orphans
+        Invoke-LocalCompose -ComposeArgs @("up", "-d", "--build", "--remove-orphans")
         $envMap = Read-DotEnv
         Wait-Http -Url "http://localhost:$($envMap['LOCAL_BACKEND_PORT'])/health" -Label "Backend"
         Wait-Http -Url "http://localhost:$($envMap['LOCAL_FRONTEND_PORT'])" -Label "Frontend"
         Show-LocalAccess
     }
     "down" {
-        Invoke-LocalCompose down --remove-orphans
+        Invoke-LocalCompose -ComposeArgs @("down", "--remove-orphans")
         Write-Host "Stack locale arrêtée. Les données sont conservées." -ForegroundColor Green
     }
     "reset" {
         Write-Host "Suppression des conteneurs et volumes LOCAUX eAdmin..." -ForegroundColor Yellow
-        Invoke-LocalCompose down -v --remove-orphans
-        Invoke-LocalCompose up -d --build --remove-orphans
+        Invoke-LocalCompose -ComposeArgs @("down", "-v", "--remove-orphans")
+        Invoke-LocalCompose -ComposeArgs @("up", "-d", "--build", "--remove-orphans")
         $envMap = Read-DotEnv
         Wait-Http -Url "http://localhost:$($envMap['LOCAL_BACKEND_PORT'])/health" -Label "Backend"
         Wait-Http -Url "http://localhost:$($envMap['LOCAL_FRONTEND_PORT'])" -Label "Frontend"
         Show-LocalAccess
     }
     "status" {
-        Invoke-LocalCompose ps
+        Invoke-LocalCompose -ComposeArgs @("ps")
         Show-LocalAccess
     }
     "logs" {
-        Invoke-LocalCompose logs -f --tail 200
+        Invoke-LocalCompose -ComposeArgs @("logs", "-f", "--tail", "200")
     }
 }
