@@ -34,6 +34,22 @@ export interface MfaSetupResponse {
   backup_codes: string[]
 }
 
+export interface SsoStatus {
+  enabled: boolean
+  provider: string | null
+  issuer_configured: boolean
+  pkce: string
+  state_server_side: boolean
+  nonce_required: boolean
+  auto_provision: boolean
+  local_authorization_authoritative: boolean
+}
+
+export interface SsoExchangeResult extends AuthTokens {
+  mfa_required: boolean
+  return_to: string
+}
+
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '')
 
 const ACTIVE_ACCESS_KEY = 'eadmin.access_token'
@@ -45,6 +61,10 @@ function readErrorDetail(payload: unknown, fallback: string): string {
   if (payload && typeof payload === 'object' && 'detail' in payload) {
     const detail = (payload as { detail?: unknown }).detail
     if (typeof detail === 'string' && detail.trim()) return detail
+    if (detail && typeof detail === 'object' && 'message' in detail) {
+      const message = (detail as { message?: unknown }).message
+      if (typeof message === 'string' && message.trim()) return message
+    }
   }
   return fallback
 }
@@ -89,6 +109,36 @@ export async function login(email: string, password: string): Promise<AuthTokens
   })
 
   return parseResponse<AuthTokens>(response, 'Connexion impossible. Vérifiez vos identifiants.')
+}
+
+export async function getSsoStatus(): Promise<SsoStatus> {
+  const response = await fetch(`${API_URL}/api/v1/auth/sso/status`, {
+    method: 'GET',
+    credentials: 'include',
+    cache: 'no-store',
+  })
+  return parseResponse<SsoStatus>(response, 'Impossible de vérifier la disponibilité du SSO.')
+}
+
+export function getSsoLoginUrl(frontendOrigin: string, returnTo = '/'): string {
+  const params = new URLSearchParams()
+  params.set('frontend_origin', frontendOrigin)
+  params.set('return_to', returnTo)
+  return `${API_URL}/api/v1/auth/sso/oidc/login?${params.toString()}`
+}
+
+export async function exchangeSsoCode(exchangeCode: string): Promise<SsoExchangeResult> {
+  const response = await fetch(`${API_URL}/api/v1/auth/sso/exchange`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ exchange_code: exchangeCode }),
+    credentials: 'include',
+    cache: 'no-store',
+  })
+  return parseResponse<SsoExchangeResult>(
+    response,
+    'La connexion SSO a expiré ou n’est plus valide. Veuillez recommencer.',
+  )
 }
 
 export async function getCurrentUser(accessToken: string): Promise<BackendUser> {
