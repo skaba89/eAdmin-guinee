@@ -18,7 +18,7 @@ depends_on = None
 def upgrade() -> None:
     op.add_column(
         "users",
-        sa.Column("session_version", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("sessions_invalid_before", sa.DateTime(timezone=True), nullable=True),
     )
 
     op.create_table(
@@ -71,9 +71,6 @@ def upgrade() -> None:
         """
     )
 
-    # Authentication routes run before a user RLS context exists. The dedicated
-    # SSO_SERVICE transaction role may resolve a local user after a verified
-    # `(issuer, subject)` mapping; it receives no user mutation capability.
     op.execute(
         """
         CREATE POLICY users_sso_service_read
@@ -92,4 +89,4 @@ def downgrade() -> None:
     op.drop_index("ix_federated_identities_issuer", table_name="federated_identities")
     op.drop_index("ix_federated_identities_user_id", table_name="federated_identities")
     op.drop_table("federated_identities")
-    op.drop_column("users", "session_version")
+    op.drop_column("users", "sessions_invalid_before")
