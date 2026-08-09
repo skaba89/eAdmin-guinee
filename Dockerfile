@@ -19,10 +19,28 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Render exposes service environment variables to Docker builds as build args.
+# NEXT_PUBLIC_* values must therefore be explicitly declared here so Next.js can
+# bake the public API origin into the browser bundle during `next build`.
+ARG NEXT_PUBLIC_API_URL=""
+ARG RENDER=""
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-RUN npm run build
+# A Render deployment without a public API URL must fail at build time instead
+# of silently shipping a browser bundle that calls localhost. The API is a
+# public browser endpoint, so HTTPS is mandatory on Render.
+RUN if [ "$RENDER" = "true" ]; then \
+      if [ -z "$NEXT_PUBLIC_API_URL" ]; then \
+        echo "ERROR: NEXT_PUBLIC_API_URL is required for Render frontend builds." >&2; \
+        exit 1; \
+      fi; \
+      case "$NEXT_PUBLIC_API_URL" in \
+        https://*) ;; \
+        *) echo "ERROR: NEXT_PUBLIC_API_URL must use https:// on Render." >&2; exit 1 ;; \
+      esac; \
+    fi && npm run build
 
 # ---- Stage 3: Production ----
 FROM node:20-alpine AS runner
