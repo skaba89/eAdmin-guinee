@@ -17,6 +17,7 @@ def main() -> int:
         "migration": ROOT / "backend/alembic/versions/add_access_grants.py",
         "service": ROOT / "backend/app/services/authorization_service.py",
         "api": ROOT / "backend/app/api/access_control.py",
+        "rbac": ROOT / "backend/app/middleware/rbac.py",
         "users": ROOT / "backend/app/api/users.py",
         "auth_hardening": ROOT / "backend/app/api/auth_hardening.py",
         "main": ROOT / "backend/app/main.py",
@@ -42,12 +43,36 @@ def main() -> int:
 
     service = text["service"]
     require("PERMISSION_MATRIX" in service, "Authorization must use central permission matrix", errors)
+    require("BREAK_GLASS_ONLY_PERMISSIONS" in service, "Ultra-privileged delegation boundary missing", errors)
     require("AccessGrant.status == \"active\"" in service, "Only active grants may authorize", errors)
+    require("AccessGrant.approved_by.is_not(None)" in service, "Active grants must have an approver", errors)
     require("AccessGrant.valid_from <= now" in service, "Grant start time must be enforced", errors)
     require("AccessGrant.valid_until > now" in service, "Grant expiration must be enforced", errors)
-    require("grant.requires_mfa and not mfa_verified" in service, "Temporary grants must enforce MFA", errors)
+    require("grant.requires_mfa or grant.grant_type == \"break_glass\"" in service, "Temporary grants must enforce MFA", errors)
+    require("grant.approved_by in {grant.requested_by, grant.grantee_id}" in service, "Runtime SoD fail-closed guard missing", errors)
+    require("grant.ticket_reference" in service, "Break-glass ticket must be rechecked at runtime", errors)
+    require("is_delegable_permission" in service, "Grant-type permission policy missing", errors)
     require("can_assign_role" in service, "Central role-assignment guard missing", errors)
     require("can_administer_user" in service, "Central user-administration guard missing", errors)
+
+    rbac = text["rbac"]
+    require("_effective_authorization" in rbac, "Route middleware must use effective authorization", errors)
+    require("authorization_service.authorize" in rbac, "Protected routes must call central authorization service", errors)
+    require("request.state.authorization_decision" in rbac, "Authorization decision context must be observable", errors)
+    require("_audit_authorization_decision" in rbac, "Temporary grants and denials must be auditable", errors)
+    require("allow_temporary_grants=True" in rbac, "Approved temporary grants must affect real routes", errors)
+    require(
+        'request.headers.get("X-Tenant-ID"' not in rbac
+        and "request.headers.get('X-Tenant-ID'" not in rbac,
+        "Client tenant headers must not be an RBAC authorization source",
+        errors,
+    )
+    require(
+        'request.headers.get("X-Institution-ID"' not in rbac
+        and "request.headers.get('X-Institution-ID'" not in rbac,
+        "Client institution headers must not be an RBAC authorization source",
+        errors,
+    )
 
     api = text["api"]
     require('timedelta(hours=4)' in api, "Break-glass must be capped at four hours", errors)
@@ -84,6 +109,10 @@ def main() -> int:
         "expired_temporary_grant",
         "independent_mfa_approver",
         "break_glass_requires_incident_ticket",
+        "real_protected_route_honors_approved_grant_only_with_mfa",
+        "plain_delegation_cannot_elevate_break_glass_only_permission",
+        "break_glass_only_permission_requires_ticket_and_mfa_at_runtime",
+        "malformed_self_approved_grant_fails_closed",
     ):
         require(scenario in tests, f"Adversarial IAM scenario missing: {scenario}", errors)
 
