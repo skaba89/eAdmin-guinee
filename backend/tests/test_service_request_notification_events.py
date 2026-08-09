@@ -1,13 +1,16 @@
 """Service-request lifecycle notification invariants."""
 
 import uuid
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from sqlalchemy.orm import attributes
 
 from app.models.service_request import ServiceRequest, ServiceRequestStatusEnum
+from app.services.mobile_verification import MOBILE_CONSENT_VERSION
 from app.services.service_request_notification_events import (
+    _citizen_channels,
     build_request_notification_spec,
     enqueue_request_status_email,
     enqueue_request_submitted_email,
@@ -33,6 +36,14 @@ def _request(status: ServiceRequestStatusEnum = ServiceRequestStatusEnum.SOUMISE
 def _sqlite_connection() -> MagicMock:
     connection = MagicMock()
     connection.dialect = SimpleNamespace(name="sqlite")
+    return connection
+
+
+def _preference_connection(row: dict) -> MagicMock:
+    connection = _sqlite_connection()
+    result = MagicMock()
+    result.mappings.return_value.first.return_value = row
+    connection.execute.return_value = result
     return connection
 
 
@@ -90,6 +101,64 @@ def test_rejection_email_does_not_leak_free_text_decision_reason():
     assert "Consultez votre dossier eAdmin" in spec.text
     assert "Motif privé" not in spec.text
     assert "NIN-SECRET" not in spec.text
+
+
+def test_verified_current_consent_enables_requested_mobile_channels():
+    request = _request()
+    request.citizen_id = uuid.uuid4()
+    connection = _preference_connection(
+        {
+            "email": "citizen@example.gn",
+            "phone_e164": "+224620000001",
+            "phone_verified_at": datetime.now(timezone.utc),
+            "notification_email_enabled": True,
+            "notification_sms_enabled": True,
+            "notification_whatsapp_enabled": True,
+            "notification_consent_version": MOBILE_CONSENT_VERSION,
+        }
+    )
+
+    assert _citizen_channels(connection, request) == [
+        ("email", "citizen@example.gn"),
+        ("sms", "+224620000001"),
+        ("whatsapp", "+224620000001"),
+    ]
+
+
+def test_stale_or_missing_mobile_consent_blocks_mobile_channels():
+    request = _request()
+    request.citizen_id = uuid.uuid4()
+    connection = _preference_connection(
+        {
+            "email": "citizen@example.gn",
+            "phone_e164": "+224620000001",
+            "phone_verified_at": datetime.now(timezone.utc),
+            "notification_email_enabled": True,
+            "notification_sms_enabled": True,
+            "notification_whatsapp_enabled": True,
+            "notification_consent_version": "old-policy-v0",
+        }
+    )
+
+    assert _citizen_channels(connection, request) == [("email", "citizen@example.gn")]
+
+
+def test_unverified_phone_never_receives_mobile_notification():
+    request = _request()
+    request.citizen_id = uuid.uuid4()
+    connection = _preference_connection(
+        {
+            "email": "citizen@example.gn",
+            "phone_e164": "+224620000001",
+            "phone_verified_at": None,
+            "notification_email_enabled": False,
+            "notification_sms_enabled": True,
+            "notification_whatsapp_enabled": True,
+            "notification_consent_version": MOBILE_CONSENT_VERSION,
+        }
+    )
+
+    assert _citizen_channels(connection, request) == []
 
 
 def test_after_insert_enqueues_pending_email_in_same_transaction():
