@@ -87,12 +87,32 @@ const appPages: Record<string, React.ComponentType> = {
 }
 
 export default function Home() {
-  const { currentPage, isAuth, user, navigate, restoreSession } = useAppStore()
+  const {
+    currentPage,
+    isAuth,
+    user,
+    navigate,
+    restoreSession,
+    completeSsoExchange,
+  } = useAppStore()
   const hydrateRequests = useCitizenRequestsStore((state) => state.hydrateRequests)
 
   useEffect(() => {
+    const url = new URL(window.location.href)
+    const exchangeCode = url.searchParams.get('sso_exchange')
+
+    if (exchangeCode) {
+      // Remove the one-time code before the network exchange so it is not kept
+      // in browser history, copied URLs, screenshots, or subsequent referrers.
+      url.searchParams.delete('sso_exchange')
+      const cleanedUrl = `${url.pathname}${url.search}${url.hash}`
+      window.history.replaceState({}, '', cleanedUrl)
+      void completeSsoExchange(exchangeCode)
+      return
+    }
+
     void restoreSession()
-  }, [restoreSession])
+  }, [completeSsoExchange, restoreSession])
 
   useEffect(() => {
     if (isAuth) {
