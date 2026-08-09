@@ -151,6 +151,29 @@ def _mirror_audit_signal(_mapper, connection: Connection, target: AuditLog) -> N
         "audit_details": _safe_json(audit_details),
     }
 
+    if connection.dialect.name != "postgresql":
+        connection.execute(
+            SecuritySignal.__table__.insert().values(
+        id=uuid.uuid4(),
+        source="application_audit",
+        external_event_id=f"audit:{target_id}",
+        event_type=event_type[:150],
+        category=(category or "audit")[:100],
+        severity=severity,
+        tenant_id=tenant_id[:100],
+        institution_id=str(institution_id)[:100] if institution_id else None,
+        actor_id=actor_id,
+        resource_type=str(resource_type)[:100] if resource_type else None,
+        resource_id=str(resource_id)[:255] if resource_id else None,
+        correlation_key=correlation_key,
+        network_source_hash=network_hash,
+        user_agent_hash=agent_hash,
+        details=normalized_details,
+        occurred_at=occurred_at,
+    )
+        )
+        return
+
     original = connection.execute(
         text(
             """

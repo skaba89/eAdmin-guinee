@@ -106,7 +106,7 @@ async def test_break_glass_approval_becomes_critical_incident(db_session):
         external_event_id="break-glass-1",
         event_type="security.permission_change",
         category="security",
-        severity="warning" if False else "high",
+        severity="high",
         tenant_id=settings.TENANT_DEFAULT_ID,
         institution_id="inst-soc",
         correlation_key=hashlib.sha256(b"break-glass").hexdigest(),

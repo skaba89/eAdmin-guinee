@@ -115,6 +115,12 @@ class Settings(BaseSettings):
     OIDC_REQUIRED_ACR: str = ""
     OIDC_AUTO_PROVISION: bool = False
 
+    # Machine-to-machine security event ingestion. Disabled by default;
+    # secrets come from the deployment secret manager, never from Git.
+    SOC_INGEST_ENABLED: bool = False
+    SOC_INGEST_HMAC_SECRET: str = ""
+    SOC_INGEST_MAX_SKEW_SECONDS: int = 300
+
     CORS_ORIGINS_DEV: list[str] = [
         "http://localhost:3000",
         "http://localhost:3001",
@@ -271,6 +277,13 @@ class Settings(BaseSettings):
                 for name, endpoint in secure_urls.items():
                     if not endpoint.lower().startswith("https://"):
                         raise ValueError(f"{name} must use HTTPS in staging/production.")
+
+        if not 60 <= self.SOC_INGEST_MAX_SKEW_SECONDS <= 900:
+            raise ValueError("SOC_INGEST_MAX_SKEW_SECONDS must be between 60 and 900 seconds.")
+        if self.SOC_INGEST_ENABLED and len(self.SOC_INGEST_HMAC_SECRET) < 32:
+            raise ValueError(
+                "SOC ingestion is enabled but SOC_INGEST_HMAC_SECRET is shorter than 32 characters."
+            )
 
         return self
 
