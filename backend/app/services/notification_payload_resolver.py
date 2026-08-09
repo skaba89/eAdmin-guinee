@@ -12,8 +12,13 @@ async def materialize_notification(notification: NotificationOutbox):
     Verification codes are fetched from Redis only at delivery time. The raw OTP
     therefore never appears in the durable outbox payload, database dumps or
     dead-letter rows.
+
+    Provider-boundary tests and legacy adapters may pass notification-like
+    objects with only the fields their provider needs. Treat anything without
+    the explicit OTP template as an ordinary notification and return it
+    untouched.
     """
-    if notification.template_key != "mobile_verification_code":
+    if getattr(notification, "template_key", None) != "mobile_verification_code":
         return notification
 
     challenge_id = str(notification.payload.get("challenge_id") or "").strip()
