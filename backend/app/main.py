@@ -30,6 +30,7 @@ from app.api import (
     identity_federation,
     institutions,
     metrics,
+    notification_preferences,
     security,
     security_events,
     security_hardening,
@@ -142,6 +143,12 @@ async def lifespan(application: FastAPI):
 
     from app.services.session_service import session_service
     await session_service.close()
+
+    try:
+        from app.services.mobile_verification import mobile_verification_service
+        await mobile_verification_service.close()
+    except Exception:
+        pass
 
     try:
         from app.services.sentry_service import sentry_service
@@ -277,6 +284,12 @@ app.include_router(
     service_requests.router,
     prefix="/api/v1/service-requests",
     tags=["Demandes citoyennes"],
+    dependencies=rls_dependencies,
+)
+app.include_router(
+    notification_preferences.router,
+    prefix="/api/v1/notification-preferences",
+    tags=["Préférences de notification"],
     dependencies=rls_dependencies,
 )
 app.include_router(
