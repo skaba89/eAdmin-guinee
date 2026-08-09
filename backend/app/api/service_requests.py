@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.auth import get_current_user
 from app.config import settings
 from app.database import get_db
+from app.middleware.rbac import require_permission
 from app.models.institution import Institution
 from app.models.service_request import (
     DeliveryModeEnum,
@@ -82,6 +83,8 @@ class StatusUpdate(BaseModel):
 
 
 class AssignmentUpdate(BaseModel):
+    # Compatibility-only hints from the historical frontend. Assignment is
+    # server-authoritative: these values are never trusted as agent identity.
     agent_id: uuid.UUID | None = None
     agent_name: str = Field(min_length=1, max_length=255)
 
@@ -134,7 +137,17 @@ def _default_timeline() -> list[dict[str, Any]]:
 
 
 def _is_staff(user: User) -> bool:
+    """Compatibility helper retained for tests and legacy call sites."""
     return user.role != RoleEnum.CITOYEN
+
+
+def _status_permission_action(target_status: ServiceRequestStatusEnum) -> str:
+    """Map a workflow decision to the IAM permission that must authorize it."""
+    if target_status == ServiceRequestStatusEnum.VALIDEE:
+        return "approve"
+    if target_status == ServiceRequestStatusEnum.REJETEE:
+        return "reject"
+    return "process"
 
 
 def _serialize_request(item: ServiceRequest) -> dict[str, Any]:
@@ -383,11 +396,13 @@ async def get_service_request(
 async def update_service_request_status(
     request_id: uuid.UUID,
     payload: StatusUpdate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    if not _is_staff(current_user):
-        raise HTTPException(status_code=403, detail="Seuls les agents habilités peuvent modifier le statut.")
+    action = _status_permission_action(payload.status)
+    permission_checker = require_permission("requests", action)
+    await permission_checker(request=request, current_user=current_user, db=db)
 
     item = await _load_request(db, request_id)
     if payload.status not in ALLOWED_TRANSITIONS[item.status]:
@@ -413,19 +428,28 @@ async def update_service_request_status(
     return _serialize_request(item)
 
 
-@router.post("/{request_id}/assign", summary="Affecter un agent")
+@router.post("/{request_id}/assign", summary="Prendre en charge une demande")
 async def assign_service_request(
     request_id: uuid.UUID,
     payload: AssignmentUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("requests", "process")),
 ) -> dict[str, Any]:
-    if not _is_staff(current_user):
-        raise HTTPException(status_code=403, detail="Affectation réservée aux agents habilités.")
+    # Never trust agent_id/agent_name from the browser. This compatibility
+    # endpoint means "take charge": the authenticated principal becomes owner.
+    del payload
     item = await _load_request(db, request_id)
-    item.assigned_agent_id = payload.agent_id
-    item.assigned_agent_name = payload.agent_name
-    await _append_note(db, item, current_user, f"Demande affectée à {payload.agent_name}.", "notification")
+    if item.status in {ServiceRequestStatusEnum.LIVREE, ServiceRequestStatusEnum.REJETEE}:
+        raise HTTPException(status_code=409, detail="Une demande terminée ne peut plus être affectée.")
+    item.assigned_agent_id = current_user.id
+    item.assigned_agent_name = current_user.full_name
+    await _append_note(
+        db,
+        item,
+        current_user,
+        f"Demande prise en charge par {current_user.full_name}.",
+        "notification",
+    )
     await db.flush()
     return _serialize_request(item)
 
@@ -435,10 +459,8 @@ async def add_service_request_note(
     request_id: uuid.UUID,
     payload: NoteCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("requests", "process")),
 ) -> dict[str, Any]:
-    if not _is_staff(current_user):
-        raise HTTPException(status_code=403, detail="Notes de traitement réservées aux agents.")
     item = await _load_request(db, request_id)
     note = await _append_note(db, item, current_user, payload.text, payload.note_type)
     return {
@@ -456,10 +478,8 @@ async def complete_service_request(
     request_id: uuid.UUID,
     payload: CompletionRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("requests", "process")),
 ) -> dict[str, Any]:
-    if not _is_staff(current_user):
-        raise HTTPException(status_code=403, detail="Finalisation réservée aux agents habilités.")
     item = await _load_request(db, request_id)
     if item.status != ServiceRequestStatusEnum.PRETE:
         raise HTTPException(status_code=409, detail="La demande doit être au statut 'prete' avant livraison.")
@@ -472,16 +492,19 @@ async def complete_service_request(
     return _serialize_request(item)
 
 
-@router.post("/{request_id}/generated-document", summary="Enregistrer le document officiel généré")
+@router.post("/{request_id}/generated-document", summary="Enregistrer le document administratif validé")
 async def save_generated_document(
     request_id: uuid.UUID,
     payload: GeneratedDocumentCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("requests", "approve")),
 ) -> dict[str, Any]:
-    if not _is_staff(current_user):
-        raise HTTPException(status_code=403, detail="Génération documentaire réservée aux agents.")
     item = await _load_request(db, request_id)
+    if item.status != ServiceRequestStatusEnum.VALIDEE:
+        raise HTTPException(
+            status_code=409,
+            detail="Le document ne peut être enregistré que lorsque la demande est validée.",
+        )
     digest = hashlib.sha256(payload.html_content.encode("utf-8")).hexdigest()
     if item.generated_document:
         generated = item.generated_document
@@ -608,10 +631,8 @@ async def verify_service_request_attachment(
     request_id: uuid.UUID,
     attachment_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("requests", "process")),
 ) -> dict[str, bool]:
-    if not _is_staff(current_user):
-        raise HTTPException(status_code=403, detail="Vérification réservée aux agents.")
     await _load_request(db, request_id)
     attachment = (
         await db.execute(
