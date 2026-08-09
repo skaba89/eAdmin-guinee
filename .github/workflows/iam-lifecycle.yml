@@ -1,0 +1,100 @@
+name: IAM Lifecycle Gate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+      - agent/iam-jml-recertification
+  workflow_dispatch:
+
+concurrency:
+  group: iam-lifecycle-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  iam-lifecycle:
+    name: JML offboarding and access recertification invariants
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: eadmin_iam_lifecycle
+          POSTGRES_USER: eadmin
+          POSTGRES_PASSWORD: ci-test-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U eadmin -d eadmin_iam_lifecycle"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      ENVIRONMENT: test
+      DATABASE_URL: postgresql+asyncpg://eadmin:ci-test-password@localhost:5432/eadmin_iam_lifecycle
+      REDIS_URL: redis://localhost:6379
+      SECRET_KEY: ci-only-secret-key-not-for-production-0123456789
+      ENCRYPTION_KEY: ci-only-encryption-key-0123456789abcdef
+      MINIO_ACCESS_KEY: ci-minio
+      MINIO_SECRET_KEY: ci-minio-secret
+      MINIO_ENDPOINT: localhost:9000
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Enforce static lifecycle policy
+        run: python scripts/ops/check_iam_lifecycle.py
+
+      - name: Lint JML and recertification implementation
+        run: |
+          cd backend
+          ruff check \
+            app/models/identity_lifecycle.py \
+            app/services/identity_lifecycle_service.py \
+            app/services/access_review_service.py \
+            app/api/access_reviews.py \
+            app/api/access_control.py \
+            app/api/users.py \
+            tests/test_iam_lifecycle.py \
+            alembic/versions/iam_jml_recertification.py
+          cd ..
+          ruff check scripts/ops/check_iam_lifecycle.py
+
+      - name: Validate Alembic head includes lifecycle schema
+        working-directory: backend
+        run: |
+          alembic heads | tee iam-lifecycle-alembic-heads.txt
+          grep -q 'iam_jml_recertification' iam-lifecycle-alembic-heads.txt
+
+      - name: Test adversarial JML and recertification behavior
+        working-directory: backend
+        run: pytest -q tests/test_iam_lifecycle.py
