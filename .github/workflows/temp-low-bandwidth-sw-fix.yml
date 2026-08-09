@@ -1,0 +1,99 @@
+name: Temporary low-bandwidth SW correction
+
+on:
+  push:
+    branches:
+      - work/low-bandwidth-offline-first
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temporary-low-bandwidth-sw-correction
+  cancel-in-progress: true
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    if: github.actor != 'github-actions[bot]'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/low-bandwidth-offline-first
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Correct cache request variables and assert sections
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('public/sw.js')
+          text = path.read_text(encoding='utf-8')
+
+          cache_start = text.index('async function cacheFirst(request) {')
+          public_start = text.index('async function staleWhileRevalidatePublic(request) {')
+          nav_start = text.index('async function networkFirstNavigation(request) {')
+
+          cache_section = text[cache_start:public_start]
+          public_section = text[public_start:nav_start]
+
+          cache_section = cache_section.replace(
+              'await cache.put(publicRequest, response.clone())',
+              'await cache.put(request, response.clone())',
+          )
+          public_section = public_section.replace(
+              'await cache.put(request, response.clone())',
+              'await cache.put(publicRequest, response.clone())',
+          )
+
+          if 'publicRequest' in cache_section:
+              raise SystemExit('cacheFirst must never reference publicRequest')
+          if "const publicRequest = new Request(request, { credentials: 'omit' })" not in public_section:
+              raise SystemExit('public catalogue request must omit credentials')
+          if 'await cache.match(publicRequest)' not in public_section:
+              raise SystemExit('public catalogue cache lookup must use publicRequest')
+          if 'await cache.put(publicRequest, response.clone())' not in public_section:
+              raise SystemExit('public catalogue cache write must use publicRequest')
+
+          text = text[:cache_start] + cache_section + public_section + text[nav_start:]
+          path.write_text(text, encoding='utf-8')
+
+          policy_path = Path('scripts/ops/check_low_bandwidth_policy.py')
+          policy = policy_path.read_text(encoding='utf-8')
+          if 'Static cache must not use publicRequest' not in policy:
+              anchor = '    manifest = text["manifest"]\n'
+              if anchor not in policy:
+                  raise SystemExit('policy manifest anchor missing')
+              assertion = (
+                  '    cache_first = sw.split("async function cacheFirst", 1)[1].split("async function staleWhileRevalidatePublic", 1)[0]\n'
+                  '    public_cache = sw.split("async function staleWhileRevalidatePublic", 1)[1].split("async function networkFirstNavigation", 1)[0]\n'
+                  '    require("publicRequest" not in cache_first, "Static cache must not use publicRequest", errors)\n'
+                  '    require("cache.put(request" in cache_first, "Static cache must key assets by original request", errors)\n'
+                  '    require("credentials: \'omit\'" in public_cache, "Public catalogue cache must omit credentials", errors)\n'
+                  '    require("cache.put(publicRequest" in public_cache, "Public catalogue cache must use credential-free request", errors)\n\n'
+              )
+              policy = policy.replace(anchor, assertion + anchor, 1)
+          policy_path.write_text(policy, encoding='utf-8')
+
+          for helper in Path('.github/workflows').glob('temp-low-bandwidth-*.yml'):
+              helper.unlink()
+          PY
+          git diff --check
+
+      - name: Commit SW correction
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Service worker already correct"
+            exit 0
+          fi
+          git commit -m "fix(pwa): separate credential-free public cache from static cache"
+          git push origin HEAD:work/low-bandwidth-offline-first
