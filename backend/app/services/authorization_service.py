@@ -6,12 +6,16 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import uuid
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.middleware.rbac import PERMISSION_MATRIX
 from app.models.access_grant import AccessGrant
 from app.models.user import RoleEnum, User
+from app.services.iam_policy import (
+    conflicting_permissions,
+    evaluate_security_attributes,
+)
 
 
 # Permissions whose temporary elevation is too sensitive for ordinary
@@ -87,6 +91,43 @@ class AuthorizationService:
 
         return True
 
+    async def would_violate_sod(
+        self,
+        *,
+        user: User,
+        resource: str,
+        action: str,
+        db: AsyncSession,
+    ) -> bool:
+        """Prevent a temporary grant from introducing maker/checker conflicts."""
+        conflicts = conflicting_permissions(resource, action)
+        if not conflicts:
+            return False
+
+        for conflict_resource, conflict_action in conflicts:
+            if self.has_permanent_permission(user, conflict_resource, conflict_action):
+                return True
+
+        now = datetime.now(timezone.utc)
+        conflict_filters = [
+            and_(AccessGrant.resource == item[0], AccessGrant.action == item[1])
+            for item in conflicts
+        ]
+        if not conflict_filters:
+            return False
+        existing = await db.scalar(
+            select(AccessGrant.id)
+            .where(
+                AccessGrant.grantee_id == user.id,
+                AccessGrant.status == "active",
+                AccessGrant.valid_from <= now,
+                AccessGrant.valid_until > now,
+                or_(*conflict_filters),
+            )
+            .limit(1)
+        )
+        return existing is not None
+
     async def authorize(
         self,
         *,
@@ -112,7 +153,15 @@ class AuthorizationService:
             institution_id=institution_id,
         )
         if permanent and scoped:
-            return AuthorizationDecision(True, "permanent_role_and_scope", "role")
+            attributes = evaluate_security_attributes(
+                user,
+                resource=resource,
+                action=action,
+                mfa_verified=mfa_verified,
+            )
+            if not attributes.allowed:
+                return AuthorizationDecision(False, attributes.reason, "deny")
+            return AuthorizationDecision(True, "permanent_role_scope_and_attributes", "role")
 
         if not allow_temporary_grants:
             reason = "scope_denied" if permanent and not scoped else "role_denied"
@@ -170,6 +219,26 @@ class AuthorizationService:
             if tenant_id and grant.tenant_id != tenant_id:
                 continue
             if institution_id and grant.institution_id not in (None, institution_id):
+                continue
+
+            attributes = evaluate_security_attributes(
+                user,
+                resource=resource,
+                action=action,
+                mfa_verified=mfa_verified,
+                break_glass=grant.grant_type == "break_glass",
+            )
+            if not attributes.allowed:
+                continue
+
+            # A previously issued grant must not remain usable if later grants
+            # or a role change create a maker/checker conflict.
+            if grant.grant_type == "delegation" and await self.would_violate_sod(
+                user=user,
+                resource=resource,
+                action=action,
+                db=db,
+            ):
                 continue
 
             grant.last_used_at = now
