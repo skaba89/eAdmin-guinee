@@ -7,6 +7,7 @@ on:
       - main
       - develop
       - agent/iam-jml-recertification
+      - work/iam-national-governance
   workflow_dispatch:
 
 concurrency:
@@ -89,11 +90,27 @@ jobs:
           cd ..
           ruff check scripts/ops/check_iam_lifecycle.py
 
-      - name: Validate Alembic head includes lifecycle schema
+      - name: Validate Alembic chain contains lifecycle schema
         working-directory: backend
         run: |
-          alembic heads | tee iam-lifecycle-alembic-heads.txt
-          grep -q 'iam_jml_recertification' iam-lifecycle-alembic-heads.txt
+          python - <<'PY'
+          from alembic.config import Config
+          from alembic.script import ScriptDirectory
+
+          script = ScriptDirectory.from_config(Config("alembic.ini"))
+          heads = script.get_heads()
+          if len(heads) != 1:
+              raise SystemExit(f"Expected exactly one Alembic head, found: {heads}")
+          revisions = {
+              revision.revision
+              for revision in script.walk_revisions(base="base", head="heads")
+          }
+          if "iam_jml_recertification" not in revisions:
+              raise SystemExit(
+                  "iam_jml_recertification must remain in the ancestry of the current Alembic head"
+              )
+          print(f"Alembic head {heads[0]} includes iam_jml_recertification")
+          PY
 
       - name: Test adversarial JML and recertification behavior
         working-directory: backend
