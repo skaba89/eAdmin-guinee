@@ -10,9 +10,11 @@ from urllib.parse import parse_qs, urlparse
 import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from fastapi import HTTPException
 from jose import jwt
 
 from app.api.auth import create_access_token
+from app.api.identity_federation import _trusted_frontend_origin
 from app.config import Settings, settings
 from app.models.federated_identity import FederatedIdentity
 from app.models.user import RoleEnum, User
@@ -112,6 +114,20 @@ def test_oidc_configuration_is_disabled_and_auto_provisioning_is_forbidden():
         Settings(ENVIRONMENT="development", OIDC_ENABLED=True)
 
 
+def test_frontend_origin_must_be_exactly_trusted():
+    assert _trusted_frontend_origin("http://localhost:3000") == "http://localhost:3000"
+
+    for untrusted in (
+        "https://evil.example",
+        "http://localhost:3000.evil.example",
+        "http://localhost:3000/path",
+        "http://user:password@localhost:3000",
+        "//evil.example",
+    ):
+        with pytest.raises(HTTPException):
+            _trusted_frontend_origin(untrusted)
+
+
 @pytest.mark.asyncio
 async def test_authorization_request_uses_server_state_nonce_pkce_and_state_is_one_time(monkeypatch):
     _configure_oidc(monkeypatch)
@@ -122,7 +138,10 @@ async def test_authorization_request_uses_server_state_nonce_pkce_and_state_is_o
         return redis
 
     monkeypatch.setattr(service, "_redis", fake_redis)
-    url = await service.start_authorization("//evil.example/phish")
+    url = await service.start_authorization(
+        "//evil.example/phish",
+        frontend_origin="http://localhost:3000",
+    )
     parsed = urlparse(url)
     params = parse_qs(parsed.query)
 
@@ -136,6 +155,7 @@ async def test_authorization_request_uses_server_state_nonce_pkce_and_state_is_o
     state = params["state"][0]
     stored = await service.consume_authorization_state(state)
     assert stored["return_to"] == "/"
+    assert stored["frontend_origin"] == "http://localhost:3000"
     assert stored["nonce"] == params["nonce"][0]
     assert len(stored["code_verifier"]) >= 43
 
@@ -177,8 +197,6 @@ async def test_signed_id_token_is_verified_and_external_role_claim_is_not_author
             "nonce": "expected-nonce",
             "email": "agent@gov.gn",
             "email_verified": True,
-            # Deliberately malicious authorization-like claims. The validated
-            # OIDCClaims object has no role/tenant/institution authority fields.
             "role": "SUPER_ADMIN",
             "tenant_id": "attacker-tenant",
             "groups": ["superadmins"],
