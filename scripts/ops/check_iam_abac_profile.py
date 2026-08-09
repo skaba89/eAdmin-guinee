@@ -49,6 +49,11 @@ def main() -> int:
     require("verified_mfa_required" in text["policy"], "Sensitive operations must require MFA", errors)
     require("privileged_account_required" in text["policy"], "Privileged account flag must be enforced", errors)
     require("SOD_CONFLICTS" in text["policy"], "Maker/checker conflict matrix missing", errors)
+    require(
+        "break_glass_emergency_attributes_satisfied" in text["policy"],
+        "Break-glass must be an explicit emergency policy branch, not an accidental RBAC bypass",
+        errors,
+    )
 
     require("evaluate_security_attributes" in text["authorization"], "Central authorization must enforce ABAC", errors)
     require("would_violate_sod" in text["authorization"], "Central authorization must recheck SoD", errors)
@@ -58,6 +63,8 @@ def main() -> int:
     require("AccessGrant.requested_by == current_user.id" in access, "Grant visibility must be actor-scoped", errors)
     require("would_violate_sod" in access, "Grant creation must reject SoD conflicts", errors)
     require("MFA vérifié requis pour demander un break-glass" in access, "Break-glass request MFA guard missing", errors)
+    require("ticket d'incident est obligatoire pour break-glass" in access, "Break-glass incident ticket guard missing", errors)
+    require('timedelta(hours=4)' in access, "Break-glass must remain capped at four hours", errors)
     require('prefix="/security-profiles"' in access, "Security-profile API must be mounted", errors)
 
     governance = text["governance"]
@@ -78,7 +85,7 @@ def main() -> int:
         "suspended_account_fails_even_for_ordinary_permission",
         "temporary_approval_cannot_create_maker_checker_conflict",
         "sensitive_permanent_permission_needs_local_abac_attributes",
-        "break_glass_requires_privileged_assured_account",
+        "break_glass_is_explicit_emergency_override_but_still_requires_mfa",
         "super_admin_cannot_review_own_privileged_attributes",
     ):
         require(scenario in tests, f"ABAC regression scenario missing: {scenario}", errors)
