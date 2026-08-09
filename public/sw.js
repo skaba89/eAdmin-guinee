@@ -11,8 +11,10 @@ const PUBLIC_CATALOG_PATHS = new Set([
 const PRECACHE_ASSETS = [
   '/',
   '/manifest.webmanifest',
+  '/site.webmanifest',
   '/logo-128.png',
   '/logo-256.png',
+  '/favicon.ico',
   '/favicon-16x16.png',
   '/favicon-32x32.png',
   '/apple-touch-icon.png',
