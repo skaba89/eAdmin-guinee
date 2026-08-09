@@ -1,0 +1,46 @@
+name: Backend Runtime Contract Gate
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-runtime-contract.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-runtime-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  backend-runtime-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker build -f backend/Dockerfile backend -t eadmin-backend:contract
+
+      - name: Assert runtime contract
+        run: |
+          set -euo pipefail
+          entrypoint="$(docker inspect eadmin-backend:contract --format '{{json .Config.Entrypoint}}')"
+          command="$(docker inspect eadmin-backend:contract --format '{{json .Config.Cmd}}')"
+          test "$entrypoint" = "null" || test "$entrypoint" = "[]"
+          echo "$command" | grep -q 'alembic upgrade head'
+          echo "$command" | grep -q 'python -m app.bootstrap_runtime'
+          echo "$command" | grep -q 'uvicorn app.main:app'
+          if echo "$command" | grep -q '/app/entrypoint.sh'; then
+            echo 'Backend image must not depend on /app/entrypoint.sh at runtime.' >&2
+            exit 1
+          fi
+
+      - name: Assert required application files are present
+        run: |
+          docker run --rm --entrypoint sh \
+            -e ENVIRONMENT=development \
+            eadmin-backend:contract \
+            -c 'test -f /app/alembic.ini && test -f /app/app/main.py && test -f /app/app/bootstrap_runtime.py && python -m app.bootstrap_runtime'

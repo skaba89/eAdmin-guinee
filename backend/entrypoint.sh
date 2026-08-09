@@ -1,25 +1,25 @@
-#!/bin/bash
-# =============================================================================
-# Entrypoint - eAdmin Guinée Backend
-# Waits for PostgreSQL, runs Alembic migrations, then starts uvicorn
-# =============================================================================
+#!/bin/sh
+# Backward-compatible launcher for existing Render Docker Command overrides.
+# The Docker image's normal CMD no longer depends on this file.
 
-set -e
+set -eu
 
 echo "=== eAdmin Guinée Backend Starting ==="
 
-# Wait for PostgreSQL
-echo "Waiting for PostgreSQL..."
-until pg_isready -h ${POSTGRES_HOST:-postgres} -p ${POSTGRES_PORT:-5432} -U ${POSTGRES_USER:-eadmin} -q; do
-  echo "PostgreSQL is unavailable - sleeping"
-  sleep 2
+attempt=1
+while ! alembic upgrade head; do
+  if [ "$attempt" -ge 12 ]; then
+    echo "ERROR: Alembic migrations failed after 12 attempts." >&2
+    exit 1
+  fi
+  echo "Database/migration unavailable (attempt $attempt/12); retrying in 5s..."
+  attempt=$((attempt + 1))
+  sleep 5
 done
-echo "PostgreSQL is ready!"
 
-# Run database migrations
-echo "Running database migrations..."
-alembic upgrade head
+python -m app.bootstrap_runtime
 
-# Start the server
-echo "Starting server..."
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS:-4}
+exec uvicorn app.main:app \
+  --host 0.0.0.0 \
+  --port "${PORT:-8000}" \
+  --workers "${UVICORN_WORKERS:-2}"
