@@ -6,7 +6,7 @@ import {
   Settings, Shield, Bell, Puzzle, Palette,
   Lock, Clock, Key, Globe, Sun, Moon,
   Monitor, Save, CheckCircle2, AlertTriangle,
-  Wifi, Mail, MessageSquare, Smartphone,
+  Wifi, Mail,
   Building2, Phone, MapPin, Upload, Loader2
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -16,11 +16,10 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Separator } from '@/components/ui/separator'
-import { Badge } from '@/components/ui/badge'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose,
 } from '@/components/ui/dialog'
+import { NotificationPreferencesPanel } from '@/components/app/notification-preferences-panel'
 import { useAppStore } from '@/store/app-store'
 
 interface IntegrationConfig {
@@ -48,15 +47,9 @@ export function SettingsPage() {
   const [ipWhitelist, setIpWhitelist] = useState(false)
   const [theme, setTheme] = useState(appTheme === 'dark' ? 'dark' : appTheme === 'light' ? 'light' : 'system')
   const [language, setLanguage] = useState('fr')
-  const [notifSettings, setNotifSettings] = useState({
-    email_courrier: true, email_workflow: true, email_signature: true,
-    sms_urgent: true, sms_courrier: false,
-    whatsapp_courrier: true, whatsapp_workflow: false,
-  })
   const [successToast, setSuccessToast] = useState('')
   const [savingGeneral, setSavingGeneral] = useState(false)
   const [savingSecurity, setSavingSecurity] = useState(false)
-  const [savingNotifications, setSavingNotifications] = useState(false)
   const [savingAppearance, setSavingAppearance] = useState(false)
 
   // Logo upload
@@ -153,14 +146,6 @@ export function SettingsPage() {
     await new Promise(r => setTimeout(r, 1000))
     setSavingSecurity(false)
     setSuccessToast('Paramètres de sécurité enregistrés avec succès')
-    setTimeout(() => setSuccessToast(''), 4000)
-  }
-
-  const handleSaveNotifications = async () => {
-    setSavingNotifications(true)
-    await new Promise(r => setTimeout(r, 1000))
-    setSavingNotifications(false)
-    setSuccessToast('Préférences de notification enregistrées avec succès')
     setTimeout(() => setSuccessToast(''), 4000)
   }
 
@@ -370,98 +355,7 @@ export function SettingsPage() {
         {/* Notifications */}
         <TabsContent value="notifications">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <Card className="glass-premium">
-              <CardHeader>
-                <CardTitle className="text-base">Préférences de notification</CardTitle>
-                <CardDescription>Configurez les notifications par canal et par événement</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Email notifications */}
-                <div>
-                  <h4 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                    <Mail className="h-4 w-4 text-brand dark:text-primary" />
-                    Notifications par email
-                  </h4>
-                  <div className="space-y-3">
-                    {[
-                      { key: 'email_courrier' as const, label: 'Nouveau courrier', desc: 'Notification lors de l\'arrivée d\'un nouveau courrier' },
-                      { key: 'email_workflow' as const, label: 'Mise à jour workflow', desc: 'Changement d\'étape dans un workflow' },
-                      { key: 'email_signature' as const, label: 'Demande de signature', desc: 'Nouvelle demande de signature en attente' },
-                    ].map(item => (
-                      <div key={item.key} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors">
-                        <div>
-                          <p className="text-sm font-medium">{item.label}</p>
-                          <p className="text-xs text-muted-foreground">{item.desc}</p>
-                        </div>
-                        <Switch
-                          checked={notifSettings[item.key]}
-                          onCheckedChange={(checked) => setNotifSettings(prev => ({ ...prev, [item.key]: !!checked }))}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="divider-premium" />
-
-                {/* SMS */}
-                <div>
-                  <h4 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                    <Smartphone className="h-4 w-4 text-brand dark:text-primary" />
-                    Notifications SMS
-                  </h4>
-                  <div className="space-y-3">
-                    {[
-                      { key: 'sms_urgent' as const, label: 'Courriers urgents', desc: 'Uniquement les courriers marqués comme urgents' },
-                      { key: 'sms_courrier' as const, label: 'Tous les courriers', desc: 'Chaque nouveau courrier entrant' },
-                    ].map(item => (
-                      <div key={item.key} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors">
-                        <div>
-                          <p className="text-sm font-medium">{item.label}</p>
-                          <p className="text-xs text-muted-foreground">{item.desc}</p>
-                        </div>
-                        <Switch
-                          checked={notifSettings[item.key]}
-                          onCheckedChange={(checked) => setNotifSettings(prev => ({ ...prev, [item.key]: !!checked }))}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="divider-premium" />
-
-                {/* WhatsApp */}
-                <div>
-                  <h4 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                    <MessageSquare className="h-4 w-4 text-green-600" />
-                    Notifications WhatsApp
-                  </h4>
-                  <div className="space-y-3">
-                    {[
-                      { key: 'whatsapp_courrier' as const, label: 'Courriers entrants', desc: 'Notification WhatsApp pour les nouveaux courriers' },
-                      { key: 'whatsapp_workflow' as const, label: 'Rappels workflow', desc: 'Rappel des tâches en attente dans les workflows' },
-                    ].map(item => (
-                      <div key={item.key} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors">
-                        <div>
-                          <p className="text-sm font-medium">{item.label}</p>
-                          <p className="text-xs text-muted-foreground">{item.desc}</p>
-                        </div>
-                        <Switch
-                          checked={notifSettings[item.key]}
-                          onCheckedChange={(checked) => setNotifSettings(prev => ({ ...prev, [item.key]: !!checked }))}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <Button className="btn-premium gap-2" onClick={handleSaveNotifications} disabled={savingNotifications}>
-                  {savingNotifications ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  {savingNotifications ? 'Enregistrement...' : 'Enregistrer les préférences'}
-                </Button>
-              </CardContent>
-            </Card>
+            <NotificationPreferencesPanel />
           </motion.div>
         </TabsContent>
 
