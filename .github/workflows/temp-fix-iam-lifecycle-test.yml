@@ -1,0 +1,79 @@
+name: Temporary IAM lifecycle fixture patch
+
+on:
+  push:
+    branches:
+      - work/iam-national-governance
+    paths:
+      - .github/workflows/temp-fix-iam-lifecycle-test.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/iam-national-governance
+          fetch-depth: 0
+
+      - name: Patch sensitive leaver scenario and remove helper
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("backend/tests/test_iam_lifecycle.py")
+          text = path.read_text(encoding="utf-8")
+          old = '''async def test_leaver_disables_sso_revokes_grants_and_sets_session_cutoff(
+              client,
+              db_session,
+              super_admin_user,
+              super_admin_auth_headers,
+              monkeypatch,
+          ):
+              revoke_refresh = _patch_refresh_revocation(monkeypatch)
+          '''
+          new = '''async def test_leaver_disables_sso_revokes_grants_and_sets_session_cutoff(
+              client,
+              db_session,
+              super_admin_user,
+              monkeypatch,
+          ):
+              # Base.metadata.create_all() bypasses Alembic data backfills. Model the
+              # real post-migration SUPER_ADMIN profile and explicitly prove MFA for
+              # the sensitive users:delete operation.
+              super_admin_user.security_clearance = 4
+              super_admin_user.assurance_level = 3
+              super_admin_user.privileged_account = True
+              super_admin_user.mfa_enabled = True
+              await db_session.flush()
+              sensitive_admin_headers = _headers(super_admin_user, mfa_verified=True)
+
+              revoke_refresh = _patch_refresh_revocation(monkeypatch)
+          '''
+          if old not in text:
+              raise SystemExit("Expected leaver test signature block not found")
+          text = text.replace(old, new, 1)
+          old_call = '''response = await client.delete(
+              f"/api/v1/users/{target.id}",
+              headers=super_admin_auth_headers,
+          )'''
+          new_call = '''response = await client.delete(
+              f"/api/v1/users/{target.id}",
+              headers=sensitive_admin_headers,
+          )'''
+          if old_call not in text:
+              raise SystemExit("Expected leaver delete call not found")
+          text = text.replace(old_call, new_call, 1)
+          path.write_text(text, encoding="utf-8")
+          Path(".github/workflows/temp-fix-iam-lifecycle-test.yml").unlink()
+
+      - name: Commit targeted test compatibility patch
+        run: |
+          git config user.name "eAdmin CI hardening"
+          git config user.email "actions@users.noreply.github.com"
+          git add backend/tests/test_iam_lifecycle.py .github/workflows/temp-fix-iam-lifecycle-test.yml
+          git commit -m "align lifecycle test with privileged ABAC"
+          git push origin HEAD:work/iam-national-governance
