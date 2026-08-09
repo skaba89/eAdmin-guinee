@@ -15,6 +15,7 @@ from app.api.service_requests import (
     _add_business_days,
     _append_note,
     _default_timeline,
+    _ensure_transition_business_invariants,
     _is_staff,
     _load_request,
     _reference,
@@ -52,6 +53,28 @@ def test_status_decisions_map_to_explicit_iam_permissions():
     assert _status_permission_action(ServiceRequestStatusEnum.PIECES_COMPLEMENTAIRES) == "process"
     assert _status_permission_action(ServiceRequestStatusEnum.PRETE) == "process"
     assert _status_permission_action(ServiceRequestStatusEnum.LIVREE) == "process"
+
+
+def test_ready_transition_requires_a_persisted_document():
+    item = SimpleNamespace(generated_document=None)
+
+    with pytest.raises(HTTPException) as exc:
+        _ensure_transition_business_invariants(item, ServiceRequestStatusEnum.PRETE)
+
+    assert exc.value.status_code == 409
+    assert "document administratif enregistré" in exc.value.detail
+
+
+def test_ready_transition_accepts_a_persisted_document():
+    item = SimpleNamespace(generated_document=SimpleNamespace(id=uuid.uuid4()))
+
+    _ensure_transition_business_invariants(item, ServiceRequestStatusEnum.PRETE)
+
+
+def test_non_ready_transition_does_not_require_a_document():
+    item = SimpleNamespace(generated_document=None)
+
+    _ensure_transition_business_invariants(item, ServiceRequestStatusEnum.EN_COURS)
 
 
 def test_business_day_helper_skips_weekends():
