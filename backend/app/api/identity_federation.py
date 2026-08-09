@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 import hashlib
+import json
+from urllib.parse import urlencode, urlsplit
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -37,13 +39,6 @@ from app.services.token_blacklist import token_blacklist
 
 public_router = APIRouter()
 admin_router = APIRouter()
-
-
-class SSOCallbackResponse(BaseModel):
-    exchange_code: str
-    expires_in: int
-    return_to: str
-    mfa_required: bool
 
 
 class SSOExchangeRequest(BaseModel):
@@ -107,6 +102,43 @@ def _subject_fingerprint(subject: str) -> str:
     return hashlib.sha256(subject.encode("utf-8")).hexdigest()[:16]
 
 
+def _trusted_frontend_origin(raw_origin: str) -> str:
+    """Accept only an origin already trusted by the application's CORS policy."""
+    candidate = (raw_origin or "").strip()
+    try:
+        parsed = urlsplit(candidate)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Origine frontend SSO invalide.") from exc
+
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.netloc
+        or parsed.username
+        or parsed.password
+        or parsed.path not in {"", "/"}
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise HTTPException(status_code=400, detail="Origine frontend SSO invalide.")
+
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+    allowed = set(settings.CORS_ORIGINS_PROD)
+    if settings.is_development or settings.is_test:
+        allowed.update(settings.CORS_ORIGINS_DEV)
+        try:
+            extra = json.loads(settings.EXTRA_CORS_ORIGINS)
+            if isinstance(extra, list):
+                allowed.update(str(item).rstrip("/") for item in extra)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            pass
+
+    if origin not in {item.rstrip("/") for item in allowed}:
+        raise HTTPException(status_code=403, detail="Origine frontend non autorisée pour le SSO.")
+    if (settings.is_production or settings.is_staging) and parsed.scheme != "https":
+        raise HTTPException(status_code=403, detail="HTTPS est obligatoire pour le frontend SSO.")
+    return origin
+
+
 async def _audit(
     db: AsyncSession,
     request: Request,
@@ -148,17 +180,25 @@ async def sso_status() -> dict:
 
 
 @public_router.get("/oidc/login", summary="Démarrer la connexion SSO")
-async def oidc_login(return_to: str | None = Query(default="/")):
+async def oidc_login(
+    return_to: str | None = Query(default="/"),
+    frontend_origin: str = Query(..., min_length=8, max_length=512),
+):
+    trusted_origin = _trusted_frontend_origin(frontend_origin)
     try:
-        authorization_url = await oidc_service.start_authorization(return_to)
+        authorization_url = await oidc_service.start_authorization(
+            return_to,
+            frontend_origin=trusted_origin,
+        )
     except OIDCError as exc:
         raise _oidc_http_error(exc) from exc
-    return RedirectResponse(authorization_url, status_code=status.HTTP_302_FOUND)
+    response = RedirectResponse(authorization_url, status_code=status.HTTP_302_FOUND)
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @public_router.get(
     "/oidc/callback",
-    response_model=SSOCallbackResponse,
     summary="Callback OIDC sécurisé",
 )
 async def oidc_callback(
@@ -167,7 +207,7 @@ async def oidc_callback(
     code: str | None = Query(default=None, max_length=4096),
     error: str | None = Query(default=None, max_length=255),
     db: AsyncSession = Depends(get_db),
-) -> SSOCallbackResponse:
+) -> RedirectResponse:
     try:
         state_data = await oidc_service.consume_authorization_state(state)
         if error:
@@ -230,12 +270,16 @@ async def oidc_callback(
         tenant_id=user.tenant_id,
         institution_id=user.institution_id,
     )
-    return SSOCallbackResponse(
-        exchange_code=exchange_code,
-        expires_in=OIDC_EXCHANGE_TTL_SECONDS,
-        return_to=state_data["return_to"],
-        mfa_required=user.mfa_enabled,
+
+    redirect_query = urlencode({"sso_exchange": exchange_code})
+    frontend_origin = state_data["frontend_origin"].rstrip("/")
+    response = RedirectResponse(
+        f"{frontend_origin}/?{redirect_query}",
+        status_code=status.HTTP_302_FOUND,
     )
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
 
 
 @public_router.post(
