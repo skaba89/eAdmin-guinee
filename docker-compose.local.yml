@@ -1,0 +1,231 @@
+name: eadmin-local
+
+x-backend-environment: &backend-environment
+  ENVIRONMENT: development
+  DEBUG: "true"
+  DATABASE_URL: postgresql+asyncpg://eadmin:${POSTGRES_PASSWORD}@postgres:5432/eadmin
+  REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+  SECRET_KEY: ${SECRET_KEY}
+  ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+  MINIO_ENDPOINT: minio:9000
+  MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-eadmin}
+  MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+  MINIO_BUCKET_NAME: eadmin-documents
+  MINIO_SECURE: "false"
+  EXTRA_CORS_ORIGINS: "[]"
+  EADMIN_BOOTSTRAP_SUPERADMIN_ENABLED: "true"
+  EADMIN_BOOTSTRAP_SUPERADMIN_EMAIL: ${LOCAL_SUPERADMIN_EMAIL:-superadmin@eadmin.test}
+  EADMIN_BOOTSTRAP_SUPERADMIN_PASSWORD: ${LOCAL_TEST_PASSWORD}
+  EADMIN_BOOTSTRAP_SUPERADMIN_NAME: "Super Administrateur Local"
+  EADMIN_BOOTSTRAP_TEST_USERS: "true"
+  EADMIN_BOOTSTRAP_TEST_PASSWORD: ${LOCAL_TEST_PASSWORD}
+  EADMIN_BOOTSTRAP_TEST_DOMAIN: ${LOCAL_TEST_DOMAIN:-eadmin.test}
+  EADMIN_BOOTSTRAP_TEST_INSTITUTION: "Institution Locale eAdmin"
+  EADMIN_BOOTSTRAP_TEST_INSTITUTION_ID: institution-local
+  EADMIN_SMTP_HOST: mailpit
+  EADMIN_SMTP_PORT: "1025"
+  EADMIN_SMTP_FROM_EMAIL: no-reply@eadmin.test
+  EADMIN_SMTP_STARTTLS: "false"
+  EADMIN_SMTP_SSL: "false"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: eadmin-local-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: eadmin
+      POSTGRES_USER: eadmin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${LOCAL_POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - local_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eadmin -d eadmin"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [eadmin-local]
+
+  redis:
+    image: redis:7-alpine
+    container_name: eadmin-local-redis
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    command: ["sh", "-c", "exec redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru --requirepass \"$$REDIS_PASSWORD\""]
+    ports:
+      - "${LOCAL_REDIS_PORT:-6380}:6379"
+    volumes:
+      - local_redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [eadmin-local]
+
+  minio:
+    image: minio/minio:latest
+    container_name: eadmin-local-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-eadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "${LOCAL_MINIO_API_PORT:-9000}:9000"
+      - "${LOCAL_MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - local_minio_data:/data
+    networks: [eadmin-local]
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: eadmin-local-minio-init
+    restart: "no"
+    depends_on:
+      - minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-eadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        until mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null 2>&1;
+        do sleep 2; done;
+        mc mb --ignore-existing local/eadmin-documents;
+        mc anonymous set none local/eadmin-documents >/dev/null 2>&1 || true
+    networks: [eadmin-local]
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: eadmin-local-mailpit
+    restart: unless-stopped
+    ports:
+      - "${LOCAL_MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${LOCAL_MAILPIT_UI_PORT:-8025}:8025"
+    networks: [eadmin-local]
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: eadmin-local-backend
+    restart: unless-stopped
+    environment: *backend-environment
+    command:
+      - sh
+      - -c
+      - >-
+        set -eu;
+        alembic upgrade head;
+        python -m app.bootstrap_runtime;
+        exec uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+    volumes:
+      - ./backend:/app
+    ports:
+      - "${LOCAL_BACKEND_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      mailpit:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    networks: [eadmin-local]
+
+  notification-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: eadmin-local-notification-worker
+    restart: unless-stopped
+    environment: *backend-environment
+    command: ["python", "-m", "app.workers.notification_outbox"]
+    volumes:
+      - ./backend:/app
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks: [eadmin-local]
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    container_name: eadmin-local-frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:${LOCAL_BACKEND_PORT:-8000}
+      NEXT_PUBLIC_APP_NAME: eAdministration Suite Guinea Local
+      NEXT_PUBLIC_ENCRYPTION_KEY: ${NEXT_PUBLIC_ENCRYPTION_KEY}
+    volumes:
+      - ./src:/app/src
+      - ./public:/app/public
+    ports:
+      - "${LOCAL_FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks: [eadmin-local]
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: eadmin-local-prometheus
+    profiles: ["observability"]
+    restart: unless-stopped
+    ports:
+      - "${LOCAL_PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - local_prometheus_data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    networks: [eadmin-local]
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: eadmin-local-grafana
+    profiles: ["observability"]
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "${LOCAL_GRAFANA_PORT:-3001}:3000"
+    volumes:
+      - local_grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    depends_on:
+      - prometheus
+    networks: [eadmin-local]
+
+networks:
+  eadmin-local:
+    name: eadmin-local-network
+
+volumes:
+  local_postgres_data:
+    name: eadmin-local-postgres-data
+  local_redis_data:
+    name: eadmin-local-redis-data
+  local_minio_data:
+    name: eadmin-local-minio-data
+  local_prometheus_data:
+    name: eadmin-local-prometheus-data
+  local_grafana_data:
+    name: eadmin-local-grafana-data
