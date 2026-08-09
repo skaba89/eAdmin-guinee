@@ -230,11 +230,10 @@ app.add_middleware(
     ],
 )
 
-# Public SSO protocol endpoints intentionally run before authenticated/RLS
-# dependencies. Authentication/callback creates the local session; all account
-# management endpoints below remain governed by bearer auth and RLS.
+# Public SSO protocol endpoints intentionally run without bearer/RLS
+# dependencies. Login/callback/exchange establish or bootstrap the local session.
 app.include_router(
-    identity_federation.protocol_router,
+    identity_federation.public_router,
     prefix="/api/v1/auth/sso",
     tags=["Fédération OIDC"],
 )
@@ -255,6 +254,14 @@ app.include_router(
 
 rls_dependencies = [Depends(set_rls_context)]
 
+# Federated identity lifecycle is administrative state and therefore runs under
+# the same trusted bearer + PostgreSQL RLS context as the rest of IAM.
+app.include_router(
+    identity_federation.admin_router,
+    prefix="/api/v1/auth/sso",
+    tags=["Gestion Fédération OIDC"],
+    dependencies=rls_dependencies,
+)
 app.include_router(
     institutions.router,
     prefix="/api/v1/institutions",
