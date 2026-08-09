@@ -1,0 +1,148 @@
+name: Temporary SOC six-gate release guard
+
+on:
+  push:
+    branches:
+      - work/soc-siem-incident-response
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+  checks: read
+
+concurrency:
+  group: temporary-soc-release-guard
+  cancel-in-progress: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR_NUMBER: '46'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/soc-siem-incident-response
+          fetch-depth: 0
+
+      - name: Require clean temporary-workflow state
+        shell: bash
+        run: |
+          git fetch origin work/soc-siem-incident-response
+          git reset --hard origin/work/soc-siem-incident-response
+          mapfile -t helpers < <(find .github/workflows -maxdepth 1 -type f -name 'temp-soc-*.yml' ! -name 'temp-soc-release-guard.yml' -print)
+          if (( ${#helpers[@]} > 0 )); then
+            printf 'Temporary SOC helpers still present:\n%s\n' "${helpers[*]}"
+            exit 1
+          fi
+
+      - name: Remove release guard from merge candidate
+        id: candidate
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm .github/workflows/temp-soc-release-guard.yml
+          git add -A
+          git diff --cached --check
+          git commit -m "chore(soc): remove temporary release guard"
+          git push origin HEAD:work/soc-siem-incident-response
+          final_sha=$(git rev-parse HEAD)
+          echo "sha=$final_sha" >> "$GITHUB_OUTPUT"
+          echo "Final merge candidate: $final_sha"
+
+      - name: Require six permanent national gates on final SHA
+        shell: bash
+        env:
+          FINAL_SHA: ${{ steps.candidate.outputs.sha }}
+        run: |
+          required=(
+            'P0 Government Readiness Gates'
+            'Operational Resilience Gate'
+            'PKI Trust Boundary Gate'
+            'IAM Governance Gate'
+            'SSO Federation Gate'
+            'SOC Governance Gate'
+          )
+
+          for attempt in $(seq 1 180); do
+            gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --commit "$FINAL_SHA" \
+              --limit 100 \
+              --json name,status,conclusion,databaseId > /tmp/runs.json
+
+            decision=$(python - "${required[@]}" <<'PY'
+          import json
+          import sys
+
+          required = sys.argv[1:]
+          runs = json.load(open('/tmp/runs.json', encoding='utf-8'))
+          latest = {}
+          for run in runs:
+              name = run.get('name')
+              if name not in required:
+                  continue
+              if name not in latest or int(run.get('databaseId') or 0) > int(latest[name].get('databaseId') or 0):
+                  latest[name] = run
+
+          missing = [name for name in required if name not in latest]
+          if missing:
+              print('WAIT:' + ','.join(missing))
+              raise SystemExit(0)
+
+          pending = [name for name in required if latest[name].get('status') != 'completed']
+          if pending:
+              print('WAIT:' + ','.join(pending))
+              raise SystemExit(0)
+
+          failed = [
+              f"{name}={latest[name].get('conclusion')}"
+              for name in required
+              if latest[name].get('conclusion') != 'success'
+          ]
+          if failed:
+              print('FAIL:' + ','.join(failed))
+          else:
+              print('PASS')
+          PY
+            )
+
+            echo "Gate decision: $decision"
+            if [[ "$decision" == "PASS" ]]; then
+              exit 0
+            fi
+            if [[ "$decision" == FAIL:* ]]; then
+              exit 1
+            fi
+            sleep 10
+          done
+
+          echo "National gates did not complete within release guard window"
+          exit 1
+
+      - name: Mark PR ready and merge exact validated SHA
+        shell: bash
+        env:
+          FINAL_SHA: ${{ steps.candidate.outputs.sha }}
+        run: |
+          current_head=$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq .headRefOid)
+          if [[ "$current_head" != "$FINAL_SHA" ]]; then
+            echo "PR head moved: expected $FINAL_SHA got $current_head"
+            exit 1
+          fi
+
+          is_draft=$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)
+          if [[ "$is_draft" == "true" ]]; then
+            gh pr ready "$PR_NUMBER" --repo "$GITHUB_REPOSITORY"
+          fi
+
+          gh api \
+            --method PUT \
+            "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/merge" \
+            -f sha="$FINAL_SHA" \
+            -f merge_method=merge \
+            -f commit_title='Merge PR #46: SOC/SIEM and incident response'
