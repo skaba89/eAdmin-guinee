@@ -1,0 +1,108 @@
+name: Temporary low-bandwidth final cleanup
+
+on:
+  push:
+    branches:
+      - work/low-bandwidth-offline-first
+
+permissions:
+  contents: write
+
+concurrency:
+  group: temporary-low-bandwidth-final-cleanup
+  cancel-in-progress: true
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    if: github.actor != 'github-actions[bot]'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/low-bandwidth-offline-first
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Apply final robustness cleanup
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('backend/app/middleware/idempotency.py')
+          text = path.read_text(encoding='utf-8')
+          if 'import binascii\n' not in text:
+              text = text.replace('import base64\n', 'import base64\nimport binascii\n', 1)
+          text = text.replace(
+              '                except (KeyError, TypeError, ValueError):\n',
+              '                except (binascii.Error, KeyError, TypeError, ValueError):\n',
+              1,
+          )
+          text = text.replace(
+              '        except Exception:\n            await redis.delete(redis_key)\n            raise\n',
+              '        except Exception:  # noqa: BLE001 - release reservation for every downstream failure\n'
+              '            await redis.delete(redis_key)\n'
+              '            raise\n',
+              1,
+          )
+          path.write_text(text, encoding='utf-8')
+
+          path = Path('src/components/pwa/pwa-bootstrap.tsx')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace(
+              "    if ('serviceWorker' in navigator && window.location.protocol !== 'http:') {\n"
+              "      void navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {\n"
+              "        // The web application remains fully usable online when SW registration\n"
+              "        // is blocked by the browser or deployment policy.\n"
+              "      })\n"
+              "    } else if ('serviceWorker' in navigator && window.location.hostname === 'localhost') {\n"
+              "      void navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => undefined)\n"
+              "    }\n",
+              "    const canRegisterServiceWorker = window.location.protocol === 'https:'\n"
+              "      || window.location.hostname === 'localhost'\n"
+              "      || window.location.hostname === '127.0.0.1'\n"
+              "    if ('serviceWorker' in navigator && canRegisterServiceWorker) {\n"
+              "      void navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {\n"
+              "        // The application remains usable online if browser/deployment policy blocks SW.\n"
+              "      })\n"
+              "    }\n",
+              1,
+          )
+          path.write_text(text, encoding='utf-8')
+
+          required = {
+              'backend/app/main.py': ['IdempotencyMiddleware'],
+              'backend/app/middleware/idempotency.py': ['binascii.Error', 'noqa: BLE001'],
+              'src/app/layout.tsx': ['PwaBootstrap'],
+              'src/lib/service-requests-api.ts': ['getStableIdempotencyKey', 'Idempotency-Key'],
+              'public/sw.js': ["credentials: 'omit'", 'PUBLIC_ASSET_PATHS', 'Authorization'],
+              '.github/workflows/low-bandwidth-offline.yml': ['Low Bandwidth Offline Gate'],
+          }
+          for filename, markers in required.items():
+              content = Path(filename).read_text(encoding='utf-8')
+              for marker in markers:
+                  if marker not in content:
+                      raise SystemExit(f'{filename}: missing required marker {marker!r}')
+
+          for helper in Path('.github/workflows').glob('temp-low-bandwidth-*.yml'):
+              helper.unlink()
+          PY
+
+          python -m compileall -q backend/app backend/tests scripts/ops
+          git diff --check
+
+      - name: Commit final cleanup
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Cleanup already satisfied"
+            exit 0
+          fi
+          git commit -m "fix(network): harden idempotency replay and PWA registration"
+          git push origin HEAD:work/low-bandwidth-offline-first

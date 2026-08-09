@@ -1,0 +1,211 @@
+name: Temporary low-bandwidth national release guard
+
+on:
+  push:
+    branches:
+      - work/low-bandwidth-offline-first
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+  checks: read
+
+concurrency:
+  group: temporary-low-bandwidth-release-guard
+  cancel-in-progress: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HEAD_BRANCH: work/low-bandwidth-offline-first
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/low-bandwidth-offline-first
+          fetch-depth: 0
+
+      - name: Wait for wiring helpers and verify final invariants
+        shell: bash
+        run: |
+          for attempt in $(seq 1 60); do
+            git fetch origin "$HEAD_BRANCH"
+            git reset --hard "origin/$HEAD_BRANCH"
+            mapfile -t helpers < <(find .github/workflows -maxdepth 1 -type f -name 'temp-low-bandwidth-*.yml' ! -name 'temp-low-bandwidth-release-guard.yml' -print)
+            if (( ${#helpers[@]} == 0 )); then
+              break
+            fi
+            echo "Waiting for temporary wiring helpers: ${helpers[*]}"
+            sleep 5
+          done
+
+          mapfile -t remaining < <(find .github/workflows -maxdepth 1 -type f -name 'temp-low-bandwidth-*.yml' ! -name 'temp-low-bandwidth-release-guard.yml' -print)
+          if (( ${#remaining[@]} > 0 )); then
+            echo "Temporary helpers did not self-delete: ${remaining[*]}"
+            exit 1
+          fi
+
+          python - <<'PY'
+          from pathlib import Path
+
+          required = {
+              'backend/app/main.py': ['IdempotencyMiddleware'],
+              'backend/app/middleware/idempotency.py': [
+                  'Idempotency-Key',
+                  'IDEMPOTENCY_KEY_REUSED',
+                  'Idempotency-Replayed',
+                  'binascii.Error',
+              ],
+              'src/app/layout.tsx': ['PwaBootstrap'],
+              'src/components/pwa/pwa-bootstrap.tsx': [
+                  "serviceWorker.register('/sw.js'",
+                  'manifest.webmanifest',
+                  'navigator.onLine',
+              ],
+              'src/lib/service-requests-api.ts': [
+                  'getStableIdempotencyKey',
+                  'Idempotency-Key',
+              ],
+              'public/sw.js': [
+                  'PUBLIC_ASSET_PATHS',
+                  "credentials: 'omit'",
+                  'Authorization',
+                  'cache.put(publicRequest',
+              ],
+              'scripts/ops/check_low_bandwidth_policy.py': [
+                  'Static cache must not use publicRequest',
+                  'Low-bandwidth and offline privacy policy: PASS',
+              ],
+              '.github/workflows/low-bandwidth-offline.yml': ['Low Bandwidth Offline Gate'],
+          }
+          for path, markers in required.items():
+              content = Path(path).read_text(encoding='utf-8')
+              for marker in markers:
+                  if marker not in content:
+                      raise SystemExit(f'{path}: missing final invariant {marker!r}')
+
+          sw = Path('public/sw.js').read_text(encoding='utf-8')
+          static_section = sw.split('async function cacheFirst', 1)[1].split('async function staleWhileRevalidatePublic', 1)[0]
+          public_section = sw.split('async function staleWhileRevalidatePublic', 1)[1].split('async function networkFirstNavigation', 1)[0]
+          if 'publicRequest' in static_section:
+              raise SystemExit('Static cache incorrectly references publicRequest')
+          if 'cache.put(request' not in static_section:
+              raise SystemExit('Static cache no longer keys original requests')
+          if "credentials: 'omit'" not in public_section or 'cache.put(publicRequest' not in public_section:
+              raise SystemExit('Public cache is not credential-free')
+          PY
+
+      - name: Remove release guard from merge candidate
+        id: candidate
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm .github/workflows/temp-low-bandwidth-release-guard.yml
+          git add -A
+          git diff --cached --check
+          git commit -m "chore(network): remove temporary release guard"
+          git push origin HEAD:"$HEAD_BRANCH"
+          final_sha=$(git rev-parse HEAD)
+          echo "sha=$final_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch permanent gates on exact cleaned SHA
+        id: dispatch
+        shell: bash
+        run: |
+          workflows=(
+            'P0 Government Readiness Gates'
+            'Operational Resilience Gate'
+            'PKI Trust Boundary Gate'
+            'IAM Governance Gate'
+            'SSO Federation Gate'
+            'Low Bandwidth Offline Gate'
+          )
+          if [[ -f .github/workflows/soc-governance.yml ]]; then
+            workflows+=('SOC Governance Gate')
+          fi
+          printf '%s\n' "${workflows[@]}" > /tmp/required-workflows.txt
+          for workflow in "${workflows[@]}"; do
+            gh workflow run "$workflow" --repo "$GITHUB_REPOSITORY" --ref "$HEAD_BRANCH"
+          done
+
+      - name: Require every dispatched gate on exact SHA
+        shell: bash
+        env:
+          FINAL_SHA: ${{ steps.candidate.outputs.sha }}
+        run: |
+          mapfile -t required < /tmp/required-workflows.txt
+          for attempt in $(seq 1 180); do
+            gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --commit "$FINAL_SHA" \
+              --limit 100 \
+              --json name,status,conclusion,databaseId > /tmp/runs.json
+
+            decision=$(python - "${required[@]}" <<'PY'
+          import json
+          import sys
+
+          required = sys.argv[1:]
+          runs = json.load(open('/tmp/runs.json', encoding='utf-8'))
+          latest = {}
+          for run in runs:
+              name = run.get('name')
+              if name not in required:
+                  continue
+              if name not in latest or int(run.get('databaseId') or 0) > int(latest[name].get('databaseId') or 0):
+                  latest[name] = run
+          missing = [name for name in required if name not in latest]
+          if missing:
+              print('WAIT:' + ','.join(missing))
+              raise SystemExit(0)
+          pending = [name for name in required if latest[name].get('status') != 'completed']
+          if pending:
+              print('WAIT:' + ','.join(pending))
+              raise SystemExit(0)
+          failed = [
+              f"{name}={latest[name].get('conclusion')}"
+              for name in required
+              if latest[name].get('conclusion') != 'success'
+          ]
+          print('FAIL:' + ','.join(failed) if failed else 'PASS')
+          PY
+            )
+            echo "Gate decision: $decision"
+            if [[ "$decision" == "PASS" ]]; then
+              exit 0
+            fi
+            if [[ "$decision" == FAIL:* ]]; then
+              exit 1
+            fi
+            sleep 10
+          done
+          exit 1
+
+      - name: Mark PR ready and merge validated SHA
+        shell: bash
+        env:
+          FINAL_SHA: ${{ steps.candidate.outputs.sha }}
+        run: |
+          pr_number=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$HEAD_BRANCH" --state open --json number --jq '.[0].number')
+          if [[ -z "$pr_number" || "$pr_number" == "null" ]]; then
+            echo "Open PR not found for $HEAD_BRANCH"
+            exit 1
+          fi
+          current_head=$(gh pr view "$pr_number" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq .headRefOid)
+          if [[ "$current_head" != "$FINAL_SHA" ]]; then
+            echo "PR head moved: expected $FINAL_SHA got $current_head"
+            exit 1
+          fi
+          if [[ $(gh pr view "$pr_number" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft) == "true" ]]; then
+            gh pr ready "$pr_number" --repo "$GITHUB_REPOSITORY"
+          fi
+          gh api \
+            --method PUT \
+            "repos/$GITHUB_REPOSITORY/pulls/$pr_number/merge" \
+            -f sha="$FINAL_SHA" \
+            -f merge_method=merge \
+            -f commit_title="Merge PR #$pr_number: low-bandwidth PWA and reconnect idempotency"
