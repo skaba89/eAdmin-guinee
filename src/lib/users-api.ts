@@ -1,5 +1,5 @@
 import { getActiveAccessToken } from '@/lib/auth-client'
-import { getApiBaseUrl } from '@/lib/api-base-url'
+import { API_URL } from '@/lib/api-base-url'
 
 export type BackendRole =
   | 'CITOYEN'
@@ -56,7 +56,7 @@ async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers.set('Content-Type', 'application/json')
   }
 
-  const response = await fetch(`${getApiBaseUrl()}${path}`, {
+  const response = await fetch(`${API_URL}${path}`, {
     ...init,
     headers,
     credentials: 'include',
