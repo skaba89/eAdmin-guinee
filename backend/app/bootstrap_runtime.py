@@ -38,6 +38,27 @@ def _require_strong_password(value: str, variable: str) -> str:
     return value
 
 
+def _test_security_profile(role: RoleEnum) -> tuple[int, int, bool]:
+    """Return ABAC values that remain inside the governed DB ranges.
+
+    security_clearance is constrained to 0..4 and assurance_level to 1..4.
+    Role hierarchy is intentionally not copied directly into clearance because
+    the two concepts have different scales and governance semantics.
+    """
+    profiles: dict[RoleEnum, tuple[int, int, bool]] = {
+        RoleEnum.CITOYEN: (0, 1, False),
+        RoleEnum.AGENT: (1, 1, False),
+        RoleEnum.MAIRIE: (1, 1, False),
+        RoleEnum.AGENCE: (1, 1, False),
+        RoleEnum.ADMIN: (2, 2, True),
+        RoleEnum.CHEF_SERVICE: (2, 2, True),
+        RoleEnum.DIRECTEUR: (3, 3, True),
+        RoleEnum.MINISTRE: (4, 3, True),
+        RoleEnum.SUPER_ADMIN: (4, 3, True),
+    }
+    return profiles[role]
+
+
 async def _bootstrap_superadmin() -> None:
     if not _enabled("EADMIN_BOOTSTRAP_SUPERADMIN_ENABLED"):
         return
@@ -74,8 +95,8 @@ async def _bootstrap_superadmin() -> None:
             tenant_id=settings.TENANT_DEFAULT_ID,
             institution_id=None,
             privileged_account=True,
-            security_clearance=10,
-            assurance_level=2,
+            security_clearance=4,
+            assurance_level=3,
         )
         session.add(user)
         await session.commit()
@@ -114,6 +135,7 @@ async def _bootstrap_test_portal_users() -> None:
             email = f"{slug}@{domain}"
             if await session.scalar(select(User).where(User.email == email)):
                 continue
+            security_clearance, assurance_level, privileged_account = _test_security_profile(role)
             session.add(
                 User(
                     email=email,
@@ -123,9 +145,9 @@ async def _bootstrap_test_portal_users() -> None:
                     institution=institution_name if role != RoleEnum.CITOYEN else None,
                     tenant_id=settings.TENANT_DEFAULT_ID,
                     institution_id=institution_id if role != RoleEnum.CITOYEN else None,
-                    privileged_account=role in {RoleEnum.ADMIN, RoleEnum.CHEF_SERVICE, RoleEnum.DIRECTEUR, RoleEnum.MINISTRE},
-                    security_clearance=5 if role.hierarchy_level() >= RoleEnum.CHEF_SERVICE.hierarchy_level() else 1,
-                    assurance_level=1,
+                    privileged_account=privileged_account,
+                    security_clearance=security_clearance,
+                    assurance_level=assurance_level,
                 )
             )
             created += 1
