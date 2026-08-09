@@ -2,6 +2,8 @@
 
 **Statut : document de cadrage — ne vaut pas homologation juridique, certification de sécurité ni qualification de signature électronique.**
 
+**Dernière révision technique : 9 août 2026.**
+
 Ce document définit les formulations qui peuvent être utilisées lors d'une présentation à une administration publique guinéenne et celles qui doivent rester conditionnelles tant que les autorités compétentes, les responsables juridiques et les partenaires d'infrastructure n'ont pas formellement validé le dispositif.
 
 ## 1. Positionnement recommandé
