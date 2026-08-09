@@ -17,6 +17,11 @@ from app.models.document_ocr import DocumentOCRResult
 from app.models.document_version import DocumentVersion
 from app.models.electronic_stamp import ElectronicStamp, SignatureCircuit, SignatureStep
 from app.models.federated_identity import FederatedIdentity
+from app.models.identity_lifecycle import (
+    AccessReviewCampaign,
+    AccessReviewItem,
+    IdentityLifecycleEvent,
+)
 from app.models.institution import Institution
 from app.models.qualified_signature_evidence import QualifiedSignatureEvidence
 from app.models.service_request import (
@@ -38,6 +43,9 @@ from app.models.workflow import (
 
 __all__ = [
     "AccessGrant",
+    "AccessReviewCampaign",
+    "AccessReviewItem",
+    "IdentityLifecycleEvent",
     "AdministrativeService",
     "User",
     "RoleEnum",
