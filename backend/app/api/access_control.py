@@ -199,6 +199,15 @@ async def request_access_grant(
         )
     if (body.resource, body.action) not in PERMISSION_MATRIX:
         raise HTTPException(status_code=422, detail="Permission inconnue dans la matrice d'autorisation.")
+    if not authorization_service.is_delegable_permission(
+        body.resource,
+        body.action,
+        grant_type=body.grant_type,
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail="Cette permission ne peut pas être déléguée; utilisez le processus break-glass contrôlé.",
+        )
     if not authorization_service.has_permanent_permission(current_user, body.resource, body.action):
         raise HTTPException(
             status_code=403,

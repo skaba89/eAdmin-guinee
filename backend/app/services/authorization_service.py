@@ -14,6 +14,18 @@ from app.models.access_grant import AccessGrant
 from app.models.user import RoleEnum, User
 
 
+# Permissions whose temporary elevation is too sensitive for ordinary
+# delegation. They remain available only through the separately governed,
+# short-lived break-glass path.
+BREAK_GLASS_ONLY_PERMISSIONS: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("users", "delete"),
+        ("settings", "update"),
+        ("tenants", "manage"),
+    }
+)
+
+
 @dataclass(frozen=True)
 class AuthorizationDecision:
     allowed: bool
@@ -31,6 +43,22 @@ class AuthorizationService:
     def has_permanent_permission(user: User, resource: str, action: str) -> bool:
         required_level = PERMISSION_MATRIX.get((resource, action), 7)
         return user.is_active and user.role.hierarchy_level() >= required_level
+
+    @staticmethod
+    def is_delegable_permission(
+        resource: str,
+        action: str,
+        *,
+        grant_type: str = "delegation",
+    ) -> bool:
+        """Return whether a permission may be elevated by this grant type."""
+        if (resource, action) not in PERMISSION_MATRIX:
+            return False
+        if grant_type == "break_glass":
+            return True
+        if grant_type != "delegation":
+            return False
+        return (resource, action) not in BREAK_GLASS_ONLY_PERMISSIONS
 
     @staticmethod
     def scope_allows(
@@ -74,6 +102,9 @@ class AuthorizationService:
         if not user.is_active:
             return AuthorizationDecision(False, "account_inactive", "deny")
 
+        if (resource, action) not in PERMISSION_MATRIX:
+            return AuthorizationDecision(False, "unknown_permission", "deny")
+
         permanent = self.has_permanent_permission(user, resource, action)
         scoped = self.scope_allows(
             user,
@@ -92,6 +123,7 @@ class AuthorizationService:
             and_(
                 AccessGrant.grantee_id == user.id,
                 AccessGrant.status == "active",
+                AccessGrant.approved_by.is_not(None),
                 AccessGrant.resource == resource,
                 AccessGrant.action == action,
                 AccessGrant.valid_from <= now,
@@ -113,17 +145,40 @@ class AuthorizationService:
         grants = result.scalars().all()
 
         for grant in grants:
-            if grant.requires_mfa and not mfa_verified:
+            # Defense in depth against a malformed/tampered database row. The
+            # API and DB constraints already enforce most of these invariants,
+            # but the runtime authorization authority must fail closed itself.
+            if grant.grant_type not in {"delegation", "break_glass"}:
                 continue
-            # A grant cannot become a cross-tenant escape hatch. Its own tenant is
-            # authoritative; institution=None explicitly means tenant-wide grant.
+            if grant.requested_by == grant.grantee_id:
+                continue
+            if grant.approved_by in {grant.requested_by, grant.grantee_id}:
+                continue
+            if not self.is_delegable_permission(
+                resource,
+                action,
+                grant_type=grant.grant_type,
+            ):
+                continue
+            if grant.grant_type == "break_glass" and not (grant.ticket_reference or "").strip():
+                continue
+            if (grant.requires_mfa or grant.grant_type == "break_glass") and not mfa_verified:
+                continue
+
+            # A grant cannot become a cross-tenant escape hatch. Its own tenant
+            # is authoritative; institution=None explicitly means tenant-wide.
             if tenant_id and grant.tenant_id != tenant_id:
                 continue
             if institution_id and grant.institution_id not in (None, institution_id):
                 continue
 
             grant.last_used_at = now
-            return AuthorizationDecision(True, "approved_temporary_grant", grant.grant_type, grant.id)
+            reason = (
+                "approved_break_glass"
+                if grant.grant_type == "break_glass"
+                else "approved_temporary_grant"
+            )
+            return AuthorizationDecision(True, reason, grant.grant_type, grant.id)
 
         reason = "scope_denied" if permanent and not scoped else "permission_denied"
         return AuthorizationDecision(False, reason, "deny")
