@@ -72,9 +72,32 @@ jobs:
         run: |
           docker compose --env-file .env.local.ci -f docker-compose.local.yml build backend frontend notification-worker
 
-      - name: Start local core services
+      - name: Start local infrastructure
         run: |
-          docker compose --env-file .env.local.ci -f docker-compose.local.yml up -d postgres redis minio minio-init mailpit backend
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml up -d postgres redis minio minio-init mailpit
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml ps
+
+      - name: Validate backend settings
+        run: |
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml run --rm --no-deps backend \
+            python -c "from app.config import settings; print('settings OK', settings.ENVIRONMENT, settings.DATABASE_URL.split('@')[-1])"
+
+      - name: Run migrations explicitly
+        run: |
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml run --rm --no-deps backend alembic upgrade head
+
+      - name: Run enabled bootstrap explicitly
+        run: |
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml run --rm --no-deps backend python -m app.bootstrap_runtime
+
+      - name: Import FastAPI application explicitly
+        run: |
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml run --rm --no-deps backend \
+            python -c "from app.main import app; print('FastAPI import OK', app.title)"
+
+      - name: Start backend service
+        run: |
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml up -d backend
 
       - name: Wait for backend health
         run: |
@@ -84,9 +107,15 @@ jobs:
               cat /tmp/backend-health.json
               exit 0
             fi
+            if ! docker compose --env-file .env.local.ci -f docker-compose.local.yml ps --status running backend | grep -q eadmin-local-backend; then
+              echo 'Backend container stopped before becoming healthy.' >&2
+              docker compose --env-file .env.local.ci -f docker-compose.local.yml ps -a backend
+              docker compose --env-file .env.local.ci -f docker-compose.local.yml logs --tail 250 backend
+              exit 1
+            fi
             sleep 2
           done
-          docker compose --env-file .env.local.ci -f docker-compose.local.yml logs --tail 200 backend
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml logs --tail 250 backend
           exit 1
 
       - name: Verify bootstrapped portal accounts
@@ -150,7 +179,7 @@ jobs:
 
       - name: Show local service state
         if: always()
-        run: docker compose --env-file .env.local.ci -f docker-compose.local.yml ps || true
+        run: docker compose --env-file .env.local.ci -f docker-compose.local.yml ps -a || true
 
       - name: Show logs on failure
         if: failure()
