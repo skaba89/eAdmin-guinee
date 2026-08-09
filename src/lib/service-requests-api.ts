@@ -78,6 +78,19 @@ async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   return payload as T
 }
 
+function attachRequestContext(request: CitizenRequest): CitizenRequest {
+  // Persisted attachments intentionally contain no browser data URL. Attach the
+  // already-authorized parent request id locally so shared download/preview
+  // helpers can request a five-minute backend URL on demand.
+  return {
+    ...request,
+    uploadedDocuments: (request.uploadedDocuments || []).map((document) => ({
+      ...document,
+      requestId: request.id,
+    })),
+  }
+}
+
 export async function listInstitutions(search?: string): Promise<InstitutionOption[]> {
   const params = new URLSearchParams()
   if (search) params.set('search', search)
@@ -92,7 +105,7 @@ export async function listRequests(): Promise<CitizenRequest[]> {
   const payload = await apiFetch<{ items: CitizenRequest[] }>(
     '/api/v1/service-requests?page=1&page_size=200',
   )
-  return payload.items
+  return payload.items.map(attachRequestContext)
 }
 
 export async function createRequest(input: CreateServiceRequestInput): Promise<CitizenRequest> {
@@ -114,13 +127,14 @@ export async function createRequest(input: CreateServiceRequestInput): Promise<C
   }
   const idempotencyKey = await getStableIdempotencyKey(requestPayload)
 
-  return apiFetch<CitizenRequest>('/api/v1/service-requests', {
+  const created = await apiFetch<CitizenRequest>('/api/v1/service-requests', {
     method: 'POST',
     headers: {
       'Idempotency-Key': idempotencyKey,
     },
     body: JSON.stringify(requestPayload),
   })
+  return attachRequestContext(created)
 }
 
 export async function updateStatus(id: string, status: RequestStatus, note?: string): Promise<CitizenRequest> {
@@ -131,17 +145,19 @@ export async function updateStatus(id: string, status: RequestStatus, note?: str
     }
   }
 
-  return apiFetch<CitizenRequest>(`/api/v1/service-requests/${id}/status`, {
+  const updated = await apiFetch<CitizenRequest>(`/api/v1/service-requests/${id}/status`, {
     method: 'POST',
     body: JSON.stringify({ status, note: note || null }),
   })
+  return attachRequestContext(updated)
 }
 
 export async function assignRequest(id: string, agent: string): Promise<CitizenRequest> {
-  return apiFetch<CitizenRequest>(`/api/v1/service-requests/${id}/assign`, {
+  const updated = await apiFetch<CitizenRequest>(`/api/v1/service-requests/${id}/assign`, {
     method: 'POST',
     body: JSON.stringify({ agent_name: agent, agent_id: null }),
   })
+  return attachRequestContext(updated)
 }
 
 export async function addNote(
@@ -159,13 +175,14 @@ export async function completeRequest(
   deliveryMode: CitizenRequest['deliveryMode'],
   deliveryLocation?: string,
 ): Promise<CitizenRequest> {
-  return apiFetch<CitizenRequest>(`/api/v1/service-requests/${id}/complete`, {
+  const updated = await apiFetch<CitizenRequest>(`/api/v1/service-requests/${id}/complete`, {
     method: 'POST',
     body: JSON.stringify({
       delivery_mode: deliveryMode,
       delivery_location: deliveryLocation || null,
     }),
   })
+  return attachRequestContext(updated)
 }
 
 export async function saveGeneratedDocument(
@@ -177,7 +194,7 @@ export async function saveGeneratedDocument(
   void legacyDocument
   const write = apiFetch<CitizenRequest>(`/api/v1/service-requests/${id}/generated-document`, {
     method: 'POST',
-  })
+  }).then(attachRequestContext)
 
   pendingGeneratedDocumentWrites.set(id, write)
   try {
@@ -197,10 +214,14 @@ export async function uploadAttachment(
   const form = new FormData()
   form.set('file', file)
   form.set('required_doc_name', requiredDocName)
-  return apiFetch<UploadedDocument>(`/api/v1/service-requests/${requestId}/attachments`, {
+  const uploaded = await apiFetch<UploadedDocument>(`/api/v1/service-requests/${requestId}/attachments`, {
     method: 'POST',
     body: form,
   })
+  return {
+    ...uploaded,
+    requestId,
+  } as UploadedDocument
 }
 
 export async function verifyAttachment(requestId: string, attachmentId: string): Promise<void> {
@@ -223,8 +244,9 @@ export async function getAttachmentDownloadUrl(requestId: string, attachmentId: 
 }
 
 export async function rateRequest(id: string, rating: SatisfactionRating): Promise<CitizenRequest> {
-  return apiFetch<CitizenRequest>(`/api/v1/service-requests/${id}/satisfaction`, {
+  const updated = await apiFetch<CitizenRequest>(`/api/v1/service-requests/${id}/satisfaction`, {
     method: 'POST',
     body: JSON.stringify({ rating: rating.rating, comment: rating.comment }),
   })
+  return attachRequestContext(updated)
 }
