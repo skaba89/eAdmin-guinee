@@ -42,6 +42,7 @@ from app.api import (
 )
 from app.config import settings
 from app.middleware.audit import AuditMiddleware
+from app.middleware.idempotency import IdempotencyMiddleware
 from app.middleware.mfa_guard import MFAGuardMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.rls import set_rls_context
@@ -162,10 +163,13 @@ app = FastAPI(
 
 # Starlette executes the last added middleware first.
 # Request order: CORS -> Tenant -> Security Headers -> Session validity -> MFA
-# -> Rate -> Audit -> Logging.
+# -> Idempotency -> Rate -> Audit -> Logging.
+# Keeping idempotency inside session/MFA guards prevents replaying a successful
+# citizen mutation with a revoked or no-longer-MFA-valid bearer token.
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(AuditMiddleware)
 app.add_middleware(RateLimitMiddleware)
+app.add_middleware(IdempotencyMiddleware)
 app.add_middleware(MFAGuardMiddleware)
 app.add_middleware(SessionValidityMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
@@ -209,11 +213,15 @@ app.add_middleware(
     allow_headers=[
         "Authorization",
         "Content-Type",
+        "Idempotency-Key",
         "X-Request-ID",
         "X-Tenant-ID",
         "X-Institution-ID",
     ],
     expose_headers=[
+        "Idempotency-Key",
+        "Idempotency-Replayed",
+        "Retry-After",
         "X-Request-ID",
         "X-Response-Time",
         "X-RateLimit-Limit",
@@ -223,29 +231,29 @@ app.add_middleware(
 )
 
 # Public SSO protocol endpoints intentionally run before authenticated/RLS
-# routers. They establish identity only; local authorization happens after the
-# explicit federated identity mapping is resolved.
+# dependencies. Authentication/callback creates the local session; all account
+# management endpoints below remain governed by bearer auth and RLS.
 app.include_router(
-    identity_federation.public_router,
+    identity_federation.protocol_router,
     prefix="/api/v1/auth/sso",
-    tags=["SSO OIDC"],
+    tags=["Fédération OIDC"],
 )
-app.include_router(
-    soc.ingest_router,
-    prefix="/api/v1/soc",
-    tags=["SOC - ingestion machine"],
-)
-# Authentication and security overrides are intentionally registered first.
+
+# Keep hardened auth routes before legacy auth so duplicate paths resolve to
+# fail-closed implementations first.
 app.include_router(auth_hardening.router, prefix="/api/v1/auth", tags=["Authentification"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentification"])
 
-rls_dependencies = [Depends(set_rls_context)]
-
+# Public machine-to-machine SOC ingestion is HMAC-authenticated and intentionally
+# separate from human bearer/RLS routes. The endpoint establishes its own
+# SOC_SERVICE PostgreSQL scope before touching FORCE RLS tables.
 app.include_router(
-    service_catalog.public_router,
-    prefix="/api/v1/public/service-catalog",
-    tags=["Catalogue public des démarches"],
+    soc.ingest_router,
+    prefix="/api/v1/soc",
+    tags=["SOC Ingestion"],
 )
+
+rls_dependencies = [Depends(set_rls_context)]
 
 app.include_router(
     institutions.router,
@@ -254,15 +262,15 @@ app.include_router(
     dependencies=rls_dependencies,
 )
 app.include_router(
-    service_catalog.router,
-    prefix="/api/v1/service-catalog",
-    tags=["Catalogue des démarches"],
+    access_control.router,
+    prefix="/api/v1/access-control",
+    tags=["Habilitations IAM"],
     dependencies=rls_dependencies,
 )
 app.include_router(
-    service_request_files.router,
-    prefix="/api/v1/service-requests",
-    tags=["Pièces des demandes"],
+    service_catalog.router,
+    prefix="/api/v1/services",
+    tags=["Catalogue de services"],
     dependencies=rls_dependencies,
 )
 app.include_router(
@@ -271,6 +279,9 @@ app.include_router(
     tags=["Demandes citoyennes"],
     dependencies=rls_dependencies,
 )
+# Register all server-authoritative GED routes before the historical
+# documents router. Import/query/file routes therefore own duplicate method/path
+# combinations and prevent client-authoritative legacy mutations.
 app.include_router(
     document_imports.router,
     prefix="/api/v1/documents",
@@ -326,18 +337,6 @@ app.include_router(
     dependencies=rls_dependencies,
 )
 app.include_router(
-    access_control.router,
-    prefix="/api/v1/access-control",
-    tags=["IAM et habilitations"],
-    dependencies=rls_dependencies,
-)
-app.include_router(
-    identity_federation.admin_router,
-    prefix="/api/v1/access-control/federated-identities",
-    tags=["IAM - identités fédérées"],
-    dependencies=rls_dependencies,
-)
-app.include_router(
     users.router,
     prefix="/api/v1/users",
     tags=["Utilisateurs"],
@@ -355,6 +354,8 @@ app.include_router(
     tags=["Audit"],
     dependencies=rls_dependencies,
 )
+# Grounded routes intentionally precede the historical AI router. Duplicate
+# paths are therefore handled by the sourced, human-in-the-loop implementation.
 app.include_router(
     ai_grounded.router,
     prefix="/api/v1/ai",
@@ -367,6 +368,12 @@ app.include_router(
     tags=["Intelligence Artificielle (compatibilité)"],
     dependencies=rls_dependencies,
 )
+app.include_router(
+    soc.router,
+    prefix="/api/v1/soc",
+    tags=["SOC"],
+    dependencies=rls_dependencies,
+)
 
 app.include_router(security_hardening.router, prefix="/api/v1/security", tags=["Sécurité"])
 app.include_router(security.router, prefix="/api/v1/security", tags=["Sécurité"])
@@ -374,12 +381,6 @@ app.include_router(
     security_events.router,
     prefix="/api/v1/security-events",
     tags=["Événements de Sécurité"],
-    dependencies=rls_dependencies,
-)
-app.include_router(
-    soc.router,
-    prefix="/api/v1/soc",
-    tags=["SOC et réponse à incident"],
     dependencies=rls_dependencies,
 )
 app.include_router(metrics.router, tags=["Métriques"])
@@ -418,28 +419,91 @@ async def health_check():
         health_status["redis"] = f"unhealthy: {str(exc)[:100]}"
         health_status["status"] = "degraded"
 
-    health_status["minio"] = "healthy" if settings.is_development else "not_configured"
+    try:
+        from app.services.object_storage import object_storage
+        start = time.time()
+        await object_storage.healthcheck()
+        health_status["object_storage"] = "healthy"
+        health_status["object_storage_latency_ms"] = round((time.time() - start) * 1000)
+    except Exception as exc:
+        health_status["object_storage"] = f"unhealthy: {str(exc)[:100]}"
+        health_status["status"] = "degraded"
+
     return health_status
 
 
-@app.get("/api/v1/health", tags=["Santé"])
-async def api_v1_health_check():
-    return await health_check()
-
-
-@app.get("/metrics", tags=["Métriques"])
-async def get_metrics():
-    avg_response_time = (
-        round(total_response_time_ms / request_counter, 2)
-        if request_counter > 0
-        else 0
-    )
+@app.get("/health/live", tags=["Santé"])
+async def liveness_check():
+    """Process liveness only; never depend on external services here."""
     return {
-        "eadmin_requests_total": request_counter,
-        "eadmin_errors_total": error_counter,
-        "eadmin_active_sessions": active_sessions_count,
-        "eadmin_avg_response_time_ms": avg_response_time,
-        "eadmin_uptime_seconds": round(time.time() - APP_START_TIME),
-        "eadmin_environment": settings.ENVIRONMENT,
-        "eadmin_version": settings.APP_VERSION,
+        "status": "alive",
+        "service": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "uptime_seconds": round(time.time() - APP_START_TIME),
     }
+
+
+@app.get("/health/ready", tags=["Santé"])
+async def readiness_check():
+    """Fail closed when a stateful dependency required for safe traffic is down."""
+    from fastapi.responses import JSONResponse
+    from sqlalchemy import text
+
+    dependencies: dict[str, dict[str, object]] = {}
+    healthy = True
+
+    try:
+        from app.database import engine
+        start = time.time()
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        dependencies["postgresql"] = {
+            "status": "healthy",
+            "latency_ms": round((time.time() - start) * 1000),
+        }
+    except Exception as exc:
+        healthy = False
+        dependencies["postgresql"] = {
+            "status": "unhealthy",
+            "error": str(exc)[:120],
+        }
+
+    try:
+        from app.services.token_blacklist import token_blacklist
+        start = time.time()
+        redis = await token_blacklist._get_redis()
+        await redis.ping()
+        dependencies["redis"] = {
+            "status": "healthy",
+            "latency_ms": round((time.time() - start) * 1000),
+        }
+    except Exception as exc:
+        healthy = False
+        dependencies["redis"] = {
+            "status": "unhealthy",
+            "error": str(exc)[:120],
+        }
+
+    try:
+        from app.services.object_storage import object_storage
+        start = time.time()
+        await object_storage.healthcheck()
+        dependencies["object_storage"] = {
+            "status": "healthy",
+            "latency_ms": round((time.time() - start) * 1000),
+        }
+    except Exception as exc:
+        healthy = False
+        dependencies["object_storage"] = {
+            "status": "unhealthy",
+            "error": str(exc)[:120],
+        }
+
+    payload = {
+        "status": "ready" if healthy else "not_ready",
+        "service": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "dependencies": dependencies,
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    return JSONResponse(status_code=200 if healthy else 503, content=payload)
