@@ -150,6 +150,21 @@ def _status_permission_action(target_status: ServiceRequestStatusEnum) -> str:
     return "process"
 
 
+def _ensure_transition_business_invariants(
+    item: ServiceRequest,
+    target_status: ServiceRequestStatusEnum,
+) -> None:
+    """Reject workflow states whose required business evidence is absent."""
+    if (
+        target_status == ServiceRequestStatusEnum.PRETE
+        and item.generated_document is None
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Un document administratif enregistré est requis avant le passage au statut 'prete'.",
+        )
+
+
 def _serialize_request(item: ServiceRequest) -> dict[str, Any]:
     notes = sorted(item.notes or [], key=lambda note: note.created_at or datetime.min.replace(tzinfo=timezone.utc))
     attachments = sorted(item.attachments or [], key=lambda att: att.uploaded_at or datetime.min.replace(tzinfo=timezone.utc))
@@ -410,6 +425,7 @@ async def update_service_request_status(
             status_code=409,
             detail=f"Transition interdite : {item.status.value} → {payload.status.value}.",
         )
+    _ensure_transition_business_invariants(item, payload.status)
 
     old_status = item.status
     item.status = payload.status
