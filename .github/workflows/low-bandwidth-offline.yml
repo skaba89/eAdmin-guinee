@@ -1,0 +1,63 @@
+name: Low Bandwidth Offline Gate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+      - work/low-bandwidth-offline-first
+  workflow_dispatch:
+
+concurrency:
+  group: low-bandwidth-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  low-bandwidth:
+    name: PWA privacy and reconnect idempotency invariants
+    runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: test
+      DATABASE_URL: postgresql+asyncpg://eadmin:ci-test-password@localhost:5432/eadmin_low_bandwidth
+      REDIS_URL: redis://localhost:6379
+      SECRET_KEY: ci-only-secret-key-not-for-production-0123456789
+      ENCRYPTION_KEY: ci-only-encryption-key-0123456789abcdef
+      MINIO_ACCESS_KEY: ci-minio
+      MINIO_SECRET_KEY: ci-minio-secret
+      MINIO_ENDPOINT: localhost:9000
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Enforce low-bandwidth privacy policy
+        run: python scripts/ops/check_low_bandwidth_policy.py
+
+      - name: Lint reconnect middleware and tests
+        working-directory: backend
+        run: |
+          ruff check \
+            app/middleware/idempotency.py \
+            tests/test_idempotency_middleware.py
+
+      - name: Test reconnect-safe idempotency
+        working-directory: backend
+        run: pytest -q tests/test_idempotency_middleware.py
