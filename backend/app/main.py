@@ -42,6 +42,7 @@ from app.api import (
 )
 from app.config import settings
 from app.middleware.audit import AuditMiddleware
+from app.middleware.idempotency import IdempotencyMiddleware
 from app.middleware.mfa_guard import MFAGuardMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.rls import set_rls_context
@@ -162,10 +163,13 @@ app = FastAPI(
 
 # Starlette executes the last added middleware first.
 # Request order: CORS -> Tenant -> Security Headers -> Session validity -> MFA
-# -> Rate -> Audit -> Logging.
+# -> Idempotency -> Rate -> Audit -> Logging.
+# Keeping idempotency inside session/MFA guards prevents replaying a successful
+# citizen mutation with a revoked or no-longer-MFA-valid bearer token.
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(AuditMiddleware)
 app.add_middleware(RateLimitMiddleware)
+app.add_middleware(IdempotencyMiddleware)
 app.add_middleware(MFAGuardMiddleware)
 app.add_middleware(SessionValidityMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
@@ -209,11 +213,15 @@ app.add_middleware(
     allow_headers=[
         "Authorization",
         "Content-Type",
+        "Idempotency-Key",
         "X-Request-ID",
         "X-Tenant-ID",
         "X-Institution-ID",
     ],
     expose_headers=[
+        "Idempotency-Key",
+        "Idempotency-Replayed",
+        "Retry-After",
         "X-Request-ID",
         "X-Response-Time",
         "X-RateLimit-Limit",

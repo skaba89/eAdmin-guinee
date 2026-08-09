@@ -1,4 +1,5 @@
 import { getActiveAccessToken } from '@/lib/auth-client'
+import { getStableIdempotencyKey } from '@/lib/idempotency-client'
 import type {
   CitizenRequest,
   GeneratedDocument,
@@ -89,21 +90,30 @@ export async function listRequests(): Promise<CitizenRequest[]> {
 }
 
 export async function createRequest(input: CreateServiceRequestInput): Promise<CitizenRequest> {
+  // Canonicalize exactly the payload sent to the backend. The derived key is
+  // kept in sessionStorage only, so a mobile reconnect can safely retry the
+  // same mutation without storing any citizen business data offline.
+  const requestPayload = {
+    service_id: input.serviceId,
+    target_institution_id: input.targetInstitutionId,
+    citizen_name: input.citizenName,
+    citizen_first_name: input.citizenFirstName,
+    citizen_nin: input.citizenNIN,
+    citizen_phone: input.citizenPhone,
+    citizen_email: input.citizenEmail,
+    citizen_address: input.citizenAddress,
+    motif: input.motif,
+    mairie: input.mairie || null,
+    delivery_mode: input.deliveryMode,
+  }
+  const idempotencyKey = await getStableIdempotencyKey(requestPayload)
+
   return apiFetch<CitizenRequest>('/api/v1/service-requests', {
     method: 'POST',
-    body: JSON.stringify({
-      service_id: input.serviceId,
-      target_institution_id: input.targetInstitutionId,
-      citizen_name: input.citizenName,
-      citizen_first_name: input.citizenFirstName,
-      citizen_nin: input.citizenNIN,
-      citizen_phone: input.citizenPhone,
-      citizen_email: input.citizenEmail,
-      citizen_address: input.citizenAddress,
-      motif: input.motif,
-      mairie: input.mairie || null,
-      delivery_mode: input.deliveryMode,
-    }),
+    headers: {
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify(requestPayload),
   })
 }
 
