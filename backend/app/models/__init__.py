@@ -23,6 +23,7 @@ from app.models.identity_lifecycle import (
     IdentityLifecycleEvent,
 )
 from app.models.institution import Institution
+from app.models.notification_outbox import NotificationOutbox
 from app.models.qualified_signature_evidence import QualifiedSignatureEvidence
 from app.models.service_request import (
     DeliveryModeEnum,
@@ -40,6 +41,11 @@ from app.models.workflow import (
     WorkflowStepStatusEnum,
     WorkflowStatusEnum,
 )
+
+# Register transactional mapper listeners only after all referenced ORM models
+# have been imported. The imported name is deliberately private: registration is
+# the side effect, not a public models API.
+from app.services import service_request_notification_events as _service_request_notification_events  # noqa: E402,F401
 
 __all__ = [
     "AccessGrant",
@@ -59,6 +65,7 @@ __all__ = [
     "SignatureCircuit",
     "SignatureStep",
     "FederatedIdentity",
+    "NotificationOutbox",
     "QualifiedSignatureEvidence",
     "Courrier",
     "CourrierTypeEnum",
