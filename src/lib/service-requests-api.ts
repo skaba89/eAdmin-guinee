@@ -168,10 +168,13 @@ export async function completeRequest(
   })
 }
 
-export async function saveGeneratedDocument(id: string): Promise<CitizenRequest> {
-  // No title, HTML, filename or identity is accepted from the browser. The
-  // backend loads the request's historical catalog version and renders its
-  // approved plain-text template inside a controlled server-owned layout.
+export async function saveGeneratedDocument(
+  id: string,
+  legacyDocument?: unknown,
+): Promise<CitizenRequest> {
+  // Compatibility only: an older component may still pass a browser-composed
+  // document object. It is deliberately discarded and never crosses the API.
+  void legacyDocument
   const write = apiFetch<CitizenRequest>(`/api/v1/service-requests/${id}/generated-document`, {
     method: 'POST',
   })
