@@ -79,9 +79,18 @@ def upgrade() -> None:
         USING (current_setting('app.current_role', true) = 'SSO_SERVICE')
         """
     )
+    op.execute(
+        """
+        CREATE POLICY users_auth_service_read
+        ON users
+        FOR SELECT
+        USING (current_setting('app.current_role', true) = 'AUTH_SERVICE')
+        """
+    )
 
 
 def downgrade() -> None:
+    op.execute("DROP POLICY IF EXISTS users_auth_service_read ON users")
     op.execute("DROP POLICY IF EXISTS users_sso_service_read ON users")
     op.execute("DROP POLICY IF EXISTS federated_identities_super_admin_read ON federated_identities")
     op.execute("DROP POLICY IF EXISTS federated_identities_sso_service_all ON federated_identities")
