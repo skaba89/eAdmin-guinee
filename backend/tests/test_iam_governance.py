@@ -310,3 +310,196 @@ async def test_break_glass_requires_incident_ticket(client, db_session):
     )
     assert response.status_code == 422, response.text
     assert "ticket" in response.text.lower()
+
+
+@pytest.mark.asyncio
+async def test_real_protected_route_honors_approved_grant_only_with_mfa(client, db_session):
+    requester = await _user(
+        db_session,
+        email="director.route@eadmin.gn",
+        role=RoleEnum.DIRECTEUR,
+    )
+    grantee = await _user(
+        db_session,
+        email="agent.route@eadmin.gn",
+        role=RoleEnum.AGENT,
+        mfa_enabled=True,
+    )
+    citizen = await _user(
+        db_session,
+        email="citizen.route@eadmin.gn",
+        role=RoleEnum.CITOYEN,
+    )
+    now = datetime.now(timezone.utc)
+    grant = AccessGrant(
+        grant_type="delegation",
+        status="active",
+        grantee_id=grantee.id,
+        requested_by=requester.id,
+        approved_by=uuid.uuid4(),
+        tenant_id=settings.TENANT_DEFAULT_ID,
+        institution_id="inst-a",
+        resource="users",
+        action="read",
+        reason="Consultation temporaire des comptes de l'institution",
+        requires_mfa=True,
+        valid_from=now - timedelta(minutes=1),
+        valid_until=now + timedelta(hours=1),
+    )
+    db_session.add(grant)
+    await db_session.commit()
+
+    denied = await client.get("/api/v1/users", headers=_headers(grantee))
+    assert denied.status_code == 403, denied.text
+
+    allowed = await client.get(
+        "/api/v1/users",
+        headers=_headers(grantee, mfa_verified=True),
+    )
+    assert allowed.status_code == 200, allowed.text
+    payload = allowed.json()
+    assert any(item["id"] == str(citizen.id) for item in payload["items"])
+
+
+@pytest.mark.asyncio
+async def test_plain_delegation_cannot_elevate_break_glass_only_permission(db_session):
+    requester = await _user(
+        db_session,
+        email="root.policy@eadmin.gn",
+        role=RoleEnum.SUPER_ADMIN,
+        institution_id=None,
+    )
+    grantee = await _user(
+        db_session,
+        email="agent.policy@eadmin.gn",
+        role=RoleEnum.AGENT,
+        mfa_enabled=True,
+    )
+    now = datetime.now(timezone.utc)
+    grant = AccessGrant(
+        grant_type="delegation",
+        status="active",
+        grantee_id=grantee.id,
+        requested_by=requester.id,
+        approved_by=uuid.uuid4(),
+        tenant_id=settings.TENANT_DEFAULT_ID,
+        institution_id="inst-a",
+        resource="settings",
+        action="update",
+        reason="Tentative de délégation d'une permission ultra privilégiée",
+        requires_mfa=True,
+        valid_from=now - timedelta(minutes=1),
+        valid_until=now + timedelta(hours=1),
+    )
+    db_session.add(grant)
+    await db_session.commit()
+
+    decision = await authorization_service.authorize(
+        user=grantee,
+        resource="settings",
+        action="update",
+        db=db_session,
+        tenant_id=settings.TENANT_DEFAULT_ID,
+        institution_id="inst-a",
+        mfa_verified=True,
+    )
+    assert decision.allowed is False
+
+
+@pytest.mark.asyncio
+async def test_break_glass_only_permission_requires_ticket_and_mfa_at_runtime(db_session):
+    requester = await _user(
+        db_session,
+        email="root.breakglass.runtime@eadmin.gn",
+        role=RoleEnum.SUPER_ADMIN,
+        institution_id=None,
+    )
+    grantee = await _user(
+        db_session,
+        email="agent.breakglass.runtime@eadmin.gn",
+        role=RoleEnum.AGENT,
+        mfa_enabled=True,
+    )
+    now = datetime.now(timezone.utc)
+    grant = AccessGrant(
+        grant_type="break_glass",
+        status="active",
+        grantee_id=grantee.id,
+        requested_by=requester.id,
+        approved_by=uuid.uuid4(),
+        tenant_id=settings.TENANT_DEFAULT_ID,
+        institution_id="inst-a",
+        resource="settings",
+        action="update",
+        reason="Incident national nécessitant une élévation contrôlée",
+        ticket_reference="INC-SEV1-2026-0001",
+        requires_mfa=True,
+        valid_from=now - timedelta(minutes=1),
+        valid_until=now + timedelta(minutes=30),
+    )
+    db_session.add(grant)
+    await db_session.commit()
+
+    without_mfa = await authorization_service.authorize(
+        user=grantee,
+        resource="settings",
+        action="update",
+        db=db_session,
+        tenant_id=settings.TENANT_DEFAULT_ID,
+        institution_id="inst-a",
+        mfa_verified=False,
+    )
+    assert without_mfa.allowed is False
+
+    with_mfa = await authorization_service.authorize(
+        user=grantee,
+        resource="settings",
+        action="update",
+        db=db_session,
+        tenant_id=settings.TENANT_DEFAULT_ID,
+        institution_id="inst-a",
+        mfa_verified=True,
+    )
+    assert with_mfa.allowed is True
+    assert with_mfa.source == "break_glass"
+    assert with_mfa.reason == "approved_break_glass"
+
+
+@pytest.mark.asyncio
+async def test_malformed_self_approved_grant_fails_closed(db_session):
+    grantee = await _user(
+        db_session,
+        email="agent.malformed@eadmin.gn",
+        role=RoleEnum.AGENT,
+        mfa_enabled=True,
+    )
+    now = datetime.now(timezone.utc)
+    db_session.add(
+        AccessGrant(
+            grant_type="delegation",
+            status="active",
+            grantee_id=grantee.id,
+            requested_by=uuid.uuid4(),
+            approved_by=grantee.id,
+            tenant_id=settings.TENANT_DEFAULT_ID,
+            institution_id="inst-a",
+            resource="workflows",
+            action="manage",
+            reason="Ligne incohérente injectée pour vérifier le fail-closed",
+            requires_mfa=True,
+            valid_from=now - timedelta(minutes=1),
+            valid_until=now + timedelta(hours=1),
+        )
+    )
+    await db_session.commit()
+
+    decision = await authorization_service.authorize(
+        user=grantee,
+        resource="workflows",
+        action="manage",
+        db=db_session,
+        tenant_id=settings.TENANT_DEFAULT_ID,
+        institution_id="inst-a",
+        mfa_verified=True,
+    )
+    assert decision.allowed is False
