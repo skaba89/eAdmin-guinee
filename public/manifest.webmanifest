@@ -1,0 +1,23 @@
+{
+  "name": "eAdmin Guinée",
+  "short_name": "eAdmin",
+  "description": "Plateforme nationale de services administratifs numériques de la République de Guinée",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0B2E58",
+  "lang": "fr-GN",
+  "icons": [
+    {
+      "src": "/logo-128.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo-256.png",
+      "sizes": "256x256",
+      "type": "image/png"
+    }
+  ]
+}
