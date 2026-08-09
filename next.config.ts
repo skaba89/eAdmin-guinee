@@ -25,10 +25,10 @@ const nextConfig: NextConfig = {
 
   async rewrites() {
     return {
-      // These historical URLs are still referenced by the landing page. The
-      // original files were JPEG bytes stored with a .png suffix. Rewriting
-      // before filesystem resolution gives browsers/proxies the correct JPEG
-      // resource without any external request or visual re-encoding.
+      // These historical URLs are still referenced by the landing/login pages.
+      // The source files were JPEG bytes stored with a .png suffix. Rewriting
+      // before filesystem resolution serves the correctly named local JPEG
+      // without any external request or visual re-encoding.
       beforeFiles: localImageRewrites.map(([source, destination]) => ({
         source,
         destination,
@@ -40,6 +40,12 @@ const nextConfig: NextConfig = {
 
   async headers() {
     return [
+      // Browsers/proxies must not infer image/png from the historical URL.
+      // The internal rewrite serves JPEG bytes, so declare that type explicitly.
+      ...localImageRewrites.map(([source]) => ({
+        source,
+        headers: [{ key: "Content-Type", value: "image/jpeg" }],
+      })),
       {
         source: "/:asset*.jpg",
         headers: [
