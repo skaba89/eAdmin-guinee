@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AlertCircle, CheckCircle2, Pencil, Plus, RefreshCw, Shield, Trash2, Users } from 'lucide-react'
 import { useAppStore, type UserRole } from '@/store/app-store'
+import { listInstitutions, type InstitutionOption } from '@/lib/institutions-api'
 import {
   createManagedUser,
   deactivateManagedUser,
@@ -45,6 +46,15 @@ const FRONTEND_LEVEL: Record<UserRole, number> = {
   super_admin: 7,
 }
 
+const INSTITUTION_BOUND_ROLES = new Set<BackendRole>([
+  'AGENT',
+  'MAIRIE',
+  'AGENCE',
+  'ADMIN',
+  'CHEF_SERVICE',
+  'DIRECTEUR',
+])
+
 interface UserFormState {
   fullName: string
   email: string
@@ -73,9 +83,17 @@ function formatDate(value: string): string {
   }
 }
 
+function institutionsForRole(role: BackendRole, institutions: InstitutionOption[]): InstitutionOption[] {
+  if (role === 'MAIRIE') return institutions.filter((item) => item.type.toLowerCase() === 'mairie')
+  if (role === 'AGENCE') return institutions.filter((item) => item.type.toLowerCase() === 'agence')
+  return institutions
+}
+
 export function ManagedUsersPage() {
   const actor = useAppStore((state) => state.user)
   const [users, setUsers] = useState<ManagedUser[]>([])
+  const [institutions, setInstitutions] = useState<InstitutionOption[]>([])
+  const [loadingInstitutions, setLoadingInstitutions] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -113,11 +131,29 @@ export function ManagedUsersPage() {
     }
   }
 
+  async function loadGovernedInstitutions() {
+    if (actor?.role !== 'super_admin') return
+    setLoadingInstitutions(true)
+    try {
+      setInstitutions(await listInstitutions({ limit: 500 }))
+    } catch (reason) {
+      setInstitutions([])
+      setError(reason instanceof Error ? reason.message : 'Impossible de charger les institutions.')
+    } finally {
+      setLoadingInstitutions(false)
+    }
+  }
+
   useEffect(() => {
     void loadUsers()
     // Filters are deliberately server-authoritative; reload when they change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roleFilter])
+
+  useEffect(() => {
+    void loadGovernedInstitutions()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actor?.role])
 
   function openCreate() {
     setForm({
@@ -126,6 +162,7 @@ export function ManagedUsersPage() {
       institution: actor?.institution === 'République de Guinée' ? '' : actor?.institution || '',
     })
     setError('')
+    setNotice('')
     setCreateOpen(true)
   }
 
@@ -134,8 +171,18 @@ export function ManagedUsersPage() {
       setError('Nom, email, mot de passe et rôle sont obligatoires.')
       return
     }
+    if (
+      actor?.role === 'super_admin'
+      && INSTITUTION_BOUND_ROLES.has(form.role)
+      && !form.institutionId.trim()
+    ) {
+      setError('Sélectionnez l’institution ou la mairie de rattachement avant de créer ce compte.')
+      return
+    }
+
     setSaving(true)
     setError('')
+    setNotice('')
     try {
       const created = await createManagedUser({
         email: form.email,
@@ -146,10 +193,26 @@ export function ManagedUsersPage() {
         institutionId: form.institutionId,
         tenantId: actor?.role === 'super_admin' ? form.tenantId : undefined,
       })
-      setUsers((current) => [created, ...current.filter((item) => item.id !== created.id)])
+
+      // Do not trust an optimistic browser insert. Re-read the new account from
+      // the server; the backend itself only returns 201 after PostgreSQL COMMIT.
+      const verification = await listManagedUsers({
+        search: created.email,
+        pageSize: 100,
+      })
+      const persisted = verification.items.find((item) => item.id === created.id)
+      if (!persisted) {
+        throw new Error(
+          'Le backend a répondu à la création, mais le compte n’est pas relu depuis la base. La création est considérée comme échouée.',
+        )
+      }
+
       setCreateOpen(false)
       setForm(EMPTY_FORM)
-      setNotice(`Compte ${created.email} créé. Il peut maintenant se connecter au portail ${ROLE_META[created.role].label}.`)
+      await loadUsers()
+      setNotice(
+        `Compte ${persisted.email} enregistré dans PostgreSQL et rattaché à ${persisted.institution || 'son périmètre'}.`,
+      )
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Création impossible.')
     } finally {
@@ -169,6 +232,7 @@ export function ManagedUsersPage() {
       tenantId: user.tenant_id || '',
     })
     setError('')
+    setNotice('')
   }
 
   async function handleEdit() {
@@ -217,7 +281,7 @@ export function ManagedUsersPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Utilisateurs et portails</h1>
           <p className="text-sm text-muted-foreground">
-            Comptes réels gouvernés par le backend. Les rôles déterminent automatiquement le portail après connexion.
+            Comptes réels PostgreSQL. Chaque compte administratif est rattaché à son tenant et à son institution.
           </p>
         </div>
         <div className="flex gap-2">
@@ -250,7 +314,7 @@ export function ManagedUsersPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" /> Comptes</CardTitle>
-          <CardDescription>La liste respecte le tenant, l’institution et la hiérarchie du compte connecté.</CardDescription>
+          <CardDescription>Un administrateur municipal ne peut gérer que les comptes et dossiers de sa propre mairie.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col gap-3 md:flex-row">
@@ -302,16 +366,37 @@ export function ManagedUsersPage() {
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
-          <DialogHeader><DialogTitle>Créer un compte réel</DialogTitle><DialogDescription>Le backend contrôle la hiérarchie, le tenant et l’institution. Le mot de passe doit contenir au moins 12 caractères, majuscule, minuscule, chiffre et caractère spécial.</DialogDescription></DialogHeader>
-          <UserForm form={form} setForm={setForm} roles={assignableRoles} showPassword showTenant={actor?.role === 'super_admin'} />
+          <DialogHeader>
+            <DialogTitle>Créer un compte réel</DialogTitle>
+            <DialogDescription>
+              La création n’est confirmée qu’après écriture PostgreSQL. Pour une mairie, choisissez l’institution réelle : un seul ADMIN actif est autorisé par mairie.
+            </DialogDescription>
+          </DialogHeader>
+          <UserForm
+            form={form}
+            setForm={setForm}
+            roles={assignableRoles}
+            showPassword
+            showTenant={actor?.role === 'super_admin'}
+            governedInstitutions={actor?.role === 'super_admin' ? institutions : []}
+            loadingInstitutions={loadingInstitutions}
+          />
           <DialogFooter><Button variant="outline" onClick={() => setCreateOpen(false)}>Annuler</Button><Button onClick={() => void handleCreate()} disabled={saving}>{saving ? 'Création…' : 'Créer le compte'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={Boolean(editUser)} onOpenChange={(open) => { if (!open) setEditUser(null) }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
-          <DialogHeader><DialogTitle>Modifier le compte</DialogTitle><DialogDescription>Les changements de rôle/périmètre déclenchent les contrôles de gouvernance du backend.</DialogDescription></DialogHeader>
-          <UserForm form={form} setForm={setForm} roles={assignableRoles} showPassword={false} showTenant={false} />
+          <DialogHeader><DialogTitle>Modifier le compte</DialogTitle><DialogDescription>Les changements de rôle/périmètre sont revalidés par le backend.</DialogDescription></DialogHeader>
+          <UserForm
+            form={form}
+            setForm={setForm}
+            roles={assignableRoles}
+            showPassword={false}
+            showTenant={false}
+            governedInstitutions={actor?.role === 'super_admin' ? institutions : []}
+            loadingInstitutions={loadingInstitutions}
+          />
           <DialogFooter><Button variant="outline" onClick={() => setEditUser(null)}>Annuler</Button><Button onClick={() => void handleEdit()} disabled={saving}>{saving ? 'Enregistrement…' : 'Enregistrer'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
@@ -333,21 +418,74 @@ function UserForm({
   roles,
   showPassword,
   showTenant,
+  governedInstitutions,
+  loadingInstitutions,
 }: {
   form: UserFormState
   setForm: React.Dispatch<React.SetStateAction<UserFormState>>
   roles: [BackendRole, { label: string; level: number }][]
   showPassword: boolean
   showTenant: boolean
+  governedInstitutions: InstitutionOption[]
+  loadingInstitutions: boolean
 }) {
+  const requiresInstitution = INSTITUTION_BOUND_ROLES.has(form.role)
+  const selectableInstitutions = institutionsForRole(form.role, governedInstitutions)
+  const usesGovernedSelector = governedInstitutions.length > 0 || loadingInstitutions
+
   return (
     <div className="grid gap-4 py-2">
       <div className="space-y-2"><Label>Nom complet</Label><Input value={form.fullName} onChange={(event) => setForm((current) => ({ ...current, fullName: event.target.value }))} /></div>
       <div className="space-y-2"><Label>Email</Label><Input type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} /></div>
       {showPassword && <div className="space-y-2"><Label>Mot de passe initial</Label><Input type="password" autoComplete="new-password" value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} /></div>}
-      <div className="space-y-2"><Label>Rôle / portail</Label><Select value={form.role} onValueChange={(value) => setForm((current) => ({ ...current, role: value as BackendRole }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{roles.map(([role, meta]) => <SelectItem key={role} value={role}>{meta.label}</SelectItem>)}</SelectContent></Select></div>
-      <div className="space-y-2"><Label>Institution (libellé)</Label><Input value={form.institution} onChange={(event) => setForm((current) => ({ ...current, institution: event.target.value }))} placeholder="Ex. Mairie de Ratoma" /></div>
-      <div className="space-y-2"><Label>Identifiant institution</Label><Input value={form.institutionId} onChange={(event) => setForm((current) => ({ ...current, institutionId: event.target.value }))} placeholder="Ex. mairie-ratoma" /></div>
+      <div className="space-y-2">
+        <Label>Rôle / portail</Label>
+        <Select
+          value={form.role}
+          onValueChange={(value) => setForm((current) => ({
+            ...current,
+            role: value as BackendRole,
+            institution: '',
+            institutionId: '',
+          }))}
+        >
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>{roles.map(([role, meta]) => <SelectItem key={role} value={role}>{meta.label}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>
+
+      {requiresInstitution && usesGovernedSelector ? (
+        <div className="space-y-2">
+          <Label>Institution / mairie de rattachement</Label>
+          <Select
+            value={form.institutionId || undefined}
+            onValueChange={(value) => {
+              const selected = governedInstitutions.find((item) => item.id === value)
+              setForm((current) => ({
+                ...current,
+                institutionId: value,
+                institution: selected?.name || '',
+              }))
+            }}
+            disabled={loadingInstitutions}
+          >
+            <SelectTrigger><SelectValue placeholder={loadingInstitutions ? 'Chargement…' : 'Sélectionner une institution'} /></SelectTrigger>
+            <SelectContent>
+              {selectableInstitutions.map((institution) => (
+                <SelectItem key={institution.id} value={institution.id}>
+                  {institution.name} ({institution.type})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {form.role === 'ADMIN' && <p className="text-xs text-muted-foreground">Pour une mairie, le backend garantit un seul administrateur ADMIN actif par mairie.</p>}
+        </div>
+      ) : requiresInstitution ? (
+        <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
+          L’institution est imposée par votre compte connecté. Vous ne pouvez pas créer un utilisateur dans une autre mairie.
+        </div>
+      ) : null}
+
       {showTenant && <div className="space-y-2"><Label>Tenant (optionnel)</Label><Input value={form.tenantId} onChange={(event) => setForm((current) => ({ ...current, tenantId: event.target.value }))} placeholder="republique-de-guinee" /></div>}
     </div>
   )

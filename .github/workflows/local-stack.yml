@@ -9,6 +9,9 @@ on:
       - 'bun.lock'
       - 'backend/**'
       - 'src/lib/api-base-url.ts'
+      - 'src/lib/users-api.ts'
+      - 'src/lib/institutions-api.ts'
+      - 'src/components/app/managed-users-page.tsx'
       - 'scripts/local.ps1'
       - 'local-*.bat'
       - 'docs/LOCAL_DEVELOPMENT.md'
@@ -22,6 +25,9 @@ on:
       - 'bun.lock'
       - 'backend/**'
       - 'src/lib/api-base-url.ts'
+      - 'src/lib/users-api.ts'
+      - 'src/lib/institutions-api.ts'
+      - 'src/components/app/managed-users-page.tsx'
       - 'scripts/local.ps1'
       - 'local-*.bat'
       - '.github/workflows/local-stack.yml'
@@ -204,6 +210,143 @@ jobs:
           assert not missing, f'Missing local portal accounts: {sorted(missing)}'
           assert payload['total'] >= 9, payload
           PY
+
+      - name: Verify durable mairie admins and cross-mairie dossier isolation
+        run: |
+          set -euo pipefail
+
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T postgres \
+            psql -U eadmin -d eadmin -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO institutions (id, tenant_id, name, type, is_active, settings)
+          VALUES
+            ('mairie-ratoma-ci', 'republique-de-guinee', 'Mairie de Ratoma CI', 'mairie', TRUE, '{"ci": true}'::json),
+            ('mairie-matoto-ci', 'republique-de-guinee', 'Mairie de Matoto CI', 'mairie', TRUE, '{"ci": true}'::json)
+          ON CONFLICT (id) DO UPDATE SET
+            tenant_id = EXCLUDED.tenant_id,
+            name = EXCLUDED.name,
+            type = EXCLUDED.type,
+            is_active = TRUE;
+          SQL
+
+          login_token() {
+            local email="$1"
+            curl -fsS -X POST http://localhost:8000/api/v1/auth/login \
+              -H 'Content-Type: application/x-www-form-urlencoded' \
+              --data-urlencode "username=${email}" \
+              --data-urlencode 'password=CiLocal!2026Aa-test-password' \
+              | python -c "import json,sys; print(json.load(sys.stdin)['access_token'])"
+          }
+
+          SUPERADMIN_TOKEN="$(login_token superadmin@eadmin.test)"
+
+          create_admin() {
+            local email="$1"
+            local name="$2"
+            local institution="$3"
+            local output="$4"
+            curl -sS -o "${output}" -w '%{http_code}' -X POST http://localhost:8000/api/v1/users \
+              -H "Authorization: Bearer ${SUPERADMIN_TOKEN}" \
+              -H 'Content-Type: application/json' \
+              -d "{\"email\":\"${email}\",\"password\":\"CiMairie!2026Aa-test-password\",\"full_name\":\"${name}\",\"role\":\"ADMIN\",\"tenant_id\":\"republique-de-guinee\",\"institution_id\":\"${institution}\"}"
+          }
+
+          RATOMA_STATUS="$(create_admin admin.ratoma@eadmin.test 'Admin Ratoma CI' mairie-ratoma-ci /tmp/admin-ratoma.json)"
+          MATOTO_STATUS="$(create_admin admin.matoto@eadmin.test 'Admin Matoto CI' mairie-matoto-ci /tmp/admin-matoto.json)"
+          echo "Create Ratoma ADMIN: HTTP ${RATOMA_STATUS}"; cat /tmp/admin-ratoma.json; echo
+          echo "Create Matoto ADMIN: HTTP ${MATOTO_STATUS}"; cat /tmp/admin-matoto.json; echo
+          test "${RATOMA_STATUS}" = "201"
+          test "${MATOTO_STATUS}" = "201"
+
+          # The API response is not enough: prove both rows are already durable
+          # in PostgreSQL before any subsequent request or container shutdown.
+          for email in admin.ratoma@eadmin.test admin.matoto@eadmin.test; do
+            FOUND="$(docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T postgres \
+              psql -U eadmin -d eadmin -Atc "SELECT count(*) FROM users WHERE email='${email}' AND is_active=TRUE;")"
+            test "${FOUND}" = "1"
+          done
+
+          DUPLICATE_STATUS="$(create_admin admin.ratoma2@eadmin.test 'Second Admin Ratoma CI' mairie-ratoma-ci /tmp/admin-ratoma-duplicate.json)"
+          echo "Second Ratoma ADMIN: HTTP ${DUPLICATE_STATUS}"; cat /tmp/admin-ratoma-duplicate.json; echo
+          test "${DUPLICATE_STATUS}" = "409"
+
+          # Seed one dossier per municipality using the ORM so enum/UUID types
+          # match the production model exactly.
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T backend python - <<'PY'
+          import asyncio
+          import uuid
+          from datetime import datetime, timedelta, timezone
+          from sqlalchemy import select
+          from app.database import async_session_factory
+          from app.models.service_request import DeliveryModeEnum, ServiceRequest, ServiceRequestStatusEnum
+          from app.models.user import User
+
+          async def main():
+              async with async_session_factory() as session:
+                  citizen = await session.scalar(select(User).where(User.email == 'citoyen@eadmin.test'))
+                  assert citizen is not None
+                  rows = (
+                      ('11111111-1111-4111-8111-111111111111', 'CI-RATOMA-001', 'mairie-ratoma-ci'),
+                      ('22222222-2222-4222-8222-222222222222', 'CI-MATOTO-001', 'mairie-matoto-ci'),
+                  )
+                  for request_id, reference, institution_id in rows:
+                      existing = await session.get(ServiceRequest, uuid.UUID(request_id))
+                      if existing:
+                          continue
+                      session.add(ServiceRequest(
+                          id=uuid.UUID(request_id),
+                          reference=reference,
+                          service_id='ci-service',
+                          service_name='Service CI',
+                          category='CI',
+                          category_id='ci',
+                          citizen_id=citizen.id,
+                          citizen_name='Citoyen',
+                          citizen_first_name='Test',
+                          citizen_nin='CI-NIN-001',
+                          citizen_phone='+224000000000',
+                          citizen_email=citizen.email,
+                          citizen_address='Conakry',
+                          motif='Test isolation mairie',
+                          required_documents=[],
+                          status=ServiceRequestStatusEnum.SOUMISE,
+                          assigned_service=institution_id,
+                          timeline=[],
+                          deadline_days=5,
+                          deadline_date=datetime.now(timezone.utc) + timedelta(days=5),
+                          delivery_mode=DeliveryModeEnum.EN_LIGNE,
+                          tenant_id='republique-de-guinee',
+                          institution_id=institution_id,
+                      ))
+                  await session.commit()
+          asyncio.run(main())
+          PY
+
+          RATOMA_TOKEN="$(curl -fsS -X POST http://localhost:8000/api/v1/auth/login \
+            -H 'Content-Type: application/x-www-form-urlencoded' \
+            --data-urlencode 'username=admin.ratoma@eadmin.test' \
+            --data-urlencode 'password=CiMairie!2026Aa-test-password' \
+            | python -c "import json,sys; print(json.load(sys.stdin)['access_token'])")"
+
+          RATOMA_LIST_STATUS="$(curl -sS -o /tmp/ratoma-requests.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${RATOMA_TOKEN}" \
+            'http://localhost:8000/api/v1/service-requests?page=1&page_size=100')"
+          echo "Ratoma dossier list: HTTP ${RATOMA_LIST_STATUS}"; cat /tmp/ratoma-requests.json; echo
+          test "${RATOMA_LIST_STATUS}" = "200"
+          python - <<'PY'
+          import json
+          with open('/tmp/ratoma-requests.json', encoding='utf-8') as handle:
+              payload = json.load(handle)
+          refs = {item['reference'] for item in payload['items']}
+          assert 'CI-RATOMA-001' in refs, refs
+          assert 'CI-MATOTO-001' not in refs, refs
+          assert all(item['institutionId'] == 'mairie-ratoma-ci' for item in payload['items']), payload
+          PY
+
+          CROSS_STATUS="$(curl -sS -o /tmp/cross-mairie.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${RATOMA_TOKEN}" \
+            'http://localhost:8000/api/v1/service-requests/22222222-2222-4222-8222-222222222222')"
+          echo "Ratoma reads Matoto dossier: HTTP ${CROSS_STATUS}"; cat /tmp/cross-mairie.json; echo
+          test "${CROSS_STATUS}" = "404"
 
       - name: Start and verify frontend and notification worker
         run: |
