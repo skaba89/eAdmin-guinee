@@ -5,12 +5,11 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import hashlib
 import hmac
-import json
 import time
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -191,7 +190,7 @@ async def ingest_external_signal(
 
     try:
         payload = ExternalSignalInput.model_validate_json(raw_body)
-    except Exception as exc:
+    except ValidationError as exc:
         raise HTTPException(status_code=422, detail="Signal SOC invalide.") from exc
 
     occurred_at = payload.occurred_at
