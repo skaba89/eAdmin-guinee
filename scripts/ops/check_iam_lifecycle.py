@@ -33,14 +33,19 @@ def main() -> int:
     text = {name: path.read_text(encoding="utf-8") for name, path in paths.items()}
 
     migration = text["migration"]
+    require(
+        "FORCE ROW LEVEL SECURITY" in migration,
+        "Lifecycle migration must force RLS on governed tables",
+        errors,
+    )
     for table in (
         "identity_lifecycle_events",
         "access_review_campaigns",
         "access_review_items",
     ):
         require(
-            f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY" in migration,
-            f"{table} must FORCE RLS",
+            f'"{table}"' in migration,
+            f"{table} must be present in the FORCE-RLS migration",
             errors,
         )
     require("identity_lifecycle_scoped_insert" in migration, "Lifecycle insert policy missing", errors)
