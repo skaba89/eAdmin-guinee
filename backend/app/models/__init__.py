@@ -24,6 +24,7 @@ from app.models.identity_lifecycle import (
 )
 from app.models.institution import Institution
 from app.models.notification_outbox import NotificationOutbox
+from app.models.phone_verification import PhoneVerificationChallenge
 from app.models.qualified_signature_evidence import QualifiedSignatureEvidence
 from app.models.service_request import (
     DeliveryModeEnum,
@@ -66,6 +67,7 @@ __all__ = [
     "SignatureStep",
     "FederatedIdentity",
     "NotificationOutbox",
+    "PhoneVerificationChallenge",
     "QualifiedSignatureEvidence",
     "Courrier",
     "CourrierTypeEnum",
