@@ -151,14 +151,24 @@ jobs:
           set -euo pipefail
           login() {
             local email="$1"
-            curl -fsS -X POST http://localhost:8000/api/v1/auth/login \
+            local output_file="$2"
+            local status_code
+            status_code="$(curl -sS -o "${output_file}" -w '%{http_code}' -X POST http://localhost:8000/api/v1/auth/login \
               -H 'Content-Type: application/x-www-form-urlencoded' \
               --data-urlencode "username=${email}" \
-              --data-urlencode 'password=CiLocal!2026Aa-test-password'
+              --data-urlencode 'password=CiLocal!2026Aa-test-password')"
+            echo "Login ${email}: HTTP ${status_code}"
+            cat "${output_file}"
+            echo
+            if [ "${status_code}" != "200" ]; then
+              echo "Authentication failed for ${email}" >&2
+              docker compose --env-file .env.local.ci -f docker-compose.local.yml logs --tail 200 backend
+              return 1
+            fi
           }
 
-          login superadmin@eadmin.test > /tmp/superadmin-login.json
-          login citoyen@eadmin.test > /tmp/citizen-login.json
+          login superadmin@eadmin.test /tmp/superadmin-login.json
+          login citoyen@eadmin.test /tmp/citizen-login.json
 
           SUPERADMIN_TOKEN="$(python - <<'PY'
           import json
@@ -167,10 +177,13 @@ jobs:
           PY
           )"
 
-          curl -fsS \
+          USERS_STATUS="$(curl -sS -o /tmp/users.json -w '%{http_code}' \
             -H "Authorization: Bearer ${SUPERADMIN_TOKEN}" \
-            'http://localhost:8000/api/v1/users?page=1&page_size=100' \
-            > /tmp/users.json
+            'http://localhost:8000/api/v1/users?page=1&page_size=100')"
+          echo "GET /api/v1/users: HTTP ${USERS_STATUS}"
+          cat /tmp/users.json
+          echo
+          test "${USERS_STATUS}" = "200"
 
           python - <<'PY'
           import json
