@@ -14,6 +14,7 @@ from sqlalchemy import select
 
 from app.config import settings
 from app.database import async_session_factory
+from app.models.institution import Institution
 from app.models.user import RoleEnum, User
 
 logger = logging.getLogger("eadmin.bootstrap")
@@ -36,6 +37,27 @@ def _require_strong_password(value: str, variable: str) -> str:
     if not any(not ch.isalnum() for ch in value):
         raise RuntimeError(f"{variable} must contain a special character.")
     return value
+
+
+def _test_security_profile(role: RoleEnum) -> tuple[int, int, bool]:
+    """Return ABAC values that remain inside the governed DB ranges.
+
+    security_clearance is constrained to 0..4 and assurance_level to 1..4.
+    Role hierarchy is intentionally not copied directly into clearance because
+    the two concepts have different scales and governance semantics.
+    """
+    profiles: dict[RoleEnum, tuple[int, int, bool]] = {
+        RoleEnum.CITOYEN: (0, 1, False),
+        RoleEnum.AGENT: (1, 1, False),
+        RoleEnum.MAIRIE: (1, 1, False),
+        RoleEnum.AGENCE: (1, 1, False),
+        RoleEnum.ADMIN: (2, 2, True),
+        RoleEnum.CHEF_SERVICE: (2, 2, True),
+        RoleEnum.DIRECTEUR: (3, 3, True),
+        RoleEnum.MINISTRE: (4, 3, True),
+        RoleEnum.SUPER_ADMIN: (4, 3, True),
+    }
+    return profiles[role]
 
 
 async def _bootstrap_superadmin() -> None:
@@ -74,8 +96,8 @@ async def _bootstrap_superadmin() -> None:
             tenant_id=settings.TENANT_DEFAULT_ID,
             institution_id=None,
             privileged_account=True,
-            security_clearance=10,
-            assurance_level=2,
+            security_clearance=4,
+            assurance_level=3,
         )
         session.add(user)
         await session.commit()
@@ -96,6 +118,34 @@ TEST_ROLES: tuple[tuple[str, RoleEnum, str], ...] = (
 )
 
 
+async def _ensure_test_institution(institution_id: str, institution_name: str) -> None:
+    """Ensure the non-production institution referenced by test staff exists."""
+    async with async_session_factory() as session:
+        institution = await session.get(Institution, institution_id)
+        if institution:
+            if institution.tenant_id != settings.TENANT_DEFAULT_ID:
+                raise RuntimeError(
+                    "Configured test institution already belongs to another tenant; "
+                    "refusing to reuse it for local bootstrap."
+                )
+            return
+
+        session.add(
+            Institution(
+                id=institution_id,
+                tenant_id=settings.TENANT_DEFAULT_ID,
+                name=institution_name,
+                type="agence",
+                parent_id=None,
+                code=None,
+                is_active=True,
+                settings={"bootstrap": "local-test"},
+            )
+        )
+        await session.commit()
+        logger.info("Local test institution %s created.", institution_id)
+
+
 async def _bootstrap_test_portal_users() -> None:
     if not _enabled("EADMIN_BOOTSTRAP_TEST_USERS"):
         return
@@ -108,12 +158,31 @@ async def _bootstrap_test_portal_users() -> None:
     institution_id = os.getenv("EADMIN_BOOTSTRAP_TEST_INSTITUTION_ID", "institution-test").strip()
     institution_name = os.getenv("EADMIN_BOOTSTRAP_TEST_INSTITUTION", "Institution Pilote eAdmin").strip()
 
+    if not institution_id or not institution_name:
+        raise RuntimeError(
+            "EADMIN_BOOTSTRAP_TEST_INSTITUTION_ID and EADMIN_BOOTSTRAP_TEST_INSTITUTION "
+            "must not be empty when test users are enabled."
+        )
+
+    await _ensure_test_institution(institution_id, institution_name)
+
     async with async_session_factory() as session:
+        existing_emails = set(
+            (
+                await session.scalars(
+                    select(User.email).where(
+                        User.email.in_([f"{slug}@{domain}" for slug, _, _ in TEST_ROLES])
+                    )
+                )
+            ).all()
+        )
+
         created = 0
         for slug, role, full_name in TEST_ROLES:
             email = f"{slug}@{domain}"
-            if await session.scalar(select(User).where(User.email == email)):
+            if email in existing_emails:
                 continue
+            security_clearance, assurance_level, privileged_account = _test_security_profile(role)
             session.add(
                 User(
                     email=email,
@@ -123,9 +192,9 @@ async def _bootstrap_test_portal_users() -> None:
                     institution=institution_name if role != RoleEnum.CITOYEN else None,
                     tenant_id=settings.TENANT_DEFAULT_ID,
                     institution_id=institution_id if role != RoleEnum.CITOYEN else None,
-                    privileged_account=role in {RoleEnum.ADMIN, RoleEnum.CHEF_SERVICE, RoleEnum.DIRECTEUR, RoleEnum.MINISTRE},
-                    security_clearance=5 if role.hierarchy_level() >= RoleEnum.CHEF_SERVICE.hierarchy_level() else 1,
-                    assurance_level=1,
+                    privileged_account=privileged_account,
+                    security_clearance=security_clearance,
+                    assurance_level=assurance_level,
                 )
             )
             created += 1
