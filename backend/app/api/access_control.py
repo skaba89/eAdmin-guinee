@@ -8,11 +8,12 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.access_reviews import router as access_reviews_router
 from app.api.auth import get_current_user
+from app.api.iam_governance import router as iam_governance_router
 from app.config import settings
 from app.database import get_db
 from app.middleware.rbac import PERMISSION_MATRIX
@@ -76,13 +77,7 @@ class AuthorizationProbeResponse(BaseModel):
 
 
 def _as_utc(value: datetime) -> datetime:
-    """Normalize database timestamps before Python comparisons.
-
-    PostgreSQL preserves timezone-aware values, while SQLite used by isolated
-    tests may deserialize DateTime(timezone=True) without tzinfo. Treat a naive
-    persisted value as UTC because every write into this module is normalized
-    to UTC before persistence.
-    """
+    """Normalize database timestamps before Python comparisons."""
     if value.tzinfo is None or value.utcoffset() is None:
         return value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc)
@@ -170,12 +165,39 @@ async def list_access_grants(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[AccessGrant]:
-    query = select(AccessGrant).order_by(AccessGrant.created_at.desc()).limit(500)
+    query = select(AccessGrant)
+
+    # Defense in depth in addition to PostgreSQL RLS. Lower roles can only see
+    # grants that concern them or that they requested; DIRECTEUR+ is limited to
+    # its governed tenant/institution; SUPER_ADMIN is global.
+    if current_user.role != RoleEnum.SUPER_ADMIN:
+        tenant = current_user.tenant_id or settings.TENANT_DEFAULT_ID
+        query = query.where(AccessGrant.tenant_id == tenant)
+        if current_user.role == RoleEnum.MINISTRE:
+            pass
+        elif current_user.role.hierarchy_level() >= RoleEnum.DIRECTEUR.hierarchy_level():
+            if not current_user.institution_id:
+                raise HTTPException(status_code=403, detail="Périmètre institutionnel absent.")
+            query = query.where(AccessGrant.institution_id == current_user.institution_id)
+        else:
+            query = query.where(
+                or_(
+                    AccessGrant.grantee_id == current_user.id,
+                    AccessGrant.requested_by == current_user.id,
+                )
+            )
+
     if status_filter:
         query = query.where(AccessGrant.status == status_filter)
     if grantee_id:
+        if (
+            current_user.role.hierarchy_level() < RoleEnum.DIRECTEUR.hierarchy_level()
+            and grantee_id != current_user.id
+        ):
+            raise HTTPException(status_code=403, detail="Filtre bénéficiaire hors périmètre.")
         query = query.where(AccessGrant.grantee_id == grantee_id)
-    result = await db.execute(query)
+
+    result = await db.execute(query.order_by(AccessGrant.created_at.desc()).limit(500))
     return list(result.scalars().all())
 
 
@@ -198,6 +220,8 @@ async def request_access_grant(
             status_code=403,
             detail="Séparation des tâches: le demandeur ne peut pas être le bénéficiaire.",
         )
+    if body.grant_type == "break_glass" and not _mfa_verified(request, current_user):
+        raise HTTPException(status_code=403, detail="MFA vérifié requis pour demander un break-glass.")
     if (body.resource, body.action) not in PERMISSION_MATRIX:
         raise HTTPException(status_code=422, detail="Permission inconnue dans la matrice d'autorisation.")
     if not authorization_service.is_delegable_permission(
@@ -229,6 +253,17 @@ async def request_access_grant(
             raise HTTPException(status_code=403, detail="Le bénéficiaire appartient à un autre tenant.")
         if institution_id and grantee.role != RoleEnum.MINISTRE and grantee.institution_id != institution_id:
             raise HTTPException(status_code=403, detail="Le bénéficiaire appartient à une autre institution.")
+
+    if body.grant_type == "delegation" and await authorization_service.would_violate_sod(
+        user=grantee,
+        resource=body.resource,
+        action=body.action,
+        db=db,
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="Séparation des tâches: cette délégation créerait un conflit maker/checker.",
+        )
 
     now = datetime.now(timezone.utc)
     valid_until = _as_utc(body.valid_until)
@@ -292,14 +327,21 @@ async def approve_access_grant(
     elif current_user.role not in (RoleEnum.DIRECTEUR, RoleEnum.MINISTRE, RoleEnum.SUPER_ADMIN):
         raise HTTPException(status_code=403, detail="Approbation DIRECTEUR+ requise.")
 
-    if not authorization_service.has_permanent_permission(current_user, grant.resource, grant.action):
-        raise HTTPException(status_code=403, detail="L'approbateur ne détient pas cette permission de façon permanente.")
-    if not authorization_service.scope_allows(
-        current_user,
+    approver_decision = await authorization_service.authorize(
+        user=current_user,
+        resource=grant.resource,
+        action=grant.action,
+        db=db,
         tenant_id=grant.tenant_id,
         institution_id=grant.institution_id,
-    ):
-        raise HTTPException(status_code=403, detail="L'habilitation est hors du périmètre de l'approbateur.")
+        mfa_verified=True,
+        allow_temporary_grants=False,
+    )
+    if not approver_decision.allowed:
+        raise HTTPException(
+            status_code=403,
+            detail="L'approbateur ne satisfait pas l'habilitation permanente et les attributs requis.",
+        )
 
     now = datetime.now(timezone.utc)
     grant.status = "active"
@@ -401,6 +443,11 @@ async def evaluate_effective_access(
     )
 
 
+router.include_router(
+    iam_governance_router,
+    prefix="/security-profiles",
+    tags=["IAM - attributs ABAC"],
+)
 router.include_router(
     access_reviews_router,
     prefix="/reviews",
