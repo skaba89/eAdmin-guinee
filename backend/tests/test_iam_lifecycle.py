@@ -189,9 +189,18 @@ async def test_leaver_disables_sso_revokes_grants_and_sets_session_cutoff(
     client,
     db_session,
     super_admin_user,
-    super_admin_auth_headers,
     monkeypatch,
 ):
+    # Base.metadata.create_all() bypasses Alembic data backfills. Model the
+    # real post-migration SUPER_ADMIN profile and explicitly prove MFA for the
+    # sensitive users:delete operation.
+    super_admin_user.security_clearance = 4
+    super_admin_user.assurance_level = 3
+    super_admin_user.privileged_account = True
+    super_admin_user.mfa_enabled = True
+    await db_session.flush()
+    sensitive_admin_headers = _headers(super_admin_user, mfa_verified=True)
+
     revoke_refresh = _patch_refresh_revocation(monkeypatch)
     target = await _user(
         db_session,
@@ -227,7 +236,7 @@ async def test_leaver_disables_sso_revokes_grants_and_sets_session_cutoff(
 
     response = await client.delete(
         f"/api/v1/users/{target.id}",
-        headers=super_admin_auth_headers,
+        headers=sensitive_admin_headers,
     )
     assert response.status_code == 204, response.text
     await db_session.refresh(target)
