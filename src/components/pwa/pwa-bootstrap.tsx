@@ -4,12 +4,12 @@ import { useEffect, useState } from 'react'
 import { CloudOff, RefreshCw, Wifi } from 'lucide-react'
 
 export function PwaBootstrap() {
-  const [online, setOnline] = useState(true)
+  const [online, setOnline] = useState(() =>
+    typeof navigator === 'undefined' ? true : navigator.onLine
+  )
   const [recovered, setRecovered] = useState(false)
 
   useEffect(() => {
-    setOnline(navigator.onLine)
-
     const handleOnline = () => {
       setOnline(true)
       setRecovered(true)
