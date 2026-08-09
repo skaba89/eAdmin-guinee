@@ -1,23 +1,49 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { CloudOff, RefreshCw, Wifi } from 'lucide-react'
 
+function subscribeNetworkStatus(onStoreChange: () => void) {
+  window.addEventListener('online', onStoreChange)
+  window.addEventListener('offline', onStoreChange)
+  return () => {
+    window.removeEventListener('online', onStoreChange)
+    window.removeEventListener('offline', onStoreChange)
+  }
+}
+
+function getNetworkSnapshot() {
+  return navigator.onLine
+}
+
+function getServerNetworkSnapshot() {
+  return true
+}
+
 export function PwaBootstrap() {
-  const [online, setOnline] = useState(() =>
-    typeof navigator === 'undefined' ? true : navigator.onLine
+  const online = useSyncExternalStore(
+    subscribeNetworkStatus,
+    getNetworkSnapshot,
+    getServerNetworkSnapshot
   )
   const [recovered, setRecovered] = useState(false)
 
   useEffect(() => {
+    let recoveryTimer: number | undefined
+
     const handleOnline = () => {
-      setOnline(true)
       setRecovered(true)
-      window.setTimeout(() => setRecovered(false), 4000)
+      if (recoveryTimer !== undefined) {
+        window.clearTimeout(recoveryTimer)
+      }
+      recoveryTimer = window.setTimeout(() => setRecovered(false), 4000)
     }
     const handleOffline = () => {
       setRecovered(false)
-      setOnline(false)
+      if (recoveryTimer !== undefined) {
+        window.clearTimeout(recoveryTimer)
+        recoveryTimer = undefined
+      }
     }
 
     window.addEventListener('online', handleOnline)
@@ -35,6 +61,9 @@ export function PwaBootstrap() {
     return () => {
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
+      if (recoveryTimer !== undefined) {
+        window.clearTimeout(recoveryTimer)
+      }
     }
   }, [])
 
