@@ -16,6 +16,7 @@ def main() -> int:
         "model": ROOT / "backend/app/models/access_grant.py",
         "migration": ROOT / "backend/alembic/versions/add_access_grants.py",
         "service": ROOT / "backend/app/services/authorization_service.py",
+        "lifecycle": ROOT / "backend/app/services/identity_lifecycle_service.py",
         "api": ROOT / "backend/app/api/access_control.py",
         "rbac": ROOT / "backend/app/middleware/rbac.py",
         "users": ROOT / "backend/app/api/users.py",
@@ -55,6 +56,23 @@ def main() -> int:
     require("can_assign_role" in service, "Central role-assignment guard missing", errors)
     require("can_administer_user" in service, "Central user-administration guard missing", errors)
 
+    lifecycle = text["lifecycle"]
+    require(
+        "await token_blacklist.revoke_all_user_tokens" in lifecycle,
+        "Central lifecycle service must revoke refresh tokens",
+        errors,
+    )
+    require(
+        "user.sessions_invalid_before = now" in lifecycle,
+        "Central lifecycle service must invalidate access JWTs after role/scope changes",
+        errors,
+    )
+    require(
+        "AccessGrant.status.in_([\"pending\", \"active\"])" in lifecycle,
+        "Lifecycle service must revoke pending/active temporary grants",
+        errors,
+    )
+
     rbac = text["rbac"]
     require("_effective_authorization" in rbac, "Route middleware must use effective authorization", errors)
     require("authorization_service.authorize" in rbac, "Protected routes must call central authorization service", errors)
@@ -85,7 +103,21 @@ def main() -> int:
     users = text["users"]
     require("authorization_service.can_assign_role" in users, "User creation/update must use central role guard", errors)
     require("authorization_service.can_administer_user" in users, "User mutation must use central scope guard", errors)
-    require("revoke_all_user_tokens" in users, "Role/scope changes must revoke sessions", errors)
+    require(
+        "identity_lifecycle_service.handle_mover" in users,
+        "Role/scope mutations must use the centralized JML mover flow",
+        errors,
+    )
+    require(
+        "identity_lifecycle_service.offboard_user" in users,
+        "User deactivation must use the centralized JML leaver flow",
+        errors,
+    )
+    require(
+        "revoke_all_user_tokens" not in users,
+        "User API must not bypass the centralized lifecycle revocation authority",
+        errors,
+    )
     require("User.tenant_id == tenant" in users, "User listing must be tenant-scoped", errors)
     require("User.institution_id == current_user.institution_id" in users, "User listing must be institution-scoped", errors)
 
