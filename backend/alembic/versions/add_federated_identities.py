@@ -66,8 +66,21 @@ def upgrade() -> None:
         """
     )
 
+    # Authentication routes run before a user RLS context exists. The dedicated
+    # SSO_SERVICE transaction role may resolve a local user after a verified
+    # `(issuer, subject)` mapping; it receives no user mutation capability.
+    op.execute(
+        """
+        CREATE POLICY users_sso_service_read
+        ON users
+        FOR SELECT
+        USING (current_setting('app.current_role', true) = 'SSO_SERVICE')
+        """
+    )
+
 
 def downgrade() -> None:
+    op.execute("DROP POLICY IF EXISTS users_sso_service_read ON users")
     op.execute("DROP POLICY IF EXISTS federated_identities_super_admin_read ON federated_identities")
     op.execute("DROP POLICY IF EXISTS federated_identities_sso_service_all ON federated_identities")
     op.drop_index("ix_federated_identities_subject", table_name="federated_identities")
