@@ -51,6 +51,8 @@ def main() -> int:
     require("navigator.onLine" in bootstrap, "Network state detection missing", errors)
     require("window.addEventListener('online'" in bootstrap, "Online recovery listener missing", errors)
     require("window.addEventListener('offline'" in bootstrap, "Offline listener missing", errors)
+    require("useSyncExternalStore" in bootstrap, "Network state must be hydration-safe", errors)
+    require("getServerNetworkSnapshot" in bootstrap, "Stable server network snapshot missing", errors)
 
     client_idempotency = text["client_idempotency"]
     require("sessionStorage" in client_idempotency, "Idempotency metadata must be session-scoped", errors)
@@ -61,6 +63,7 @@ def main() -> int:
 
     service_client = text["service_requests_client"]
     require("getStableIdempotencyKey" in service_client, "Service request client must obtain stable idempotency key", errors)
+    require("requestPayload" in service_client, "Idempotency key and request body must share one canonical payload", errors)
     require("Idempotency-Key" in service_client, "Service request creation must send Idempotency-Key", errors)
 
     middleware = text["middleware"]
@@ -81,8 +84,29 @@ def main() -> int:
     require("/access" not in middleware, "IAM operations must not be replay-cached", errors)
 
     main = text["main"]
-    require("IdempotencyMiddleware" in main, "Idempotency middleware must be registered", errors)
+    require("from app.middleware.idempotency import IdempotencyMiddleware" in main, "Idempotency middleware import missing", errors)
+    require("app.add_middleware(IdempotencyMiddleware)" in main, "Idempotency middleware must be registered", errors)
+    require('"Idempotency-Key"' in main, "CORS must allow/expose Idempotency-Key", errors)
+    require('"Idempotency-Replayed"' in main, "CORS must expose replay state", errors)
+    require('"Retry-After"' in main, "CORS must expose safe retry guidance", errors)
     require("PwaBootstrap" not in main, "Backend must remain independent of browser PWA code", errors)
+
+    # Starlette executes middleware in reverse registration order. The source
+    # must therefore register Rate -> Idempotency -> MFA -> Session so request
+    # execution is Session -> MFA -> Idempotency -> Rate. This prevents a
+    # revoked/non-MFA-valid bearer from receiving a cached mutation replay.
+    try:
+        rate_index = main.index("app.add_middleware(RateLimitMiddleware)")
+        idempotency_index = main.index("app.add_middleware(IdempotencyMiddleware)")
+        mfa_index = main.index("app.add_middleware(MFAGuardMiddleware)")
+        session_index = main.index("app.add_middleware(SessionValidityMiddleware)")
+        require(
+            rate_index < idempotency_index < mfa_index < session_index,
+            "Idempotency must execute behind session and MFA guards",
+            errors,
+        )
+    except ValueError:
+        require(False, "Required authentication/idempotency middleware registration missing", errors)
 
     tests = text["tests"]
     for scenario in (
