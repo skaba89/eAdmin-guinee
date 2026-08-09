@@ -65,8 +65,29 @@ def upgrade() -> None:
         ["user_id", "created_at"],
     )
 
+    # Verification challenges contain security-sensitive possession evidence.
+    # Only the authenticated user, in the same tenant, may read or mutate their
+    # own rows. FORCE keeps the table owner subject to the policy as well.
+    op.execute("ALTER TABLE phone_verification_challenges ENABLE ROW LEVEL SECURITY")
+    op.execute("ALTER TABLE phone_verification_challenges FORCE ROW LEVEL SECURITY")
+    op.execute(
+        """
+        CREATE POLICY phone_verification_self_policy
+        ON phone_verification_challenges
+        USING (
+            tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')
+            AND user_id::text = NULLIF(current_setting('app.current_user_id', true), '')
+        )
+        WITH CHECK (
+            tenant_id = NULLIF(current_setting('app.current_tenant_id', true), '')
+            AND user_id::text = NULLIF(current_setting('app.current_user_id', true), '')
+        )
+        """
+    )
+
 
 def downgrade() -> None:
+    op.execute("DROP POLICY IF EXISTS phone_verification_self_policy ON phone_verification_challenges")
     op.drop_index("ix_phone_verification_user_created", table_name="phone_verification_challenges")
     op.drop_index("ix_phone_verification_created_at", table_name="phone_verification_challenges")
     op.drop_index("ix_phone_verification_expires_at", table_name="phone_verification_challenges")
