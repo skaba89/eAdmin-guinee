@@ -74,6 +74,7 @@ def _serialize_preferences(user: User) -> dict:
         "consent": {
             "version": user.notification_consent_version,
             "currentVersion": MOBILE_CONSENT_VERSION,
+            "current": user.notification_consent_version == MOBILE_CONSENT_VERSION,
             "updatedAt": (
                 user.notification_consent_updated_at.isoformat()
                 if user.notification_consent_updated_at
@@ -190,8 +191,6 @@ async def confirm_mobile_verification(
                 "max_attempts": challenge.max_attempts,
             },
         )
-        # A response object, rather than a raised HTTPException, lets the normal
-        # request DB dependency commit the failed-attempt counter.
         return JSONResponse(
             status_code=400,
             content={
@@ -237,22 +236,28 @@ async def update_my_notification_preferences(
         if payload.whatsapp_enabled is None
         else payload.whatsapp_enabled
     )
+    any_mobile_enabled = requested_sms or requested_whatsapp
     enabling_mobile = (
         (requested_sms and not current_user.notification_sms_enabled)
         or (requested_whatsapp and not current_user.notification_whatsapp_enabled)
     )
+    consent_stale = (
+        any_mobile_enabled
+        and current_user.notification_consent_version != MOBILE_CONSENT_VERSION
+    )
+    requires_mobile_consent = enabling_mobile or consent_stale
 
-    if (requested_sms or requested_whatsapp) and (
+    if any_mobile_enabled and (
         not current_user.phone_e164 or current_user.phone_verified_at is None
     ):
         raise HTTPException(
             status_code=409,
             detail="Vérifiez d'abord votre numéro de téléphone avant d'activer SMS ou WhatsApp.",
         )
-    if enabling_mobile and not payload.confirm_mobile_consent:
+    if requires_mobile_consent and not payload.confirm_mobile_consent:
         raise HTTPException(
             status_code=422,
-            detail="Une confirmation explicite du consentement mobile est requise.",
+            detail="Une confirmation explicite du consentement mobile courant est requise.",
         )
 
     if payload.email_enabled is not None:
@@ -263,7 +268,7 @@ async def update_my_notification_preferences(
         current_user.notification_whatsapp_enabled = payload.whatsapp_enabled
 
     now = datetime.now(timezone.utc)
-    if enabling_mobile:
+    if requires_mobile_consent:
         current_user.notification_consent_version = MOBILE_CONSENT_VERSION
         current_user.notification_consent_updated_at = now
     elif payload.sms_enabled is not None or payload.whatsapp_enabled is not None:
