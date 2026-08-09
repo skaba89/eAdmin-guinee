@@ -14,6 +14,7 @@ from sqlalchemy import select
 
 from app.config import settings
 from app.database import async_session_factory
+from app.models.institution import Institution
 from app.models.user import RoleEnum, User
 
 logger = logging.getLogger("eadmin.bootstrap")
@@ -117,6 +118,34 @@ TEST_ROLES: tuple[tuple[str, RoleEnum, str], ...] = (
 )
 
 
+async def _ensure_test_institution(institution_id: str, institution_name: str) -> None:
+    """Ensure the non-production institution referenced by test staff exists."""
+    async with async_session_factory() as session:
+        institution = await session.get(Institution, institution_id)
+        if institution:
+            if institution.tenant_id != settings.TENANT_DEFAULT_ID:
+                raise RuntimeError(
+                    "Configured test institution already belongs to another tenant; "
+                    "refusing to reuse it for local bootstrap."
+                )
+            return
+
+        session.add(
+            Institution(
+                id=institution_id,
+                tenant_id=settings.TENANT_DEFAULT_ID,
+                name=institution_name,
+                type="agence",
+                parent_id=None,
+                code=None,
+                is_active=True,
+                settings={"bootstrap": "local-test"},
+            )
+        )
+        await session.commit()
+        logger.info("Local test institution %s created.", institution_id)
+
+
 async def _bootstrap_test_portal_users() -> None:
     if not _enabled("EADMIN_BOOTSTRAP_TEST_USERS"):
         return
@@ -129,11 +158,29 @@ async def _bootstrap_test_portal_users() -> None:
     institution_id = os.getenv("EADMIN_BOOTSTRAP_TEST_INSTITUTION_ID", "institution-test").strip()
     institution_name = os.getenv("EADMIN_BOOTSTRAP_TEST_INSTITUTION", "Institution Pilote eAdmin").strip()
 
+    if not institution_id or not institution_name:
+        raise RuntimeError(
+            "EADMIN_BOOTSTRAP_TEST_INSTITUTION_ID and EADMIN_BOOTSTRAP_TEST_INSTITUTION "
+            "must not be empty when test users are enabled."
+        )
+
+    await _ensure_test_institution(institution_id, institution_name)
+
     async with async_session_factory() as session:
+        existing_emails = set(
+            (
+                await session.scalars(
+                    select(User.email).where(
+                        User.email.in_([f"{slug}@{domain}" for slug, _, _ in TEST_ROLES])
+                    )
+                )
+            ).all()
+        )
+
         created = 0
         for slug, role, full_name in TEST_ROLES:
             email = f"{slug}@{domain}"
-            if await session.scalar(select(User).where(User.email == email)):
+            if email in existing_emails:
                 continue
             security_clearance, assurance_level, privileged_account = _test_security_profile(role)
             session.add(
