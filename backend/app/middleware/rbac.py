@@ -81,14 +81,19 @@ def _trusted_scope(
     The authenticated User is authoritative. RLS may already have normalized
     the same values on request.state, but client-supplied routing headers are not
     consulted here. Resource-specific rows are still constrained by FORCE RLS.
+
+    Institution is always supplied to the grant evaluator when the account has
+    one, even for legacy dependencies that did not request an institution check.
+    That makes a malformed cross-institution temporary grant fail closed. The
+    `check_institution` flag is retained for backward-compatible call sites.
     """
+    del request, check_institution
     if user.role == RoleEnum.SUPER_ADMIN and not check_tenant:
         tenant_id = None
     else:
         tenant_id = user.tenant_id or settings.TENANT_DEFAULT_ID
 
-    institution_id = user.institution_id if check_institution else None
-    return tenant_id, institution_id
+    return tenant_id, user.institution_id
 
 
 async def _audit_authorization_decision(
