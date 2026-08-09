@@ -77,6 +77,21 @@ class AuditLog(Base):
         return f"<AuditLog {self.action} on {self.resource_type}/{self.resource_id}>"
 
 
+def _normalize_optional_scope(value: str | None) -> str | None:
+    """Convert blank optional scope identifiers to NULL-safe values.
+
+    Authentication and system-level actions legitimately have no institution.
+    Persisting an empty string would violate the audit_logs institution foreign
+    key and poison the caller's SQLAlchemy transaction. Normalize once at the
+    model boundary so every audit caller gets the same fail-safe behavior.
+    """
+
+    if value is None:
+        return None
+    normalized = value.strip()
+    return normalized or None
+
+
 def _audit_entry_hash(target: AuditLog) -> str:
     """Compute the same canonical SHA-256 representation as AuditService."""
 
@@ -115,8 +130,11 @@ def _lock_and_chain_audit_entry(mapper, connection, target: AuditLog) -> None:
         target.id = uuid.uuid4()
     if target.timestamp is None:
         target.timestamp = datetime.now(timezone.utc)
-    if not target.tenant_id:
-        target.tenant_id = settings.TENANT_DEFAULT_ID
+
+    target.tenant_id = (
+        _normalize_optional_scope(target.tenant_id) or settings.TENANT_DEFAULT_ID
+    )
+    target.institution_id = _normalize_optional_scope(target.institution_id)
 
     connection.execute(
         text(
