@@ -7,6 +7,7 @@ on:
       - main
       - develop
       - work/iam-abac-governance
+      - work/iam-national-governance
       - agent/iam-effective-authorization
   workflow_dispatch:
 
@@ -73,22 +74,30 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Enforce static IAM governance policy
-        run: python scripts/ops/check_iam_governance.py
+        run: |
+          python scripts/ops/check_iam_governance.py
+          python scripts/ops/check_iam_abac_profile.py
 
       - name: Lint IAM implementation
         run: |
           cd backend
           ruff check \
+            app/models/user.py \
             app/models/access_grant.py \
+            app/services/iam_policy.py \
             app/services/authorization_service.py \
             app/middleware/rbac.py \
             app/api/access_control.py \
+            app/api/iam_governance.py \
             app/api/users.py \
             app/api/auth_hardening.py \
-            tests/test_iam_governance.py
+            tests/test_iam_governance.py \
+            tests/test_iam_abac_governance.py
           cd ..
-          ruff check scripts/ops/check_iam_governance.py
+          ruff check \
+            scripts/ops/check_iam_governance.py \
+            scripts/ops/check_iam_abac_profile.py
 
       - name: Test adversarial IAM behavior
         working-directory: backend
-        run: pytest -q tests/test_iam_governance.py
+        run: pytest -q tests/test_iam_governance.py tests/test_iam_abac_governance.py
