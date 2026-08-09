@@ -7,6 +7,7 @@ on:
       - main
       - develop
       - work/iam-abac-governance
+      - agent/iam-effective-authorization
   workflow_dispatch:
 
 concurrency:
@@ -80,6 +81,7 @@ jobs:
           ruff check \
             app/models/access_grant.py \
             app/services/authorization_service.py \
+            app/middleware/rbac.py \
             app/api/access_control.py \
             app/api/users.py \
             app/api/auth_hardening.py \
