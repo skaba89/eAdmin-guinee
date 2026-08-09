@@ -75,9 +75,11 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-eadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    # The S3 API is intentionally NOT published on the Windows host.
+    # Backend and init containers reach it safely through the Docker network at minio:9000.
+    # Only the browser console needs a host port.
     ports:
-      - "${LOCAL_MINIO_API_PORT:-9000}:9000"
-      - "${LOCAL_MINIO_CONSOLE_PORT:-9001}:9001"
+      - "${LOCAL_MINIO_CONSOLE_PORT:-9101}:9001"
     volumes:
       - local_minio_data:/data
     networks: [eadmin-local]
@@ -94,10 +96,19 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >-
+        attempt=0;
         until mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" >/dev/null 2>&1;
-        do sleep 2; done;
+        do
+          attempt=$$((attempt + 1));
+          if [ "$$attempt" -ge 60 ]; then
+            echo "ERROR: MinIO n'est pas joignable sur minio:9000 après 120 secondes" >&2;
+            exit 1;
+          fi;
+          sleep 2;
+        done;
         mc mb --ignore-existing local/eadmin-documents;
-        mc anonymous set none local/eadmin-documents >/dev/null 2>&1 || true
+        mc anonymous set none local/eadmin-documents >/dev/null 2>&1 || true;
+        echo "Bucket MinIO eadmin-documents prêt."
     networks: [eadmin-local]
 
   mailpit:
