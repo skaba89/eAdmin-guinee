@@ -75,6 +75,15 @@ def _require_reviewer_level(user: User) -> None:
         raise HTTPException(status_code=403, detail="Rôle CHEF_SERVICE ou supérieur requis.")
 
 
+def _require_verified_mfa(request: Request, user: User) -> None:
+    payload = getattr(request.state, "jwt_payload", {}) or {}
+    if not user.mfa_enabled or payload.get("mfa_verified") is not True:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="MFA vérifié requis pour modifier une campagne de recertification.",
+        )
+
+
 def _service_error(exc: AccessReviewError) -> HTTPException:
     message = str(exc)
     denied_markers = (
@@ -142,6 +151,7 @@ async def create_campaign(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> AccessReviewCampaign:
+    _require_verified_mfa(request, current_user)
     try:
         campaign = await access_review_service.create_campaign(
             db=db,
@@ -213,6 +223,7 @@ async def decide_access(
     current_user: User = Depends(get_current_user),
 ) -> AccessReviewItem:
     _require_reviewer_level(current_user)
+    _require_verified_mfa(request, current_user)
     try:
         item = await access_review_service.decide_item(
             db=db,
