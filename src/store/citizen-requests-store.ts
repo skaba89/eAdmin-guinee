@@ -299,7 +299,7 @@ interface CitizenRequestsState {
   addUploadedDocument: (id: string, doc: UploadedDocument) => void
   removeUploadedDocument: (requestId: string, docId: string) => void
   verifyDocument: (requestId: string, docId: string) => void
-  setGeneratedDocument: (id: string) => void
+  setGeneratedDocument: (id: string, legacyDocument?: unknown) => void
   rateRequest: (id: string, rating: SatisfactionRating) => void
   resetToDemoData: () => void
   checkAndRejectExpiredRequests: () => void
@@ -468,7 +468,10 @@ export const useCitizenRequestsStore = create<CitizenRequestsState>((set, get) =
       .catch((error) => set({ syncError: error instanceof Error ? error.message : 'Vérification impossible.' }))
   },
 
-  setGeneratedDocument: (id) => {
+  setGeneratedDocument: (id, legacyDocument) => {
+    // Transitional compatibility for institution dashboards that still build a
+    // local object. It is deliberately discarded and never crosses the API.
+    void legacyDocument
     void serviceRequestsApi.saveGeneratedDocument(id)
       .then((updated) => set((state) => ({ requests: replaceRequest(state.requests, updated) })))
       .catch((error) => set({ syncError: error instanceof Error ? error.message : 'Génération du document impossible.' }))
