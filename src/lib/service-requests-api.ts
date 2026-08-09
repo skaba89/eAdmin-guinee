@@ -11,6 +11,12 @@ import type {
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '')
 
+// The current page/store API launches document persistence and the PRETE status
+// mutation back-to-back. Track the authoritative document write per request so
+// PRETE is never sent before that write has succeeded. A rejected write is
+// deliberately propagated and prevents the status request from leaving the browser.
+const pendingGeneratedDocumentWrites = new Map<string, Promise<CitizenRequest>>()
+
 export interface InstitutionOption {
   id: string
   name: string
@@ -118,6 +124,13 @@ export async function createRequest(input: CreateServiceRequestInput): Promise<C
 }
 
 export async function updateStatus(id: string, status: RequestStatus, note?: string): Promise<CitizenRequest> {
+  if (status === 'prete') {
+    const pendingDocumentWrite = pendingGeneratedDocumentWrites.get(id)
+    if (pendingDocumentWrite) {
+      await pendingDocumentWrite
+    }
+  }
+
   return apiFetch<CitizenRequest>(`/api/v1/service-requests/${id}/status`, {
     method: 'POST',
     body: JSON.stringify({ status, note: note || null }),
@@ -156,7 +169,7 @@ export async function completeRequest(
 }
 
 export async function saveGeneratedDocument(id: string, document: GeneratedDocument): Promise<CitizenRequest> {
-  return apiFetch<CitizenRequest>(`/api/v1/service-requests/${id}/generated-document`, {
+  const write = apiFetch<CitizenRequest>(`/api/v1/service-requests/${id}/generated-document`, {
     method: 'POST',
     body: JSON.stringify({
       title: document.title,
@@ -164,6 +177,15 @@ export async function saveGeneratedDocument(id: string, document: GeneratedDocum
       file_name: document.fileName,
     }),
   })
+
+  pendingGeneratedDocumentWrites.set(id, write)
+  try {
+    return await write
+  } finally {
+    if (pendingGeneratedDocumentWrites.get(id) === write) {
+      pendingGeneratedDocumentWrites.delete(id)
+    }
+  }
 }
 
 export async function uploadAttachment(
