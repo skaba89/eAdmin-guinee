@@ -33,6 +33,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /install /usr/local
 COPY . .
+# Backward compatibility for an existing Render Docker Command that still
+# invokes /app/entrypoint.sh. The image itself no longer depends on it.
+RUN chmod +x /app/entrypoint.sh
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
