@@ -24,13 +24,23 @@ const localAliases = new Map([
   ['/guinea-culture-dance.png', '/guinea-culture-dance.jpg'],
 ])
 
-function walk(directory) {
+function walkText(directory) {
   if (!fs.existsSync(directory)) return []
   const entries = fs.readdirSync(directory, { withFileTypes: true })
   return entries.flatMap((entry) => {
     const full = path.join(directory, entry.name)
-    if (entry.isDirectory()) return walk(full)
+    if (entry.isDirectory()) return walkText(full)
     return textExtensions.has(path.extname(entry.name).toLowerCase()) ? [full] : []
+  })
+}
+
+function walkImages(directory) {
+  if (!fs.existsSync(directory)) return []
+  const entries = fs.readdirSync(directory, { withFileTypes: true })
+  return entries.flatMap((entry) => {
+    const full = path.join(directory, entry.name)
+    if (entry.isDirectory()) return walkImages(full)
+    return imageExtensions.has(path.extname(entry.name).toLowerCase()) ? [full] : []
   })
 }
 
@@ -56,7 +66,7 @@ function expectedKind(extension) {
   return extension.slice(1)
 }
 
-const files = [...new Set([...scanRoots.flatMap(walk), ...extraFiles])]
+const files = [...new Set([...scanRoots.flatMap(walkText), ...extraFiles])]
 const localRefs = new Map()
 const externalRefs = []
 
@@ -92,18 +102,15 @@ for (const file of files) {
 const errors = []
 const checkedTargets = new Set()
 
-for (const [ref, sources] of [...localRefs.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-  const target = localAliases.get(ref) ?? ref
+function validateAsset(target, label) {
   const extension = path.extname(target).toLowerCase()
-  if (!imageExtensions.has(extension)) continue
-
+  if (!imageExtensions.has(extension)) return
   const diskPath = path.join(publicDir, target.slice(1))
   if (!fs.existsSync(diskPath)) {
-    errors.push(`MISSING ${ref}${target !== ref ? ` -> ${target}` : ''} referenced by ${[...sources].join(', ')}`)
-    continue
+    errors.push(`MISSING ${label}`)
+    return
   }
-
-  if (checkedTargets.has(target)) continue
+  if (checkedTargets.has(target)) return
   checkedTargets.add(target)
   const buffer = fs.readFileSync(diskPath)
   const actual = detectKind(buffer)
@@ -113,11 +120,32 @@ for (const [ref, sources] of [...localRefs.entries()].sort(([a], [b]) => a.local
   }
 }
 
+for (const [ref, sources] of [...localRefs.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+  const target = localAliases.get(ref) ?? ref
+  validateAsset(
+    target,
+    `${ref}${target !== ref ? ` -> ${target}` : ''} referenced by ${[...sources].join(', ')}`,
+  )
+}
+
+// Also validate every image physically shipped in public/, not only images that
+// are currently referenced. Historical alias source files are intentionally
+// skipped because Next intercepts those URLs before filesystem resolution and
+// serves the matching .jpg target instead.
+const legacyAliasSources = new Set(localAliases.keys())
+let shippedImages = 0
+for (const diskPath of walkImages(publicDir)) {
+  const publicPath = `/${path.relative(publicDir, diskPath).split(path.sep).join('/')}`
+  shippedImages += 1
+  if (legacyAliasSources.has(publicPath)) continue
+  validateAsset(publicPath, publicPath)
+}
+
 for (const item of externalRefs) {
   errors.push(`REMOTE ${item.url} referenced by ${item.file}`)
 }
 
-console.log(`Local image audit: ${localRefs.size} referenced paths, ${checkedTargets.size} local targets, ${externalRefs.length} remote image references.`)
+console.log(`Local image audit: ${localRefs.size} referenced paths, ${checkedTargets.size} validated local targets, ${shippedImages} shipped public images, ${externalRefs.length} remote image references.`)
 for (const [ref, sources] of [...localRefs.entries()].sort(([a], [b]) => a.localeCompare(b))) {
   const target = localAliases.get(ref) ?? ref
   console.log(`  OK ${ref}${target !== ref ? ` -> ${target}` : ''} (${[...sources].join(', ')})`)
@@ -129,4 +157,4 @@ if (errors.length) {
   process.exit(1)
 }
 
-console.log('Local image audit passed: every static runtime image is local and has a matching file signature.')
+console.log('Local image audit passed: every runtime image is local and every shipped non-legacy asset has a matching file signature.')
