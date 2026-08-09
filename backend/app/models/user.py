@@ -7,7 +7,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, Integer, String, func
+from sqlalchemy import Boolean, DateTime, Enum, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -55,13 +55,7 @@ class RoleEnum(str, enum.Enum):
         return mapping.get(self, "citoyen")
 
     def hierarchy_level(self) -> int:
-        """
-        Retourne le niveau hiérarchique du rôle (0=le plus bas, 7=le plus élevé).
-
-        La hiérarchie à 7 niveaux effectifs :
-        - CITOYEN: 0, AGENT/MAIRIE/AGENCE: 2, ADMIN: 3,
-        - CHEF_SERVICE: 4, DIRECTEUR: 5, MINISTRE: 6, SUPER_ADMIN: 7
-        """
+        """Retourne le niveau hiérarchique du rôle."""
         levels = {
             RoleEnum.CITOYEN: 0,
             RoleEnum.MAIRIE: 2,
@@ -106,10 +100,11 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     mfa_secret: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    # Every security-sensitive lifecycle change increments this value. Access
-    # and refresh JWTs carry the version and become unusable as soon as it no
-    # longer matches the database value.
-    session_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Tokens with iat <= this cutoff are invalid. This supports immediate access
+    # token invalidation without changing every existing token issuer.
+    sessions_invalid_before: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     last_login_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
