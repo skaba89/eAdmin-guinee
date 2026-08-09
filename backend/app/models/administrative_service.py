@@ -55,6 +55,24 @@ class AdministrativeService(Base):
     source_reference: Mapped[str | None] = mapped_column(String(500), nullable=True)
     source_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
+    # Administrative output is versioned with the service itself. Templates are
+    # plain text with a controlled placeholder allow-list; the backend owns the
+    # final HTML layout. "approved" therefore means approved content, not
+    # arbitrary executable markup.
+    document_template_status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="not_configured", index=True
+    )
+    document_template_title: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    document_template_body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    document_template_source_reference: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    document_template_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    document_template_approved_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    document_template_approved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     effective_from: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
