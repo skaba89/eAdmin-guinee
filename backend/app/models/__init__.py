@@ -16,6 +16,7 @@ from app.models.document import Document, DocumentStatusEnum
 from app.models.document_ocr import DocumentOCRResult
 from app.models.document_version import DocumentVersion
 from app.models.electronic_stamp import ElectronicStamp, SignatureCircuit, SignatureStep
+from app.models.federated_identity import FederatedIdentity
 from app.models.institution import Institution
 from app.models.qualified_signature_evidence import QualifiedSignatureEvidence
 from app.models.service_request import (
@@ -49,6 +50,7 @@ __all__ = [
     "ElectronicStamp",
     "SignatureCircuit",
     "SignatureStep",
+    "FederatedIdentity",
     "QualifiedSignatureEvidence",
     "Courrier",
     "CourrierTypeEnum",

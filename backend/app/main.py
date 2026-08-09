@@ -27,6 +27,7 @@ from app.api import (
     document_search,
     documents,
     documents_search,
+    identity_federation,
     institutions,
     metrics,
     security,
@@ -44,6 +45,7 @@ from app.middleware.mfa_guard import MFAGuardMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
 from app.middleware.rls import set_rls_context
 from app.middleware.security_headers import SecurityHeadersMiddleware
+from app.middleware.session_validity import SessionValidityMiddleware
 from app.middleware.tenant import TenantResolutionMiddleware
 
 logger = logging.getLogger("eadmin")
@@ -158,11 +160,13 @@ app = FastAPI(
 )
 
 # Starlette executes the last added middleware first.
-# Request order: CORS -> Tenant -> Security Headers -> MFA -> Rate -> Audit -> Logging
+# Request order: CORS -> Tenant -> Security Headers -> Session validity -> MFA
+# -> Rate -> Audit -> Logging.
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(AuditMiddleware)
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(MFAGuardMiddleware)
+app.add_middleware(SessionValidityMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(TenantResolutionMiddleware)
 
@@ -217,15 +221,20 @@ app.add_middleware(
     ],
 )
 
+# Public SSO protocol endpoints intentionally run before authenticated/RLS
+# routers. They establish identity only; local authorization happens after the
+# explicit federated identity mapping is resolved.
+app.include_router(
+    identity_federation.public_router,
+    prefix="/api/v1/auth/sso",
+    tags=["SSO OIDC"],
+)
 # Authentication and security overrides are intentionally registered first.
 app.include_router(auth_hardening.router, prefix="/api/v1/auth", tags=["Authentification"])
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentification"])
 
 rls_dependencies = [Depends(set_rls_context)]
 
-# Public administrative-service metadata is readable without authentication.
-# The route installs its own host-derived PUBLIC RLS context and does not accept
-# client tenant/institution headers in non-development environments.
 app.include_router(
     service_catalog.public_router,
     prefix="/api/v1/public/service-catalog",
@@ -256,9 +265,6 @@ app.include_router(
     tags=["Demandes citoyennes"],
     dependencies=rls_dependencies,
 )
-# Register all server-authoritative GED routes before the historical
-# documents router. Import/query/file routes therefore own duplicate method/path
-# combinations and prevent client-authoritative legacy mutations.
 app.include_router(
     document_imports.router,
     prefix="/api/v1/documents",
@@ -320,6 +326,12 @@ app.include_router(
     dependencies=rls_dependencies,
 )
 app.include_router(
+    identity_federation.admin_router,
+    prefix="/api/v1/access-control/federated-identities",
+    tags=["IAM - identités fédérées"],
+    dependencies=rls_dependencies,
+)
+app.include_router(
     users.router,
     prefix="/api/v1/users",
     tags=["Utilisateurs"],
@@ -337,8 +349,6 @@ app.include_router(
     tags=["Audit"],
     dependencies=rls_dependencies,
 )
-# Grounded routes intentionally precede the historical AI router. Duplicate
-# paths are therefore handled by the sourced, human-in-the-loop implementation.
 app.include_router(
     ai_grounded.router,
     prefix="/api/v1/ai",

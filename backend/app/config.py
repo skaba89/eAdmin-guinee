@@ -95,6 +95,26 @@ class Settings(BaseSettings):
     TSA_URL: str = ""
     PKI_CONNECT_TIMEOUT_SECONDS: int = 10
 
+    # Government identity federation. OIDC authenticates an external identity;
+    # eAdmin remains authoritative for roles, tenant and institution. Accounts
+    # are never created from email/group claims in the login callback.
+    OIDC_ENABLED: bool = False
+    OIDC_PROVIDER: str = "government-oidc"
+    OIDC_ISSUER: str = ""
+    OIDC_AUTHORIZATION_ENDPOINT: str = ""
+    OIDC_TOKEN_ENDPOINT: str = ""
+    OIDC_JWKS_URI: str = ""
+    OIDC_CLIENT_ID: str = ""
+    OIDC_CLIENT_SECRET: str = ""
+    OIDC_REDIRECT_URI: str = ""
+    OIDC_SCOPES: str = "openid profile email"
+    OIDC_ALLOWED_ALGORITHMS: str = "RS256"
+    OIDC_STATE_TTL_SECONDS: int = 600
+    OIDC_HTTP_TIMEOUT_SECONDS: int = 10
+    OIDC_REQUIRE_VERIFIED_EMAIL: bool = True
+    OIDC_REQUIRED_ACR: str = ""
+    OIDC_AUTO_PROVISION: bool = False
+
     CORS_ORIGINS_DEV: list[str] = [
         "http://localhost:3000",
         "http://localhost:3001",
@@ -206,6 +226,51 @@ class Settings(BaseSettings):
                     "PKI_HSM_KEY_REFERENCE must reference an external HSM/KMS key; "
                     "raw private-key material is forbidden in application settings."
                 )
+
+        if self.OIDC_AUTO_PROVISION:
+            raise ValueError(
+                "OIDC_AUTO_PROVISION is forbidden: federated identities must be explicitly linked "
+                "to governed local eAdmin accounts."
+            )
+
+        if self.OIDC_ENABLED:
+            required_oidc = {
+                "OIDC_ISSUER": self.OIDC_ISSUER,
+                "OIDC_AUTHORIZATION_ENDPOINT": self.OIDC_AUTHORIZATION_ENDPOINT,
+                "OIDC_TOKEN_ENDPOINT": self.OIDC_TOKEN_ENDPOINT,
+                "OIDC_JWKS_URI": self.OIDC_JWKS_URI,
+                "OIDC_CLIENT_ID": self.OIDC_CLIENT_ID,
+                "OIDC_CLIENT_SECRET": self.OIDC_CLIENT_SECRET,
+                "OIDC_REDIRECT_URI": self.OIDC_REDIRECT_URI,
+            }
+            missing_oidc = [name for name, value in required_oidc.items() if not value.strip()]
+            if missing_oidc:
+                raise ValueError(
+                    "OIDC federation is enabled but required settings are missing: "
+                    + ", ".join(missing_oidc)
+                )
+
+            if "openid" not in self.OIDC_SCOPES.split():
+                raise ValueError("OIDC_SCOPES must include openid.")
+
+            algorithms = {item.strip() for item in self.OIDC_ALLOWED_ALGORITHMS.split(",") if item.strip()}
+            if not algorithms or not algorithms.issubset({"RS256", "ES256"}):
+                raise ValueError("OIDC_ALLOWED_ALGORITHMS may only contain RS256 and/or ES256.")
+
+            if not 120 <= self.OIDC_STATE_TTL_SECONDS <= 900:
+                raise ValueError("OIDC_STATE_TTL_SECONDS must be between 120 and 900 seconds.")
+
+            if self.is_production or self.is_staging:
+                secure_urls = {
+                    "OIDC_ISSUER": self.OIDC_ISSUER,
+                    "OIDC_AUTHORIZATION_ENDPOINT": self.OIDC_AUTHORIZATION_ENDPOINT,
+                    "OIDC_TOKEN_ENDPOINT": self.OIDC_TOKEN_ENDPOINT,
+                    "OIDC_JWKS_URI": self.OIDC_JWKS_URI,
+                    "OIDC_REDIRECT_URI": self.OIDC_REDIRECT_URI,
+                }
+                for name, endpoint in secure_urls.items():
+                    if not endpoint.lower().startswith("https://"):
+                        raise ValueError(f"{name} must use HTTPS in staging/production.")
 
         return self
 

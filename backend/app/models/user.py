@@ -55,13 +55,7 @@ class RoleEnum(str, enum.Enum):
         return mapping.get(self, "citoyen")
 
     def hierarchy_level(self) -> int:
-        """
-        Retourne le niveau hiérarchique du rôle (0=le plus bas, 7=le plus élevé).
-
-        La hiérarchie à 7 niveaux effectifs :
-        - CITOYEN: 0, AGENT/MAIRIE/AGENCE: 2, ADMIN: 3,
-        - CHEF_SERVICE: 4, DIRECTEUR: 5, MINISTRE: 6, SUPER_ADMIN: 7
-        """
+        """Retourne le niveau hiérarchique du rôle."""
         levels = {
             RoleEnum.CITOYEN: 0,
             RoleEnum.MAIRIE: 2,
@@ -75,7 +69,7 @@ class RoleEnum(str, enum.Enum):
         }
         return levels.get(self, 0)
 
-    def can_create_role(self, target_role: 'RoleEnum') -> bool:
+    def can_create_role(self, target_role: "RoleEnum") -> bool:
         """Check if this role can create another role."""
         return self.hierarchy_level() > target_role.hierarchy_level() or self == RoleEnum.SUPER_ADMIN
 
@@ -97,7 +91,6 @@ class User(Base):
         Enum(RoleEnum), default=RoleEnum.AGENT, nullable=False
     )
     institution: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    # Multi-tenant fields
     tenant_id: Mapped[str | None] = mapped_column(
         String(100), nullable=True, index=True, comment="Tenant identifier for multi-tenant isolation"
     )
@@ -107,6 +100,11 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     mfa_secret: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Tokens with iat <= this cutoff are invalid. This supports immediate access
+    # token invalidation without changing every existing token issuer.
+    sessions_invalid_before: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     last_login_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -117,7 +115,6 @@ class User(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
-    # Relations
     documents = relationship("Document", back_populates="owner", lazy="selectin")
     audit_logs = relationship("AuditLog", back_populates="user", lazy="selectin")
 
