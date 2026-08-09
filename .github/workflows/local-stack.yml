@@ -8,6 +8,7 @@ on:
       - 'package.json'
       - 'bun.lock'
       - 'backend/**'
+      - 'src/lib/api-base-url.ts'
       - 'scripts/local.ps1'
       - 'local-*.bat'
       - 'docs/LOCAL_DEVELOPMENT.md'
@@ -20,6 +21,7 @@ on:
       - 'package.json'
       - 'bun.lock'
       - 'backend/**'
+      - 'src/lib/api-base-url.ts'
       - 'scripts/local.ps1'
       - 'local-*.bat'
       - '.github/workflows/local-stack.yml'
@@ -72,6 +74,12 @@ jobs:
         run: |
           docker compose --env-file .env.local.ci -f docker-compose.local.yml build backend frontend notification-worker
 
+      - name: Verify localhost browser API resolver
+        run: |
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml run --rm --no-deps \
+            -e NODE_ENV=production -e NEXT_PUBLIC_API_URL= frontend \
+            bun -e "globalThis.window={location:{hostname:'localhost'}}; const m=await import('./src/lib/api-base-url.ts'); if(m.API_URL!=='http://localhost:8000'){throw new Error('unexpected API URL: '+m.API_URL)}; console.log('browser API URL OK',m.API_URL)"
+
       - name: Start local infrastructure
         run: |
           docker compose --env-file .env.local.ci -f docker-compose.local.yml up -d postgres redis minio minio-init mailpit
@@ -89,6 +97,26 @@ jobs:
       - name: Run enabled bootstrap explicitly
         run: |
           docker compose --env-file .env.local.ci -f docker-compose.local.yml run --rm --no-deps backend python -m app.bootstrap_runtime
+
+      - name: Verify users directly in PostgreSQL
+        run: |
+          set -euo pipefail
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T postgres \
+            psql -U eadmin -d eadmin -P pager=off -c \
+            "SELECT email, role, is_active, security_clearance, assurance_level, privileged_account FROM users ORDER BY role, email;"
+
+          USER_COUNT="$(docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T postgres \
+            psql -U eadmin -d eadmin -Atc "SELECT count(*) FROM users;")"
+          test "${USER_COUNT}" -ge 9
+
+          for email in \
+            superadmin@eadmin.test citoyen@eadmin.test agent@eadmin.test mairie@eadmin.test \
+            agence@eadmin.test admin@eadmin.test chef-service@eadmin.test directeur@eadmin.test ministre@eadmin.test
+          do
+            FOUND="$(docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T postgres \
+              psql -U eadmin -d eadmin -Atc "SELECT count(*) FROM users WHERE email='${email}' AND is_active=TRUE;")"
+            test "${FOUND}" = "1"
+          done
 
       - name: Import FastAPI application explicitly
         run: |
@@ -118,7 +146,7 @@ jobs:
           docker compose --env-file .env.local.ci -f docker-compose.local.yml logs --tail 250 backend
           exit 1
 
-      - name: Verify bootstrapped portal accounts
+      - name: Verify bootstrapped portal accounts through auth API
         run: |
           set -euo pipefail
           login() {
@@ -170,6 +198,8 @@ jobs:
           for attempt in $(seq 1 90); do
             if curl -fsS http://localhost:3000 >/tmp/frontend.html; then
               test -s /tmp/frontend.html
+              docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T frontend \
+                sh -lc 'test "$NEXT_PUBLIC_API_URL" = "http://localhost:8000" && echo "frontend env OK: $NEXT_PUBLIC_API_URL"'
               exit 0
             fi
             sleep 2
