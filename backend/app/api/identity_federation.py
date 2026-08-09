@@ -53,7 +53,7 @@ class SSOExchangeRequest(BaseModel):
 class SSOExchangeResponse(BaseModel):
     access_token: str
     refresh_token: str
-    token_type: str = "bearer"
+    token_type: str = "bearer"  # noqa: S105 - OAuth token type, not a secret
     mfa_required: bool
     return_to: str
 
@@ -410,8 +410,6 @@ async def _set_identity_status(
     target = await _load_manageable_target(db, current_user, identity.user_id)
     if target_status == "disabled":
         now = datetime.now(timezone.utc)
-        # Invalidate both tracked refresh tokens and every access JWT issued up
-        # to this cutoff. New password sessions may still be established later.
         await token_blacklist.revoke_all_user_tokens(str(target.id))
         target.sessions_invalid_before = now
         await db.flush()
