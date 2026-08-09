@@ -1,0 +1,93 @@
+name: SSO Federation Gate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+      - work/oidc-federation-lifecycle
+  workflow_dispatch:
+
+concurrency:
+  group: sso-federation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  oidc-federation:
+    name: OIDC protocol, identity lifecycle and session invariants
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: eadmin_sso
+          POSTGRES_USER: eadmin
+          POSTGRES_PASSWORD: ci-test-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U eadmin -d eadmin_sso"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      ENVIRONMENT: test
+      DATABASE_URL: postgresql+asyncpg://eadmin:ci-test-password@localhost:5432/eadmin_sso
+      REDIS_URL: redis://localhost:6379
+      SECRET_KEY: ci-only-secret-key-not-for-production-0123456789
+      ENCRYPTION_KEY: ci-only-encryption-key-0123456789abcdef
+      MINIO_ACCESS_KEY: ci-minio
+      MINIO_SECRET_KEY: ci-minio-secret
+      MINIO_ENDPOINT: localhost:9000
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Enforce static SSO federation policy
+        run: python scripts/ops/check_oidc_federation.py
+
+      - name: Lint federation implementation
+        run: |
+          cd backend
+          ruff check \
+            app/config.py \
+            app/models/federated_identity.py \
+            app/services/oidc_service.py \
+            app/services/federated_identity_service.py \
+            app/api/identity_federation.py \
+            app/middleware/session_validity.py \
+            tests/test_oidc_federation.py
+          cd ..
+          ruff check scripts/ops/check_oidc_federation.py
+
+      - name: Test adversarial federation behavior
+        working-directory: backend
+        run: pytest -q tests/test_oidc_federation.py
