@@ -241,7 +241,13 @@ async def process_outbox_batch(
         await db.commit()
 
         try:
-            result = await provider.send(item)
+            # Imported lazily to avoid a module cycle: mobile verification uses
+            # enqueue_notification, while its OTP payload resolver is needed only
+            # here at provider-delivery time.
+            from app.services.notification_payload_resolver import materialize_notification
+
+            delivery_notification = await materialize_notification(item)
+            result = await provider.send(delivery_notification)
         except Exception as exc:  # provider boundary: always turn failure into durable state
             message = str(exc).strip() or exc.__class__.__name__
             item.last_error = message[:4000]
