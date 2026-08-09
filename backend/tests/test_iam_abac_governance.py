@@ -144,7 +144,7 @@ async def test_sensitive_permanent_permission_needs_local_abac_attributes(db_ses
 
 
 @pytest.mark.asyncio
-async def test_break_glass_requires_privileged_assured_account(db_session):
+async def test_break_glass_is_explicit_emergency_override_but_still_requires_mfa(db_session):
     requester = User(
         id=uuid.uuid4(),
         email="sponsor@eadmin.gn",
@@ -173,8 +173,8 @@ async def test_break_glass_requires_privileged_assured_account(db_session):
         institution_id="justice",
         is_active=True,
         employment_status="active",
-        security_clearance=4,
-        assurance_level=3,
+        security_clearance=0,
+        assurance_level=1,
         privileged_account=False,
     )
     db_session.add_all([requester, approver, grantee])
@@ -208,12 +208,13 @@ async def test_break_glass_requires_privileged_assured_account(db_session):
         db=db_session,
         tenant_id="republique-de-guinee",
         institution_id="justice",
-        mfa_verified=True,
+        mfa_verified=False,
     )
     assert denied.allowed is False
 
-    grantee.privileged_account = True
-    await db_session.flush()
+    # Emergency access may bypass the normal sensitive-operation ABAC profile,
+    # but only because the AccessGrant itself already carries the independent
+    # SUPER_ADMIN approval, incident ticket, bounded scope and short lifetime.
     allowed = await authorization_service.authorize(
         user=grantee,
         resource="settings",
