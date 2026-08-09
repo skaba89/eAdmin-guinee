@@ -7,7 +7,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, String, func
+from sqlalchemy import Boolean, DateTime, Enum, Integer, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -98,6 +98,31 @@ class User(Base):
         String(100), nullable=True, index=True, comment="Institution identifier for RLS"
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    # Server-authoritative ABAC attributes. External IdP group/role claims must
+    # never populate these fields automatically. They are governed locally and
+    # complement (never replace) the permanent RoleEnum hierarchy.
+    employment_status: Mapped[str] = mapped_column(
+        String(32), default="active", nullable=False
+    )
+    security_clearance: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False
+    )
+    assurance_level: Mapped[int] = mapped_column(
+        Integer, default=1, nullable=False
+    )
+    privileged_account: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
+    job_function: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    department_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    access_attributes_reviewed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    access_attributes_reviewed_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     mfa_secret: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # Tokens with iat <= this cutoff are invalid. This supports immediate access
