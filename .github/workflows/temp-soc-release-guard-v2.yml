@@ -1,0 +1,195 @@
+name: Temporary SOC six-gate release guard v2
+
+on:
+  push:
+    branches:
+      - work/soc-siem-incident-response
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+  checks: read
+
+concurrency:
+  group: temporary-soc-release-guard
+  cancel-in-progress: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR_NUMBER: '46'
+      HEAD_BRANCH: work/soc-siem-incident-response
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/soc-siem-incident-response
+          fetch-depth: 0
+
+      - name: Verify final SOC wiring before cleanup
+        shell: bash
+        run: |
+          git fetch origin "$HEAD_BRANCH"
+          git reset --hard "origin/$HEAD_BRANCH"
+          python - <<'PY'
+          from pathlib import Path
+
+          required = {
+              'backend/app/config.py': [
+                  'SOC_INGEST_ENABLED: bool = False',
+                  'SOC_INGEST_HMAC_SECRET: str = ""',
+                  'SOC_INGEST_MAX_SKEW_SECONDS must be between 60 and 900 seconds.',
+              ],
+              'backend/app/main.py': ['soc.ingest_router', 'soc.router'],
+              'backend/app/services/soc_service.py': [
+                  'event.listen(AuditLog, "after_insert"',
+                  'if connection.dialect.name != "postgresql":',
+                  'SOC_SERVICE',
+              ],
+              'backend/app/api/soc.py': [
+                  'ValidationError',
+                  'X-EAdmin-SOC-Timestamp',
+                  'X-EAdmin-SOC-Signature',
+                  'hmac.compare_digest',
+              ],
+              'backend/alembic/versions/add_soc_incident_response.py': [
+                  'revision = "soc_incident_response"',
+                  'FORCE ROW LEVEL SECURITY',
+              ],
+              '.github/workflows/soc-governance.yml': ['SOC Governance Gate'],
+              'backend/tests/test_soc_service.py': [
+                  'test_security_audit_is_mirrored_redacted_and_pseudonymized',
+              ],
+          }
+          for path, markers in required.items():
+              text = Path(path).read_text(encoding='utf-8')
+              for marker in markers:
+                  if marker not in text:
+                      raise SystemExit(f'{path}: missing required marker {marker!r}')
+          PY
+
+      - name: Remove every temporary SOC workflow
+        id: candidate
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          find .github/workflows -maxdepth 1 -type f -name 'temp-soc-*.yml' -delete
+          git add -A
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "Expected at least this release guard to be removed"
+            exit 1
+          fi
+          git commit -m "chore(soc): remove temporary release workflows"
+          git push origin HEAD:"$HEAD_BRANCH"
+          final_sha=$(git rev-parse HEAD)
+          echo "sha=$final_sha" >> "$GITHUB_OUTPUT"
+          echo "Final cleaned candidate: $final_sha"
+
+      - name: Dispatch six permanent gates on cleaned branch head
+        shell: bash
+        run: |
+          workflows=(
+            'P0 Government Readiness Gates'
+            'Operational Resilience Gate'
+            'PKI Trust Boundary Gate'
+            'IAM Governance Gate'
+            'SSO Federation Gate'
+            'SOC Governance Gate'
+          )
+          for workflow in "${workflows[@]}"; do
+            echo "Dispatching $workflow"
+            gh workflow run "$workflow" --repo "$GITHUB_REPOSITORY" --ref "$HEAD_BRANCH"
+          done
+
+      - name: Require six permanent gates on exact cleaned SHA
+        shell: bash
+        env:
+          FINAL_SHA: ${{ steps.candidate.outputs.sha }}
+        run: |
+          required=(
+            'P0 Government Readiness Gates'
+            'Operational Resilience Gate'
+            'PKI Trust Boundary Gate'
+            'IAM Governance Gate'
+            'SSO Federation Gate'
+            'SOC Governance Gate'
+          )
+
+          for attempt in $(seq 1 180); do
+            gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --commit "$FINAL_SHA" \
+              --limit 100 \
+              --json name,status,conclusion,databaseId > /tmp/runs.json
+
+            decision=$(python - "${required[@]}" <<'PY'
+          import json
+          import sys
+
+          required = sys.argv[1:]
+          runs = json.load(open('/tmp/runs.json', encoding='utf-8'))
+          latest = {}
+          for run in runs:
+              name = run.get('name')
+              if name not in required:
+                  continue
+              if name not in latest or int(run.get('databaseId') or 0) > int(latest[name].get('databaseId') or 0):
+                  latest[name] = run
+
+          missing = [name for name in required if name not in latest]
+          if missing:
+              print('WAIT:' + ','.join(missing))
+              raise SystemExit(0)
+
+          pending = [name for name in required if latest[name].get('status') != 'completed']
+          if pending:
+              print('WAIT:' + ','.join(pending))
+              raise SystemExit(0)
+
+          failed = [
+              f"{name}={latest[name].get('conclusion')}"
+              for name in required
+              if latest[name].get('conclusion') != 'success'
+          ]
+          print('FAIL:' + ','.join(failed) if failed else 'PASS')
+          PY
+            )
+
+            echo "Gate decision: $decision"
+            if [[ "$decision" == "PASS" ]]; then
+              exit 0
+            fi
+            if [[ "$decision" == FAIL:* ]]; then
+              exit 1
+            fi
+            sleep 10
+          done
+          exit 1
+
+      - name: Mark PR ready and merge exact validated SHA
+        shell: bash
+        env:
+          FINAL_SHA: ${{ steps.candidate.outputs.sha }}
+        run: |
+          current_head=$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq .headRefOid)
+          if [[ "$current_head" != "$FINAL_SHA" ]]; then
+            echo "PR head moved: expected $FINAL_SHA got $current_head"
+            exit 1
+          fi
+
+          is_draft=$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)
+          if [[ "$is_draft" == "true" ]]; then
+            gh pr ready "$PR_NUMBER" --repo "$GITHUB_REPOSITORY"
+          fi
+
+          gh api \
+            --method PUT \
+            "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/merge" \
+            -f sha="$FINAL_SHA" \
+            -f merge_method=merge \
+            -f commit_title='Merge PR #46: SOC/SIEM and incident response'
