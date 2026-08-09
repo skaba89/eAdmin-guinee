@@ -15,7 +15,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from app.config import settings
-from app.database import async_session_factory
+from app.database import async_session_factory, get_db
 from app.models.user import User
 
 logger = logging.getLogger("eadmin.session_validity")
@@ -39,6 +39,27 @@ async def _production_user_lookup(user_uuid: uuid.UUID) -> User | None:
             "is_super_admin": False,
         }
         return await db.scalar(select(User).where(User.id == user_uuid))
+
+
+async def _lookup_from_fastapi_override(request: Request, user_uuid: uuid.UUID) -> User | None:
+    """Use the same DB override FastAPI tests already install.
+
+    This does not create a production bypass: dependency_overrides is empty in
+    deployed applications, so production always uses `_production_user_lookup`.
+    """
+    override = request.app.dependency_overrides.get(get_db)
+    if override is None:
+        return await _production_user_lookup(user_uuid)
+
+    dependency = override()
+    try:
+        db = await dependency.__anext__()
+        return await db.scalar(select(User).where(User.id == user_uuid))
+    finally:
+        try:
+            await dependency.__anext__()
+        except StopAsyncIteration:
+            pass
 
 
 class SessionValidityMiddleware(BaseHTTPMiddleware):
@@ -75,14 +96,8 @@ class SessionValidityMiddleware(BaseHTTPMiddleware):
                 content={"detail": "Token de session invalide.", "code": "INVALID_SESSION_TOKEN"},
             )
 
-        # Tests may inject the same transaction-backed lookup used by their
-        # FastAPI DB override. Production never sets this hook and therefore
-        # always uses the dedicated AUTH_SERVICE PostgreSQL read context above.
-        user_lookup = getattr(request.app.state, "session_validity_user_lookup", None)
-        if user_lookup is None:
-            user_lookup = _production_user_lookup
         try:
-            user = await user_lookup(user_uuid)
+            user = await _lookup_from_fastapi_override(request, user_uuid)
         except Exception as exc:
             logger.error("Session validity lookup failed user=%s error=%s", user_uuid, exc)
             return JSONResponse(
