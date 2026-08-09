@@ -40,7 +40,6 @@ class RoleEnum(str, enum.Enum):
     CITOYEN = "CITOYEN"
 
     def to_frontend_role(self) -> str:
-        """Map backend role to frontend role name."""
         mapping = {
             RoleEnum.SUPER_ADMIN: "superadmin",
             RoleEnum.MINISTRE: "ministre",
@@ -55,7 +54,6 @@ class RoleEnum(str, enum.Enum):
         return mapping.get(self, "citoyen")
 
     def hierarchy_level(self) -> int:
-        """Retourne le niveau hiérarchique du rôle."""
         levels = {
             RoleEnum.CITOYEN: 0,
             RoleEnum.MAIRIE: 2,
@@ -70,7 +68,6 @@ class RoleEnum(str, enum.Enum):
         return levels.get(self, 0)
 
     def can_create_role(self, target_role: "RoleEnum") -> bool:
-        """Check if this role can create another role."""
         return self.hierarchy_level() > target_role.hierarchy_level() or self == RoleEnum.SUPER_ADMIN
 
 
@@ -99,6 +96,17 @@ class User(Base):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
+    # Notification contact and consent are server-authoritative. Mobile channels
+    # remain disabled until the user proves possession of the number and then
+    # explicitly opts in under the current consent version.
+    phone_e164: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    phone_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    notification_email_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    notification_sms_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    notification_whatsapp_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    notification_consent_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    notification_consent_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     # Server-authoritative ABAC attributes. External IdP group/role claims must
     # never populate these fields automatically. They are governed locally and
     # complement (never replace) the permanent RoleEnum hierarchy.
@@ -125,8 +133,6 @@ class User(Base):
 
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     mfa_secret: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    # Tokens with iat <= this cutoff are invalid. This supports immediate access
-    # token invalidation without changing every existing token issuer.
     sessions_invalid_before: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
