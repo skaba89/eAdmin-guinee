@@ -220,8 +220,6 @@ async def request_access_grant(
             status_code=403,
             detail="Séparation des tâches: le demandeur ne peut pas être le bénéficiaire.",
         )
-    if body.grant_type == "break_glass" and not _mfa_verified(request, current_user):
-        raise HTTPException(status_code=403, detail="MFA vérifié requis pour demander un break-glass.")
     if (body.resource, body.action) not in PERMISSION_MATRIX:
         raise HTTPException(status_code=422, detail="Permission inconnue dans la matrice d'autorisation.")
     if not authorization_service.is_delegable_permission(
@@ -277,6 +275,8 @@ async def request_access_grant(
         )
     if body.grant_type == "break_glass" and not (body.ticket_reference or "").strip():
         raise HTTPException(status_code=422, detail="Un ticket d'incident est obligatoire pour break-glass.")
+    if body.grant_type == "break_glass" and not _mfa_verified(request, current_user):
+        raise HTTPException(status_code=403, detail="MFA vérifié requis pour demander un break-glass.")
 
     grant = AccessGrant(
         grant_type=body.grant_type,
