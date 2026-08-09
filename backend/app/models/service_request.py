@@ -171,4 +171,11 @@ class GeneratedServiceDocument(Base):
     generated_by_name: Mapped[str] = mapped_column(String(255), nullable=False)
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
+    # Provenance of the approved server-side template. Historical rows created
+    # before this migration remain nullable/false and are visibly distinguishable.
+    template_service_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    template_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    template_source_reference: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    rendered_server_side: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
     request = relationship("ServiceRequest", back_populates="generated_document")
