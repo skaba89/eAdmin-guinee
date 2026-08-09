@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +17,7 @@ from app.services.mobile_verification import (
     MOBILE_CONSENT_VERSION,
     MobileProviderUnavailableError,
     MobileVerificationError,
+    MobileVerificationRateLimitError,
     mask_phone,
     mobile_verification_service,
 )
@@ -42,7 +44,10 @@ class NotificationPreferencesUpdate(BaseModel):
 
 
 def _provider_status() -> dict[str, bool]:
-    registry = ProviderRegistry.from_environment()
+    try:
+        registry = ProviderRegistry.from_environment()
+    except ValueError:
+        return {"sms": False, "whatsapp": False}
     return {
         "sms": registry.get("sms") is not None,
         "whatsapp": registry.get("whatsapp") is not None,
@@ -129,8 +134,10 @@ async def start_mobile_verification(
         )
     except MobileProviderUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except MobileVerificationError as exc:
+    except MobileVerificationRateLimitError as exc:
         raise HTTPException(status_code=429, detail=str(exc)) from exc
+    except MobileVerificationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     await _audit_preferences(
         db,
@@ -158,9 +165,9 @@ async def confirm_mobile_verification(
     request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> dict:
+):
     try:
-        challenge = await mobile_verification_service.confirm_challenge(
+        result = await mobile_verification_service.confirm_challenge(
             db,
             user=current_user,
             challenge_id=payload.challenge_id,
@@ -168,6 +175,30 @@ async def confirm_mobile_verification(
         )
     except MobileVerificationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    challenge = result.challenge
+    if not result.success:
+        await _audit_preferences(
+            db,
+            request,
+            current_user,
+            description="Tentative de vérification mobile échouée",
+            details={
+                "channel": challenge.channel,
+                "phone_masked": mask_phone(challenge.phone_e164),
+                "attempt_count": challenge.attempt_count,
+                "max_attempts": challenge.max_attempts,
+            },
+        )
+        # A response object, rather than a raised HTTPException, lets the normal
+        # request DB dependency commit the failed-attempt counter.
+        return JSONResponse(
+            status_code=400,
+            content={
+                "detail": result.error or "Code de vérification incorrect.",
+                "remainingAttempts": max(0, challenge.max_attempts - challenge.attempt_count),
+            },
+        )
 
     await _audit_preferences(
         db,
