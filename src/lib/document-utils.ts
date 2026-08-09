@@ -2,6 +2,7 @@
 // Administrative output is server-authoritative: this module can download an
 // already-rendered document, but it must never manufacture official content.
 
+import { getAttachmentDownloadUrl } from '@/lib/service-requests-api'
 import type {
   UploadedDocument,
   GeneratedDocument,
@@ -68,36 +69,46 @@ export function processFile(file: File, requiredDocName: string): Promise<Upload
   })
 }
 
-/**
- * Local-file helper only. Persisted attachments deliberately contain no data
- * URL and must be retrieved through the authenticated short-lived backend URL.
- */
-export function downloadUploadedFile(doc: UploadedDocument) {
-  if (!doc.data?.startsWith('data:')) {
-    throw new Error(
-      'Cette pièce est stockée côté serveur. Utilisez le téléchargement authentifié de la demande.',
-    )
+type ScopedUploadedDocument = UploadedDocument & { requestId?: string }
+
+async function resolveUploadedDocumentUrl(doc: UploadedDocument): Promise<string> {
+  if (doc.serverStored) {
+    const requestId = (doc as ScopedUploadedDocument).requestId
+    if (!requestId) {
+      throw new Error(
+        'Le contexte de la demande est manquant pour télécharger cette pièce stockée côté serveur.',
+      )
+    }
+    return getAttachmentDownloadUrl(requestId, doc.id)
   }
+
+  if (doc.data?.startsWith('data:')) return doc.data
+
+  throw new Error('Le contenu de cette pièce n’est pas disponible.')
+}
+
+/**
+ * Download either a local pre-upload file or, for persisted attachments, a
+ * short-lived URL obtained from the authenticated backend.
+ */
+export async function downloadUploadedFile(doc: UploadedDocument): Promise<void> {
+  const url = await resolveUploadedDocumentUrl(doc)
   const link = document.createElement('a')
-  link.href = doc.data
+  link.href = url
   link.download = doc.name
-  link.rel = 'noopener'
+  link.rel = 'noopener noreferrer'
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
 }
 
 /**
- * Local preview only. Opening the data URL directly avoids document.write and
- * prevents filename/content interpolation into a newly-created HTML document.
+ * Preview without document.write. Persisted files use a five-minute backend
+ * URL; local files use their data URL before upload.
  */
-export function previewUploadedFile(doc: UploadedDocument) {
-  if (!doc.data?.startsWith('data:')) {
-    throw new Error(
-      'Cette pièce est stockée côté serveur. Utilisez l’aperçu authentifié de la demande.',
-    )
-  }
-  const preview = window.open(doc.data, '_blank', 'noopener,noreferrer')
+export async function previewUploadedFile(doc: UploadedDocument): Promise<void> {
+  const url = await resolveUploadedDocumentUrl(doc)
+  const preview = window.open(url, '_blank', 'noopener,noreferrer')
   if (preview) preview.opener = null
 }
 
@@ -121,13 +132,28 @@ export function downloadGeneratedDocument(doc: GeneratedDocument) {
 
 /**
  * Download only the persisted server-rendered document associated with a
- * request. There is intentionally no browser-side fallback generator.
+ * request. The optional legacy second argument is intentionally ignored.
  */
-export function downloadCitizenDocument(req: CitizenRequest) {
+export function downloadCitizenDocument(req: CitizenRequest, legacyAgentName?: string) {
+  void legacyAgentName
   if (!req.generatedDocument) {
     throw new Error(
       'Aucun document administratif rendu par le serveur n’est disponible pour cette demande.',
     )
   }
   downloadGeneratedDocument(req.generatedDocument)
+}
+
+/**
+ * @deprecated Transitional compile-time shim for Agence/Mairie dashboards.
+ * It deliberately returns no document. The caller may pass this value to the
+ * store, which discards it and asks the backend to render the approved model.
+ */
+export function createGeneratedDocument(
+  req: CitizenRequest,
+  legacyAgentName?: string,
+): undefined {
+  void req
+  void legacyAgentName
+  return undefined
 }
