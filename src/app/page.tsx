@@ -27,7 +27,7 @@ const WorkflowPage = dynamic(() => import('@/components/app/workflow-page').then
 const SignaturesPage = dynamic(() => import('@/components/app/signatures-page').then(m => ({ default: m.SignaturesPage })), { ssr: false })
 const CitizenPortalPage = dynamic(() => import('@/components/app/citizen-portal-page').then(m => ({ default: m.CitizenPortalPage })), { ssr: false })
 const AdminPage = dynamic(() => import('@/components/app/admin-page').then(m => ({ default: m.AdminPage })), { ssr: false })
-const UsersPage = dynamic(() => import('@/components/app/users-page').then(m => ({ default: m.UsersPage })), { ssr: false })
+const UsersPage = dynamic(() => import('@/components/app/managed-users-page').then(m => ({ default: m.ManagedUsersPage })), { ssr: false })
 const SettingsPage = dynamic(() => import('@/components/app/settings-page').then(m => ({ default: m.SettingsPage })), { ssr: false })
 const NotificationsPage = dynamic(() => import('@/components/app/notifications-page').then(m => ({ default: m.NotificationsPage })), { ssr: false })
 const AuditLogsPage = dynamic(() => import('@/components/app/audit-logs-page').then(m => ({ default: m.AuditLogsPage })), { ssr: false })
