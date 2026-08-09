@@ -27,6 +27,20 @@ def _utc(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
+async def _production_user_lookup(user_uuid: uuid.UUID) -> User | None:
+    async with async_session_factory() as db:
+        # Authentication infrastructure receives read-only access to users even
+        # when the users table is protected by FORCE RLS.
+        db.sync_session.info["rls_scope"] = {
+            "user_id": "",
+            "tenant_id": "",
+            "institution_id": "",
+            "role": "AUTH_SERVICE",
+            "is_super_admin": False,
+        }
+        return await db.scalar(select(User).where(User.id == user_uuid))
+
+
 class SessionValidityMiddleware(BaseHTTPMiddleware):
     """Fail closed when an access token represents stale authorization state."""
 
@@ -61,17 +75,23 @@ class SessionValidityMiddleware(BaseHTTPMiddleware):
                 content={"detail": "Token de session invalide.", "code": "INVALID_SESSION_TOKEN"},
             )
 
-        async with async_session_factory() as db:
-            # Authentication infrastructure receives read-only access to users
-            # even when the users table is protected by FORCE RLS.
-            db.sync_session.info["rls_scope"] = {
-                "user_id": "",
-                "tenant_id": "",
-                "institution_id": "",
-                "role": "AUTH_SERVICE",
-                "is_super_admin": False,
-            }
-            user = await db.scalar(select(User).where(User.id == user_uuid))
+        # Tests may inject the same transaction-backed lookup used by their
+        # FastAPI DB override. Production never sets this hook and therefore
+        # always uses the dedicated AUTH_SERVICE PostgreSQL read context above.
+        user_lookup = getattr(request.app.state, "session_validity_user_lookup", None)
+        if user_lookup is None:
+            user_lookup = _production_user_lookup
+        try:
+            user = await user_lookup(user_uuid)
+        except Exception as exc:
+            logger.error("Session validity lookup failed user=%s error=%s", user_uuid, exc)
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "detail": "La validité de la session n'a pas pu être vérifiée.",
+                    "code": "SESSION_VALIDATION_UNAVAILABLE",
+                },
+            )
 
         if user is None or not user.is_active:
             return JSONResponse(
