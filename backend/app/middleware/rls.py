@@ -70,7 +70,12 @@ async def set_rls_context(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> AsyncGenerator[User, None]:
-    """Establish and propagate a fail-closed RLS context for one request."""
+    """Establish and propagate a fail-closed RLS context for one request.
+
+    Only failures while establishing the trusted PostgreSQL context are mapped
+    to HTTP 503. Exceptions raised by the endpoint after ``yield`` (validation,
+    authorization, conflicts, etc.) must keep their original HTTP semantics.
+    """
 
     _validate_requested_scope(request, current_user)
 
@@ -94,60 +99,65 @@ async def set_rls_context(
     context_token = current_rls_scope.set(scope)
 
     try:
-        bind = db.get_bind()
-        dialect_name = bind.dialect.name if bind is not None else "unknown"
+        # Keep the setup guard deliberately narrower than the dependency yield.
+        # FastAPI sends endpoint exceptions back into yield dependencies. If the
+        # yield is inside this catch block, normal 422/403/409 errors become 503.
+        try:
+            bind = db.get_bind()
+            dialect_name = bind.dialect.name if bind is not None else "unknown"
 
-        if dialect_name != "postgresql":
-            if not settings.is_test:
-                raise RLSContextError(
-                    f"RLS requires PostgreSQL; active dialect is {dialect_name}"
+            if dialect_name != "postgresql":
+                if not settings.is_test:
+                    raise RLSContextError(
+                        f"RLS requires PostgreSQL; active dialect is {dialect_name}"
+                    )
+            else:
+                # get_current_user already queried this session, so its transaction
+                # may have started before the ContextVar existed. Set the variables
+                # explicitly on the request session; secondary sessions inherit them
+                # through the SQLAlchemy after_begin hook in app.database.
+                await db.execute(
+                    text(
+                        """
+                        SELECT
+                            set_config('app.current_user_id', :user_id, true),
+                            set_config('app.current_tenant_id', :tenant_id, true),
+                            set_config('app.current_institution_id', :institution_id, true),
+                            set_config('app.current_role', :role, true)
+                        """
+                    ),
+                    {
+                        "user_id": scope["user_id"],
+                        "tenant_id": scope["tenant_id"],
+                        "institution_id": scope["institution_id"],
+                        "role": scope["role"],
+                    },
                 )
-        else:
-            # get_current_user already queried this session, so its transaction
-            # may have started before the ContextVar existed. Set the variables
-            # explicitly on the request session; secondary sessions inherit them
-            # through the SQLAlchemy after_begin hook in app.database.
-            await db.execute(
-                text(
-                    """
-                    SELECT
-                        set_config('app.current_user_id', :user_id, true),
-                        set_config('app.current_tenant_id', :tenant_id, true),
-                        set_config('app.current_institution_id', :institution_id, true),
-                        set_config('app.current_role', :role, true)
-                    """
-                ),
-                {
-                    "user_id": scope["user_id"],
-                    "tenant_id": scope["tenant_id"],
-                    "institution_id": scope["institution_id"],
-                    "role": scope["role"],
-                },
+
+            logger.debug(
+                "Trusted RLS context established: user=%s tenant=%s institution=%s role=%s",
+                scope["user_id"],
+                scope["tenant_id"],
+                scope["institution_id"] or "<none>",
+                scope["role"],
             )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.error(
+                "RLS context setup failed; request blocked: user=%s tenant=%s error=%s",
+                scope["user_id"],
+                scope["tenant_id"],
+                exc,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Le contexte de sécurité des données n'a pas pu être établi.",
+            ) from exc
 
-        logger.debug(
-            "Trusted RLS context established: user=%s tenant=%s institution=%s role=%s",
-            scope["user_id"],
-            scope["tenant_id"],
-            scope["institution_id"] or "<none>",
-            scope["role"],
-        )
-
+        # Deliberately outside the setup exception handler: endpoint exceptions
+        # must propagate unchanged to FastAPI's normal exception handlers.
         yield current_user
-
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.error(
-            "RLS context setup failed; request blocked: user=%s tenant=%s error=%s",
-            scope["user_id"],
-            scope["tenant_id"],
-            exc,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Le contexte de sécurité des données n'a pas pu être établi.",
-        ) from exc
     finally:
         current_rls_scope.reset(context_token)
 
