@@ -1,5 +1,5 @@
 import { API_URL } from '@/lib/api-base-url'
-import { getActiveAccessToken, getCurrentUser } from '@/lib/auth-client'
+import { getActiveAccessToken } from '@/lib/auth-client'
 import { getStableIdempotencyKey } from '@/lib/idempotency-client'
 import type {
   CitizenRequest,
@@ -15,6 +15,13 @@ import type {
 // render is deliberately propagated and prevents the status request from leaving
 // the browser.
 const pendingGeneratedDocumentWrites = new Map<string, Promise<CitizenRequest>>()
+
+// ServiceRequestCreate still accepts citizen_email for legacy clients even though
+// the backend deliberately ignores it and persists current_user.email instead.
+// Local bootstrap accounts use the reserved .local suffix, which EmailStr rejects
+// before the endpoint can apply that authority rule. Send a non-PII syntactically
+// valid compatibility value until the legacy field is removed from the API model.
+const AUTHENTICATED_EMAIL_COMPATIBILITY_PLACEHOLDER = 'authenticated-user@eadmin.gn'
 
 export interface InstitutionOption {
   id: string
@@ -158,14 +165,6 @@ export async function listRequests(): Promise<CitizenRequest[]> {
 }
 
 export async function createRequest(input: CreateServiceRequestInput): Promise<CitizenRequest> {
-  const token = getActiveAccessToken()
-  if (!token) throw new Error('Session expirée. Veuillez vous reconnecter.')
-
-  // The backend persists the authenticated identity e-mail, not the editable
-  // form hint. Still send a valid value because the compatibility request model
-  // validates citizen_email before the endpoint can apply that authority rule.
-  const currentUser = await getCurrentUser(token)
-
   // Canonicalize exactly the payload sent to the backend. This also prevents an
   // opaque FastAPI 422 caused by whitespace-only or undersized form values.
   const requestPayload = {
@@ -175,7 +174,7 @@ export async function createRequest(input: CreateServiceRequestInput): Promise<C
     citizen_first_name: normalizeRequired(input.citizenFirstName, 'Le prénom'),
     citizen_nin: normalizeRequired(input.citizenNIN, 'Le NIN', 3),
     citizen_phone: normalizeRequired(input.citizenPhone, 'Le téléphone', 3),
-    citizen_email: currentUser.email.trim().toLowerCase(),
+    citizen_email: AUTHENTICATED_EMAIL_COMPATIBILITY_PLACEHOLDER,
     citizen_address: normalizeRequired(input.citizenAddress, 'L’adresse', 3),
     motif: normalizeRequired(input.motif, 'Le motif', 3),
     mairie: input.mairie?.trim() || null,
