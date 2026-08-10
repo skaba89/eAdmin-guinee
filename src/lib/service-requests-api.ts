@@ -1,5 +1,5 @@
 import { API_URL } from '@/lib/api-base-url'
-import { getActiveAccessToken } from '@/lib/auth-client'
+import { getActiveAccessToken, getCurrentUser } from '@/lib/auth-client'
 import { getStableIdempotencyKey } from '@/lib/idempotency-client'
 import type {
   CitizenRequest,
@@ -38,6 +38,55 @@ export interface CreateServiceRequestInput {
   deliveryMode: CitizenRequest['deliveryMode']
 }
 
+type FastApiValidationError = {
+  loc?: unknown
+  msg?: unknown
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  service_id: 'démarche',
+  target_institution_id: 'institution destinataire',
+  citizen_name: 'nom',
+  citizen_first_name: 'prénom',
+  citizen_nin: 'NIN',
+  citizen_phone: 'téléphone',
+  citizen_email: 'e-mail',
+  citizen_address: 'adresse',
+  motif: 'motif',
+  delivery_mode: 'mode de livraison',
+}
+
+function formatValidationDetail(detail: unknown): string | null {
+  if (!Array.isArray(detail)) return null
+
+  const messages = detail.flatMap((entry): string[] => {
+    if (!entry || typeof entry !== 'object') return []
+    const validation = entry as FastApiValidationError
+    const loc = Array.isArray(validation.loc) ? validation.loc : []
+    const rawField = [...loc].reverse().find((part) => typeof part === 'string' && part !== 'body')
+    const field = typeof rawField === 'string' ? rawField : 'champ'
+    const label = FIELD_LABELS[field] || field
+    const msg = typeof validation.msg === 'string' && validation.msg.trim()
+      ? validation.msg.trim()
+      : 'valeur invalide'
+    return [`${label} : ${msg}`]
+  })
+
+  return messages.length ? `Données de la demande invalides — ${messages.join(' ; ')}` : null
+}
+
+function normalizeRequired(value: string, label: string, minLength = 1): string {
+  const normalized = value.trim()
+  if (normalized.length < minLength) {
+    throw new Error(
+      minLength > 1
+        ? `${label} doit contenir au moins ${minLength} caractères.`
+        : `${label} est obligatoire.`,
+    )
+  }
+  return normalized
+}
+
 async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getActiveAccessToken()
   if (!token) throw new Error('Session expirée. Veuillez vous reconnecter.')
@@ -68,9 +117,10 @@ async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
     const detail = payload && typeof payload === 'object' && 'detail' in payload
       ? (payload as { detail?: unknown }).detail
       : null
-    const message = typeof detail === 'string'
+    const validationMessage = formatValidationDetail(detail)
+    const message = validationMessage || (typeof detail === 'string'
       ? detail
-      : 'Une erreur est survenue lors de la communication avec eAdmin.'
+      : 'Une erreur est survenue lors de la communication avec eAdmin.')
     throw new Error(message)
   }
 
@@ -108,20 +158,27 @@ export async function listRequests(): Promise<CitizenRequest[]> {
 }
 
 export async function createRequest(input: CreateServiceRequestInput): Promise<CitizenRequest> {
-  // Canonicalize exactly the payload sent to the backend. The derived key is
-  // kept in sessionStorage only, so a mobile reconnect can safely retry the
-  // same mutation without storing any citizen business data offline.
+  const token = getActiveAccessToken()
+  if (!token) throw new Error('Session expirée. Veuillez vous reconnecter.')
+
+  // The backend persists the authenticated identity e-mail, not the editable
+  // form hint. Still send a valid value because the compatibility request model
+  // validates citizen_email before the endpoint can apply that authority rule.
+  const currentUser = await getCurrentUser(token)
+
+  // Canonicalize exactly the payload sent to the backend. This also prevents an
+  // opaque FastAPI 422 caused by whitespace-only or undersized form values.
   const requestPayload = {
-    service_id: input.serviceId,
-    target_institution_id: input.targetInstitutionId,
-    citizen_name: input.citizenName,
-    citizen_first_name: input.citizenFirstName,
-    citizen_nin: input.citizenNIN,
-    citizen_phone: input.citizenPhone,
-    citizen_email: input.citizenEmail,
-    citizen_address: input.citizenAddress,
-    motif: input.motif,
-    mairie: input.mairie || null,
+    service_id: normalizeRequired(input.serviceId, 'La démarche'),
+    target_institution_id: normalizeRequired(input.targetInstitutionId, 'L’institution destinataire'),
+    citizen_name: normalizeRequired(input.citizenName, 'Le nom'),
+    citizen_first_name: normalizeRequired(input.citizenFirstName, 'Le prénom'),
+    citizen_nin: normalizeRequired(input.citizenNIN, 'Le NIN', 3),
+    citizen_phone: normalizeRequired(input.citizenPhone, 'Le téléphone', 3),
+    citizen_email: currentUser.email.trim().toLowerCase(),
+    citizen_address: normalizeRequired(input.citizenAddress, 'L’adresse', 3),
+    motif: normalizeRequired(input.motif, 'Le motif', 3),
+    mairie: input.mairie?.trim() || null,
     delivery_mode: input.deliveryMode,
   }
   const idempotencyKey = await getStableIdempotencyKey(requestPayload)
