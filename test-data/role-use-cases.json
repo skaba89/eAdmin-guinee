@@ -1,0 +1,400 @@
+{
+  "dataset": "comprehensive-role-recette",
+  "version": 1,
+  "environment": "non-production only",
+  "accounts_domain": "recette.eadmin.gn",
+  "password_source": [
+    "EADMIN_RECETTE_PASSWORD",
+    "EADMIN_BOOTSTRAP_TEST_PASSWORD"
+  ],
+  "seeded_requests": {
+    "REC-GN-2026-001": "soumise / Ratoma / citoyen Awa",
+    "REC-GN-2026-002": "en_cours / Ratoma / citoyen Awa",
+    "REC-GN-2026-003": "pieces_complementaires / Matoto / citoyen Mamadou",
+    "REC-GN-2026-004": "validee / ANIP / citoyen Fatou",
+    "REC-GN-2026-005": "prete / APIP / citoyen Fatou / document généré",
+    "REC-GN-2026-006": "livree / Justice / citoyen Mamadou / satisfaction 5/5",
+    "REC-GN-2026-007": "rejetee / Ratoma / citoyen Awa",
+    "REC-GN-2026-008": "en_cours / Matoto / SLA dépassé",
+    "REC-ISO-2026-001": "soumise / tenant secondaire / isolation"
+  },
+  "roles": {
+    "CITOYEN": {
+      "accounts": [
+        "citoyen.awa@recette.eadmin.gn",
+        "citoyen.mamadou@recette.eadmin.gn",
+        "citoyen.fatou@recette.eadmin.gn",
+        "citoyen.isolation@recette.eadmin.gn"
+      ],
+      "cases": [
+        {
+          "id": "CIT-01",
+          "title": "Connexion citoyen",
+          "action": "Se connecter avec citoyen.awa@recette.eadmin.gn",
+          "expected": "Connexion autorisée et portail citoyen affiché."
+        },
+        {
+          "id": "CIT-02",
+          "title": "Lister uniquement ses propres demandes",
+          "action": "Awa consulte Mes demandes.",
+          "expected": "REC-GN-2026-001, 002 et 007 sont visibles. Les demandes Mamadou/Fatou ne le sont pas."
+        },
+        {
+          "id": "CIT-03",
+          "title": "Soumettre une nouvelle demande valide",
+          "action": "Créer une demande sur une démarche active et sélectionner une institution destinataire active.",
+          "expected": "HTTP 201, référence officielle générée par le serveur et dossier rattaché au citoyen authentifié."
+        },
+        {
+          "id": "CIT-04",
+          "title": "Validation des champs obligatoires",
+          "action": "Essayer de soumettre avec NIN, téléphone, adresse ou motif trop court/vide.",
+          "expected": "La soumission est refusée avec un message de validation lisible; aucun dossier n'est créé."
+        },
+        {
+          "id": "CIT-05",
+          "title": "Accès au dossier d'un autre citoyen",
+          "action": "Awa tente d'ouvrir REC-GN-2026-006 appartenant à Mamadou.",
+          "expected": "Dossier non visible / accès masqué par la portée propriétaire."
+        },
+        {
+          "id": "CIT-06",
+          "title": "Noter une demande livrée",
+          "action": "Mamadou ouvre REC-GN-2026-006 puis saisit une note entre 1 et 5.",
+          "expected": "Notation acceptée car le dossier est livré et appartient au citoyen."
+        },
+        {
+          "id": "CIT-07",
+          "title": "Interdire la notation avant livraison",
+          "action": "Awa tente de noter REC-GN-2026-002 en cours.",
+          "expected": "Refus métier HTTP 409."
+        },
+        {
+          "id": "CIT-08",
+          "title": "Isolation inter-tenant",
+          "action": "Un citoyen du tenant principal tente d'accéder à REC-ISO-2026-001.",
+          "expected": "Le dossier du tenant secondaire reste invisible."
+        }
+      ]
+    },
+    "AGENT": {
+      "accounts": [
+        "agent.ratoma@recette.eadmin.gn",
+        "agent.matoto@recette.eadmin.gn",
+        "agent.anip@recette.eadmin.gn",
+        "agent.apip@recette.eadmin.gn",
+        "agent.justice@recette.eadmin.gn"
+      ],
+      "cases": [
+        {
+          "id": "AGT-01",
+          "title": "Voir les dossiers de son institution",
+          "action": "agent.ratoma consulte les demandes.",
+          "expected": "Seuls les dossiers Ratoma sont visibles; Matoto, ANIP, APIP et Justice sont exclus."
+        },
+        {
+          "id": "AGT-02",
+          "title": "Prendre en charge un dossier soumis",
+          "action": "Sur un dossier Ratoma soumis, utiliser l'action de prise en charge.",
+          "expected": "L'agent authentifié devient l'agent affecté; l'identité envoyée par le navigateur n'est pas autoritaire."
+        },
+        {
+          "id": "AGT-03",
+          "title": "Passer soumise vers en_cours",
+          "action": "Mettre un dossier soumis de sa propre institution en cours.",
+          "expected": "Transition autorisée avec permission requests/process."
+        },
+        {
+          "id": "AGT-04",
+          "title": "Demander des pièces complémentaires",
+          "action": "Depuis un dossier en_cours, passer à pieces_complementaires et ajouter une note.",
+          "expected": "Transition et note autorisées dans le périmètre institutionnel."
+        },
+        {
+          "id": "AGT-05",
+          "title": "Interdire l'approbation métier",
+          "action": "Un AGENT tente de passer directement un dossier en_cours à validee.",
+          "expected": "Refus d'autorisation: l'approbation requiert CHEF_SERVICE ou supérieur."
+        },
+        {
+          "id": "AGT-06",
+          "title": "Interdire le dossier d'une autre institution",
+          "action": "agent.ratoma tente d'ouvrir REC-GN-2026-003 de Matoto.",
+          "expected": "Dossier masqué hors périmètre institutionnel."
+        }
+      ]
+    },
+    "MAIRIE": {
+      "accounts": [
+        "mairie.ratoma@recette.eadmin.gn"
+      ],
+      "cases": [
+        {
+          "id": "MAI-01",
+          "title": "Portée mairie",
+          "action": "Le compte MAIRIE Ratoma consulte les dossiers.",
+          "expected": "Visibilité limitée au tenant principal et à mairie-ratoma-recette."
+        },
+        {
+          "id": "MAI-02",
+          "title": "Traitement d'un dossier mairie",
+          "action": "Traiter une demande Ratoma et ajouter une note opérationnelle.",
+          "expected": "Autorisé avec le niveau opérationnel du rôle MAIRIE."
+        },
+        {
+          "id": "MAI-03",
+          "title": "Refus inter-mairie",
+          "action": "Tenter d'ouvrir une demande Matoto.",
+          "expected": "Aucune donnée Matoto ne doit être exposée."
+        },
+        {
+          "id": "MAI-04",
+          "title": "Refus d'approbation",
+          "action": "Tenter de valider ou rejeter une décision nécessitant l'approbation.",
+          "expected": "Refus car approve/reject requiert CHEF_SERVICE+."
+        },
+        {
+          "id": "MAI-05",
+          "title": "Contrôle de rattachement du rôle",
+          "action": "Essayer d'affecter un rôle MAIRIE à une institution de type agence via l'administration des utilisateurs.",
+          "expected": "Refus de validation HTTP 422."
+        }
+      ]
+    },
+    "AGENCE": {
+      "accounts": [
+        "agence.anip@recette.eadmin.gn"
+      ],
+      "cases": [
+        {
+          "id": "AGE-01",
+          "title": "Portée agence",
+          "action": "Le compte AGENCE ANIP consulte les dossiers.",
+          "expected": "Seuls les dossiers ANIP sont dans son périmètre."
+        },
+        {
+          "id": "AGE-02",
+          "title": "Traitement agence",
+          "action": "Prendre en charge et traiter un dossier ANIP.",
+          "expected": "Autorisé dans l'institution ANIP."
+        },
+        {
+          "id": "AGE-03",
+          "title": "Refus autre agence ou mairie",
+          "action": "Tenter d'ouvrir un dossier APIP ou Ratoma.",
+          "expected": "Dossier masqué hors institution."
+        },
+        {
+          "id": "AGE-04",
+          "title": "Contrôle de rattachement AGENCE",
+          "action": "Essayer d'affecter le rôle AGENCE à une mairie.",
+          "expected": "Refus de validation HTTP 422."
+        }
+      ]
+    },
+    "ADMIN": {
+      "accounts": [
+        "admin.ratoma@recette.eadmin.gn",
+        "admin.matoto@recette.eadmin.gn"
+      ],
+      "cases": [
+        {
+          "id": "ADM-01",
+          "title": "Lister les utilisateurs de sa mairie",
+          "action": "admin.ratoma ouvre Utilisateurs et portails.",
+          "expected": "Il ne voit et ne gère que les comptes administrables de Ratoma."
+        },
+        {
+          "id": "ADM-02",
+          "title": "Créer un rôle inférieur dans sa mairie",
+          "action": "Créer un AGENT rattaché à mairie-ratoma-recette.",
+          "expected": "Création autorisée et persistée dans PostgreSQL."
+        },
+        {
+          "id": "ADM-03",
+          "title": "Création inter-mairie interdite",
+          "action": "admin.ratoma tente de créer un AGENT pour mairie-matoto-recette.",
+          "expected": "Refus HTTP 403."
+        },
+        {
+          "id": "ADM-04",
+          "title": "Élévation de privilège interdite",
+          "action": "Un ADMIN tente de créer CHEF_SERVICE, DIRECTEUR, MINISTRE ou SUPER_ADMIN.",
+          "expected": "Refus hiérarchique."
+        },
+        {
+          "id": "ADM-05",
+          "title": "Un seul ADMIN actif par mairie",
+          "action": "Tenter de créer un second ADMIN actif à Ratoma.",
+          "expected": "Conflit HTTP 409."
+        },
+        {
+          "id": "ADM-06",
+          "title": "Isolation des dossiers",
+          "action": "admin.ratoma tente d'ouvrir REC-GN-2026-003 de Matoto.",
+          "expected": "Dossier masqué hors périmètre."
+        }
+      ]
+    },
+    "CHEF_SERVICE": {
+      "accounts": [
+        "chef.casier@recette.eadmin.gn"
+      ],
+      "cases": [
+        {
+          "id": "CHF-01",
+          "title": "Voir les dossiers de son service",
+          "action": "Le chef du casier consulte les demandes Justice de son institution.",
+          "expected": "Visibilité limitée à service-casier-recette."
+        },
+        {
+          "id": "CHF-02",
+          "title": "Approuver une demande",
+          "action": "Depuis un dossier en_cours de son service, passer à validee.",
+          "expected": "Autorisé car CHEF_SERVICE possède le niveau approve."
+        },
+        {
+          "id": "CHF-03",
+          "title": "Rejeter une demande",
+          "action": "Depuis un statut éligible, passer à rejetee avec une note de décision.",
+          "expected": "Autorisé car CHEF_SERVICE possède le niveau reject."
+        },
+        {
+          "id": "CHF-04",
+          "title": "Document requis avant prete",
+          "action": "Passer une demande validee à prete sans document administratif généré.",
+          "expected": "Refus métier HTTP 409."
+        },
+        {
+          "id": "CHF-05",
+          "title": "Génération puis passage à prete",
+          "action": "Générer le document serveur depuis un modèle approuvé puis passer la demande à prete.",
+          "expected": "Document enregistré puis transition autorisée."
+        },
+        {
+          "id": "CHF-06",
+          "title": "Refus hors institution",
+          "action": "Tenter d'ouvrir un dossier mairie ou ANIP.",
+          "expected": "Dossier masqué hors institution."
+        }
+      ]
+    },
+    "DIRECTEUR": {
+      "accounts": [
+        "directeur.justice@recette.eadmin.gn"
+      ],
+      "cases": [
+        {
+          "id": "DIR-01",
+          "title": "Accès fonctions de direction",
+          "action": "Consulter les fonctionnalités nécessitant le niveau DIRECTEUR, notamment vues élargies, audit/workflow selon le portail.",
+          "expected": "Accès accordé selon la matrice RBAC et le périmètre autorisé."
+        },
+        {
+          "id": "DIR-02",
+          "title": "Créer un rôle inférieur",
+          "action": "Créer ou administrer CHEF_SERVICE/ADMIN/AGENT dans le périmètre autorisé.",
+          "expected": "Autorisé si le compte cible est strictement inférieur et dans le même périmètre."
+        },
+        {
+          "id": "DIR-03",
+          "title": "Approbation et rejet",
+          "action": "Approuver/rejeter une demande accessible.",
+          "expected": "Autorisé par le niveau hiérarchique DIRECTEUR."
+        },
+        {
+          "id": "DIR-04",
+          "title": "Interdire l'élévation vers MINISTRE/SUPER_ADMIN",
+          "action": "Tenter de créer un MINISTRE ou SUPER_ADMIN.",
+          "expected": "Refus hiérarchique."
+        },
+        {
+          "id": "DIR-05",
+          "title": "Respect de l'institution",
+          "action": "Tenter de manipuler un dossier d'une mairie ou agence extérieure à son institution.",
+          "expected": "Refus de portée institutionnelle."
+        }
+      ]
+    },
+    "MINISTRE": {
+      "accounts": [
+        "ministre.justice@recette.eadmin.gn"
+      ],
+      "cases": [
+        {
+          "id": "MIN-01",
+          "title": "Visibilité tenant-wide",
+          "action": "Consulter la liste des demandes du tenant République de Guinée.",
+          "expected": "Les institutions du tenant principal sont visibles selon les autorisations tenant-wide."
+        },
+        {
+          "id": "MIN-02",
+          "title": "Isolation inter-tenant",
+          "action": "Tenter d'accéder à REC-ISO-2026-001 du tenant secondaire.",
+          "expected": "Accès refusé / dossier non visible."
+        },
+        {
+          "id": "MIN-03",
+          "title": "Administrer des rôles inférieurs",
+          "action": "Créer ou modifier un DIRECTEUR, CHEF_SERVICE, ADMIN ou AGENT dans son tenant.",
+          "expected": "Autorisé si toutes les règles d'institution et de hiérarchie sont respectées."
+        },
+        {
+          "id": "MIN-04",
+          "title": "Interdire SUPER_ADMIN",
+          "action": "Tenter de créer ou promouvoir un utilisateur SUPER_ADMIN.",
+          "expected": "Refus hiérarchique."
+        },
+        {
+          "id": "MIN-05",
+          "title": "Gouvernance des institutions",
+          "action": "Accéder aux fonctions institutions/manage et workflows/manage.",
+          "expected": "Autorisé au niveau MINISTRE sous réserve des attributs de sécurité/MFA applicables."
+        }
+      ]
+    },
+    "SUPER_ADMIN": {
+      "accounts": [
+        "superadmin.recette@recette.eadmin.gn"
+      ],
+      "cases": [
+        {
+          "id": "SUP-01",
+          "title": "Visibilité globale",
+          "action": "Lister les dossiers et utilisateurs.",
+          "expected": "Visibilité globale, y compris le tenant secondaire de recette lorsque la route est globale."
+        },
+        {
+          "id": "SUP-02",
+          "title": "Créer tous les niveaux de rôle",
+          "action": "Créer un utilisateur de n'importe quel rôle avec tenant/institution explicites.",
+          "expected": "Autorisé si le rattachement institutionnel est valide."
+        },
+        {
+          "id": "SUP-03",
+          "title": "Institution inexistante",
+          "action": "Créer un rôle institution-bound avec un institution_id inconnu.",
+          "expected": "Refus HTTP 422."
+        },
+        {
+          "id": "SUP-04",
+          "title": "Email utilisateur en doublon",
+          "action": "Créer un utilisateur avec un email existant.",
+          "expected": "Conflit HTTP 409."
+        },
+        {
+          "id": "SUP-05",
+          "title": "Gestion tenant sensible",
+          "action": "Accéder aux opérations tenants/manage ou settings/update.",
+          "expected": "Niveau RBAC suffisant; les contrôles ABAC/MFA restent obligatoires quand configurés."
+        },
+        {
+          "id": "SUP-06",
+          "title": "Contrôle sécurité données invalides",
+          "action": "Envoyer un payload API invalide.",
+          "expected": "La validation applicative conserve ses codes 4xx et n'est pas transformée en erreur RLS 503."
+        }
+      ]
+    }
+  }
+}
