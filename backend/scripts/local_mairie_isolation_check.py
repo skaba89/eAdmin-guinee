@@ -8,8 +8,17 @@ regressions without requiring pytest in production/local runtime images.
 from __future__ import annotations
 
 import asyncio
+import sys
 import uuid
+from pathlib import Path
 from unittest.mock import AsyncMock
+
+# When executed as `python scripts/local_mairie_isolation_check.py`, Python puts
+# `/app/scripts` (not `/app`) on sys.path. Add the backend root explicitly so
+# imports work identically in Docker CI and on Windows local bind mounts.
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
 
 from fastapi import HTTPException
 from sqlalchemy import select
