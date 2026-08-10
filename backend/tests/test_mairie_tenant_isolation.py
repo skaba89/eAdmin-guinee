@@ -10,7 +10,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 
 from app.api.service_requests import _apply_request_scope
-from app.api.users import _validate_target_assignment
+from app.api.users import UserCreate, _target_scope_for_create, _validate_target_assignment
 from app.config import settings
 from app.models.institution import Institution
 from app.models.service_request import ServiceRequest
@@ -39,6 +39,17 @@ def _compiled_scope(user: User) -> tuple[str, dict]:
     statement = _apply_request_scope(select(ServiceRequest), user)
     compiled = statement.compile()
     return str(compiled), compiled.params
+
+
+def _create_payload(*, institution_id: str) -> UserCreate:
+    return UserCreate(
+        email="agent.scope@ci.eadmin-guinee.org",
+        password="CiScope!2026Aa-test-password",
+        full_name="Agent Scope Test",
+        role=RoleEnum.AGENT,
+        tenant_id=settings.TENANT_DEFAULT_ID,
+        institution_id=institution_id,
+    )
 
 
 def test_mairie_admin_query_is_bound_to_tenant_and_own_institution() -> None:
@@ -111,6 +122,39 @@ def test_operational_account_without_institution_fails_closed() -> None:
         _apply_request_scope(select(ServiceRequest), user)
 
     assert error.value.status_code == 403
+
+
+def test_mairie_admin_can_create_user_only_in_own_institution() -> None:
+    actor = _user(
+        RoleEnum.ADMIN,
+        tenant_id=settings.TENANT_DEFAULT_ID,
+        institution_id="mairie-ratoma-e2e",
+    )
+
+    tenant_id, institution_id = _target_scope_for_create(
+        actor,
+        _create_payload(institution_id="mairie-ratoma-e2e"),
+    )
+
+    assert tenant_id == settings.TENANT_DEFAULT_ID
+    assert institution_id == "mairie-ratoma-e2e"
+
+
+def test_mairie_admin_cross_institution_create_is_rejected() -> None:
+    actor = _user(
+        RoleEnum.ADMIN,
+        tenant_id=settings.TENANT_DEFAULT_ID,
+        institution_id="mairie-ratoma-e2e",
+    )
+
+    with pytest.raises(HTTPException) as error:
+        _target_scope_for_create(
+            actor,
+            _create_payload(institution_id="mairie-matoto-e2e"),
+        )
+
+    assert error.value.status_code == 403
+    assert "institution cible" in str(error.value.detail).lower()
 
 
 @pytest.mark.asyncio
