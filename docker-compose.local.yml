@@ -132,6 +132,16 @@ services:
       - -c
       - >-
         set -eu;
+        attempt=0;
+        until python -c "import socket; socket.getaddrinfo('postgres', 5432)" >/dev/null 2>&1;
+        do
+          attempt=$$((attempt + 1));
+          if [ "$$attempt" -ge 60 ]; then
+            echo "ERROR: le DNS Docker postgres:5432 n'est pas résolu après 120 secondes" >&2;
+            exit 1;
+          fi;
+          sleep 2;
+        done;
         alembic upgrade head;
         python -m app.bootstrap_runtime;
         exec uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -163,7 +173,15 @@ services:
     container_name: eadmin-local-notification-worker
     restart: unless-stopped
     environment: *backend-environment
-    command: ["python", "-m", "app.workers.notification_outbox"]
+    command:
+      - sh
+      - -c
+      - >-
+        while true;
+        do
+          python -m app.workers.notification_outbox || echo "WARN: notification worker batch failed; retry in 10s" >&2;
+          sleep 10;
+        done
     volumes:
       - ./backend:/app
     depends_on:
