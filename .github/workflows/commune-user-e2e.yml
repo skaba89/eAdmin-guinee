@@ -67,6 +67,11 @@ jobs:
           docker compose --env-file .env.local.ci -f docker-compose.local.yml logs --tail 200 backend
           exit 1
 
+      - name: Run municipality scope regression tests
+        run: |
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T backend \
+            pytest -q tests/test_mairie_tenant_isolation.py
+
       - name: Seed Ratoma and Matoto communes
         run: |
           docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T postgres \
@@ -168,6 +173,28 @@ jobs:
           assert_status 201 "${RATOMA_CITIZEN_STATUS}" 'Ratoma citizen creation' /tmp/ratoma-citizen.json
           assert_status 201 "${MATOTO_AGENT_STATUS}" 'Matoto agent creation' /tmp/matoto-agent.json
           assert_status 201 "${MATOTO_CITIZEN_STATUS}" 'Matoto citizen creation' /tmp/matoto-citizen.json
+
+          # Prove that the token used below really belongs to the Ratoma ADMIN.
+          # Only the JWT subject UUID and non-secret DB scope are inspected.
+          RATOMA_TOKEN_SUB="$(RATOMA_TOKEN="${RATOMA_TOKEN}" python - <<'PY'
+          import base64
+          import json
+          import os
+
+          token = os.environ['RATOMA_TOKEN']
+          payload = token.split('.')[1]
+          payload += '=' * (-len(payload) % 4)
+          print(json.loads(base64.urlsafe_b64decode(payload.encode()))['sub'])
+          PY
+          )"
+          RATOMA_CREATED_ID="$(python -c "import json; print(json.load(open('/tmp/ratoma-admin.json'))['id'])")"
+          echo "Ratoma token subject matches created admin: $([ "${RATOMA_TOKEN_SUB}" = "${RATOMA_CREATED_ID}" ] && echo yes || echo no)"
+          test "${RATOMA_TOKEN_SUB}" = "${RATOMA_CREATED_ID}"
+
+          RATOMA_ACTOR_SCOPE="$(docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T postgres \
+            psql -U eadmin -d eadmin -Atc "SELECT role || '|' || COALESCE(tenant_id,'') || '|' || COALESCE(institution_id,'') FROM users WHERE id='${RATOMA_TOKEN_SUB}';")"
+          echo "Ratoma actor DB scope: ${RATOMA_ACTOR_SCOPE}"
+          test "${RATOMA_ACTOR_SCOPE}" = 'ADMIN|republique-de-guinee|mairie-ratoma-e2e'
 
           CROSS_CREATE_STATUS="$(create_user "${RATOMA_TOKEN}" "agent.cross.e2e@${DOMAIN}" 'Agent Cross Commune E2E' AGENT mairie-matoto-e2e /tmp/cross-agent.json)"
           assert_status 403 "${CROSS_CREATE_STATUS}" 'Ratoma admin creating Matoto agent' /tmp/cross-agent.json
