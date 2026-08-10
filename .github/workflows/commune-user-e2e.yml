@@ -50,7 +50,7 @@ jobs:
       - name: Build backend
         run: docker compose --env-file .env.local.ci -f docker-compose.local.yml build backend
 
-      - name: Start dependencies and migrate
+      - name: Start dependencies migrate bootstrap and backend
         run: |
           set -euo pipefail
           docker compose --env-file .env.local.ci -f docker-compose.local.yml up -d postgres redis minio minio-init mailpit
@@ -58,7 +58,10 @@ jobs:
           docker compose --env-file .env.local.ci -f docker-compose.local.yml run --rm --no-deps backend python -m app.bootstrap_runtime
           docker compose --env-file .env.local.ci -f docker-compose.local.yml up -d backend
           for attempt in $(seq 1 90); do
-            if curl -fsS http://localhost:8000/health >/dev/null; then exit 0; fi
+            if curl -fsS http://localhost:8000/health >/dev/null; then
+              echo 'Backend healthy'
+              exit 0
+            fi
             sleep 2
           done
           docker compose --env-file .env.local.ci -f docker-compose.local.yml logs --tail 200 backend
@@ -79,12 +82,30 @@ jobs:
             is_active = TRUE;
           SQL
 
+      - name: Verify invalid user payload stays 422 not RLS 503
+        run: |
+          set -euo pipefail
+          API='http://localhost:8000/api/v1'
+          SUPER_TOKEN="$(curl -fsS -X POST "${API}/auth/login" \
+            -H 'Content-Type: application/x-www-form-urlencoded' \
+            --data-urlencode 'username=superadmin@eadmin.test' \
+            --data-urlencode 'password=CiLocal!2026Aa-test-password' \
+            | python -c "import json,sys; print(json.load(sys.stdin)['access_token'])")"
+          STATUS="$(curl -sS -o /tmp/invalid-user.json -w '%{http_code}' -X POST "${API}/users" \
+            -H "Authorization: Bearer ${SUPER_TOKEN}" \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"not-an-email","password":"CiCommune!2026Aa-test-password","full_name":"Invalid E2E","role":"ADMIN","tenant_id":"republique-de-guinee","institution_id":"mairie-ratoma-e2e"}')"
+          echo "Invalid user payload: HTTP ${STATUS}"
+          cat /tmp/invalid-user.json
+          test "${STATUS}" = '422'
+
       - name: Create admins agents and citizens per commune through API
         run: |
           set -euo pipefail
           API='http://localhost:8000/api/v1'
           SUPER_PASSWORD='CiLocal!2026Aa-test-password'
           USER_PASSWORD='CiCommune!2026Aa-test-password'
+          DOMAIN='ci.eadmin-guinee.org'
 
           login_token() {
             local email="$1"
@@ -109,47 +130,52 @@ jobs:
               -d "{\"email\":\"${email}\",\"password\":\"${USER_PASSWORD}\",\"full_name\":\"${full_name}\",\"role\":\"${role}\",\"tenant_id\":\"republique-de-guinee\",\"institution_id\":\"${institution_id}\"}"
           }
 
+          assert_status() {
+            local expected="$1"; local actual="$2"; local label="$3"; local body="$4"
+            echo "${label}: HTTP ${actual}"
+            if [ "${actual}" != "${expected}" ]; then
+              echo "Unexpected response for ${label}:"
+              cat "${body}" || true
+              exit 1
+            fi
+          }
+
           SUPER_TOKEN="$(login_token superadmin@eadmin.test "${SUPER_PASSWORD}")"
 
-          RATOMA_ADMIN_STATUS="$(create_user "${SUPER_TOKEN}" admin.ratoma.e2e@eadmin.test 'Admin Ratoma E2E' ADMIN mairie-ratoma-e2e /tmp/ratoma-admin.json)"
-          MATOTO_ADMIN_STATUS="$(create_user "${SUPER_TOKEN}" admin.matoto.e2e@eadmin.test 'Admin Matoto E2E' ADMIN mairie-matoto-e2e /tmp/matoto-admin.json)"
-          echo "Ratoma admin creation: HTTP ${RATOMA_ADMIN_STATUS}"
-          echo "Matoto admin creation: HTTP ${MATOTO_ADMIN_STATUS}"
-          test "${RATOMA_ADMIN_STATUS}" = '201'
-          test "${MATOTO_ADMIN_STATUS}" = '201'
+          RATOMA_ADMIN="admin.ratoma.e2e@${DOMAIN}"
+          MATOTO_ADMIN="admin.matoto.e2e@${DOMAIN}"
+          RATOMA_AGENT="agent.ratoma.e2e@${DOMAIN}"
+          MATOTO_AGENT="agent.matoto.e2e@${DOMAIN}"
+          RATOMA_CITIZEN="citoyen.ratoma.e2e@${DOMAIN}"
+          MATOTO_CITIZEN="citoyen.matoto.e2e@${DOMAIN}"
 
-          DUP_ADMIN_STATUS="$(create_user "${SUPER_TOKEN}" admin.ratoma.duplicate.e2e@eadmin.test 'Duplicate Admin Ratoma E2E' ADMIN mairie-ratoma-e2e /tmp/ratoma-admin-duplicate.json)"
-          echo "Second Ratoma admin: HTTP ${DUP_ADMIN_STATUS}"
-          test "${DUP_ADMIN_STATUS}" = '409'
+          RATOMA_ADMIN_STATUS="$(create_user "${SUPER_TOKEN}" "${RATOMA_ADMIN}" 'Admin Ratoma E2E' ADMIN mairie-ratoma-e2e /tmp/ratoma-admin.json)"
+          MATOTO_ADMIN_STATUS="$(create_user "${SUPER_TOKEN}" "${MATOTO_ADMIN}" 'Admin Matoto E2E' ADMIN mairie-matoto-e2e /tmp/matoto-admin.json)"
+          assert_status 201 "${RATOMA_ADMIN_STATUS}" 'Ratoma admin creation' /tmp/ratoma-admin.json
+          assert_status 201 "${MATOTO_ADMIN_STATUS}" 'Matoto admin creation' /tmp/matoto-admin.json
 
-          RATOMA_TOKEN="$(login_token admin.ratoma.e2e@eadmin.test "${USER_PASSWORD}")"
-          MATOTO_TOKEN="$(login_token admin.matoto.e2e@eadmin.test "${USER_PASSWORD}")"
+          DUP_ADMIN_STATUS="$(create_user "${SUPER_TOKEN}" "admin.ratoma.duplicate.e2e@${DOMAIN}" 'Duplicate Admin Ratoma E2E' ADMIN mairie-ratoma-e2e /tmp/ratoma-admin-duplicate.json)"
+          assert_status 409 "${DUP_ADMIN_STATUS}" 'Second Ratoma admin' /tmp/ratoma-admin-duplicate.json
 
-          RATOMA_AGENT_STATUS="$(create_user "${RATOMA_TOKEN}" agent.ratoma.e2e@eadmin.test 'Agent Ratoma E2E' AGENT mairie-ratoma-e2e /tmp/ratoma-agent.json)"
-          RATOMA_CITIZEN_STATUS="$(create_user "${RATOMA_TOKEN}" citoyen.ratoma.e2e@eadmin.test 'Citoyen Ratoma E2E' CITOYEN mairie-ratoma-e2e /tmp/ratoma-citizen.json)"
-          MATOTO_AGENT_STATUS="$(create_user "${MATOTO_TOKEN}" agent.matoto.e2e@eadmin.test 'Agent Matoto E2E' AGENT mairie-matoto-e2e /tmp/matoto-agent.json)"
-          MATOTO_CITIZEN_STATUS="$(create_user "${MATOTO_TOKEN}" citoyen.matoto.e2e@eadmin.test 'Citoyen Matoto E2E' CITOYEN mairie-matoto-e2e /tmp/matoto-citizen.json)"
+          RATOMA_TOKEN="$(login_token "${RATOMA_ADMIN}" "${USER_PASSWORD}")"
+          MATOTO_TOKEN="$(login_token "${MATOTO_ADMIN}" "${USER_PASSWORD}")"
 
-          echo "Ratoma agent creation: HTTP ${RATOMA_AGENT_STATUS}"
-          echo "Ratoma citizen creation: HTTP ${RATOMA_CITIZEN_STATUS}"
-          echo "Matoto agent creation: HTTP ${MATOTO_AGENT_STATUS}"
-          echo "Matoto citizen creation: HTTP ${MATOTO_CITIZEN_STATUS}"
-          test "${RATOMA_AGENT_STATUS}" = '201'
-          test "${RATOMA_CITIZEN_STATUS}" = '201'
-          test "${MATOTO_AGENT_STATUS}" = '201'
-          test "${MATOTO_CITIZEN_STATUS}" = '201'
+          RATOMA_AGENT_STATUS="$(create_user "${RATOMA_TOKEN}" "${RATOMA_AGENT}" 'Agent Ratoma E2E' AGENT mairie-ratoma-e2e /tmp/ratoma-agent.json)"
+          RATOMA_CITIZEN_STATUS="$(create_user "${RATOMA_TOKEN}" "${RATOMA_CITIZEN}" 'Citoyen Ratoma E2E' CITOYEN mairie-ratoma-e2e /tmp/ratoma-citizen.json)"
+          MATOTO_AGENT_STATUS="$(create_user "${MATOTO_TOKEN}" "${MATOTO_AGENT}" 'Agent Matoto E2E' AGENT mairie-matoto-e2e /tmp/matoto-agent.json)"
+          MATOTO_CITIZEN_STATUS="$(create_user "${MATOTO_TOKEN}" "${MATOTO_CITIZEN}" 'Citoyen Matoto E2E' CITOYEN mairie-matoto-e2e /tmp/matoto-citizen.json)"
+          assert_status 201 "${RATOMA_AGENT_STATUS}" 'Ratoma agent creation' /tmp/ratoma-agent.json
+          assert_status 201 "${RATOMA_CITIZEN_STATUS}" 'Ratoma citizen creation' /tmp/ratoma-citizen.json
+          assert_status 201 "${MATOTO_AGENT_STATUS}" 'Matoto agent creation' /tmp/matoto-agent.json
+          assert_status 201 "${MATOTO_CITIZEN_STATUS}" 'Matoto citizen creation' /tmp/matoto-citizen.json
 
-          CROSS_CREATE_STATUS="$(create_user "${RATOMA_TOKEN}" agent.cross.e2e@eadmin.test 'Agent Cross Commune E2E' AGENT mairie-matoto-e2e /tmp/cross-agent.json)"
-          echo "Ratoma admin creating Matoto agent: HTTP ${CROSS_CREATE_STATUS}"
-          test "${CROSS_CREATE_STATUS}" = '403'
+          CROSS_CREATE_STATUS="$(create_user "${RATOMA_TOKEN}" "agent.cross.e2e@${DOMAIN}" 'Agent Cross Commune E2E' AGENT mairie-matoto-e2e /tmp/cross-agent.json)"
+          assert_status 403 "${CROSS_CREATE_STATUS}" 'Ratoma admin creating Matoto agent' /tmp/cross-agent.json
 
           for account in \
-            'admin.ratoma.e2e@eadmin.test' \
-            'admin.matoto.e2e@eadmin.test' \
-            'agent.ratoma.e2e@eadmin.test' \
-            'agent.matoto.e2e@eadmin.test' \
-            'citoyen.ratoma.e2e@eadmin.test' \
-            'citoyen.matoto.e2e@eadmin.test'
+            "${RATOMA_ADMIN}" "${MATOTO_ADMIN}" \
+            "${RATOMA_AGENT}" "${MATOTO_AGENT}" \
+            "${RATOMA_CITIZEN}" "${MATOTO_CITIZEN}"
           do
             login_token "${account}" "${USER_PASSWORD}" >/dev/null
             echo "Login OK: ${account}"
@@ -158,9 +184,10 @@ jobs:
       - name: Verify durable PostgreSQL municipality assignment
         run: |
           set -euo pipefail
+          DOMAIN='ci.eadmin-guinee.org'
           docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T postgres \
             psql -U eadmin -d eadmin -P pager=off -c \
-            "SELECT email, role, tenant_id, institution_id, is_active FROM users WHERE email LIKE '%.e2e@eadmin.test' ORDER BY institution_id, role, email;"
+            "SELECT email, role, tenant_id, institution_id, is_active FROM users WHERE email LIKE '%@${DOMAIN}' ORDER BY institution_id, role, email;"
 
           check_one() {
             local email="$1"; local role="$2"; local institution="$3"
@@ -170,17 +197,15 @@ jobs:
             test "${count}" = '1'
           }
 
-          check_one admin.ratoma.e2e@eadmin.test ADMIN mairie-ratoma-e2e
-          check_one agent.ratoma.e2e@eadmin.test AGENT mairie-ratoma-e2e
-          check_one citoyen.ratoma.e2e@eadmin.test CITOYEN mairie-ratoma-e2e
-          check_one admin.matoto.e2e@eadmin.test ADMIN mairie-matoto-e2e
-          check_one agent.matoto.e2e@eadmin.test AGENT mairie-matoto-e2e
-          check_one citoyen.matoto.e2e@eadmin.test CITOYEN mairie-matoto-e2e
+          check_one "admin.ratoma.e2e@${DOMAIN}" ADMIN mairie-ratoma-e2e
+          check_one "agent.ratoma.e2e@${DOMAIN}" AGENT mairie-ratoma-e2e
+          check_one "citoyen.ratoma.e2e@${DOMAIN}" CITOYEN mairie-ratoma-e2e
+          check_one "admin.matoto.e2e@${DOMAIN}" ADMIN mairie-matoto-e2e
+          check_one "agent.matoto.e2e@${DOMAIN}" AGENT mairie-matoto-e2e
+          check_one "citoyen.matoto.e2e@${DOMAIN}" CITOYEN mairie-matoto-e2e
 
-          RATOMA_ADMINS="$(docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T postgres \
-            psql -U eadmin -d eadmin -Atc "SELECT count(*) FROM users WHERE role='ADMIN' AND institution_id='mairie-ratoma-e2e' AND is_active=TRUE;")"
-          MATOTO_ADMINS="$(docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T postgres \
-            psql -U eadmin -d eadmin -Atc "SELECT count(*) FROM users WHERE role='ADMIN' AND institution_id='mairie-matoto-e2e' AND is_active=TRUE;")"
+          RATOMA_ADMINS="$(docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T postgres psql -U eadmin -d eadmin -Atc "SELECT count(*) FROM users WHERE role='ADMIN' AND institution_id='mairie-ratoma-e2e' AND is_active=TRUE;")"
+          MATOTO_ADMINS="$(docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T postgres psql -U eadmin -d eadmin -Atc "SELECT count(*) FROM users WHERE role='ADMIN' AND institution_id='mairie-matoto-e2e' AND is_active=TRUE;")"
           test "${RATOMA_ADMINS}" = '1'
           test "${MATOTO_ADMINS}" = '1'
 
@@ -188,40 +213,40 @@ jobs:
         run: |
           set -euo pipefail
           API='http://localhost:8000/api/v1'
-          USER_PASSWORD='CiCommune!2026Aa-test-password'
+          PASSWORD='CiCommune!2026Aa-test-password'
+          DOMAIN='ci.eadmin-guinee.org'
+
           login_token() {
             curl -fsS -X POST "${API}/auth/login" \
               -H 'Content-Type: application/x-www-form-urlencoded' \
               --data-urlencode "username=$1" \
-              --data-urlencode "password=${USER_PASSWORD}" \
+              --data-urlencode "password=${PASSWORD}" \
               | python -c "import json,sys; print(json.load(sys.stdin)['access_token'])"
           }
 
-          RATOMA_TOKEN="$(login_token admin.ratoma.e2e@eadmin.test)"
-          MATOTO_TOKEN="$(login_token admin.matoto.e2e@eadmin.test)"
-
+          RATOMA_TOKEN="$(login_token "admin.ratoma.e2e@${DOMAIN}")"
+          MATOTO_TOKEN="$(login_token "admin.matoto.e2e@${DOMAIN}")"
           curl -fsS -H "Authorization: Bearer ${RATOMA_TOKEN}" "${API}/users?page=1&page_size=100" > /tmp/ratoma-users.json
           curl -fsS -H "Authorization: Bearer ${MATOTO_TOKEN}" "${API}/users?page=1&page_size=100" > /tmp/matoto-users.json
 
           python - <<'PY'
           import json
+          domain = 'ci.eadmin-guinee.org'
           ratoma = json.load(open('/tmp/ratoma-users.json', encoding='utf-8'))['items']
           matoto = json.load(open('/tmp/matoto-users.json', encoding='utf-8'))['items']
-          ratoma_emails = {u['email'] for u in ratoma}
-          matoto_emails = {u['email'] for u in matoto}
-
-          assert 'agent.ratoma.e2e@eadmin.test' in ratoma_emails
-          assert 'citoyen.ratoma.e2e@eadmin.test' in ratoma_emails
-          assert 'agent.matoto.e2e@eadmin.test' not in ratoma_emails
-          assert 'citoyen.matoto.e2e@eadmin.test' not in ratoma_emails
-
-          assert 'agent.matoto.e2e@eadmin.test' in matoto_emails
-          assert 'citoyen.matoto.e2e@eadmin.test' in matoto_emails
-          assert 'agent.ratoma.e2e@eadmin.test' not in matoto_emails
-          assert 'citoyen.ratoma.e2e@eadmin.test' not in matoto_emails
-
+          re = {u['email'] for u in ratoma}
+          me = {u['email'] for u in matoto}
+          assert f'agent.ratoma.e2e@{domain}' in re
+          assert f'citoyen.ratoma.e2e@{domain}' in re
+          assert f'agent.matoto.e2e@{domain}' not in re
+          assert f'citoyen.matoto.e2e@{domain}' not in re
+          assert f'agent.matoto.e2e@{domain}' in me
+          assert f'citoyen.matoto.e2e@{domain}' in me
+          assert f'agent.ratoma.e2e@{domain}' not in me
+          assert f'citoyen.ratoma.e2e@{domain}' not in me
           assert all(u['institution_id'] == 'mairie-ratoma-e2e' for u in ratoma)
           assert all(u['institution_id'] == 'mairie-matoto-e2e' for u in matoto)
+          print(f'Ratoma scoped users: {len(ratoma)}; Matoto scoped users: {len(matoto)}')
           PY
 
       - name: Debug backend on failure
