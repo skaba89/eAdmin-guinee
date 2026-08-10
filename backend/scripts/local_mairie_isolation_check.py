@@ -50,9 +50,11 @@ def _user(
 
 
 def _compiled_scope(user: User) -> tuple[str, dict]:
+    """Return only effective WHERE predicates, not selected column names."""
     statement = _apply_request_scope(select(ServiceRequest), user)
     compiled = statement.compile()
-    return str(compiled), compiled.params
+    where_sql = str(statement.whereclause) if statement.whereclause is not None else ""
+    return where_sql, compiled.params
 
 
 def _create_payload(*, institution_id: str) -> UserCreate:
@@ -83,17 +85,17 @@ def check_query_scopes() -> None:
         tenant_id=settings.TENANT_DEFAULT_ID,
         institution_id="mairie-ratoma-local-check",
     )
-    sql, params = _compiled_scope(ratoma)
-    assert "service_requests.tenant_id" in sql
-    assert "service_requests.institution_id" in sql
+    where_sql, params = _compiled_scope(ratoma)
+    assert "service_requests.tenant_id" in where_sql
+    assert "service_requests.institution_id" in where_sql
     assert settings.TENANT_DEFAULT_ID in params.values()
     assert "mairie-ratoma-local-check" in params.values()
     assert "mairie-matoto-local-check" not in params.values()
 
     citizen = _user(RoleEnum.CITOYEN, tenant_id=settings.TENANT_DEFAULT_ID)
-    sql, params = _compiled_scope(citizen)
-    assert "service_requests.tenant_id" in sql
-    assert "service_requests.citizen_id" in sql
+    where_sql, params = _compiled_scope(citizen)
+    assert "service_requests.tenant_id" in where_sql
+    assert "service_requests.citizen_id" in where_sql
     assert settings.TENANT_DEFAULT_ID in params.values()
     assert citizen.id in params.values()
 
@@ -102,15 +104,15 @@ def check_query_scopes() -> None:
         tenant_id=settings.TENANT_DEFAULT_ID,
         institution_id="ministere-matd",
     )
-    sql, params = _compiled_scope(minister)
-    assert "service_requests.tenant_id" in sql
-    assert "service_requests.institution_id" not in sql
+    where_sql, params = _compiled_scope(minister)
+    assert "service_requests.tenant_id" in where_sql
+    assert "service_requests.institution_id" not in where_sql
     assert settings.TENANT_DEFAULT_ID in params.values()
+    assert "ministere-matd" not in params.values()
 
     super_admin = _user(RoleEnum.SUPER_ADMIN, tenant_id=settings.TENANT_DEFAULT_ID)
-    sql, params = _compiled_scope(super_admin)
-    assert "service_requests.tenant_id" not in sql
-    assert "service_requests.institution_id" not in sql
+    where_sql, params = _compiled_scope(super_admin)
+    assert where_sql == ""
     assert params == {}
 
     orphan_admin = _user(
