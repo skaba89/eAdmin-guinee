@@ -61,11 +61,6 @@ function Invoke-Compose {
 
     $dockerArgs = @("compose", "--env-file", $EnvFile, "-f", $ComposeFile) + $Args
     if ($Capture) {
-        # Docker Compose writes normal progress/status messages to stderr. In
-        # Windows PowerShell 5.1, redirecting stderr with ErrorActionPreference
-        # set to Stop turns those harmless lines into terminating exceptions.
-        # Temporarily use Continue, capture both streams, then rely exclusively
-        # on Docker's real process exit code.
         $previousErrorActionPreference = $ErrorActionPreference
         try {
             $ErrorActionPreference = "Continue"
@@ -175,8 +170,6 @@ try {
     }
     Add-Check -Name "Docker Desktop" -Ok $true -Details "moteur joignable"
 
-    # Reuse the canonical local bootstrap logic. In particular, this migrates
-    # stale LOCAL_MINIO_CONSOLE_PORT=9001 values without rebuilding or resetting data.
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $LocalScript status *> $null
     if ($LASTEXITCODE -ne 0) {
         throw "scripts/local.ps1 status a échoué."
@@ -269,7 +262,7 @@ try {
 
     $scopeTests = Invoke-Compose -Capture -AllowFailure -Args @(
         "exec", "-T", "backend",
-        "pytest", "-q", "tests/test_mairie_tenant_isolation.py"
+        "python", "scripts/local_mairie_isolation_check.py"
     )
     $scopeTestsOk = ([int]$scopeTests[0] -eq 0)
     $scopeSummary = ([string]$scopeTests[1]).Trim()
