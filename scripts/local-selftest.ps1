@@ -1,4 +1,4 @@
-param(
+﻿param(
     [switch]$NoStart
 )
 
@@ -61,8 +61,21 @@ function Invoke-Compose {
 
     $dockerArgs = @("compose", "--env-file", $EnvFile, "-f", $ComposeFile) + $Args
     if ($Capture) {
-        $output = & docker @dockerArgs 2>&1
-        $exitCode = $LASTEXITCODE
+        # Docker Compose writes normal progress/status messages to stderr. In
+        # Windows PowerShell 5.1, redirecting stderr with ErrorActionPreference
+        # set to Stop turns those harmless lines into terminating exceptions.
+        # Temporarily use Continue, capture both streams, then rely exclusively
+        # on Docker's real process exit code.
+        $previousErrorActionPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = "Continue"
+            $output = & docker @dockerArgs 2>&1 | ForEach-Object { [string]$_ }
+            $exitCode = $LASTEXITCODE
+        }
+        finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+        }
+
         if ($exitCode -ne 0 -and -not $AllowFailure) {
             throw "docker compose $($Args -join ' ') a échoué (code $exitCode): $($output -join [Environment]::NewLine)"
         }
@@ -147,7 +160,7 @@ function Save-Report {
     [System.IO.File]::WriteAllLines($ReportFile, $lines, (New-Object System.Text.UTF8Encoding($false)))
 }
 
-Write-Host "" 
+Write-Host ""
 Write-Host "=== eAdmin Guinée - Self-test local Docker ===" -ForegroundColor Cyan
 Write-Host "Ce test ne supprime aucun volume et ne réinitialise aucune donnée." -ForegroundColor DarkGray
 Write-Host ""
