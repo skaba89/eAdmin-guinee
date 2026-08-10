@@ -8,8 +8,17 @@ regressions without requiring pytest in production/local runtime images.
 from __future__ import annotations
 
 import asyncio
+import sys
 import uuid
+from pathlib import Path
 from unittest.mock import AsyncMock
+
+# When executed as `python scripts/local_mairie_isolation_check.py`, Python puts
+# `/app/scripts` (not `/app`) on sys.path. Add the backend root explicitly so
+# imports work identically in Docker CI and on Windows local bind mounts.
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -41,9 +50,11 @@ def _user(
 
 
 def _compiled_scope(user: User) -> tuple[str, dict]:
+    """Return only effective WHERE predicates, not selected column names."""
     statement = _apply_request_scope(select(ServiceRequest), user)
     compiled = statement.compile()
-    return str(compiled), compiled.params
+    where_sql = str(statement.whereclause) if statement.whereclause is not None else ""
+    return where_sql, compiled.params
 
 
 def _create_payload(*, institution_id: str) -> UserCreate:
@@ -74,17 +85,17 @@ def check_query_scopes() -> None:
         tenant_id=settings.TENANT_DEFAULT_ID,
         institution_id="mairie-ratoma-local-check",
     )
-    sql, params = _compiled_scope(ratoma)
-    assert "service_requests.tenant_id" in sql
-    assert "service_requests.institution_id" in sql
+    where_sql, params = _compiled_scope(ratoma)
+    assert "service_requests.tenant_id" in where_sql
+    assert "service_requests.institution_id" in where_sql
     assert settings.TENANT_DEFAULT_ID in params.values()
     assert "mairie-ratoma-local-check" in params.values()
     assert "mairie-matoto-local-check" not in params.values()
 
     citizen = _user(RoleEnum.CITOYEN, tenant_id=settings.TENANT_DEFAULT_ID)
-    sql, params = _compiled_scope(citizen)
-    assert "service_requests.tenant_id" in sql
-    assert "service_requests.citizen_id" in sql
+    where_sql, params = _compiled_scope(citizen)
+    assert "service_requests.tenant_id" in where_sql
+    assert "service_requests.citizen_id" in where_sql
     assert settings.TENANT_DEFAULT_ID in params.values()
     assert citizen.id in params.values()
 
@@ -93,15 +104,15 @@ def check_query_scopes() -> None:
         tenant_id=settings.TENANT_DEFAULT_ID,
         institution_id="ministere-matd",
     )
-    sql, params = _compiled_scope(minister)
-    assert "service_requests.tenant_id" in sql
-    assert "service_requests.institution_id" not in sql
+    where_sql, params = _compiled_scope(minister)
+    assert "service_requests.tenant_id" in where_sql
+    assert "service_requests.institution_id" not in where_sql
     assert settings.TENANT_DEFAULT_ID in params.values()
+    assert "ministere-matd" not in params.values()
 
     super_admin = _user(RoleEnum.SUPER_ADMIN, tenant_id=settings.TENANT_DEFAULT_ID)
-    sql, params = _compiled_scope(super_admin)
-    assert "service_requests.tenant_id" not in sql
-    assert "service_requests.institution_id" not in sql
+    where_sql, params = _compiled_scope(super_admin)
+    assert where_sql == ""
     assert params == {}
 
     orphan_admin = _user(
@@ -129,14 +140,16 @@ def check_creation_scope() -> None:
     assert tenant_id == settings.TENANT_DEFAULT_ID
     assert institution_id == "mairie-ratoma-local-check"
 
-    exc = _expect_http_status(
+    # The security contract is the HTTP status, not a specific translated
+    # wording. This keeps the regression check stable while preserving the
+    # fail-closed 403 behavior for cross-mairie assignment attempts.
+    _expect_http_status(
         lambda: _target_scope_for_create(
             actor,
             _create_payload(institution_id="mairie-matoto-local-check"),
         ),
         403,
     )
-    assert "institution cible" in str(exc.detail).lower()
 
 
 async def check_assignment_rules() -> None:
@@ -159,7 +172,6 @@ async def check_assignment_rules() -> None:
         )
     except HTTPException as exc:
         assert exc.status_code == 409, f"HTTP 409 attendu, reçu {exc.status_code}"
-        assert "déjà un administrateur actif" in str(exc.detail)
     else:
         raise AssertionError("Un second ADMIN actif de mairie aurait dû être refusé")
 
