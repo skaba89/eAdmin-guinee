@@ -1,0 +1,233 @@
+name: Commune User Creation E2E
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'docker-compose.local.yml'
+      - 'Dockerfile.local'
+      - '.github/workflows/commune-user-e2e.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  commune-users-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create CI environment
+        run: |
+          cat > .env.local.ci <<'EOF'
+          POSTGRES_PASSWORD=ci_postgres_password_2026
+          REDIS_PASSWORD=ci_redis_password_2026
+          MINIO_ROOT_USER=eadmin
+          MINIO_ROOT_PASSWORD=ci_minio_password_2026
+          SECRET_KEY=ci_secret_key_0123456789abcdef0123456789abcdef0123456789abcdef
+          ENCRYPTION_KEY=ci_encryption_key_0123456789abcdef0123456789abcdef
+          NEXT_PUBLIC_ENCRYPTION_KEY=ci_frontend_encryption_0123456789abcdef
+          GRAFANA_ADMIN_USER=admin
+          GRAFANA_ADMIN_PASSWORD=Grafana!2026Aa-ci-password
+          LOCAL_TEST_PASSWORD=CiLocal!2026Aa-test-password
+          LOCAL_TEST_DOMAIN=eadmin.test
+          LOCAL_SUPERADMIN_EMAIL=superadmin@eadmin.test
+          LOCAL_FRONTEND_PORT=3000
+          LOCAL_BACKEND_PORT=8000
+          LOCAL_POSTGRES_PORT=5433
+          LOCAL_REDIS_PORT=6380
+          LOCAL_MINIO_API_PORT=9000
+          LOCAL_MINIO_CONSOLE_PORT=9001
+          LOCAL_MAILPIT_SMTP_PORT=1025
+          LOCAL_MAILPIT_UI_PORT=8025
+          LOCAL_PROMETHEUS_PORT=9090
+          LOCAL_GRAFANA_PORT=3001
+          EOF
+
+      - name: Build backend
+        run: docker compose --env-file .env.local.ci -f docker-compose.local.yml build backend
+
+      - name: Start dependencies and migrate
+        run: |
+          set -euo pipefail
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml up -d postgres redis minio minio-init mailpit
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml run --rm --no-deps backend alembic upgrade head
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml run --rm --no-deps backend python -m app.bootstrap_runtime
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml up -d backend
+          for attempt in $(seq 1 90); do
+            if curl -fsS http://localhost:8000/health >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml logs --tail 200 backend
+          exit 1
+
+      - name: Seed Ratoma and Matoto communes
+        run: |
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T postgres \
+            psql -U eadmin -d eadmin -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO institutions (id, tenant_id, name, type, is_active, settings)
+          VALUES
+            ('mairie-ratoma-e2e', 'republique-de-guinee', 'Mairie de Ratoma E2E', 'mairie', TRUE, '{"e2e": true}'::json),
+            ('mairie-matoto-e2e', 'republique-de-guinee', 'Mairie de Matoto E2E', 'mairie', TRUE, '{"e2e": true}'::json)
+          ON CONFLICT (id) DO UPDATE SET
+            tenant_id = EXCLUDED.tenant_id,
+            name = EXCLUDED.name,
+            type = EXCLUDED.type,
+            is_active = TRUE;
+          SQL
+
+      - name: Create admins agents and citizens per commune through API
+        run: |
+          set -euo pipefail
+          API='http://localhost:8000/api/v1'
+          SUPER_PASSWORD='CiLocal!2026Aa-test-password'
+          USER_PASSWORD='CiCommune!2026Aa-test-password'
+
+          login_token() {
+            local email="$1"
+            local password="$2"
+            curl -fsS -X POST "${API}/auth/login" \
+              -H 'Content-Type: application/x-www-form-urlencoded' \
+              --data-urlencode "username=${email}" \
+              --data-urlencode "password=${password}" \
+              | python -c "import json,sys; print(json.load(sys.stdin)['access_token'])"
+          }
+
+          create_user() {
+            local token="$1"
+            local email="$2"
+            local full_name="$3"
+            local role="$4"
+            local institution_id="$5"
+            local output="$6"
+            curl -sS -o "${output}" -w '%{http_code}' -X POST "${API}/users" \
+              -H "Authorization: Bearer ${token}" \
+              -H 'Content-Type: application/json' \
+              -d "{\"email\":\"${email}\",\"password\":\"${USER_PASSWORD}\",\"full_name\":\"${full_name}\",\"role\":\"${role}\",\"tenant_id\":\"republique-de-guinee\",\"institution_id\":\"${institution_id}\"}"
+          }
+
+          SUPER_TOKEN="$(login_token superadmin@eadmin.test "${SUPER_PASSWORD}")"
+
+          RATOMA_ADMIN_STATUS="$(create_user "${SUPER_TOKEN}" admin.ratoma.e2e@eadmin.test 'Admin Ratoma E2E' ADMIN mairie-ratoma-e2e /tmp/ratoma-admin.json)"
+          MATOTO_ADMIN_STATUS="$(create_user "${SUPER_TOKEN}" admin.matoto.e2e@eadmin.test 'Admin Matoto E2E' ADMIN mairie-matoto-e2e /tmp/matoto-admin.json)"
+          echo "Ratoma admin creation: HTTP ${RATOMA_ADMIN_STATUS}"
+          echo "Matoto admin creation: HTTP ${MATOTO_ADMIN_STATUS}"
+          test "${RATOMA_ADMIN_STATUS}" = '201'
+          test "${MATOTO_ADMIN_STATUS}" = '201'
+
+          DUP_ADMIN_STATUS="$(create_user "${SUPER_TOKEN}" admin.ratoma.duplicate.e2e@eadmin.test 'Duplicate Admin Ratoma E2E' ADMIN mairie-ratoma-e2e /tmp/ratoma-admin-duplicate.json)"
+          echo "Second Ratoma admin: HTTP ${DUP_ADMIN_STATUS}"
+          test "${DUP_ADMIN_STATUS}" = '409'
+
+          RATOMA_TOKEN="$(login_token admin.ratoma.e2e@eadmin.test "${USER_PASSWORD}")"
+          MATOTO_TOKEN="$(login_token admin.matoto.e2e@eadmin.test "${USER_PASSWORD}")"
+
+          RATOMA_AGENT_STATUS="$(create_user "${RATOMA_TOKEN}" agent.ratoma.e2e@eadmin.test 'Agent Ratoma E2E' AGENT mairie-ratoma-e2e /tmp/ratoma-agent.json)"
+          RATOMA_CITIZEN_STATUS="$(create_user "${RATOMA_TOKEN}" citoyen.ratoma.e2e@eadmin.test 'Citoyen Ratoma E2E' CITOYEN mairie-ratoma-e2e /tmp/ratoma-citizen.json)"
+          MATOTO_AGENT_STATUS="$(create_user "${MATOTO_TOKEN}" agent.matoto.e2e@eadmin.test 'Agent Matoto E2E' AGENT mairie-matoto-e2e /tmp/matoto-agent.json)"
+          MATOTO_CITIZEN_STATUS="$(create_user "${MATOTO_TOKEN}" citoyen.matoto.e2e@eadmin.test 'Citoyen Matoto E2E' CITOYEN mairie-matoto-e2e /tmp/matoto-citizen.json)"
+
+          echo "Ratoma agent creation: HTTP ${RATOMA_AGENT_STATUS}"
+          echo "Ratoma citizen creation: HTTP ${RATOMA_CITIZEN_STATUS}"
+          echo "Matoto agent creation: HTTP ${MATOTO_AGENT_STATUS}"
+          echo "Matoto citizen creation: HTTP ${MATOTO_CITIZEN_STATUS}"
+          test "${RATOMA_AGENT_STATUS}" = '201'
+          test "${RATOMA_CITIZEN_STATUS}" = '201'
+          test "${MATOTO_AGENT_STATUS}" = '201'
+          test "${MATOTO_CITIZEN_STATUS}" = '201'
+
+          CROSS_CREATE_STATUS="$(create_user "${RATOMA_TOKEN}" agent.cross.e2e@eadmin.test 'Agent Cross Commune E2E' AGENT mairie-matoto-e2e /tmp/cross-agent.json)"
+          echo "Ratoma admin creating Matoto agent: HTTP ${CROSS_CREATE_STATUS}"
+          test "${CROSS_CREATE_STATUS}" = '403'
+
+          for account in \
+            'admin.ratoma.e2e@eadmin.test' \
+            'admin.matoto.e2e@eadmin.test' \
+            'agent.ratoma.e2e@eadmin.test' \
+            'agent.matoto.e2e@eadmin.test' \
+            'citoyen.ratoma.e2e@eadmin.test' \
+            'citoyen.matoto.e2e@eadmin.test'
+          do
+            login_token "${account}" "${USER_PASSWORD}" >/dev/null
+            echo "Login OK: ${account}"
+          done
+
+      - name: Verify durable PostgreSQL municipality assignment
+        run: |
+          set -euo pipefail
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T postgres \
+            psql -U eadmin -d eadmin -P pager=off -c \
+            "SELECT email, role, tenant_id, institution_id, is_active FROM users WHERE email LIKE '%.e2e@eadmin.test' ORDER BY institution_id, role, email;"
+
+          check_one() {
+            local email="$1"; local role="$2"; local institution="$3"
+            local count
+            count="$(docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T postgres \
+              psql -U eadmin -d eadmin -Atc "SELECT count(*) FROM users WHERE email='${email}' AND role='${role}' AND tenant_id='republique-de-guinee' AND institution_id='${institution}' AND is_active=TRUE;")"
+            test "${count}" = '1'
+          }
+
+          check_one admin.ratoma.e2e@eadmin.test ADMIN mairie-ratoma-e2e
+          check_one agent.ratoma.e2e@eadmin.test AGENT mairie-ratoma-e2e
+          check_one citoyen.ratoma.e2e@eadmin.test CITOYEN mairie-ratoma-e2e
+          check_one admin.matoto.e2e@eadmin.test ADMIN mairie-matoto-e2e
+          check_one agent.matoto.e2e@eadmin.test AGENT mairie-matoto-e2e
+          check_one citoyen.matoto.e2e@eadmin.test CITOYEN mairie-matoto-e2e
+
+          RATOMA_ADMINS="$(docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T postgres \
+            psql -U eadmin -d eadmin -Atc "SELECT count(*) FROM users WHERE role='ADMIN' AND institution_id='mairie-ratoma-e2e' AND is_active=TRUE;")"
+          MATOTO_ADMINS="$(docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T postgres \
+            psql -U eadmin -d eadmin -Atc "SELECT count(*) FROM users WHERE role='ADMIN' AND institution_id='mairie-matoto-e2e' AND is_active=TRUE;")"
+          test "${RATOMA_ADMINS}" = '1'
+          test "${MATOTO_ADMINS}" = '1'
+
+      - name: Verify admin user-list isolation
+        run: |
+          set -euo pipefail
+          API='http://localhost:8000/api/v1'
+          USER_PASSWORD='CiCommune!2026Aa-test-password'
+          login_token() {
+            curl -fsS -X POST "${API}/auth/login" \
+              -H 'Content-Type: application/x-www-form-urlencoded' \
+              --data-urlencode "username=$1" \
+              --data-urlencode "password=${USER_PASSWORD}" \
+              | python -c "import json,sys; print(json.load(sys.stdin)['access_token'])"
+          }
+
+          RATOMA_TOKEN="$(login_token admin.ratoma.e2e@eadmin.test)"
+          MATOTO_TOKEN="$(login_token admin.matoto.e2e@eadmin.test)"
+
+          curl -fsS -H "Authorization: Bearer ${RATOMA_TOKEN}" "${API}/users?page=1&page_size=100" > /tmp/ratoma-users.json
+          curl -fsS -H "Authorization: Bearer ${MATOTO_TOKEN}" "${API}/users?page=1&page_size=100" > /tmp/matoto-users.json
+
+          python - <<'PY'
+          import json
+          ratoma = json.load(open('/tmp/ratoma-users.json', encoding='utf-8'))['items']
+          matoto = json.load(open('/tmp/matoto-users.json', encoding='utf-8'))['items']
+          ratoma_emails = {u['email'] for u in ratoma}
+          matoto_emails = {u['email'] for u in matoto}
+
+          assert 'agent.ratoma.e2e@eadmin.test' in ratoma_emails
+          assert 'citoyen.ratoma.e2e@eadmin.test' in ratoma_emails
+          assert 'agent.matoto.e2e@eadmin.test' not in ratoma_emails
+          assert 'citoyen.matoto.e2e@eadmin.test' not in ratoma_emails
+
+          assert 'agent.matoto.e2e@eadmin.test' in matoto_emails
+          assert 'citoyen.matoto.e2e@eadmin.test' in matoto_emails
+          assert 'agent.ratoma.e2e@eadmin.test' not in matoto_emails
+          assert 'citoyen.ratoma.e2e@eadmin.test' not in matoto_emails
+
+          assert all(u['institution_id'] == 'mairie-ratoma-e2e' for u in ratoma)
+          assert all(u['institution_id'] == 'mairie-matoto-e2e' for u in matoto)
+          PY
+
+      - name: Debug backend on failure
+        if: failure()
+        run: docker compose --env-file .env.local.ci -f docker-compose.local.yml logs --tail 300 backend postgres redis
+
+      - name: Cleanup
+        if: always()
+        run: docker compose --env-file .env.local.ci -f docker-compose.local.yml down -v --remove-orphans
