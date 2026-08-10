@@ -42,6 +42,80 @@ function Read-DotEnv {
     return $values
 }
 
+function Set-DotEnvValue {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][string]$Value
+    )
+
+    $encoding = New-Object System.Text.UTF8Encoding($false)
+    $lines = if (Test-Path $EnvFile) { @(Get-Content $EnvFile) } else { @() }
+    $updated = $false
+    $escapedName = [Regex]::Escape($Name)
+
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match "^\s*$escapedName\s*=") {
+            $lines[$i] = "$Name=$Value"
+            $updated = $true
+            break
+        }
+    }
+
+    if (-not $updated) {
+        $lines += "$Name=$Value"
+    }
+
+    [System.IO.File]::WriteAllLines($EnvFile, $lines, $encoding)
+}
+
+function Test-TcpPortAvailable {
+    param([Parameter(Mandatory = $true)][int]$Port)
+
+    $listener = $null
+    try {
+        $listener = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, $Port)
+        $listener.Start()
+        return $true
+    }
+    catch {
+        return $false
+    }
+    finally {
+        if ($null -ne $listener) {
+            try { $listener.Stop() } catch { }
+        }
+    }
+}
+
+function Find-FreeTcpPort {
+    param(
+        [int]$StartPort = 9101,
+        [int]$EndPort = 9199
+    )
+
+    for ($port = $StartPort; $port -le $EndPort; $port++) {
+        if (Test-TcpPortAvailable -Port $port) {
+            return $port
+        }
+    }
+
+    throw "Aucun port TCP libre trouvé entre $StartPort et $EndPort pour la console MinIO."
+}
+
+function Migrate-LegacyLocalEnv {
+    $envMap = Read-DotEnv
+
+    # Historical versions generated 9001 in .env.local while the current
+    # Compose contract intentionally moved the MinIO console away from the
+    # commonly occupied 9000/9001 pair. Existing ignored env files survive
+    # git pull, so migrate that stale value automatically.
+    if ($envMap["LOCAL_MINIO_CONSOLE_PORT"] -eq "9001") {
+        $newPort = Find-FreeTcpPort -StartPort 9101 -EndPort 9199
+        Set-DotEnvValue -Name "LOCAL_MINIO_CONSOLE_PORT" -Value ([string]$newPort)
+        Write-Host "Ancien port MinIO 9001 détecté. Console déplacée automatiquement vers $newPort." -ForegroundColor Yellow
+    }
+}
+
 function Ensure-LocalEnv {
     $existing = Read-DotEnv
     $defaults = [ordered]@{
@@ -62,7 +136,7 @@ function Ensure-LocalEnv {
         LOCAL_POSTGRES_PORT = "5433"
         LOCAL_REDIS_PORT = "6380"
         LOCAL_MINIO_API_PORT = "9000"
-        LOCAL_MINIO_CONSOLE_PORT = "9001"
+        LOCAL_MINIO_CONSOLE_PORT = "9101"
         LOCAL_MAILPIT_SMTP_PORT = "1025"
         LOCAL_MAILPIT_UI_PORT = "8025"
         LOCAL_PROMETHEUS_PORT = "9090"
@@ -92,6 +166,8 @@ function Ensure-LocalEnv {
         [System.IO.File]::AppendAllText($EnvFile, $payload, $encoding)
         Write-Host "Configuration locale mise à jour: .env.local" -ForegroundColor Green
     }
+
+    Migrate-LegacyLocalEnv
 }
 
 function Assert-Docker {
@@ -158,7 +234,7 @@ function Show-LocalAccess {
     $frontendPort = if ($envMap["LOCAL_FRONTEND_PORT"]) { $envMap["LOCAL_FRONTEND_PORT"] } else { "3000" }
     $backendPort = if ($envMap["LOCAL_BACKEND_PORT"]) { $envMap["LOCAL_BACKEND_PORT"] } else { "8000" }
     $mailpitPort = if ($envMap["LOCAL_MAILPIT_UI_PORT"]) { $envMap["LOCAL_MAILPIT_UI_PORT"] } else { "8025" }
-    $minioPort = if ($envMap["LOCAL_MINIO_CONSOLE_PORT"]) { $envMap["LOCAL_MINIO_CONSOLE_PORT"] } else { "9001" }
+    $minioPort = if ($envMap["LOCAL_MINIO_CONSOLE_PORT"]) { $envMap["LOCAL_MINIO_CONSOLE_PORT"] } else { "9101" }
     $domain = if ($envMap["LOCAL_TEST_DOMAIN"]) { $envMap["LOCAL_TEST_DOMAIN"] } else { "eadmin.test" }
     $superadmin = if ($envMap["LOCAL_SUPERADMIN_EMAIL"]) { $envMap["LOCAL_SUPERADMIN_EMAIL"] } else { "superadmin@eadmin.test" }
     $password = $envMap["LOCAL_TEST_PASSWORD"]
