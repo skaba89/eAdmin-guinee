@@ -25,7 +25,8 @@ import {
 } from '@/components/ui/dialog'
 import { useCitizenRequestsStore, type CitizenRequest, type RequestStatus, type UploadedDocument, isDeadlineExceeded, isDeadlineApproaching } from '@/store/citizen-requests-store'
 import { formatFileSize, getFileTypeIcon, downloadUploadedFile, ACCEPTED_FILE_TYPES, processFile } from '@/lib/document-utils'
-import { filterRequestsByRLS, getRLSScopeDescription } from '@/lib/rbac'
+import { getRLSScopeDescription } from '@/lib/rbac'
+import { filterServiceRequestsBySignedScope } from '@/lib/service-request-scope'
 import {
   canApproveServiceRequest,
   canProcessServiceRequest,
@@ -87,7 +88,7 @@ export function ServiceRequestsPage() {
     return () => clearInterval(interval)
   }, [checkAndRejectExpiredRequests])
 
-  const rlsFilteredRequests = filterRequestsByRLS(requests, user)
+  const rlsFilteredRequests = filterServiceRequestsBySignedScope(requests, user)
 
   const filteredRequests = rlsFilteredRequests.filter(r => {
     const matchTab = activeTab === 'toutes' ||

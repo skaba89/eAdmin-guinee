@@ -5,6 +5,7 @@ on:
     paths:
       - 'src/store/app-store.ts'
       - 'src/lib/service-request-scope.ts'
+      - 'src/components/app/service-requests-page.tsx'
       - 'scripts/check-frontend-signed-scope-contract.ts'
       - '.github/workflows/frontend-signed-scope-contract.yml'
   push:
@@ -12,6 +13,7 @@ on:
     paths:
       - 'src/store/app-store.ts'
       - 'src/lib/service-request-scope.ts'
+      - 'src/components/app/service-requests-page.tsx'
       - 'scripts/check-frontend-signed-scope-contract.ts'
       - '.github/workflows/frontend-signed-scope-contract.yml'
 
