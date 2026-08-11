@@ -18,7 +18,7 @@ from sqlalchemy import select
 from app.api.auth import create_access_token
 from app.config import settings
 from app.database import async_session_factory
-from app.models.service_request import ServiceRequest
+from app.models.service_request import ServiceRequest, ServiceRequestStatusEnum
 from app.models.user import RoleEnum, User
 
 RECETTE_DOMAIN = "recette.eadmin.gn"
@@ -176,6 +176,145 @@ async def _assert_hidden_detail(
     print(f"PASS isolation {label}: 404 fail-closed")
 
 
+async def _assert_decision_probe(
+    client: httpx.AsyncClient,
+    *,
+    user: User,
+    target: ServiceRequest,
+    target_status: ServiceRequestStatusEnum,
+    expected_http_status: int,
+    expected_detail_fragment: str,
+    label: str,
+) -> None:
+    """Probe approve/reject authorization without changing seeded business state.
+
+    A 403 proves the role is blocked by RBAC before any workflow mutation.
+    A 404 for DIRECTEUR proves the permission check passed but the exact current
+    institution scope still hides a child-service dossier. A 409 on a terminal
+    dossier proves approve/reject permission passed and execution reached the
+    workflow state machine, which then safely rejected the impossible transition.
+    """
+    response = await client.post(
+        f"/service-requests/{target.id}/status",
+        json={"status": target_status.value, "note": f"Probe E2E {label}"},
+        headers=_headers(user),
+    )
+    assert response.status_code == expected_http_status, (
+        f"{label}: HTTP {expected_http_status} attendu, reçu "
+        f"{response.status_code}: {response.text}"
+    )
+    detail = str(response.json().get("detail", ""))
+    assert expected_detail_fragment.lower() in detail.lower(), (
+        f"{label}: détail inattendu: {detail!r}"
+    )
+    print(
+        f"PASS decision {label}: HTTP {expected_http_status} "
+        f"({target_status.value})"
+    )
+
+
+async def _assert_request_status_unchanged(
+    client: httpx.AsyncClient,
+    *,
+    user: User,
+    target: ServiceRequest,
+    expected_status: ServiceRequestStatusEnum,
+    label: str,
+) -> None:
+    response = await client.get(
+        f"/service-requests/{target.id}",
+        headers=_headers(user),
+    )
+    assert response.status_code == 200, f"{label}: GET HTTP {response.status_code}: {response.text}"
+    current_status = response.json()["status"]
+    assert current_status == expected_status.value, (
+        f"{label}: statut modifié par un probe refusé: {current_status}"
+    )
+    print(f"PASS non-mutation {label}: {current_status}")
+
+
+async def _assert_decision_permissions(
+    client: httpx.AsyncClient,
+    *,
+    user_map: dict[str, User],
+    request_map: dict[str, ServiceRequest],
+) -> None:
+    ratoma_en_cours = request_map["REC-GN-2026-002"]
+    anip_validee = request_map["REC-GN-2026-004"]
+    justice_livree = request_map["REC-GN-2026-006"]
+
+    denied_cases = (
+        (f"citoyen.awa@{RECETTE_DOMAIN}", ratoma_en_cours, "CITOYEN"),
+        (f"agent.ratoma@{RECETTE_DOMAIN}", ratoma_en_cours, "AGENT"),
+        (f"mairie.ratoma@{RECETTE_DOMAIN}", ratoma_en_cours, "MAIRIE"),
+        (f"admin.ratoma@{RECETTE_DOMAIN}", ratoma_en_cours, "ADMIN"),
+        (f"agence.anip@{RECETTE_DOMAIN}", anip_validee, "AGENCE"),
+    )
+    for email, target, role_label in denied_cases:
+        user = user_map[email]
+        for target_status, action_label in (
+            (ServiceRequestStatusEnum.VALIDEE, "approve"),
+            (ServiceRequestStatusEnum.REJETEE, "reject"),
+        ):
+            await _assert_decision_probe(
+                client,
+                user=user,
+                target=target,
+                target_status=target_status,
+                expected_http_status=403,
+                expected_detail_fragment="permission",
+                label=f"{role_label} sans {action_label}",
+            )
+
+    # CHEF_SERVICE, MINISTRE and SUPER_ADMIN own approve/reject permission.
+    # The terminal Justice dossier guarantees a non-destructive 409 after RBAC.
+    for email, role_label in (
+        (f"chef.casier@{RECETTE_DOMAIN}", "CHEF_SERVICE"),
+        (f"ministre.justice@{RECETTE_DOMAIN}", "MINISTRE"),
+        (f"superadmin.recette@{RECETTE_DOMAIN}", "SUPER_ADMIN"),
+    ):
+        user = user_map[email]
+        for target_status, action_label in (
+            (ServiceRequestStatusEnum.VALIDEE, "approve"),
+            (ServiceRequestStatusEnum.REJETEE, "reject"),
+        ):
+            await _assert_decision_probe(
+                client,
+                user=user,
+                target=justice_livree,
+                target_status=target_status,
+                expected_http_status=409,
+                expected_detail_fragment="Transition interdite",
+                label=f"{role_label} possède {action_label}",
+            )
+
+    # DIRECTEUR has approve/reject permission, but the current policy scopes it
+    # to dir-justice-recette exactly; the child service dossier must stay hidden.
+    directeur = user_map[f"directeur.justice@{RECETTE_DOMAIN}"]
+    for target_status, action_label in (
+        (ServiceRequestStatusEnum.VALIDEE, "approve"),
+        (ServiceRequestStatusEnum.REJETEE, "reject"),
+    ):
+        await _assert_decision_probe(
+            client,
+            user=directeur,
+            target=justice_livree,
+            target_status=target_status,
+            expected_http_status=404,
+            expected_detail_fragment="hors de votre périmètre",
+            label=f"DIRECTEUR {action_label} bloqué par scope exact",
+        )
+
+    # Forbidden probes must not have altered the seeded in-progress request.
+    await _assert_request_status_unchanged(
+        client,
+        user=user_map[f"admin.ratoma@{RECETTE_DOMAIN}"],
+        target=ratoma_en_cours,
+        expected_status=ServiceRequestStatusEnum.EN_COURS,
+        label="REC-GN-2026-002 après probes RBAC",
+    )
+
+
 async def main() -> None:
     if settings.is_production:
         raise RuntimeError("Le contrôle E2E de recette est interdit en production.")
@@ -208,7 +347,16 @@ async def main() -> None:
             label="MINISTRE tenant principal -> tenant secondaire",
         )
 
-    print("PASS: recette E2E tous rôles + isolation propriétaire/institution/tenant")
+        await _assert_decision_permissions(
+            client,
+            user_map=user_map,
+            request_map=request_map,
+        )
+
+    print(
+        "PASS: recette E2E tous rôles + isolation propriétaire/institution/tenant "
+        "+ frontières approve/reject"
+    )
 
 
 if __name__ == "__main__":
