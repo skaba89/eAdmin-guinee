@@ -9,6 +9,7 @@ production validation path.
 
 from __future__ import annotations
 
+import pytest
 import pytest_asyncio
 from sqlalchemy import select
 
@@ -21,15 +22,17 @@ _TARGET_MODULES = {
 }
 
 
-@pytest_asyncio.fixture(autouse=True)
-async def governed_iam_test_institutions(request):
-    """Create the synthetic governed institutions used by IAM integration tests."""
-    module_name = getattr(getattr(request.node, "module", None), "__name__", "")
-    if module_name not in _TARGET_MODULES or "db_session" not in request.fixturenames:
-        yield
-        return
+def pytest_collection_modifyitems(items) -> None:
+    """Attach the governed fixture only to the IAM modules that need it."""
+    for item in items:
+        module_name = getattr(getattr(item, "module", None), "__name__", "")
+        if module_name in _TARGET_MODULES:
+            item.add_marker(pytest.mark.usefixtures("governed_iam_test_institutions"))
 
-    db_session = request.getfixturevalue("db_session")
+
+@pytest_asyncio.fixture
+async def governed_iam_test_institutions(db_session):
+    """Create synthetic governed institutions in the active test transaction."""
     existing_ids = set(
         (
             await db_session.execute(
