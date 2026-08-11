@@ -250,8 +250,8 @@ jobs:
               -d "{\"email\":\"${email}\",\"password\":\"CiMairie!2026Aa-test-password\",\"full_name\":\"${name}\",\"role\":\"ADMIN\",\"tenant_id\":\"republique-de-guinee\",\"institution_id\":\"${institution}\"}"
           }
 
-          RATOMA_STATUS="$(create_admin admin.ratoma@eadmin.test 'Admin Ratoma CI' mairie-ratoma-ci /tmp/admin-ratoma.json)"
-          MATOTO_STATUS="$(create_admin admin.matoto@eadmin.test 'Admin Matoto CI' mairie-matoto-ci /tmp/admin-matoto.json)"
+          RATOMA_STATUS="$(create_admin admin.ratoma@example.com 'Admin Ratoma CI' mairie-ratoma-ci /tmp/admin-ratoma.json)"
+          MATOTO_STATUS="$(create_admin admin.matoto@example.com 'Admin Matoto CI' mairie-matoto-ci /tmp/admin-matoto.json)"
           echo "Create Ratoma ADMIN: HTTP ${RATOMA_STATUS}"; cat /tmp/admin-ratoma.json; echo
           echo "Create Matoto ADMIN: HTTP ${MATOTO_STATUS}"; cat /tmp/admin-matoto.json; echo
           test "${RATOMA_STATUS}" = "201"
@@ -259,13 +259,13 @@ jobs:
 
           # The API response is not enough: prove both rows are already durable
           # in PostgreSQL before any subsequent request or container shutdown.
-          for email in admin.ratoma@eadmin.test admin.matoto@eadmin.test; do
+          for email in admin.ratoma@example.com admin.matoto@example.com; do
             FOUND="$(docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T postgres \
               psql -U eadmin -d eadmin -Atc "SELECT count(*) FROM users WHERE email='${email}' AND is_active=TRUE;")"
             test "${FOUND}" = "1"
           done
 
-          DUPLICATE_STATUS="$(create_admin admin.ratoma2@eadmin.test 'Second Admin Ratoma CI' mairie-ratoma-ci /tmp/admin-ratoma-duplicate.json)"
+          DUPLICATE_STATUS="$(create_admin admin.ratoma2@example.com 'Second Admin Ratoma CI' mairie-ratoma-ci /tmp/admin-ratoma-duplicate.json)"
           echo "Second Ratoma ADMIN: HTTP ${DUPLICATE_STATUS}"; cat /tmp/admin-ratoma-duplicate.json; echo
           test "${DUPLICATE_STATUS}" = "409"
 
@@ -323,7 +323,7 @@ jobs:
 
           RATOMA_TOKEN="$(curl -fsS -X POST http://localhost:8000/api/v1/auth/login \
             -H 'Content-Type: application/x-www-form-urlencoded' \
-            --data-urlencode 'username=admin.ratoma@eadmin.test' \
+            --data-urlencode 'username=admin.ratoma@example.com' \
             --data-urlencode 'password=CiMairie!2026Aa-test-password' \
             | python -c "import json,sys; print(json.load(sys.stdin)['access_token'])")"
 
