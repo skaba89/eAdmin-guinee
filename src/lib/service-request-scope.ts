@@ -1,14 +1,10 @@
 import type { UserInfo } from '@/store/app-store'
 import type { CitizenRequest } from '@/store/citizen-requests-store'
-
-const INSTITUTION_SCOPED_ROLES = new Set<UserInfo['role']>([
-  'mairie',
-  'agence',
-  'agent',
-  'admin_general',
-  'chef_service',
-  'directeur',
-])
+import {
+  isGlobalFrontendRole,
+  isInstitutionScopedFrontendRole,
+  isTenantWideFrontendRole,
+} from '@/lib/frontend-role-authority'
 
 function normalizeScope(value?: string): string | null {
   const normalized = value?.trim()
@@ -30,7 +26,7 @@ export function filterServiceRequestsBySignedScope(
   user: UserInfo | null,
 ): CitizenRequest[] {
   if (!user) return []
-  if (user.role === 'super_admin') return requests
+  if (isGlobalFrontendRole(user.role)) return requests
 
   const tenantId = normalizeScope(user.tenantId)
   if (!tenantId) return []
@@ -46,11 +42,11 @@ export function filterServiceRequestsBySignedScope(
     )
   }
 
-  if (user.role === 'ministre' || user.role === 'ministere') {
+  if (isTenantWideFrontendRole(user.role)) {
     return tenantScoped
   }
 
-  if (INSTITUTION_SCOPED_ROLES.has(user.role)) {
+  if (isInstitutionScopedFrontendRole(user.role)) {
     const institutionId = normalizeScope(user.institutionId)
     if (!institutionId) return []
     return tenantScoped.filter(
