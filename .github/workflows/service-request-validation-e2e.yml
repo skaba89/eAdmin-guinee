@@ -1,0 +1,181 @@
+name: Service Request Validation E2E
+
+on:
+  pull_request:
+    paths:
+      - 'src/lib/service-requests-api.ts'
+      - 'backend/app/api/service_requests.py'
+      - 'backend/app/models/service_request.py'
+      - '.github/workflows/service-request-validation-e2e.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  service-request-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create isolated CI environment
+        run: |
+          set -euo pipefail
+          postgres_password="$(openssl rand -hex 24)"
+          redis_password="$(openssl rand -hex 24)"
+          minio_password="$(openssl rand -hex 24)"
+          secret_key="$(openssl rand -hex 48)"
+          encryption_key="$(openssl rand -hex 32)"
+          frontend_encryption_key="$(openssl rand -hex 32)"
+          grafana_password="$(openssl rand -hex 24)"
+          for secret in "$postgres_password" "$redis_password" "$minio_password" "$secret_key" "$encryption_key" "$frontend_encryption_key" "$grafana_password"; do
+            echo "::add-mask::${secret}"
+          done
+          cat > .env.local.ci <<EOF
+          POSTGRES_PASSWORD=${postgres_password}
+          REDIS_PASSWORD=${redis_password}
+          MINIO_ROOT_USER=eadmin
+          MINIO_ROOT_PASSWORD=${minio_password}
+          SECRET_KEY=${secret_key}
+          ENCRYPTION_KEY=${encryption_key}
+          NEXT_PUBLIC_ENCRYPTION_KEY=${frontend_encryption_key}
+          GRAFANA_ADMIN_USER=admin
+          GRAFANA_ADMIN_PASSWORD=${grafana_password}
+          LOCAL_TEST_PASSWORD=CiLocal!2026Aa-test-password
+          LOCAL_TEST_DOMAIN=eadmin.test
+          LOCAL_SUPERADMIN_EMAIL=superadmin@eadmin.test
+          LOCAL_FRONTEND_PORT=3000
+          LOCAL_BACKEND_PORT=8000
+          LOCAL_POSTGRES_PORT=5433
+          LOCAL_REDIS_PORT=6380
+          LOCAL_MINIO_CONSOLE_PORT=9101
+          LOCAL_MAILPIT_SMTP_PORT=1025
+          LOCAL_MAILPIT_UI_PORT=8025
+          EOF
+
+      - name: Build and start backend stack
+        run: |
+          set -euo pipefail
+          compose=(docker compose --env-file .env.local.ci -f docker-compose.local.yml)
+          "${compose[@]}" build backend
+          "${compose[@]}" up -d postgres redis minio minio-init mailpit
+          for attempt in $(seq 1 60); do
+            if "${compose[@]}" exec -T postgres pg_isready -U eadmin -d eadmin >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+          "${compose[@]}" run --rm --no-deps backend alembic upgrade head
+          "${compose[@]}" run --rm --no-deps backend python -m app.bootstrap_runtime
+          "${compose[@]}" up -d backend
+          for attempt in $(seq 1 90); do
+            if curl -fsS http://localhost:8000/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          "${compose[@]}" logs --tail 250 backend
+          exit 1
+
+      - name: Seed one valid mairie and one active service
+        run: |
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T backend python - <<'PY'
+          import asyncio
+          from datetime import datetime, timezone
+          from sqlalchemy import select
+          from app.database import async_session_factory
+          from app.models.administrative_service import AdministrativeService
+          from app.models.institution import Institution
+
+          async def main():
+              async with async_session_factory() as session:
+                  inst = await session.get(Institution, 'mairie-validation-e2e')
+                  if inst is None:
+                      inst = Institution(
+                          id='mairie-validation-e2e',
+                          tenant_id='republique-de-guinee',
+                          name='Mairie Validation E2E',
+                          type='mairie',
+                          is_active=True,
+                      )
+                      session.add(inst)
+                  svc = await session.scalar(select(AdministrativeService).where(
+                      AdministrativeService.tenant_id == 'republique-de-guinee',
+                      AdministrativeService.service_id == 'validation-e2e-service',
+                      AdministrativeService.version == 1,
+                  ))
+                  if svc is None:
+                      svc = AdministrativeService(
+                          tenant_id='republique-de-guinee',
+                          service_id='validation-e2e-service',
+                          version=1,
+                          category_id='etat-civil',
+                          category_name='État civil',
+                          name='Service Validation E2E',
+                          description='Service fictif de validation E2E',
+                          sla_business_days=2,
+                          is_active=True,
+                          effective_from=datetime.now(timezone.utc),
+                      )
+                      session.add(svc)
+                  else:
+                      svc.is_active = True
+                      svc.effective_from = datetime.now(timezone.utc)
+                  await session.commit()
+          asyncio.run(main())
+          PY
+
+      - name: Login local citizen
+        run: |
+          set -euo pipefail
+          curl -fsS -X POST 'http://localhost:8000/api/v1/auth/login' \
+            -H 'Content-Type: application/x-www-form-urlencoded' \
+            --data-urlencode 'username=citoyen@eadmin.test' \
+            --data-urlencode 'password=CiLocal!2026Aa-test-password' \
+            | python -c "import json,sys; print(json.load(sys.stdin)['access_token'])" > /tmp/citizen-token
+          chmod 600 /tmp/citizen-token
+          test -s /tmp/citizen-token
+
+      - name: Invalid payload returns field-level FastAPI 422
+        run: |
+          set -euo pipefail
+          status="$(curl -sS -o /tmp/invalid-request.json -w '%{http_code}' -X POST 'http://localhost:8000/api/v1/service-requests' \
+            -H "Authorization: Bearer $(cat /tmp/citizen-token)" \
+            -H 'Content-Type: application/json' \
+            -d '{"service_id":"validation-e2e-service","target_institution_id":"mairie-validation-e2e","citizen_name":"Diallo","citizen_first_name":"Awa","citizen_nin":"X","citizen_phone":"+224620000001","citizen_email":"authenticated-user@eadmin.gn","citizen_address":"Conakry","motif":"Test de validation","delivery_mode":"en_ligne"}')"
+          echo "Invalid request HTTP ${status}"
+          test "${status}" = '422'
+          python - <<'PY'
+          import json
+          payload = json.load(open('/tmp/invalid-request.json', encoding='utf-8'))
+          detail = payload.get('detail')
+          assert isinstance(detail, list) and detail, payload
+          assert any(item.get('loc') == ['body', 'citizen_nin'] for item in detail), detail
+          print('PASS: 422 exposes citizen_nin in FastAPI detail')
+          PY
+
+      - name: Valid payload is persisted and server identity stays authoritative
+        run: |
+          set -euo pipefail
+          status="$(curl -sS -o /tmp/valid-request.json -w '%{http_code}' -X POST 'http://localhost:8000/api/v1/service-requests' \
+            -H "Authorization: Bearer $(cat /tmp/citizen-token)" \
+            -H 'Content-Type: application/json' \
+            -H 'Idempotency-Key: validation-e2e-2026-001' \
+            -d '{"service_id":"validation-e2e-service","target_institution_id":"mairie-validation-e2e","citizen_name":" Diallo ","citizen_first_name":" Awa ","citizen_nin":"NIN-123456","citizen_phone":"+224620000001","citizen_email":"authenticated-user@eadmin.gn","citizen_address":"Conakry Ratoma","motif":"Demande de validation E2E","mairie":"Mairie Validation E2E","delivery_mode":"en_ligne"}')"
+          echo "Valid request HTTP ${status}"
+          test "${status}" = '201' || { cat /tmp/valid-request.json; exit 1; }
+          request_id="$(python -c "import json; print(json.load(open('/tmp/valid-request.json'))['id'])")"
+          stored_email="$(docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T postgres psql -U eadmin -d eadmin -Atc "SELECT citizen_email FROM service_requests WHERE id='${request_id}';")"
+          test "${stored_email}" = 'citoyen@eadmin.test'
+          echo 'PASS: request persisted and authenticated account email is authoritative'
+
+      - name: Backend logs on failure
+        if: failure()
+        run: docker compose --env-file .env.local.ci -f docker-compose.local.yml logs --tail 300 backend postgres
+
+      - name: Cleanup
+        if: always()
+        run: docker compose --env-file .env.local.ci -f docker-compose.local.yml down -v --remove-orphans
