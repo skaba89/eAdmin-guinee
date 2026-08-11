@@ -32,6 +32,16 @@ class DeliveryModeEnum(str, enum.Enum):
     COURRIER = "courrier"
 
 
+def _enum_values(enum_cls: type[enum.Enum]) -> list[str]:
+    """Persist public enum values instead of Python member names.
+
+    PostgreSQL native enums are defined with the lowercase business values
+    exposed by the API (for example ``soumise`` and ``guichet``). SQLAlchemy
+    otherwise serializes Python enum member names such as ``SOUMISE``.
+    """
+    return [str(member.value) for member in enum_cls]
+
+
 class ServiceRequest(Base):
     __tablename__ = "service_requests"
 
@@ -65,7 +75,7 @@ class ServiceRequest(Base):
     required_documents: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
     status: Mapped[ServiceRequestStatusEnum] = mapped_column(
-        Enum(ServiceRequestStatusEnum),
+        Enum(ServiceRequestStatusEnum, values_callable=_enum_values),
         default=ServiceRequestStatusEnum.SOUMISE,
         nullable=False,
         index=True,
@@ -82,7 +92,9 @@ class ServiceRequest(Base):
     mairie: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     delivery_mode: Mapped[DeliveryModeEnum] = mapped_column(
-        Enum(DeliveryModeEnum), default=DeliveryModeEnum.EN_LIGNE, nullable=False
+        Enum(DeliveryModeEnum, values_callable=_enum_values),
+        default=DeliveryModeEnum.EN_LIGNE,
+        nullable=False,
     )
     delivery_location: Mapped[str | None] = mapped_column(String(500), nullable=True)
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
