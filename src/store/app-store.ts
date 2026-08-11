@@ -24,6 +24,10 @@ export interface UserInfo {
   role: UserRole
   institution: string
   fonction: string
+  /** Server-issued tenant scope carried by the signed access token. */
+  tenantId?: string
+  /** Server-issued institution scope carried by the signed access token. */
+  institutionId?: string
   avatar?: string
   phone?: string
   nin?: string
@@ -97,7 +101,15 @@ function normalizeRole(frontendRole?: string, backendRole?: string): UserRole {
   return mapping[raw] || 'citizen'
 }
 
-function mapBackendUser(backendUser: authClient.BackendUser): UserInfo {
+function normalizedScope(value?: string): string | undefined {
+  const normalized = value?.trim()
+  return normalized || undefined
+}
+
+function mapBackendUser(
+  backendUser: authClient.BackendUser,
+  claims: authClient.JwtPayload,
+): UserInfo {
   const role = normalizeRole(backendUser.frontend_role, backendUser.role)
   return {
     id: backendUser.id,
@@ -106,6 +118,8 @@ function mapBackendUser(backendUser: authClient.BackendUser): UserInfo {
     role,
     institution: backendUser.institution || 'République de Guinée',
     fonction: ROLE_LABELS[role],
+    tenantId: normalizedScope(claims.tenant_id),
+    institutionId: normalizedScope(claims.institution_id),
   }
 }
 
@@ -115,7 +129,7 @@ async function resolveAuthenticatedUser(tokens: authClient.AuthTokens): Promise<
 }> {
   const claims = authClient.decodeJwtPayload(tokens.access_token)
   const backendUser = await authClient.getCurrentUser(tokens.access_token)
-  return { claims, user: mapBackendUser(backendUser) }
+  return { claims, user: mapBackendUser(backendUser, claims) }
 }
 
 interface AppState {
@@ -269,8 +283,9 @@ export const useAppStore = create<AppState>()(
 
         try {
           const tokens = await authClient.verifyMfa(pendingToken, code)
+          const claims = authClient.decodeJwtPayload(tokens.access_token)
           const backendUser = await authClient.getCurrentUser(tokens.access_token)
-          const user = mapBackendUser(backendUser)
+          const user = mapBackendUser(backendUser, claims)
           authClient.storeActiveTokens(tokens)
 
           set({
@@ -293,8 +308,9 @@ export const useAppStore = create<AppState>()(
         const activeToken = authClient.getActiveAccessToken()
         if (activeToken) {
           try {
+            const claims = authClient.decodeJwtPayload(activeToken)
             const backendUser = await authClient.getCurrentUser(activeToken)
-            const user = mapBackendUser(backendUser)
+            const user = mapBackendUser(backendUser, claims)
             set({
               isAuth: true,
               mfaRequired: false,
@@ -313,11 +329,12 @@ export const useAppStore = create<AppState>()(
         const pendingToken = authClient.getPendingAccessToken()
         if (pendingToken) {
           try {
+            const claims = authClient.decodeJwtPayload(pendingToken)
             const backendUser = await authClient.getCurrentUser(pendingToken)
             set({
               isAuth: false,
               mfaRequired: true,
-              user: mapBackendUser(backendUser),
+              user: mapBackendUser(backendUser, claims),
               currentPage: 'mfa',
               loginError: null,
             })
