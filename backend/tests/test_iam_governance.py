@@ -8,6 +8,7 @@ import pytest
 from app.api.auth import create_access_token
 from app.config import settings
 from app.models.access_grant import AccessGrant
+from app.models.institution import Institution
 from app.models.user import RoleEnum, User
 from app.services.authorization_service import authorization_service
 
@@ -24,6 +25,21 @@ def _headers(user: User, *, mfa_verified: bool = False) -> dict[str, str]:
         token_data.update({"mfa_required": True, "mfa_verified": True})
     token = create_access_token(token_data)
     return {"Authorization": f"Bearer {token}"}
+
+
+async def _ensure_institution(db_session, institution_id: str) -> None:
+    existing = await db_session.get(Institution, institution_id)
+    if existing is None:
+        db_session.add(
+            Institution(
+                id=institution_id,
+                tenant_id=settings.TENANT_DEFAULT_ID,
+                name=f"Institution {institution_id}",
+                type="service",
+                is_active=True,
+            )
+        )
+        await db_session.flush()
 
 
 async def _user(
@@ -89,6 +105,7 @@ async def test_admin_can_create_only_lower_role_inside_own_scope(
     db_session,
     admin_user,
 ):
+    await _ensure_institution(db_session, "inst-a")
     admin_user.tenant_id = settings.TENANT_DEFAULT_ID
     admin_user.institution_id = "inst-a"
     admin_user.institution = "inst-a"
