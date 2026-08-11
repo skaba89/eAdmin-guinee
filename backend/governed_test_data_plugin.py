@@ -16,7 +16,11 @@ from sqlalchemy import select
 from app.config import settings
 from app.models.institution import Institution
 
+# Depending on how pytest imports the test tree, modules may be exposed either
+# as top-level names or as tests.<module>. Support both forms deliberately.
 _TARGET_MODULES = {
+    "test_iam_governance",
+    "test_iam_lifecycle",
     "tests.test_iam_governance",
     "tests.test_iam_lifecycle",
 }
