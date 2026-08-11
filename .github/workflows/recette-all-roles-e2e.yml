@@ -5,6 +5,7 @@ on:
     paths:
       - 'backend/**'
       - 'docker-compose.local.yml'
+      - 'local-seed-test-data.bat'
       - '.github/workflows/recette-all-roles-e2e.yml'
   workflow_dispatch:
 
@@ -67,9 +68,9 @@ jobs:
           set -euo pipefail
           # Running twice proves the seed remains idempotent on the real PostgreSQL schema.
           docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T backend \
-            python scripts/seed_recette_data.py
+            python -m scripts.seed_recette_data
           docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T backend \
-            python scripts/seed_recette_data.py
+            python -m scripts.seed_recette_data
 
       - name: Assert recette cardinality and role coverage in PostgreSQL
         run: |
@@ -95,7 +96,7 @@ jobs:
       - name: Run every-role HTTP scope and isolation E2E
         run: |
           docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T backend \
-            python scripts/check_recette_all_roles_e2e.py
+            python -m scripts.check_recette_all_roles_e2e
 
       - name: Authenticate roles not covered by commune E2E
         run: |
