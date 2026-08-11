@@ -1,33 +1,24 @@
 import type { UserInfo } from '@/store/app-store'
+import { getFrontendRoleLevel } from '@/lib/frontend-role-authority'
 
 export type ServiceRequestPermission = 'process' | 'approve' | 'reject'
 
-const SERVICE_REQUEST_PERMISSIONS: Record<UserInfo['role'], ReadonlySet<ServiceRequestPermission>> = {
-  citizen: new Set(),
-  mairie: new Set(['process']),
-  agence: new Set(['process']),
-  agent: new Set(['process']),
-  admin_general: new Set(['process']),
-  chef_service: new Set(['process', 'approve', 'reject']),
-  directeur: new Set(['process', 'approve', 'reject']),
-  ministre: new Set(['process', 'approve', 'reject']),
-  // Legacy frontend role kept for compatibility with older sessions. The
-  // backend no longer emits it, but ministerial supervision remains equivalent
-  // to MINISTRE for request decisions until those sessions have expired.
-  ministere: new Set(['process', 'approve', 'reject']),
-  super_admin: new Set(['process', 'approve', 'reject']),
+const REQUEST_PERMISSION_MIN_LEVEL: Readonly<Record<ServiceRequestPermission, number>> = {
+  process: 2,
+  approve: 4,
+  reject: 4,
 }
 
 /**
- * Frontend affordance only. The FastAPI RBAC/ABAC/RLS checks remain the
- * authoritative security boundary for every mutation.
+ * Frontend affordance only. Thresholds mirror the backend request permission
+ * matrix; FastAPI RBAC/ABAC/RLS remains authoritative for every mutation.
  */
 export function hasServiceRequestPermission(
   user: UserInfo | null,
   permission: ServiceRequestPermission,
 ): boolean {
   if (!user) return false
-  return SERVICE_REQUEST_PERMISSIONS[user.role]?.has(permission) === true
+  return getFrontendRoleLevel(user.role) >= REQUEST_PERMISSION_MIN_LEVEL[permission]
 }
 
 export function canProcessServiceRequest(user: UserInfo | null): boolean {
