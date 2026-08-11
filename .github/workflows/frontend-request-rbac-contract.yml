@@ -1,0 +1,35 @@
+name: Frontend Request RBAC Contract
+
+on:
+  pull_request:
+    paths:
+      - 'src/lib/service-request-rbac.ts'
+      - 'src/components/app/service-requests-page.tsx'
+      - 'scripts/check-service-request-rbac-contract.ts'
+      - '.github/workflows/frontend-request-rbac-contract.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/lib/service-request-rbac.ts'
+      - 'src/components/app/service-requests-page.tsx'
+      - 'scripts/check-service-request-rbac-contract.ts'
+      - '.github/workflows/frontend-request-rbac-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  request-rbac-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.4
+
+      - name: Verify service-request decision contract
+        run: bun scripts/check-service-request-rbac-contract.ts
