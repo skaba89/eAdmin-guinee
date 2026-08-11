@@ -130,4 +130,21 @@ for (const requiredSnippet of [
   )
 }
 
-console.log('PASS: frontend session retains signed tenant/institution scope and fails closed')
+const requestPageSource = await Bun.file('src/components/app/service-requests-page.tsx').text()
+assert.equal(
+  requestPageSource.includes("from '@/lib/service-request-scope'"),
+  true,
+  'La page Demandes doit importer le helper de scope signé',
+)
+assert.equal(
+  requestPageSource.includes('filterServiceRequestsBySignedScope(requests, user)'),
+  true,
+  'La page Demandes doit filtrer avec tenant/institution signés',
+)
+assert.equal(
+  requestPageSource.includes('filterRequestsByRLS(requests, user)'),
+  false,
+  'La page Demandes ne doit plus utiliser le filtre historique par catégories',
+)
+
+console.log('PASS: frontend session and request page enforce signed tenant/institution scope')
