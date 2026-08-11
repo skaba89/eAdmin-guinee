@@ -16,6 +16,7 @@ from app.models.identity_lifecycle import (
     AccessReviewItem,
     IdentityLifecycleEvent,
 )
+from app.models.institution import Institution
 from app.models.user import RoleEnum, User
 from app.services.access_review_service import AccessReviewError, access_review_service
 
@@ -33,6 +34,21 @@ def _headers(user: User, *, mfa_verified: bool = False) -> dict[str, str]:
     return {"Authorization": f"Bearer {create_access_token(token_data)}"}
 
 
+async def _ensure_institution(db_session, institution_id: str) -> None:
+    existing = await db_session.get(Institution, institution_id)
+    if existing is None:
+        db_session.add(
+            Institution(
+                id=institution_id,
+                tenant_id=settings.TENANT_DEFAULT_ID,
+                name=f"Institution {institution_id}",
+                type="service",
+                is_active=True,
+            )
+        )
+        await db_session.flush()
+
+
 async def _user(
     db_session,
     *,
@@ -42,6 +58,8 @@ async def _user(
     tenant_id: str = settings.TENANT_DEFAULT_ID,
     mfa_enabled: bool = False,
 ) -> User:
+    if institution_id is not None and tenant_id == settings.TENANT_DEFAULT_ID:
+        await _ensure_institution(db_session, institution_id)
     user = User(
         email=email,
         hashed_password="not-used-in-lifecycle-tests",
@@ -74,6 +92,7 @@ async def test_joiner_creation_persists_lifecycle_evidence(
     super_admin_user,
     super_admin_auth_headers,
 ):
+    await _ensure_institution(db_session, "inst-a")
     response = await client.post(
         "/api/v1/users",
         headers=super_admin_auth_headers,
@@ -122,6 +141,7 @@ async def test_mover_revokes_sessions_and_all_related_grants(
         role=RoleEnum.AGENT,
         institution_id="inst-a",
     )
+    await _ensure_institution(db_session, "inst-b")
     now = datetime.now(timezone.utc)
     grants = [
         AccessGrant(

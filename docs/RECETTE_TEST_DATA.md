@@ -16,7 +16,7 @@ Le script :
 
 1. démarre ou réutilise la stack Docker locale ;
 2. exécute les migrations et le bootstrap local existants via `local-start.bat` ;
-3. exécute `python scripts/seed_recette_data.py` dans le backend ;
+3. exécute `python -m scripts.seed_recette_data` dans le backend ;
 4. crée ou met à jour le jeu de recette de manière idempotente ;
 5. affiche ensuite les accès locaux avec `local-status.bat`.
 
@@ -25,7 +25,7 @@ Le mot de passe n'est **pas** commité dans Git. Tous les comptes `@recette.eadm
 Pour recharger le jeu sans reconstruire la stack :
 
 ```powershell
-docker compose --env-file .env.local -f docker-compose.local.yml exec -T backend python scripts/seed_recette_data.py
+docker compose --env-file .env.local -f docker-compose.local.yml exec -T backend python -m scripts.seed_recette_data
 ```
 
 ## 2. Comptes de recette
@@ -208,4 +208,4 @@ Tous les scénarios détaillés avec leur identifiant (`CIT-01`, `AGT-01`, etc.)
 test-data/role-use-cases.json
 ```
 
-Ce fichier est prévu pour être réutilisé ultérieurement par Playwright, Postman/Newman ou un runner E2E dédié afin d'automatiser progressivement toute la matrice de recette.
+Ce fichier est prévu pour être réutilisé par Playwright, Postman/Newman ou le runner E2E dédié afin d'automatiser progressivement toute la matrice de recette.

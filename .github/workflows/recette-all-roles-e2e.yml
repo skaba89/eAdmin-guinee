@@ -1,0 +1,134 @@
+name: Recette All Roles E2E
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'docker-compose.local.yml'
+      - 'local-seed-test-data.bat'
+      - '.github/workflows/recette-all-roles-e2e.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recette-all-roles-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create isolated CI environment
+        run: |
+          cat > .env.local.ci <<'EOF'
+          POSTGRES_PASSWORD=ci_postgres_password_2026
+          REDIS_PASSWORD=ci_redis_password_2026
+          MINIO_ROOT_USER=eadmin
+          MINIO_ROOT_PASSWORD=ci_minio_password_2026
+          SECRET_KEY=ci_secret_key_0123456789abcdef0123456789abcdef0123456789abcdef
+          ENCRYPTION_KEY=ci_encryption_key_0123456789abcdef0123456789abcdef
+          NEXT_PUBLIC_ENCRYPTION_KEY=ci_frontend_encryption_0123456789abcdef
+          GRAFANA_ADMIN_USER=admin
+          GRAFANA_ADMIN_PASSWORD=Grafana!2026Aa-ci-password
+          LOCAL_TEST_PASSWORD=CiLocal!2026Aa-test-password
+          LOCAL_TEST_DOMAIN=eadmin.test
+          LOCAL_SUPERADMIN_EMAIL=superadmin@eadmin.test
+          LOCAL_FRONTEND_PORT=3000
+          LOCAL_BACKEND_PORT=8000
+          LOCAL_POSTGRES_PORT=5433
+          LOCAL_REDIS_PORT=6380
+          LOCAL_MINIO_CONSOLE_PORT=9101
+          LOCAL_MAILPIT_SMTP_PORT=1025
+          LOCAL_MAILPIT_UI_PORT=8025
+          EOF
+
+      - name: Build, migrate and start real backend stack
+        run: |
+          set -euo pipefail
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml build backend
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml up -d postgres redis minio minio-init mailpit
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml run --rm --no-deps backend alembic upgrade head
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml run --rm --no-deps backend python -m app.bootstrap_runtime
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml up -d backend
+          for attempt in $(seq 1 90); do
+            if curl -fsS http://localhost:8000/health >/dev/null; then
+              echo 'Backend healthy'
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml logs --tail 250 backend
+          exit 1
+
+      - name: Seed comprehensive recette dataset twice
+        run: |
+          set -euo pipefail
+          # Running twice proves the seed remains idempotent on the real PostgreSQL schema.
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T backend \
+            python -m scripts.seed_recette_data
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T backend \
+            python -m scripts.seed_recette_data
+
+      - name: Assert recette cardinality and role coverage in PostgreSQL
+        run: |
+          set -euo pipefail
+          psql_scalar() {
+            docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T postgres \
+              psql -U eadmin -d eadmin -Atc "$1"
+          }
+
+          users="$(psql_scalar "SELECT count(*) FROM users WHERE email LIKE '%@recette.eadmin.gn';")"
+          roles="$(psql_scalar "SELECT count(DISTINCT role) FROM users WHERE email LIKE '%@recette.eadmin.gn';")"
+          institutions="$(psql_scalar "SELECT count(*) FROM institutions WHERE COALESCE(settings->>'recette','false')='true';")"
+          dossiers="$(psql_scalar "SELECT count(*) FROM service_requests WHERE reference LIKE 'REC-%';")"
+          secondary="$(psql_scalar "SELECT count(*) FROM service_requests WHERE reference='REC-ISO-2026-001' AND tenant_id='tenant-recette-isolation';")"
+
+          echo "recette users=${users}, roles=${roles}, institutions=${institutions}, dossiers=${dossiers}, isolation=${secondary}"
+          test "${users}" = '17'
+          test "${roles}" = '9'
+          test "${institutions}" = '8'
+          test "${dossiers}" = '9'
+          test "${secondary}" = '1'
+
+      - name: Run every-role HTTP scope and isolation E2E
+        run: |
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T backend \
+            python -m scripts.check_recette_all_roles_e2e
+
+      - name: Authenticate roles not covered by commune E2E
+        run: |
+          set -euo pipefail
+          API='http://localhost:8000/api/v1'
+          PASSWORD='CiLocal!2026Aa-test-password'
+
+          login_status() {
+            local email="$1"
+            curl -sS -o /tmp/recette-login.json -w '%{http_code}' -X POST "${API}/auth/login" \
+              -H 'Content-Type: application/x-www-form-urlencoded' \
+              --data-urlencode "username=${email}" \
+              --data-urlencode "password=${PASSWORD}"
+          }
+
+          # Exactly five calls: preserve the production login rate-limit contract.
+          for account in \
+            'mairie.ratoma@recette.eadmin.gn' \
+            'agence.anip@recette.eadmin.gn' \
+            'chef.casier@recette.eadmin.gn' \
+            'directeur.justice@recette.eadmin.gn' \
+            'ministre.justice@recette.eadmin.gn'
+          do
+            status="$(login_status "${account}")"
+            echo "Login ${account}: HTTP ${status}"
+            test "${status}" = '200' || { cat /tmp/recette-login.json; exit 1; }
+          done
+
+      - name: Backend logs on failure
+        if: failure()
+        run: docker compose --env-file .env.local.ci -f docker-compose.local.yml logs --tail 350 backend postgres redis
+
+      - name: Cleanup
+        if: always()
+        run: docker compose --env-file .env.local.ci -f docker-compose.local.yml down -v --remove-orphans

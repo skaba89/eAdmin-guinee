@@ -17,7 +17,7 @@ if errorlevel 1 (
 
 echo.
 echo Chargement idempotent des utilisateurs, institutions, demarches et dossiers de recette...
-docker compose --env-file .env.local -f docker-compose.local.yml exec -T backend python scripts/seed_recette_data.py
+docker compose --env-file .env.local -f docker-compose.local.yml exec -T backend python -m scripts.seed_recette_data
 if errorlevel 1 (
   echo.
   echo Le chargement du jeu de recette a echoue.

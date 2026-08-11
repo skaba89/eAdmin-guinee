@@ -109,8 +109,9 @@ async def test_load_request_returns_scoped_request():
     result.scalar_one_or_none.return_value = expected
     db = MagicMock()
     db.execute = AsyncMock(return_value=result)
+    current_user = SimpleNamespace(role=RoleEnum.SUPER_ADMIN)
 
-    assert await _load_request(db, expected.id) is expected
+    assert await _load_request(db, expected.id, current_user) is expected
     db.execute.assert_awaited_once()
 
 
@@ -120,9 +121,10 @@ async def test_load_request_missing_is_fail_closed():
     result.scalar_one_or_none.return_value = None
     db = MagicMock()
     db.execute = AsyncMock(return_value=result)
+    current_user = SimpleNamespace(role=RoleEnum.SUPER_ADMIN)
 
     with pytest.raises(HTTPException) as exc:
-        await _load_request(db, uuid.uuid4())
+        await _load_request(db, uuid.uuid4(), current_user)
 
     assert exc.value.status_code == 404
     assert "périmètre" in exc.value.detail
