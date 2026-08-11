@@ -25,7 +25,12 @@ import {
 } from '@/components/ui/dialog'
 import { useCitizenRequestsStore, type CitizenRequest, type RequestStatus, type UploadedDocument, isDeadlineExceeded, isDeadlineApproaching } from '@/store/citizen-requests-store'
 import { formatFileSize, getFileTypeIcon, downloadUploadedFile, ACCEPTED_FILE_TYPES, processFile } from '@/lib/document-utils'
-import { filterRequestsByRLS, canProcessRequest, getRLSScopeDescription } from '@/lib/rbac'
+import { filterRequestsByRLS, getRLSScopeDescription } from '@/lib/rbac'
+import {
+  canApproveServiceRequest,
+  canProcessServiceRequest,
+  canRejectServiceRequest,
+} from '@/lib/service-request-rbac'
 import { useAppStore } from '@/store/app-store'
 
 const STATUS_CONFIG: Record<RequestStatus, { label: string; color: string; icon: React.ElementType; description: string }> = {
@@ -46,6 +51,9 @@ export function ServiceRequestsPage() {
   } = useCitizenRequestsStore()
 
   const user = useAppStore((s) => s.user)
+  const canProcess = canProcessServiceRequest(user)
+  const canApprove = canApproveServiceRequest(user)
+  const canReject = canRejectServiceRequest(user)
 
   const [activeTab, setActiveTab] = useState('soumises')
   const [searchQuery, setSearchQuery] = useState('')
@@ -410,16 +418,18 @@ export function ServiceRequestsPage() {
                             </div>
                           )}
                         </div>
-                        {req.status === 'soumise' && canProcessRequest(user, req) && (
+                        {req.status === 'soumise' && canProcess && (
                           <div className="mt-3 flex gap-2">
                             <Button size="sm" className="btn-premium gap-1 h-7 text-xs" onClick={(e) => { e.stopPropagation(); handleTakeCharge(req) }}>
                               <Play className="size-3" />
                               Prendre en charge
                             </Button>
-                            <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700 gap-1 h-7 text-xs" onClick={(e) => { e.stopPropagation(); setSelectedRequest(req); setRejectDialogOpen(true) }}>
-                              <XCircle className="size-3" />
-                              Rejeter
-                            </Button>
+                            {canReject && (
+                              <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700 gap-1 h-7 text-xs" onClick={(e) => { e.stopPropagation(); setSelectedRequest(req); setRejectDialogOpen(true) }}>
+                                <XCircle className="size-3" />
+                                Rejeter
+                              </Button>
+                            )}
                           </div>
                         )}
                       </CardContent>
@@ -489,11 +499,11 @@ export function ServiceRequestsPage() {
                                     <Badge className="text-[8px] bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-0 gap-0.5 px-1.5">
                                       <FileCheck className="size-2.5" /> Vérifié
                                     </Badge>
-                                  ) : (
+                                  ) : canProcess ? (
                                     <Button size="sm" variant="outline" className="h-5 text-[9px] gap-0.5 px-1.5" onClick={() => handleVerifyDocument(selectedRequest.id, uploaded.id)}>
                                       <Check className="size-2.5" /> Vérifier
                                     </Button>
-                                  )}
+                                  ) : null}
                                   <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => downloadUploadedFile(uploaded)}>
                                     <Download className="size-3" />
                                   </Button>
@@ -525,7 +535,7 @@ export function ServiceRequestsPage() {
                               <p className="text-muted-foreground">{formatFileSize(doc.size)} • {new Date(doc.uploadedAt).toLocaleDateString('fr-FR')}</p>
                             </div>
                             <div className="flex items-center gap-1 shrink-0">
-                              {!doc.verified && (
+                              {!doc.verified && canProcess && (
                                 <Button size="sm" variant="outline" className="h-6 px-2 text-emerald-600 text-[10px] gap-1" onClick={() => handleVerifyDocument(selectedRequest.id, doc.id)}>
                                   <Check className="size-3" />
                                   Vérifier
@@ -700,43 +710,45 @@ export function ServiceRequestsPage() {
                     </Button>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {selectedRequest.status === 'soumise' && (
+                    {selectedRequest.status === 'soumise' && canProcess && (
                       <Button size="sm" className="btn-premium flex-1 gap-1" onClick={() => handleTakeCharge(selectedRequest)}>
                         <Play className="size-3.5" />
                         Prendre en charge
                       </Button>
                     )}
-                    {(selectedRequest.status === 'en_cours' || selectedRequest.status === 'pieces_complementaires') && (
+                    {(selectedRequest.status === 'en_cours' || selectedRequest.status === 'pieces_complementaires') && canProcess && (
                       <>
-                        <Button size="sm" className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white gap-1" onClick={() => handleValidate(selectedRequest)}>
-                          <Check className="size-3.5" />
-                          Valider
-                        </Button>
+                        {canApprove && (
+                          <Button size="sm" className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white gap-1" onClick={() => handleValidate(selectedRequest)}>
+                            <Check className="size-3.5" />
+                            Valider
+                          </Button>
+                        )}
                         <Button size="sm" variant="outline" className="gap-1" onClick={() => { setNoteType('info_complementaire'); setNoteDialogOpen(true) }}>
                           <AlertCircle className="size-3.5" />
                           Demander pièces
                         </Button>
                       </>
                     )}
-                    {selectedRequest.status === 'validee' && (
+                    {selectedRequest.status === 'validee' && canApprove && (
                       <Button size="sm" className="btn-gold flex-1 gap-1" onClick={() => setGenerateDialogOpen(true)}>
                         <Stamp className="size-3.5" />
                         Générer le document
                       </Button>
                     )}
-                    {selectedRequest.status === 'prete' && (
+                    {selectedRequest.status === 'prete' && canProcess && (
                       <Button size="sm" className="btn-premium flex-1 gap-1" onClick={() => setDeliveryDialogOpen(true)}>
                         <Download className="size-3.5" />
                         Livrer le document
                       </Button>
                     )}
-                    {selectedRequest.status !== 'livree' && selectedRequest.status !== 'rejetee' && (
+                    {selectedRequest.status !== 'livree' && selectedRequest.status !== 'rejetee' && canProcess && (
                       <Button size="sm" variant="outline" className="gap-1" onClick={() => { setNoteType('note'); setNoteDialogOpen(true) }}>
                         <MessageSquare className="size-3.5" />
                         Note
                       </Button>
                     )}
-                    {selectedRequest.status !== 'livree' && selectedRequest.status !== 'rejetee' && (
+                    {selectedRequest.status !== 'livree' && selectedRequest.status !== 'rejetee' && canReject && (
                       <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700 gap-1" onClick={() => setRejectDialogOpen(true)}>
                         <XCircle className="size-3.5" />
                         Rejeter
