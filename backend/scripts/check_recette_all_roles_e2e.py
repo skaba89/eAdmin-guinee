@@ -182,12 +182,6 @@ async def main() -> None:
 
     user_map, request_map = await _load_fixtures()
     async with httpx.AsyncClient(base_url=BASE_URL, timeout=20.0) as client:
-        health = await client.get("/../health")
-        # Some HTTP clients normalize '/../health' under /api/v1 differently;
-        # scope requests below are the authoritative backend readiness proof.
-        if health.status_code not in {200, 404}:
-            raise AssertionError(f"Backend non joignable: HTTP {health.status_code}")
-
         for case in CASES:
             user = user_map[case.email]
             assert user.role == case.role, (
