@@ -22,7 +22,7 @@ from app.api.service_requests import (
     _status_permission_action,
     assign_service_request,
 )
-from app.models.service_request import ServiceRequestStatusEnum
+from app.models.service_request import DeliveryModeEnum, ServiceRequest, ServiceRequestStatusEnum
 from app.models.user import RoleEnum
 
 
@@ -33,6 +33,15 @@ def test_reference_is_server_generated_and_non_sequential():
     assert first != second
     assert re.fullmatch(r"GN-\d{4}-[0-9A-F]{10}", first)
     assert re.fullmatch(r"GN-\d{4}-[0-9A-F]{10}", second)
+
+
+def test_service_request_native_enums_persist_public_business_values():
+    assert ServiceRequest.__table__.c.status.type.enums == [
+        item.value for item in ServiceRequestStatusEnum
+    ]
+    assert ServiceRequest.__table__.c.delivery_mode.type.enums == [
+        item.value for item in DeliveryModeEnum
+    ]
 
 
 def test_terminal_request_states_cannot_transition():
