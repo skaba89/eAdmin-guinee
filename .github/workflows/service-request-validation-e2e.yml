@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'src/lib/service-requests-api.ts'
+      - 'scripts/check-service-request-frontend-validation.mjs'
       - 'backend/app/api/service_requests.py'
       - 'backend/app/models/service_request.py'
       - '.github/workflows/service-request-validation-e2e.yml'
@@ -20,6 +21,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Verify frontend normalization and 422 message contract
+        run: node scripts/check-service-request-frontend-validation.mjs
 
       - name: Create isolated CI environment
         run: |
