@@ -23,16 +23,38 @@ jobs:
 
       - name: Create isolated CI environment
         run: |
-          cat > .env.local.ci <<'EOF'
-          POSTGRES_PASSWORD=ci_postgres_password_2026
-          REDIS_PASSWORD=ci_redis_password_2026
+          set -euo pipefail
+
+          postgres_password="$(openssl rand -hex 24)"
+          redis_password="$(openssl rand -hex 24)"
+          minio_password="$(openssl rand -hex 24)"
+          secret_key="$(openssl rand -hex 48)"
+          encryption_key="$(openssl rand -hex 32)"
+          frontend_encryption_key="$(openssl rand -hex 32)"
+          grafana_password="$(openssl rand -hex 24)"
+
+          for secret in \
+            "${postgres_password}" \
+            "${redis_password}" \
+            "${minio_password}" \
+            "${secret_key}" \
+            "${encryption_key}" \
+            "${frontend_encryption_key}" \
+            "${grafana_password}"
+          do
+            echo "::add-mask::${secret}"
+          done
+
+          cat > .env.local.ci <<EOF
+          POSTGRES_PASSWORD=${postgres_password}
+          REDIS_PASSWORD=${redis_password}
           MINIO_ROOT_USER=eadmin
-          MINIO_ROOT_PASSWORD=ci_minio_password_2026
-          SECRET_KEY=ci_secret_key_0123456789abcdef0123456789abcdef0123456789abcdef
-          ENCRYPTION_KEY=ci_encryption_key_0123456789abcdef0123456789abcdef
-          NEXT_PUBLIC_ENCRYPTION_KEY=ci_frontend_encryption_0123456789abcdef
+          MINIO_ROOT_PASSWORD=${minio_password}
+          SECRET_KEY=${secret_key}
+          ENCRYPTION_KEY=${encryption_key}
+          NEXT_PUBLIC_ENCRYPTION_KEY=${frontend_encryption_key}
           GRAFANA_ADMIN_USER=admin
-          GRAFANA_ADMIN_PASSWORD=Grafana!2026Aa-ci-password
+          GRAFANA_ADMIN_PASSWORD=${grafana_password}
           LOCAL_TEST_PASSWORD=CiLocal!2026Aa-test-password
           LOCAL_TEST_DOMAIN=eadmin.test
           LOCAL_SUPERADMIN_EMAIL=superadmin@eadmin.test
