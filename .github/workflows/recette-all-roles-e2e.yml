@@ -70,11 +70,28 @@ jobs:
       - name: Build, migrate and start real backend stack
         run: |
           set -euo pipefail
-          docker compose --env-file .env.local.ci -f docker-compose.local.yml build backend
-          docker compose --env-file .env.local.ci -f docker-compose.local.yml up -d postgres redis minio minio-init mailpit
-          docker compose --env-file .env.local.ci -f docker-compose.local.yml run --rm --no-deps backend alembic upgrade head
-          docker compose --env-file .env.local.ci -f docker-compose.local.yml run --rm --no-deps backend python -m app.bootstrap_runtime
-          docker compose --env-file .env.local.ci -f docker-compose.local.yml up -d backend
+          compose=(docker compose --env-file .env.local.ci -f docker-compose.local.yml)
+
+          "${compose[@]}" build backend
+          "${compose[@]}" up -d postgres redis minio minio-init mailpit
+
+          postgres_ready=false
+          for attempt in $(seq 1 60); do
+            if "${compose[@]}" exec -T postgres pg_isready -U eadmin -d eadmin >/dev/null 2>&1; then
+              postgres_ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "${postgres_ready}" != 'true' ]; then
+            echo 'PostgreSQL did not become ready before migrations.' >&2
+            "${compose[@]}" logs --tail 250 postgres
+            exit 1
+          fi
+
+          "${compose[@]}" run --rm --no-deps backend alembic upgrade head
+          "${compose[@]}" run --rm --no-deps backend python -m app.bootstrap_runtime
+          "${compose[@]}" up -d backend
           for attempt in $(seq 1 90); do
             if curl -fsS http://localhost:8000/health >/dev/null; then
               echo 'Backend healthy'
@@ -82,7 +99,7 @@ jobs:
             fi
             sleep 2
           done
-          docker compose --env-file .env.local.ci -f docker-compose.local.yml logs --tail 250 backend
+          "${compose[@]}" logs --tail 250 backend
           exit 1
 
       - name: Seed comprehensive recette dataset twice
