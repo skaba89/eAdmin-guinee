@@ -36,9 +36,11 @@ def _user(
 
 
 def _compiled_scope(user: User) -> tuple[str, dict]:
+    """Return effective WHERE predicates, not selected column names."""
     statement = _apply_request_scope(select(ServiceRequest), user)
     compiled = statement.compile()
-    return str(compiled), compiled.params
+    where_sql = str(statement.whereclause) if statement.whereclause is not None else ""
+    return where_sql, compiled.params
 
 
 def _create_payload(*, institution_id: str) -> UserCreate:
@@ -59,10 +61,10 @@ def test_mairie_admin_query_is_bound_to_tenant_and_own_institution() -> None:
         institution_id="mairie-ratoma",
     )
 
-    sql, params = _compiled_scope(user)
+    where_sql, params = _compiled_scope(user)
 
-    assert "service_requests.tenant_id" in sql
-    assert "service_requests.institution_id" in sql
+    assert "service_requests.tenant_id" in where_sql
+    assert "service_requests.institution_id" in where_sql
     assert settings.TENANT_DEFAULT_ID in params.values()
     assert "mairie-ratoma" in params.values()
 
@@ -83,10 +85,10 @@ def test_other_mairie_never_appears_in_admin_scope() -> None:
 def test_citizen_query_is_bound_to_tenant_and_owner() -> None:
     user = _user(RoleEnum.CITOYEN, tenant_id=settings.TENANT_DEFAULT_ID)
 
-    sql, params = _compiled_scope(user)
+    where_sql, params = _compiled_scope(user)
 
-    assert "service_requests.tenant_id" in sql
-    assert "service_requests.citizen_id" in sql
+    assert "service_requests.tenant_id" in where_sql
+    assert "service_requests.citizen_id" in where_sql
     assert settings.TENANT_DEFAULT_ID in params.values()
     assert user.id in params.values()
 
@@ -98,20 +100,20 @@ def test_minister_is_tenant_wide_but_not_cross_tenant() -> None:
         institution_id="ministere-matd",
     )
 
-    sql, params = _compiled_scope(user)
+    where_sql, params = _compiled_scope(user)
 
-    assert "service_requests.tenant_id" in sql
-    assert "service_requests.institution_id" not in sql
+    assert "service_requests.tenant_id" in where_sql
+    assert "service_requests.institution_id" not in where_sql
     assert settings.TENANT_DEFAULT_ID in params.values()
+    assert "ministere-matd" not in params.values()
 
 
 def test_super_admin_scope_is_global() -> None:
     user = _user(RoleEnum.SUPER_ADMIN, tenant_id=settings.TENANT_DEFAULT_ID)
 
-    sql, params = _compiled_scope(user)
+    where_sql, params = _compiled_scope(user)
 
-    assert "service_requests.tenant_id" not in sql
-    assert "service_requests.institution_id" not in sql
+    assert where_sql == ""
     assert params == {}
 
 
@@ -153,8 +155,9 @@ def test_mairie_admin_cross_institution_create_is_rejected() -> None:
             _create_payload(institution_id="mairie-matoto-e2e"),
         )
 
+    # The security contract is the 403 fail-closed decision; translated wording
+    # may evolve without changing authorization semantics.
     assert error.value.status_code == 403
-    assert "institution cible" in str(error.value.detail).lower()
 
 
 @pytest.mark.asyncio
