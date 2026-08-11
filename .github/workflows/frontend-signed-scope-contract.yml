@@ -1,0 +1,35 @@
+name: Frontend Signed Scope Contract
+
+on:
+  pull_request:
+    paths:
+      - 'src/store/app-store.ts'
+      - 'src/lib/service-request-scope.ts'
+      - 'scripts/check-frontend-signed-scope-contract.ts'
+      - '.github/workflows/frontend-signed-scope-contract.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/store/app-store.ts'
+      - 'src/lib/service-request-scope.ts'
+      - 'scripts/check-frontend-signed-scope-contract.ts'
+      - '.github/workflows/frontend-signed-scope-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  signed-scope-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.4
+
+      - name: Verify signed tenant and institution scope
+        run: bun scripts/check-frontend-signed-scope-contract.ts
