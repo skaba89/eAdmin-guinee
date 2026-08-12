@@ -66,8 +66,40 @@ def upgrade() -> None:
         """
     )
 
+    # Routing is authoritative at creation time and must not become a way to
+    # move a dossier between descendants after a decision-maker can see it.
+    op.execute(
+        """
+        CREATE OR REPLACE FUNCTION eadmin_service_request_routing_immutable()
+        RETURNS trigger
+        LANGUAGE plpgsql
+        AS $$
+        BEGIN
+            IF NEW.tenant_id IS DISTINCT FROM OLD.tenant_id
+               OR NEW.institution_id IS DISTINCT FROM OLD.institution_id THEN
+                RAISE EXCEPTION 'service request tenant/institution routing is immutable'
+                    USING ERRCODE = '42501';
+            END IF;
+            RETURN NEW;
+        END;
+        $$;
+
+        DROP TRIGGER IF EXISTS trg_service_request_routing_immutable ON service_requests;
+        CREATE TRIGGER trg_service_request_routing_immutable
+            BEFORE UPDATE OF tenant_id, institution_id ON service_requests
+            FOR EACH ROW
+            EXECUTE FUNCTION eadmin_service_request_routing_immutable();
+        """
+    )
+
 
 def downgrade() -> None:
+    op.execute(
+        """
+        DROP TRIGGER IF EXISTS trg_service_request_routing_immutable ON service_requests;
+        DROP FUNCTION IF EXISTS eadmin_service_request_routing_immutable();
+        """
+    )
     op.execute('DROP POLICY IF EXISTS "service_requests_staff_select" ON service_requests')
     op.execute('DROP POLICY IF EXISTS "service_requests_staff_update" ON service_requests')
 
