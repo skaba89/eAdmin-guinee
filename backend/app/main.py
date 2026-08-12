@@ -101,6 +101,16 @@ async def lifespan(application: FastAPI):
     application.state.settings = settings
     logger.info("Démarrage de %s v%s (%s)", settings.APP_NAME, settings.APP_VERSION, settings.ENVIRONMENT)
 
+    if settings.is_production:
+        from app.database import engine
+        from app.services.database_principal import require_rls_safe_database_principal
+
+        principal = await require_rls_safe_database_principal(engine)
+        logger.info(
+            "Principal PostgreSQL runtime compatible RLS: %s",
+            principal.name if principal else "non-postgresql",
+        )
+
     try:
         from app.services.telemetry import telemetry_service
         telemetry_service.setup(otlp_endpoint=settings.OTLP_ENDPOINT)
