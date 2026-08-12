@@ -181,10 +181,18 @@ async function expectHiddenReference(page: Page, reference?: string): Promise<vo
   await expect(page.getByText(reference, { exact: true })).toHaveCount(0)
 }
 
-async function expectActionContract(page: Page, contract: ActionContract): Promise<void> {
-  const processButton = page.getByRole('button', { name: 'Demander pièces', exact: true })
-  const approveButton = page.getByRole('button', { name: 'Valider', exact: true })
-  const rejectButton = page.getByRole('button', { name: 'Rejeter', exact: true })
+async function expectActionContract(
+  page: Page,
+  reference: string,
+  contract: ActionContract,
+): Promise<void> {
+  const selectedReference = page.getByText(reference, { exact: true }).last()
+  const detailCard = selectedReference.locator('xpath=ancestor::*[@data-slot="card"][1]')
+  await expect(detailCard).toBeVisible()
+
+  const processButton = detailCard.getByRole('button', { name: 'Demander pièces', exact: true })
+  const approveButton = detailCard.getByRole('button', { name: 'Valider', exact: true })
+  const rejectButton = detailCard.getByRole('button', { name: 'Rejeter', exact: true })
 
   if (contract === 'none') {
     await expect(processButton).toHaveCount(0)
@@ -222,7 +230,7 @@ test.describe('All nine roles RBAC — real stack', () => {
       await expectHiddenReference(page, roleCase.hiddenReference)
 
       await openRequest(page, roleCase.visibleReference)
-      await expectActionContract(page, roleCase.actionContract)
+      await expectActionContract(page, roleCase.visibleReference, roleCase.actionContract)
 
       if (roleCase.role === 'SUPER_ADMIN') {
         await page.getByRole('tab', { name: /Toutes \(/ }).click()
