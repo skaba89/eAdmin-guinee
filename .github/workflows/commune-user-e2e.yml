@@ -22,17 +22,45 @@ jobs:
 
       - name: Create CI environment
         run: |
-          cat > .env.local.ci <<'EOF'
-          POSTGRES_PASSWORD=ci_postgres_password_2026
-          REDIS_PASSWORD=ci_redis_password_2026
+          set -euo pipefail
+          postgres_password="$(openssl rand -hex 24)"
+          redis_password="$(openssl rand -hex 24)"
+          minio_password="$(openssl rand -hex 24)"
+          secret_key="$(openssl rand -hex 48)"
+          encryption_key="$(openssl rand -hex 32)"
+          frontend_encryption_key="$(openssl rand -hex 32)"
+          grafana_password="$(openssl rand -hex 24)"
+          local_test_password="CiLocal!$(openssl rand -hex 20)Aa1"
+          commune_password="CiCommune!$(openssl rand -hex 20)Aa1"
+
+          for secret in \
+            "${postgres_password}" \
+            "${redis_password}" \
+            "${minio_password}" \
+            "${secret_key}" \
+            "${encryption_key}" \
+            "${frontend_encryption_key}" \
+            "${grafana_password}" \
+            "${local_test_password}" \
+            "${commune_password}"
+          do
+            echo "::add-mask::${secret}"
+          done
+
+          echo "LOCAL_TEST_PASSWORD=${local_test_password}" >> "${GITHUB_ENV}"
+          echo "COMMUNE_E2E_PASSWORD=${commune_password}" >> "${GITHUB_ENV}"
+
+          cat > .env.local.ci <<EOF
+          POSTGRES_PASSWORD=${postgres_password}
+          REDIS_PASSWORD=${redis_password}
           MINIO_ROOT_USER=eadmin
-          MINIO_ROOT_PASSWORD=ci_minio_password_2026
-          SECRET_KEY=ci_secret_key_0123456789abcdef0123456789abcdef0123456789abcdef
-          ENCRYPTION_KEY=ci_encryption_key_0123456789abcdef0123456789abcdef
-          NEXT_PUBLIC_ENCRYPTION_KEY=ci_frontend_encryption_0123456789abcdef
+          MINIO_ROOT_PASSWORD=${minio_password}
+          SECRET_KEY=${secret_key}
+          ENCRYPTION_KEY=${encryption_key}
+          NEXT_PUBLIC_ENCRYPTION_KEY=${frontend_encryption_key}
           GRAFANA_ADMIN_USER=admin
-          GRAFANA_ADMIN_PASSWORD=Grafana!2026Aa-ci-password
-          LOCAL_TEST_PASSWORD=CiLocal!2026Aa-test-password
+          GRAFANA_ADMIN_PASSWORD=${grafana_password}
+          LOCAL_TEST_PASSWORD=${local_test_password}
           LOCAL_TEST_DOMAIN=eadmin.test
           LOCAL_SUPERADMIN_EMAIL=superadmin@eadmin.test
           LOCAL_FRONTEND_PORT=3000
@@ -47,11 +75,27 @@ jobs:
       - name: Build and start backend stack
         run: |
           set -euo pipefail
-          docker compose --env-file .env.local.ci -f docker-compose.local.yml build backend
-          docker compose --env-file .env.local.ci -f docker-compose.local.yml up -d postgres redis minio minio-init mailpit
-          docker compose --env-file .env.local.ci -f docker-compose.local.yml run --rm --no-deps backend alembic upgrade head
-          docker compose --env-file .env.local.ci -f docker-compose.local.yml run --rm --no-deps backend python -m app.bootstrap_runtime
-          docker compose --env-file .env.local.ci -f docker-compose.local.yml up -d backend
+          compose=(docker compose --env-file .env.local.ci -f docker-compose.local.yml)
+          "${compose[@]}" build backend
+          "${compose[@]}" up -d postgres redis minio minio-init mailpit
+
+          postgres_ready=false
+          for attempt in $(seq 1 60); do
+            if "${compose[@]}" exec -T postgres pg_isready -U eadmin -d eadmin >/dev/null 2>&1; then
+              postgres_ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "${postgres_ready}" != 'true' ]; then
+            echo 'PostgreSQL did not become ready before migrations.' >&2
+            "${compose[@]}" logs --tail 250 postgres
+            exit 1
+          fi
+
+          "${compose[@]}" run --rm --no-deps backend alembic upgrade head
+          "${compose[@]}" run --rm --no-deps backend python -m app.bootstrap_runtime
+          "${compose[@]}" up -d backend
           for attempt in $(seq 1 90); do
             if curl -fsS http://localhost:8000/health >/dev/null; then
               echo 'Backend healthy'
@@ -59,7 +103,7 @@ jobs:
             fi
             sleep 2
           done
-          docker compose --env-file .env.local.ci -f docker-compose.local.yml logs --tail 200 backend
+          "${compose[@]}" logs --tail 200 backend
           exit 1
 
       - name: Verify runtime mairie scope without pytest
@@ -89,7 +133,7 @@ jobs:
           curl -fsS -X POST "${API}/auth/login" \
             -H 'Content-Type: application/x-www-form-urlencoded' \
             --data-urlencode 'username=superadmin@eadmin.test' \
-            --data-urlencode 'password=CiLocal!2026Aa-test-password' \
+            --data-urlencode "password=${LOCAL_TEST_PASSWORD}" \
             | python -c "import json,sys; print(json.load(sys.stdin)['access_token'])" > /tmp/eadmin-super-token
           chmod 600 /tmp/eadmin-super-token
           test -s /tmp/eadmin-super-token
@@ -97,7 +141,7 @@ jobs:
           status="$(curl -sS -o /tmp/invalid-user.json -w '%{http_code}' -X POST "${API}/users" \
             -H "Authorization: Bearer $(cat /tmp/eadmin-super-token)" \
             -H 'Content-Type: application/json' \
-            -d '{"email":"not-an-email","password":"CiCommune!2026Aa-test-password","full_name":"Invalid","role":"ADMIN","tenant_id":"republique-de-guinee","institution_id":"mairie-ratoma-e2e"}')"
+            -d "{\"email\":\"not-an-email\",\"password\":\"${COMMUNE_E2E_PASSWORD}\",\"full_name\":\"Invalid\",\"role\":\"ADMIN\",\"tenant_id\":\"republique-de-guinee\",\"institution_id\":\"mairie-ratoma-e2e\"}")"
           echo "Invalid payload: HTTP ${status}"
           test "${status}" = '422' || { cat /tmp/invalid-user.json; exit 1; }
 
@@ -106,7 +150,7 @@ jobs:
           set -euo pipefail
           API='http://localhost:8000/api/v1'
           TOKEN="$(cat /tmp/eadmin-super-token)"
-          PASSWORD='CiCommune!2026Aa-test-password'
+          PASSWORD="${COMMUNE_E2E_PASSWORD}"
           create_admin() {
             local email="$1" institution="$2" body="$3"
             curl -sS -o "${body}" -w '%{http_code}' -X POST "${API}/users" \
@@ -126,7 +170,7 @@ jobs:
           API='http://localhost:8000/api/v1'
           status="$(curl -sS -o /tmp/duplicate-admin.json -w '%{http_code}' -X POST "${API}/users" \
             -H "Authorization: Bearer $(cat /tmp/eadmin-super-token)" -H 'Content-Type: application/json' \
-            -d '{"email":"admin.ratoma.duplicate.e2e@ci.eadmin-guinee.org","password":"CiCommune!2026Aa-test-password","full_name":"Duplicate Ratoma Admin","role":"ADMIN","tenant_id":"republique-de-guinee","institution_id":"mairie-ratoma-e2e"}')"
+            -d "{\"email\":\"admin.ratoma.duplicate.e2e@ci.eadmin-guinee.org\",\"password\":\"${COMMUNE_E2E_PASSWORD}\",\"full_name\":\"Duplicate Ratoma Admin\",\"role\":\"ADMIN\",\"tenant_id\":\"republique-de-guinee\",\"institution_id\":\"mairie-ratoma-e2e\"}")"
           echo "Second Ratoma ADMIN: HTTP ${status}"
           test "${status}" = '409' || { cat /tmp/duplicate-admin.json; exit 1; }
 
@@ -139,7 +183,7 @@ jobs:
             curl -fsS -X POST "${API}/auth/login" \
               -H 'Content-Type: application/x-www-form-urlencoded' \
               --data-urlencode "username=${email}" \
-              --data-urlencode 'password=CiCommune!2026Aa-test-password' \
+              --data-urlencode "password=${COMMUNE_E2E_PASSWORD}" \
               | python -c "import json,sys; print(json.load(sys.stdin)['access_token'])" > "${file}"
             chmod 600 "${file}"
             test -s "${file}"
@@ -153,7 +197,7 @@ jobs:
         run: |
           set -euo pipefail
           API='http://localhost:8000/api/v1'
-          PASSWORD='CiCommune!2026Aa-test-password'
+          PASSWORD="${COMMUNE_E2E_PASSWORD}"
           create_user() {
             local token="$1" email="$2" role="$3" institution="$4" body="$5"
             curl -sS -o "${body}" -w '%{http_code}' -X POST "${API}/users" \
@@ -179,7 +223,7 @@ jobs:
           API='http://localhost:8000/api/v1'
           status="$(curl -sS -o /tmp/cross-agent.json -w '%{http_code}' -X POST "${API}/users" \
             -H "Authorization: Bearer $(cat /tmp/eadmin-ratoma-token)" -H 'Content-Type: application/json' \
-            -d '{"email":"agent.cross.e2e@ci.eadmin-guinee.org","password":"CiCommune!2026Aa-test-password","full_name":"Forbidden Cross Commune Agent","role":"AGENT","tenant_id":"republique-de-guinee","institution_id":"mairie-matoto-e2e"}')"
+            -d "{\"email\":\"agent.cross.e2e@ci.eadmin-guinee.org\",\"password\":\"${COMMUNE_E2E_PASSWORD}\",\"full_name\":\"Forbidden Cross Commune Agent\",\"role\":\"AGENT\",\"tenant_id\":\"republique-de-guinee\",\"institution_id\":\"mairie-matoto-e2e\"}")"
           echo "Ratoma -> Matoto AGENT: HTTP ${status}"
           test "${status}" = '403' || { cat /tmp/cross-agent.json; exit 1; }
 
@@ -217,7 +261,7 @@ jobs:
             curl -sS -o /tmp/login-check.json -w '%{http_code}' -X POST "${API}/auth/login" \
               -H 'Content-Type: application/x-www-form-urlencoded' \
               --data-urlencode "username=$1" \
-              --data-urlencode 'password=CiCommune!2026Aa-test-password'
+              --data-urlencode "password=${COMMUNE_E2E_PASSWORD}"
           }
           # Total login calls in this job = 5: SUPER_ADMIN, two ADMINs, one AGENT, one CITOYEN.
           # This deliberately respects the production login limiter instead of weakening it in CI.
