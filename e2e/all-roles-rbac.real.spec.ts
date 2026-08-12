@@ -108,6 +108,14 @@ const CASES: RoleCase[] = [
   },
 ]
 
+function sidebar(page: Page) {
+  return page.locator('aside')
+}
+
+function navButton(page: Page, label: string) {
+  return sidebar(page).getByRole('button', { name: label, exact: true })
+}
+
 async function login(page: Page, email: string): Promise<void> {
   await page.goto('/')
 
@@ -132,34 +140,34 @@ async function login(page: Page, email: string): Promise<void> {
   const loginResponse = await loginResponsePromise
   expect(loginResponse.status(), `Connexion API échouée pour ${email}`).toBe(200)
 
-  await expect(page.locator('aside')).toBeVisible({ timeout: 15_000 })
-  await expect(
-    page.locator('aside').getByText('Demandes citoyennes', { exact: true }).first(),
-  ).toBeVisible({ timeout: 15_000 })
+  await expect(sidebar(page)).toBeVisible({ timeout: 15_000 })
+  await expect(navButton(page, 'Demandes citoyennes')).toBeVisible({ timeout: 15_000 })
 }
 
 async function expectNavigation(page: Page, roleCase: RoleCase): Promise<void> {
-  const sidebar = page.locator('aside')
   for (const label of roleCase.visibleNav) {
     await expect(
-      sidebar.getByText(label, { exact: true }).first(),
-      `${roleCase.role} doit voir ${label}`,
+      navButton(page, label),
+      `${roleCase.role} doit voir le lien ${label}`,
     ).toBeVisible()
   }
   for (const label of roleCase.hiddenNav) {
     await expect(
-      sidebar.getByText(label, { exact: true }),
-      `${roleCase.role} ne doit pas voir ${label}`,
+      navButton(page, label),
+      `${roleCase.role} ne doit pas voir le lien ${label}`,
     ).toHaveCount(0)
   }
 }
 
-async function openRequest(page: Page, reference: string): Promise<void> {
-  await page.locator('aside').getByText('Demandes citoyennes', { exact: true }).first().click()
+async function goToRequests(page: Page): Promise<void> {
+  await navButton(page, 'Demandes citoyennes').click()
   await expect(
-    page.getByText('Traitement des Demandes Citoyennes', { exact: true }),
+    page.getByRole('heading', { name: 'Traitement des Demandes Citoyennes', level: 2 }),
   ).toBeVisible({ timeout: 15_000 })
+}
 
+async function openRequest(page: Page, reference: string): Promise<void> {
+  await goToRequests(page)
   await page.getByRole('tab', { name: /Toutes \(/ }).click()
   const requestReference = page.getByText(reference, { exact: true }).first()
   await expect(requestReference).toBeVisible({ timeout: 15_000 })
@@ -210,10 +218,7 @@ test.describe('All nine roles RBAC — real stack', () => {
       await login(page, roleCase.email)
       await expectNavigation(page, roleCase)
 
-      await page.locator('aside').getByText('Demandes citoyennes', { exact: true }).first().click()
-      await expect(
-        page.getByText('Traitement des Demandes Citoyennes', { exact: true }),
-      ).toBeVisible({ timeout: 15_000 })
+      await goToRequests(page)
       await expectHiddenReference(page, roleCase.hiddenReference)
 
       await openRequest(page, roleCase.visibleReference)
