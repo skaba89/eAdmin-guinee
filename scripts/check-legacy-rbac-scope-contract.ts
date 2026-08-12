@@ -75,7 +75,7 @@ const otherInstitution = request('OTHER-INST', { institutionId: 'institution-b' 
 const otherTenant = request('OTHER-TENANT', { tenantId: 'tenant-b' })
 const all = [ownInstitution, otherInstitution, otherTenant]
 
-for (const role of ['mairie', 'agence', 'agent', 'admin_general', 'chef_service', 'directeur'] as const) {
+for (const role of ['mairie', 'agence', 'agent', 'admin_general', 'chef_service'] as const) {
   const current = user(role)
   assert.deepEqual(filterRequestsByRLS(all, current).map((item) => item.id), ['OWN'])
   assert.equal(canViewRequest(current, ownInstitution), true)
@@ -83,6 +83,15 @@ for (const role of ['mairie', 'agence', 'agent', 'admin_general', 'chef_service'
   assert.equal(canProcessRequest(current, ownInstitution), true)
   assert.equal(canProcessRequest(current, otherInstitution), false)
 }
+
+// DIRECTEUR hierarchy is authoritative on FastAPI + PostgreSQL. The browser
+// has no signed descendant graph, so it preserves same-tenant rows already
+// returned by the server while still requiring a signed root institution.
+const director = user('directeur')
+assert.deepEqual(filterRequestsByRLS(all, director).map((item) => item.id), ['OWN', 'OTHER-INST'])
+assert.equal(canViewRequest(director, otherInstitution), true)
+assert.equal(canViewRequest(director, otherTenant), false)
+assert.equal(canProcessRequest(director, otherInstitution), true)
 
 const minister = user('ministre')
 assert.deepEqual(filterRequestsByRLS(all, minister).map((item) => item.id), ['OWN', 'OTHER-INST'])
@@ -98,6 +107,8 @@ assert.equal(canProcessRequest(citizen, ownInstitution), false)
 
 const missingScopeAdmin = user('admin_general', { institutionId: undefined })
 assert.deepEqual(filterRequestsByRLS(all, missingScopeAdmin), [], 'ADMIN sans institution signée doit échouer fermé')
+const missingScopeDirector = user('directeur', { institutionId: undefined })
+assert.deepEqual(filterRequestsByRLS(all, missingScopeDirector), [], 'DIRECTEUR sans racine institutionnelle signée doit échouer fermé')
 
 const courriers = [
   { id: 'normal', confidential: false },
@@ -114,4 +125,4 @@ assert.equal(source.includes('level >= 5'), false, 'Les scopes ne doivent plus u
 assert.equal(source.includes('filterServiceRequestsBySignedScope'), true, 'Le legacy request RLS doit réutiliser le scope signé')
 assert.equal(source.includes('isServiceRequestWithinSignedScope'), true, 'Les contrôles unitaires de demande doivent réutiliser le scope signé')
 
-console.log('PASS: legacy hierarchy matches backend and legacy request scopes are signed/fail-closed')
+console.log('PASS: legacy hierarchy matches backend and request scopes remain signed/fail-closed')
