@@ -80,6 +80,7 @@ jobs:
           import asyncio
           import importlib.util
           import os
+          import sys
           from pathlib import Path
 
           from sqlalchemy.ext.asyncio import create_async_engine
@@ -88,6 +89,7 @@ jobs:
           spec = importlib.util.spec_from_file_location('eadmin_database_principal', module_path)
           assert spec is not None and spec.loader is not None
           principal_module = importlib.util.module_from_spec(spec)
+          sys.modules[spec.name] = principal_module
           spec.loader.exec_module(principal_module)
           require_rls_safe_database_principal = principal_module.require_rls_safe_database_principal
 
