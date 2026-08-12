@@ -7,38 +7,21 @@ import type { UserRole } from '@/data/demo-accounts'
 import type { UserInfo } from '@/store/app-store'
 import type { AppPage } from '@/store/app-store'
 import type { CitizenRequest } from '@/store/citizen-requests-store'
+import { mapFrontendRoleToLegacyRole } from '@/lib/legacy-rbac-role-map'
 
-// ─── ROLE MAPPING (app-store → rbac) ────────────────────────────────────────
-// The app-store uses different role names than the rbac/demo-accounts system.
-// This mapping ensures RBAC functions work correctly regardless of which role
-// naming convention the logged-in user's data uses.
-//
-// app-store roles:  'citizen' | 'mairie' | 'admin_general' | 'agence' | 'agent' | 'chef_service' | 'directeur' | 'ministre' | 'ministere' | 'super_admin'
-// rbac roles:       'citoyen' | 'mairie' | 'admin'         | 'agence' | 'agent' | 'chef_service' | 'directeur' | 'ministre' | 'ministere' | 'superadmin'
+// ─── ROLE MAPPING (app-store → legacy rbac) ─────────────────────────────────
+// Authentication already emits canonical frontend roles. This module keeps the
+// historical UserRole vocabulary only as a compatibility layer for modules that
+// have not migrated yet. Unknown/backend raw strings must fail closed.
 
-const ROLE_MAP: Record<string, UserRole> = {
-  // App-store naming convention
-  'citizen': 'citoyen',
-  'mairie': 'mairie',
-  'admin_general': 'admin',
-  'agence': 'agence',
-  'agent': 'agent',
-  'chef_service': 'chef_service',
-  'directeur': 'directeur',
-  'ministre': 'ministre',
-  'ministere': 'ministere',
-  'super_admin': 'superadmin',
-  // RBAC naming (identity mappings)
-  'citoyen': 'citoyen',
-  'admin': 'admin',
-  'superadmin': 'superadmin',
-  // Backend role mapping (from API)
-  'SUPER_ADMIN': 'superadmin',
-  'ADMIN': 'admin',
-  'DIRECTOR': 'ministere',
-  'CHEF_SERVICE': 'mairie',
-  'AGENT': 'agence',
-  'LECTEUR': 'citoyen',
+function mapUserRole(user: UserInfo | null): UserRole {
+  if (!user) return 'citoyen'
+  return mapFrontendRoleToLegacyRole(user.role) ?? 'citoyen'
+}
+
+/** Map a frontend or explicit legacy role to the historical rbac UserRole. */
+export function mapRole(role: string): UserRole {
+  return mapFrontendRoleToLegacyRole(role) ?? 'citoyen'
 }
 
 // ─── HIERARCHY LEVELS ─────────────────────────────────────────────────────────
@@ -70,16 +53,6 @@ export function getHierarchyLevel(role: UserRole): number {
  */
 export function isRoleAbove(aboveRole: UserRole, belowRole: UserRole): boolean {
   return getHierarchyLevel(aboveRole) > getHierarchyLevel(belowRole)
-}
-
-function mapUserRole(user: UserInfo | null): UserRole {
-  if (!user) return 'citoyen'
-  return ROLE_MAP[user.role] || (user.role as UserRole)
-}
-
-/** Map a raw role string (from either naming convention) to the rbac UserRole */
-export function mapRole(role: string): UserRole {
-  return ROLE_MAP[role] || (role as UserRole)
 }
 
 // ─── PERMISSION DEFINITIONS ──────────────────────────────────────────────────
