@@ -68,13 +68,19 @@ const ownCitizen = request('own', 'tenant-a', 'inst-z', 'citizen@scope.example.c
 const otherCitizen = request('other-citizen', 'tenant-a', 'inst-z', 'other@scope.example.com')
 const all = [sameInstitution, otherInstitution, otherTenant]
 
-for (const role of ['mairie', 'agence', 'agent', 'admin_general', 'chef_service', 'directeur'] as UserRole[]) {
+for (const role of ['mairie', 'agence', 'agent', 'admin_general', 'chef_service'] as UserRole[]) {
   assert.deepEqual(
     filterServiceRequestsBySignedScope(all, user(role)).map((item) => item.id),
     ['same'],
     `${role} doit rester dans son institution signée`,
   )
 }
+
+assert.deepEqual(
+  filterServiceRequestsBySignedScope(all, user('directeur')).map((item) => item.id),
+  ['same', 'other-inst'],
+  'DIRECTEUR conserve les lignes du tenant déjà hiérarchiquement filtrées par FastAPI/RLS',
+)
 
 assert.deepEqual(
   filterServiceRequestsBySignedScope(all, user('ministre')).map((item) => item.id),
@@ -112,6 +118,7 @@ assert.deepEqual(
 )
 assert.equal(isServiceRequestWithinSignedScope(sameInstitution, user('admin_general')), true)
 assert.equal(isServiceRequestWithinSignedScope(otherInstitution, user('admin_general')), false)
+assert.equal(isServiceRequestWithinSignedScope(otherTenant, user('directeur')), false)
 
 const storeSource = await Bun.file('src/store/app-store.ts').text()
 for (const requiredSnippet of [
@@ -147,4 +154,4 @@ assert.equal(
   'La page Demandes ne doit plus utiliser le filtre historique par catégories',
 )
 
-console.log('PASS: frontend session and request page enforce signed tenant/institution scope')
+console.log('PASS: frontend session and request page enforce signed scopes with server-authoritative directeur hierarchy')

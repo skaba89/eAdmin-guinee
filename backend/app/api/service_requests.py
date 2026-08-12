@@ -28,6 +28,7 @@ from app.models.service_request import (
     ServiceRequestStatusEnum,
 )
 from app.models.user import RoleEnum, User
+from app.services.institution_scope import institution_descendant_ids_query
 from app.services.object_storage import object_storage
 from app.services.service_catalog import get_active_service, get_service_version
 from app.services.service_document_templates import render_approved_document
@@ -178,14 +179,15 @@ def _apply_request_scope(query: Select, current_user: User) -> Select:
     """Apply the authoritative dossier visibility boundary in application code.
 
     PostgreSQL RLS remains the database-level barrier. This explicit predicate is
-    defense in depth and makes the municipality rule visible/testable in the API:
+    defense in depth and makes the institutional rule visible/testable in the API:
     - SUPER_ADMIN: global visibility;
     - MINISTRE: tenant-wide visibility;
+    - DIRECTEUR: their active institution and active descendants in the tenant;
     - operational staff (including mairie admins): their institution only;
     - CITOYEN: only requests they personally own.
 
-    A municipality therefore cannot read or mutate another municipality's
-    dossier even if a client tampers with IDs, headers or frontend state.
+    An institution therefore cannot read or mutate a dossier outside its signed
+    hierarchy even if a client tampers with IDs, headers or frontend state.
     """
     if current_user.role == RoleEnum.SUPER_ADMIN:
         return query
@@ -205,6 +207,18 @@ def _apply_request_scope(query: Select, current_user: User) -> Select:
             status_code=403,
             detail="Périmètre institutionnel absent du compte administratif.",
         )
+
+    if current_user.role == RoleEnum.DIRECTEUR:
+        return scoped.where(
+            ServiceRequest.institution_id.in_(
+                institution_descendant_ids_query(
+                    tenant_id=tenant_id,
+                    root_institution_id=institution_id,
+                    name="director_request_scope",
+                )
+            )
+        )
+
     return scoped.where(ServiceRequest.institution_id == institution_id)
 
 

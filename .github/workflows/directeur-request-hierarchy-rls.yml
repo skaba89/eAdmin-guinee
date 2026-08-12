@@ -1,0 +1,220 @@
+name: Directeur Request Hierarchy RLS Gate
+
+on:
+  pull_request:
+    paths:
+      - 'backend/alembic/versions/directeur_request_hierarchy_scope.py'
+      - 'backend/app/api/service_requests.py'
+      - 'backend/app/services/institution_scope.py'
+      - 'backend/tests/test_institution_scope.py'
+      - 'backend/tests/test_service_request_hierarchy_scope.py'
+      - 'src/lib/service-request-scope.ts'
+      - 'e2e/all-roles-rbac.real.spec.ts'
+      - '.github/workflows/directeur-request-hierarchy-rls.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  directeur-request-hierarchy-rls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create isolated environment
+        run: |
+          set -euo pipefail
+          postgres_password="$(openssl rand -hex 24)"
+          redis_password="$(openssl rand -hex 24)"
+          minio_password="$(openssl rand -hex 24)"
+          secret_key="$(openssl rand -hex 48)"
+          encryption_key="$(openssl rand -hex 32)"
+          frontend_encryption_key="$(openssl rand -hex 32)"
+          grafana_password="$(openssl rand -hex 24)"
+          test_password="CiHierarchy!$(openssl rand -hex 20)Aa1"
+          runtime_password="RlsRuntime!$(openssl rand -hex 20)Aa1"
+
+          for secret in \
+            "${postgres_password}" \
+            "${redis_password}" \
+            "${minio_password}" \
+            "${secret_key}" \
+            "${encryption_key}" \
+            "${frontend_encryption_key}" \
+            "${grafana_password}" \
+            "${test_password}" \
+            "${runtime_password}"
+          do
+            echo "::add-mask::${secret}"
+          done
+
+          echo "EADMIN_HIERARCHY_RLS_PASSWORD=${runtime_password}" >> "${GITHUB_ENV}"
+
+          cat > .env.local.ci <<EOF
+          POSTGRES_PASSWORD=${postgres_password}
+          REDIS_PASSWORD=${redis_password}
+          MINIO_ROOT_USER=eadmin
+          MINIO_ROOT_PASSWORD=${minio_password}
+          SECRET_KEY=${secret_key}
+          ENCRYPTION_KEY=${encryption_key}
+          NEXT_PUBLIC_ENCRYPTION_KEY=${frontend_encryption_key}
+          GRAFANA_ADMIN_USER=admin
+          GRAFANA_ADMIN_PASSWORD=${grafana_password}
+          LOCAL_TEST_PASSWORD=${test_password}
+          LOCAL_TEST_DOMAIN=eadmin.test
+          LOCAL_SUPERADMIN_EMAIL=superadmin@eadmin.test
+          LOCAL_FRONTEND_PORT=3000
+          LOCAL_BACKEND_PORT=8000
+          LOCAL_POSTGRES_PORT=5433
+          LOCAL_REDIS_PORT=6380
+          LOCAL_MINIO_CONSOLE_PORT=9101
+          LOCAL_MAILPIT_SMTP_PORT=1025
+          LOCAL_MAILPIT_UI_PORT=8025
+          LOCAL_PROMETHEUS_PORT=9090
+          LOCAL_GRAFANA_PORT=3001
+          EOF
+
+      - name: Build backend and migrate PostgreSQL
+        run: |
+          set -euo pipefail
+          compose=(docker compose --env-file .env.local.ci -f docker-compose.local.yml)
+          "${compose[@]}" build backend
+          "${compose[@]}" up -d postgres redis minio minio-init mailpit
+
+          postgres_ready=false
+          for attempt in $(seq 1 60); do
+            if "${compose[@]}" exec -T postgres pg_isready -U eadmin -d eadmin >/dev/null 2>&1; then
+              postgres_ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "${postgres_ready}" != 'true' ]; then
+            "${compose[@]}" logs --tail 250 postgres
+            exit 1
+          fi
+
+          "${compose[@]}" run --rm --no-deps backend alembic upgrade head
+          "${compose[@]}" run --rm --no-deps backend python -m scripts.seed_recette_data
+
+      - name: Create non-bypass RLS runtime role
+        run: |
+          set -euo pipefail
+          compose=(docker compose --env-file .env.local.ci -f docker-compose.local.yml)
+          "${compose[@]}" exec -T postgres \
+            psql -U eadmin -d eadmin -v ON_ERROR_STOP=1 \
+            -v runtime_password="${EADMIN_HIERARCHY_RLS_PASSWORD}" <<'SQL'
+          CREATE ROLE eadmin_hierarchy_rls
+            LOGIN
+            NOSUPERUSER
+            NOCREATEDB
+            NOCREATEROLE
+            NOINHERIT
+            NOBYPASSRLS
+            PASSWORD :'runtime_password';
+          GRANT CONNECT ON DATABASE eadmin TO eadmin_hierarchy_rls;
+          GRANT USAGE ON SCHEMA public TO eadmin_hierarchy_rls;
+          GRANT SELECT ON institutions TO eadmin_hierarchy_rls;
+          GRANT SELECT, UPDATE ON service_requests TO eadmin_hierarchy_rls;
+          SQL
+
+          flags="$("${compose[@]}" exec -T postgres psql -U eadmin -d eadmin -Atc \
+            "SELECT rolsuper::text || ':' || rolbypassrls::text FROM pg_roles WHERE rolname='eadmin_hierarchy_rls';")"
+          test "${flags}" = 'false:false'
+
+      - name: Prove DIRECTEUR institution plus descendants only
+        run: |
+          set -euo pipefail
+          compose=(docker compose --env-file .env.local.ci -f docker-compose.local.yml)
+          psql_runtime() {
+            "${compose[@]}" exec -T -e PGPASSWORD="${EADMIN_HIERARCHY_RLS_PASSWORD}" postgres \
+              psql -X -q -A -t -h 127.0.0.1 -U eadmin_hierarchy_rls -d eadmin \
+              -v ON_ERROR_STOP=1 -c "$1"
+          }
+          scoped_sql="BEGIN;
+            SET LOCAL app.current_user_id = '00000000-0000-0000-0000-000000000001';
+            SET LOCAL app.current_tenant_id = 'republique-de-guinee';
+            SET LOCAL app.current_institution_id = 'dir-justice-recette';
+            SET LOCAL app.current_role = 'DIRECTEUR';"
+
+          child_count="$(psql_runtime "${scoped_sql} SELECT count(*) FROM service_requests WHERE reference='REC-GN-2026-006'; COMMIT;")"
+          unrelated_count="$(psql_runtime "${scoped_sql} SELECT count(*) FROM service_requests WHERE reference='REC-GN-2026-002'; COMMIT;")"
+          cross_tenant_count="$(psql_runtime "${scoped_sql} SELECT count(*) FROM service_requests WHERE reference='REC-ISO-2026-001'; COMMIT;")"
+
+          test "${child_count}" = '1'
+          test "${unrelated_count}" = '0'
+          test "${cross_tenant_count}" = '0'
+
+      - name: Prove operational roles remain exact institution
+        run: |
+          set -euo pipefail
+          compose=(docker compose --env-file .env.local.ci -f docker-compose.local.yml)
+          query_as_role() {
+            local role="$1" institution="$2" reference="$3"
+            "${compose[@]}" exec -T -e PGPASSWORD="${EADMIN_HIERARCHY_RLS_PASSWORD}" postgres \
+              psql -X -q -A -t -h 127.0.0.1 -U eadmin_hierarchy_rls -d eadmin \
+              -v ON_ERROR_STOP=1 -c "
+                BEGIN;
+                SET LOCAL app.current_user_id = '00000000-0000-0000-0000-000000000002';
+                SET LOCAL app.current_tenant_id = 'republique-de-guinee';
+                SET LOCAL app.current_institution_id = '${institution}';
+                SET LOCAL app.current_role = '${role}';
+                SELECT count(*) FROM service_requests WHERE reference='${reference}';
+                COMMIT;"
+          }
+
+          test "$(query_as_role ADMIN mairie-ratoma-recette REC-GN-2026-002)" = '1'
+          test "$(query_as_role ADMIN mairie-ratoma-recette REC-GN-2026-003)" = '0'
+          test "$(query_as_role CHEF_SERVICE service-casier-recette REC-GN-2026-006)" = '1'
+          test "$(query_as_role CHEF_SERVICE service-casier-recette REC-GN-2026-002)" = '0'
+
+      - name: Prove MINISTRE tenant scope and unknown role fail closed
+        run: |
+          set -euo pipefail
+          compose=(docker compose --env-file .env.local.ci -f docker-compose.local.yml)
+          count_for() {
+            local role="$1" institution="$2" reference="$3"
+            "${compose[@]}" exec -T -e PGPASSWORD="${EADMIN_HIERARCHY_RLS_PASSWORD}" postgres \
+              psql -X -q -A -t -h 127.0.0.1 -U eadmin_hierarchy_rls -d eadmin \
+              -v ON_ERROR_STOP=1 -c "
+                BEGIN;
+                SET LOCAL app.current_user_id = '00000000-0000-0000-0000-000000000003';
+                SET LOCAL app.current_tenant_id = 'republique-de-guinee';
+                SET LOCAL app.current_institution_id = '${institution}';
+                SET LOCAL app.current_role = '${role}';
+                SELECT count(*) FROM service_requests WHERE reference='${reference}';
+                COMMIT;"
+          }
+
+          test "$(count_for MINISTRE min-justice-recette REC-GN-2026-002)" = '1'
+          test "$(count_for MINISTRE min-justice-recette REC-ISO-2026-001)" = '0'
+          test "$(count_for UNKNOWN dir-justice-recette REC-GN-2026-006)" = '0'
+
+      - name: Prove DIRECTEUR can update descendant but not unrelated request
+        run: |
+          set -euo pipefail
+          compose=(docker compose --env-file .env.local.ci -f docker-compose.local.yml)
+          update_ref() {
+            local reference="$1"
+            "${compose[@]}" exec -T -e PGPASSWORD="${EADMIN_HIERARCHY_RLS_PASSWORD}" postgres \
+              psql -X -q -A -t -h 127.0.0.1 -U eadmin_hierarchy_rls -d eadmin \
+              -v ON_ERROR_STOP=1 -c "
+                BEGIN;
+                SET LOCAL app.current_user_id = '00000000-0000-0000-0000-000000000004';
+                SET LOCAL app.current_tenant_id = 'republique-de-guinee';
+                SET LOCAL app.current_institution_id = 'dir-justice-recette';
+                SET LOCAL app.current_role = 'DIRECTEUR';
+                UPDATE service_requests SET updated_at = updated_at WHERE reference='${reference}' RETURNING reference;
+                ROLLBACK;"
+          }
+
+          test "$(update_ref REC-GN-2026-006)" = 'REC-GN-2026-006'
+          test -z "$(update_ref REC-GN-2026-002)"
+
+      - name: Cleanup
+        if: always()
+        run: docker compose --env-file .env.local.ci -f docker-compose.local.yml down -v --remove-orphans || true

@@ -16,10 +16,13 @@ function normalizeScope(value?: string): string | null {
  * and PostgreSQL RLS. It never widens server visibility:
  * - SUPER_ADMIN keeps the global server result;
  * - MINISTRE keeps the current tenant result;
+ * - DIRECTEUR requires both signed tenant and institution scopes, then keeps the
+ *   tenant-bound institution + descendants result already authorized by the
+ *   server (the browser does not own the hierarchy graph);
  * - operational roles must match the signed institution scope;
  * - CITOYEN must match the signed tenant and their own e-mail.
  *
- * Missing signed scope fails closed for every non-super-admin role.
+ * Missing required signed scope fails closed.
  */
 export function filterServiceRequestsBySignedScope(
   requests: CitizenRequest[],
@@ -43,6 +46,11 @@ export function filterServiceRequestsBySignedScope(
   }
 
   if (isTenantWideFrontendRole(user.role)) {
+    return tenantScoped
+  }
+
+  if (user.role === 'directeur') {
+    if (!normalizeScope(user.institutionId)) return []
     return tenantScoped
   }
 
