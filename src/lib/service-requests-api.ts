@@ -16,13 +16,6 @@ import type {
 // the browser.
 const pendingGeneratedDocumentWrites = new Map<string, Promise<CitizenRequest>>()
 
-// ServiceRequestCreate still accepts citizen_email for legacy clients even though
-// the backend deliberately ignores it and persists current_user.email instead.
-// Local bootstrap accounts use the reserved .local suffix, which EmailStr rejects
-// before the endpoint can apply that authority rule. Send a non-PII syntactically
-// valid compatibility value until the legacy field is removed from the API model.
-const AUTHENTICATED_EMAIL_COMPATIBILITY_PLACEHOLDER = 'authenticated-user@eadmin.gn'
-
 export interface InstitutionOption {
   id: string
   name: string
@@ -38,7 +31,8 @@ export interface CreateServiceRequestInput {
   citizenFirstName: string
   citizenNIN: string
   citizenPhone: string
-  citizenEmail: string
+  /** @deprecated Identity is derived from the authenticated session and never sent. */
+  citizenEmail?: string
   citizenAddress: string
   motif: string
   mairie?: string
@@ -57,7 +51,6 @@ const FIELD_LABELS: Record<string, string> = {
   citizen_first_name: 'prénom',
   citizen_nin: 'NIN',
   citizen_phone: 'téléphone',
-  citizen_email: 'e-mail',
   citizen_address: 'adresse',
   motif: 'motif',
   delivery_mode: 'mode de livraison',
@@ -165,8 +158,8 @@ export async function listRequests(): Promise<CitizenRequest[]> {
 }
 
 export async function createRequest(input: CreateServiceRequestInput): Promise<CitizenRequest> {
-  // Canonicalize exactly the payload sent to the backend. This also prevents an
-  // opaque FastAPI 422 caused by whitespace-only or undersized form values.
+  // Canonicalize exactly the payload sent to the backend. Citizen identity is
+  // deliberately absent: the backend binds citizen_id/email to current_user.
   const requestPayload = {
     service_id: normalizeRequired(input.serviceId, 'La démarche'),
     target_institution_id: normalizeRequired(input.targetInstitutionId, 'L’institution destinataire'),
@@ -174,7 +167,6 @@ export async function createRequest(input: CreateServiceRequestInput): Promise<C
     citizen_first_name: normalizeRequired(input.citizenFirstName, 'Le prénom'),
     citizen_nin: normalizeRequired(input.citizenNIN, 'Le NIN', 3),
     citizen_phone: normalizeRequired(input.citizenPhone, 'Le téléphone', 3),
-    citizen_email: AUTHENTICATED_EMAIL_COMPATIBILITY_PLACEHOLDER,
     citizen_address: normalizeRequired(input.citizenAddress, 'L’adresse', 3),
     motif: normalizeRequired(input.motif, 'Le motif', 3),
     mairie: input.mairie?.trim() || null,
