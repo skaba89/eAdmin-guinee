@@ -1,0 +1,132 @@
+name: PostgreSQL Runtime Principal Gate
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/services/database_principal.py'
+      - 'backend/app/main.py'
+      - 'backend/tests/test_database_principal_safety.py'
+      - '.github/workflows/postgres-runtime-principal.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-runtime-principal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install minimal PostgreSQL test dependencies
+        run: python -m pip install 'SQLAlchemy>=2.0,<3' 'asyncpg>=0.29,<1'
+
+      - name: Start isolated PostgreSQL 16
+        run: |
+          set -euo pipefail
+          owner_password="$(openssl rand -hex 24)"
+          runtime_password="$(openssl rand -hex 24)"
+          echo "::add-mask::${owner_password}"
+          echo "::add-mask::${runtime_password}"
+          echo "PG_OWNER_PASSWORD=${owner_password}" >> "${GITHUB_ENV}"
+          echo "PG_RUNTIME_PASSWORD=${runtime_password}" >> "${GITHUB_ENV}"
+
+          docker run -d --name eadmin-principal-pg \
+            -e POSTGRES_DB=eadmin \
+            -e POSTGRES_USER=eadmin_owner \
+            -e POSTGRES_PASSWORD="${owner_password}" \
+            -p 55432:5432 \
+            postgres:16-alpine
+
+          # The official image starts a temporary Unix-socket-only PostgreSQL
+          # server during database initialization, then stops it before the
+          # final server starts. Probe TCP explicitly so CI cannot mistake that
+          # temporary server for the durable runtime database.
+          for attempt in $(seq 1 60); do
+            if docker exec eadmin-principal-pg \
+              pg_isready -h 127.0.0.1 -U eadmin_owner -d eadmin >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs eadmin-principal-pg
+          exit 1
+
+      - name: Create least-privileged runtime principal
+        run: |
+          set -euo pipefail
+          docker exec -i -e PGPASSWORD="${PG_OWNER_PASSWORD}" eadmin-principal-pg \
+            psql -U eadmin_owner -d eadmin -v ON_ERROR_STOP=1 \
+            -v runtime_password="${PG_RUNTIME_PASSWORD}" <<'SQL'
+          CREATE ROLE eadmin_runtime
+            LOGIN
+            NOSUPERUSER
+            NOCREATEDB
+            NOCREATEROLE
+            NOINHERIT
+            NOBYPASSRLS
+            PASSWORD :'runtime_password';
+          GRANT CONNECT ON DATABASE eadmin TO eadmin_runtime;
+          GRANT USAGE ON SCHEMA public TO eadmin_runtime;
+          SQL
+
+      - name: Prove owner is rejected and runtime role is accepted
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import asyncio
+          import importlib.util
+          import os
+          import sys
+          from pathlib import Path
+
+          from sqlalchemy.ext.asyncio import create_async_engine
+
+          module_path = Path('backend/app/services/database_principal.py')
+          spec = importlib.util.spec_from_file_location('eadmin_database_principal', module_path)
+          assert spec is not None and spec.loader is not None
+          principal_module = importlib.util.module_from_spec(spec)
+          sys.modules[spec.name] = principal_module
+          spec.loader.exec_module(principal_module)
+          require_rls_safe_database_principal = principal_module.require_rls_safe_database_principal
+
+          async def main() -> None:
+              owner = create_async_engine(
+                  f"postgresql+asyncpg://eadmin_owner:{os.environ['PG_OWNER_PASSWORD']}@127.0.0.1:55432/eadmin"
+              )
+              try:
+                  try:
+                      await require_rls_safe_database_principal(owner)
+                  except RuntimeError as exc:
+                      assert 'SUPERUSER' in str(exc)
+                  else:
+                      raise AssertionError('The PostgreSQL owner/superuser must be rejected for API runtime use')
+              finally:
+                  await owner.dispose()
+
+              runtime = create_async_engine(
+                  f"postgresql+asyncpg://eadmin_runtime:{os.environ['PG_RUNTIME_PASSWORD']}@127.0.0.1:55432/eadmin"
+              )
+              try:
+                  principal = await require_rls_safe_database_principal(runtime)
+                  assert principal is not None
+                  assert principal.name == 'eadmin_runtime'
+                  assert principal.is_superuser is False
+                  assert principal.bypasses_rls is False
+              finally:
+                  await runtime.dispose()
+
+          asyncio.run(main())
+          PY
+
+      - name: Cleanup
+        if: always()
+        run: docker rm -f eadmin-principal-pg >/dev/null 2>&1 || true
