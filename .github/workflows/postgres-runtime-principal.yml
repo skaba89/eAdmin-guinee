@@ -58,7 +58,7 @@ jobs:
       - name: Create least-privileged runtime principal
         run: |
           set -euo pipefail
-          docker exec -e PGPASSWORD="${PG_OWNER_PASSWORD}" eadmin-principal-pg \
+          docker exec -i -e PGPASSWORD="${PG_OWNER_PASSWORD}" eadmin-principal-pg \
             psql -U eadmin_owner -d eadmin -v ON_ERROR_STOP=1 \
             -v runtime_password="${PG_RUNTIME_PASSWORD}" <<'SQL'
           CREATE ROLE eadmin_runtime
