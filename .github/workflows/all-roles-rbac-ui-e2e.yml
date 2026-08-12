@@ -190,7 +190,7 @@ jobs:
             --project=chromium \
             --workers=1 \
             --retries=0 \
-            --reporter=list | tee "/tmp/all-roles-${EADMIN_UI_E2E_GROUP}.log"
+            --reporter=github,list | tee "/tmp/all-roles-${EADMIN_UI_E2E_GROUP}.log"
           grep -Eq '3 passed' "/tmp/all-roles-${EADMIN_UI_E2E_GROUP}.log"
           if grep -Eq '[1-9][0-9]* skipped' "/tmp/all-roles-${EADMIN_UI_E2E_GROUP}.log"; then
             echo 'A strict all-role browser assertion was skipped.' >&2
