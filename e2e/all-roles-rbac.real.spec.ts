@@ -12,6 +12,7 @@ type RoleCase = {
   visibleNav: string[]
   hiddenNav: string[]
   visibleReference: string
+  additionalVisibleReferences?: string[]
   hiddenReference?: string
   actionContract: ActionContract
 }
@@ -83,8 +84,9 @@ const CASES: RoleCase[] = [
     email: 'directeur.justice@recette.eadmin.gn',
     visibleNav: ['Tableau de bord', 'Demandes citoyennes', 'Analytics'],
     hiddenNav: ['Administration', 'Cabinet Ministériel'],
-    visibleReference: 'REC-UI-DIRECTEUR-001',
-    hiddenReference: 'REC-UI-CHEF-001',
+    visibleReference: 'REC-UI-CHEF-001',
+    additionalVisibleReferences: ['REC-UI-DIRECTEUR-001'],
+    hiddenReference: 'REC-GN-2026-002',
     actionContract: 'decision',
   },
   {
@@ -175,6 +177,14 @@ async function openRequest(page: Page, reference: string): Promise<void> {
   await expect(page.getByText(reference, { exact: true }).last()).toBeVisible()
 }
 
+async function expectVisibleReferences(page: Page, references: string[] = []): Promise<void> {
+  if (references.length === 0) return
+  await page.getByRole('tab', { name: /Toutes \(/ }).click()
+  for (const reference of references) {
+    await expect(page.getByText(reference, { exact: true }).first()).toBeVisible()
+  }
+}
+
 async function expectHiddenReference(page: Page, reference?: string): Promise<void> {
   if (!reference) return
   await page.getByRole('tab', { name: /Toutes \(/ }).click()
@@ -227,6 +237,7 @@ test.describe('All nine roles RBAC — real stack', () => {
       await expectNavigation(page, roleCase)
 
       await goToRequests(page)
+      await expectVisibleReferences(page, roleCase.additionalVisibleReferences)
       await expectHiddenReference(page, roleCase.hiddenReference)
 
       await openRequest(page, roleCase.visibleReference)
