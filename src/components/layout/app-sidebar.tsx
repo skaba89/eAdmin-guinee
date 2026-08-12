@@ -11,7 +11,8 @@ import {
   Home, Briefcase, BookOpen,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { getAccessiblePages, canAccessPage } from '@/lib/rbac'
+import { getAccessiblePages } from '@/lib/rbac'
+import { canRoleSeeSpecializedPage } from '@/lib/specialized-page-role-policy'
 import type { UserInfo } from '@/store/app-store'
 
 // ─── NAV ITEM DEFINITION ─────────────────────────────────────────────────────
@@ -70,7 +71,8 @@ const HIDDEN_PAGES: AppPage[] = [
 
 /**
  * Build navigation items dynamically from RBAC.
- * Only pages the user can access (via canAccessPage) appear in the sidebar.
+ * Generic permissions determine module access, while specialized role
+ * dashboards additionally require their exact role identity.
  */
 function buildNavItems(user: UserInfo | null): { main: NavItem[]; admin: NavItem[] } {
   const accessiblePages = getAccessiblePages(user)
@@ -79,6 +81,7 @@ function buildNavItems(user: UserInfo | null): { main: NavItem[]; admin: NavItem
 
   for (const page of accessiblePages) {
     if (HIDDEN_PAGES.includes(page)) continue
+    if (!canRoleSeeSpecializedPage(page, user?.role)) continue
     const meta = PAGE_META[page]
     if (!meta) continue
     const item: NavItem = { page, label: meta.label, icon: meta.icon }
