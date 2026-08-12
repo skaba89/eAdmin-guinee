@@ -74,16 +74,22 @@ jobs:
           SQL
 
       - name: Prove owner is rejected and runtime role is accepted
-        env:
-          PYTHONPATH: backend
         run: |
           set -euo pipefail
           python - <<'PY'
           import asyncio
+          import importlib.util
           import os
+          from pathlib import Path
 
           from sqlalchemy.ext.asyncio import create_async_engine
-          from app.services.database_principal import require_rls_safe_database_principal
+
+          module_path = Path('backend/app/services/database_principal.py')
+          spec = importlib.util.spec_from_file_location('eadmin_database_principal', module_path)
+          assert spec is not None and spec.loader is not None
+          principal_module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(principal_module)
+          require_rls_safe_database_principal = principal_module.require_rls_safe_database_principal
 
           async def main() -> None:
               owner = create_async_engine(
