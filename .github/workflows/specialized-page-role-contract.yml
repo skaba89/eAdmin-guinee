@@ -1,0 +1,35 @@
+name: Specialized Page Role Contract
+
+on:
+  pull_request:
+    paths:
+      - 'src/components/layout/app-sidebar.tsx'
+      - 'src/lib/specialized-page-role-policy.ts'
+      - 'scripts/check-specialized-page-role-policy.ts'
+      - '.github/workflows/specialized-page-role-contract.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/components/layout/app-sidebar.tsx'
+      - 'src/lib/specialized-page-role-policy.ts'
+      - 'scripts/check-specialized-page-role-policy.ts'
+      - '.github/workflows/specialized-page-role-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  specialized-page-role-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.4
+
+      - name: Verify specialized dashboard role isolation
+        run: bun scripts/check-specialized-page-role-policy.ts
