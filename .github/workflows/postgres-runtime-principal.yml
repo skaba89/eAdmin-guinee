@@ -46,8 +46,13 @@ jobs:
             -p 55432:5432 \
             postgres:16-alpine
 
+          # The official image starts a temporary Unix-socket-only PostgreSQL
+          # server during database initialization, then stops it before the
+          # final server starts. Probe TCP explicitly so CI cannot mistake that
+          # temporary server for the durable runtime database.
           for attempt in $(seq 1 60); do
-            if docker exec eadmin-principal-pg pg_isready -U eadmin_owner -d eadmin >/dev/null 2>&1; then
+            if docker exec eadmin-principal-pg \
+              pg_isready -h 127.0.0.1 -U eadmin_owner -d eadmin >/dev/null 2>&1; then
               exit 0
             fi
             sleep 1
