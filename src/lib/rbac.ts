@@ -25,8 +25,8 @@ export function mapRole(role: string): UserRole {
 }
 
 // ─── HIERARCHY LEVELS ─────────────────────────────────────────────────────────
-// 7-level hierarchical model matching Guinea's government structure.
-// Key principle: each higher level inherits all permissions of the level below it.
+// Legacy ordering retained temporarily for compatibility with old RLS helpers.
+// Permissions themselves are explicit per role and NEVER inherited by level.
 
 export const HIERARCHY_LEVELS: Record<UserRole, number> = {
   citoyen: 0,
@@ -113,8 +113,9 @@ export type Permission =
 
 // ─── ROLE → PERMISSIONS MAPPING ─────────────────────────────────────────────
 
-// Direct permissions per role (before hierarchical inheritance)
-// Inheritance is computed dynamically in getInheritedPermissions()
+// Explicit permissions per role. Do not derive permissions from hierarchy
+// levels: MAIRIE, AGENCE and AGENT are parallel operational roles, and ADMIN is
+// not allowed to inherit approval/rejection powers from supervisory roles.
 const DIRECT_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   citoyen: [
     'citizen-portal:view',
@@ -128,8 +129,6 @@ const DIRECT_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   mairie: [
     'service-requests:view_assigned',
     'service-requests:process',
-    'service-requests:approve',
-    'service-requests:reject',
     'service-requests:create',
     'citizen-portal:view',
     'ged:view',
@@ -148,8 +147,6 @@ const DIRECT_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   agence: [
     'service-requests:view_assigned',
     'service-requests:process',
-    'service-requests:approve',
-    'service-requests:reject',
     'service-requests:create',
     'citizen-portal:view',
     'ged:view',
@@ -182,6 +179,7 @@ const DIRECT_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'service-requests:view_assigned',
     'service-requests:process',
     'service-requests:approve',
+    'service-requests:reject',
     'service-requests:view_own',
     'service-requests:create',
     'citizen-portal:view',
@@ -299,11 +297,8 @@ const DIRECT_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   admin: [
     'dashboard:view',
     'dashboard:view_all',
-    'service-requests:view_all',
+    'service-requests:view_assigned',
     'service-requests:process',
-    'service-requests:approve',
-    'service-requests:reject',
-    'service-requests:delete',
     'service-requests:create',
     'citizen-portal:view',
     'ged:view',
@@ -399,35 +394,9 @@ const DIRECT_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   ],
 }
 
-/**
- * Compute inherited permissions: each role inherits all permissions
- * from roles at lower hierarchy levels, plus its own direct permissions.
- */
-function getInheritedPermissions(role: UserRole): Permission[] {
-  const roleLevel = getHierarchyLevel(role)
-  const inherited = new Set<Permission>()
-
-  // Collect permissions from all roles at lower levels
-  for (const [r, level] of Object.entries(HIERARCHY_LEVELS)) {
-    if (level <= roleLevel) {
-      const perms = DIRECT_ROLE_PERMISSIONS[r as UserRole]
-      if (perms) {
-        perms.forEach(p => inherited.add(p))
-      }
-    }
-  }
-
-  return Array.from(inherited)
-}
-
-// Pre-computed ROLE_PERMISSIONS with inheritance applied
-const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = Object.fromEntries(
-  (Object.keys(DIRECT_ROLE_PERMISSIONS) as UserRole[]).map(role => [
-    role,
-    getInheritedPermissions(role),
-  ])
-) as Record<UserRole, Permission[]>
-
+// Permissions are explicit by role. Hierarchy levels are metadata only and must
+// never grant permissions implicitly across parallel or supervisory roles.
+const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = DIRECT_ROLE_PERMISSIONS
 
 // ─── PAGE ACCESS CONTROL ─────────────────────────────────────────────────────
 
