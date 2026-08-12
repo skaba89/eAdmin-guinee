@@ -143,13 +143,13 @@ jobs:
           chmod 600 /tmp/citizen-token
           test -s /tmp/citizen-token
 
-      - name: Invalid payload returns field-level FastAPI 422
+      - name: Invalid payload returns field-level FastAPI 422 without citizen email
         run: |
           set -euo pipefail
           status="$(curl -sS -o /tmp/invalid-request.json -w '%{http_code}' -X POST 'http://localhost:8000/api/v1/service-requests' \
             -H "Authorization: Bearer $(cat /tmp/citizen-token)" \
             -H 'Content-Type: application/json' \
-            -d '{"service_id":"validation-e2e-service","target_institution_id":"mairie-validation-e2e","citizen_name":"Diallo","citizen_first_name":"Awa","citizen_nin":"X","citizen_phone":"+224620000001","citizen_email":"authenticated-user@eadmin.gn","citizen_address":"Conakry","motif":"Test de validation","delivery_mode":"en_ligne"}')"
+            -d '{"service_id":"validation-e2e-service","target_institution_id":"mairie-validation-e2e","citizen_name":"Diallo","citizen_first_name":"Awa","citizen_nin":"X","citizen_phone":"+224620000001","citizen_address":"Conakry","motif":"Test de validation","delivery_mode":"en_ligne"}')"
           echo "Invalid request HTTP ${status}"
           test "${status}" = '422'
           python - <<'PY'
@@ -158,23 +158,27 @@ jobs:
           detail = payload.get('detail')
           assert isinstance(detail, list) and detail, payload
           assert any(item.get('loc') == ['body', 'citizen_nin'] for item in detail), detail
-          print('PASS: 422 exposes citizen_nin in FastAPI detail')
+          assert not any(item.get('loc') == ['body', 'citizen_email'] for item in detail), detail
+          print('PASS: citizen_email is no longer required and 422 exposes citizen_nin')
           PY
 
-      - name: Valid payload is persisted and server identity stays authoritative
+      - name: Legacy spoofed email is ignored and authenticated identity is persisted
         run: |
           set -euo pipefail
           status="$(curl -sS -o /tmp/valid-request.json -w '%{http_code}' -X POST 'http://localhost:8000/api/v1/service-requests' \
             -H "Authorization: Bearer $(cat /tmp/citizen-token)" \
             -H 'Content-Type: application/json' \
             -H 'Idempotency-Key: validation-e2e-2026-001' \
-            -d '{"service_id":"validation-e2e-service","target_institution_id":"mairie-validation-e2e","citizen_name":" Diallo ","citizen_first_name":" Awa ","citizen_nin":"NIN-123456","citizen_phone":"+224620000001","citizen_email":"authenticated-user@eadmin.gn","citizen_address":"Conakry Ratoma","motif":"Demande de validation E2E","mairie":"Mairie Validation E2E","delivery_mode":"en_ligne"}')"
+            -d '{"service_id":"validation-e2e-service","target_institution_id":"mairie-validation-e2e","citizen_name":" Diallo ","citizen_first_name":" Awa ","citizen_nin":"NIN-123456","citizen_phone":"+224620000001","citizen_email":"victim@example.com","citizen_address":"Conakry Ratoma","motif":"Demande de validation E2E","mairie":"Mairie Validation E2E","delivery_mode":"en_ligne"}')"
           echo "Valid request HTTP ${status}"
           test "${status}" = '201' || { cat /tmp/valid-request.json; exit 1; }
           request_id="$(python -c "import json; print(json.load(open('/tmp/valid-request.json'))['id'])")"
+          response_email="$(python -c "import json; print(json.load(open('/tmp/valid-request.json'))['citizenEmail'])")"
           stored_email="$(docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T postgres psql -U eadmin -d eadmin -Atc "SELECT citizen_email FROM service_requests WHERE id='${request_id}';")"
+          test "${response_email}" = 'citoyen@eadmin.test'
           test "${stored_email}" = 'citoyen@eadmin.test'
-          echo 'PASS: request persisted and authenticated account email is authoritative'
+          test "${stored_email}" != 'victim@example.com'
+          echo 'PASS: spoofed legacy email ignored; authenticated account email is authoritative'
 
       - name: Backend logs on failure
         if: failure()

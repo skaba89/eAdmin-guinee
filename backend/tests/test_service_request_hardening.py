@@ -12,6 +12,7 @@ from fastapi import HTTPException
 from app.api.service_requests import (
     ALLOWED_TRANSITIONS,
     AssignmentUpdate,
+    ServiceRequestCreate,
     _add_business_days,
     _append_note,
     _default_timeline,
@@ -21,6 +22,7 @@ from app.api.service_requests import (
     _reference,
     _status_permission_action,
     assign_service_request,
+    create_service_request,
 )
 from app.models.service_request import DeliveryModeEnum, ServiceRequest, ServiceRequestStatusEnum
 from app.models.user import RoleEnum
@@ -42,6 +44,26 @@ def test_service_request_native_enums_persist_public_business_values():
     assert ServiceRequest.__table__.c.delivery_mode.type.enums == [
         item.value for item in DeliveryModeEnum
     ]
+
+
+def test_service_request_create_ignores_legacy_citizen_email_field():
+    payload = ServiceRequestCreate.model_validate(
+        {
+            "service_id": "ec-1",
+            "target_institution_id": "institution-a",
+            "citizen_name": "Diallo",
+            "citizen_first_name": "Aminata",
+            "citizen_nin": "NIN-CONTRACT-001",
+            "citizen_phone": "+224620000000",
+            "citizen_email": "victim@example.com",
+            "citizen_address": "Conakry",
+            "motif": "Contrat anti-usurpation",
+            "delivery_mode": "en_ligne",
+        }
+    )
+
+    assert "citizen_email" not in ServiceRequestCreate.model_fields
+    assert "citizen_email" not in payload.model_dump()
 
 
 def test_terminal_request_states_cannot_transition():
@@ -109,6 +131,97 @@ def test_staff_detection_keeps_citizen_out_of_backoffice_actions():
 
     assert _is_staff(citizen) is False
     assert _is_staff(agent) is True
+
+
+@pytest.mark.asyncio
+async def test_create_request_uses_authenticated_citizen_identity_not_spoofed_email(monkeypatch):
+    authenticated_id = uuid.uuid4()
+    authenticated_email = "owner@eadmin.gn"
+    spoofed_email = "victim@example.com"
+    current_user = SimpleNamespace(
+        id=authenticated_id,
+        email=authenticated_email,
+        full_name="Aminata Diallo",
+        role=RoleEnum.CITOYEN,
+        tenant_id="tenant-a",
+        institution_id=None,
+    )
+    catalog_service = SimpleNamespace(
+        service_id="ec-1",
+        name="Acte de naissance",
+        category_name="État civil",
+        category_id="etat-civil",
+        version=3,
+        policy_status="active",
+        source_reference="REF-CATALOG",
+        fee_label="Gratuit",
+        expected_processing_label="5 jours",
+        required_documents=["Pièce d'identité"],
+        sla_business_days=5,
+    )
+    institution = SimpleNamespace(id="institution-a", name="Mairie A")
+    db_result = MagicMock()
+    db_result.scalar_one_or_none.return_value = institution
+    db = MagicMock()
+    db.execute = AsyncMock(return_value=db_result)
+    db.add = MagicMock()
+    db.flush = AsyncMock()
+    db.refresh = AsyncMock()
+    db.sync_session = SimpleNamespace(info={})
+    bind = MagicMock()
+    bind.dialect.name = "sqlite"
+    db.get_bind.return_value = bind
+
+    monkeypatch.setattr(
+        "app.api.service_requests.get_active_service",
+        AsyncMock(return_value=catalog_service),
+    )
+    append_note = AsyncMock()
+    monkeypatch.setattr("app.api.service_requests._append_note", append_note)
+    monkeypatch.setattr(
+        "app.api.service_requests._serialize_request",
+        lambda item: {
+            "citizenId": str(item.citizen_id),
+            "citizenEmail": item.citizen_email,
+        },
+    )
+
+    payload = ServiceRequestCreate.model_validate(
+        {
+            "service_id": "ec-1",
+            "target_institution_id": "institution-a",
+            "citizen_name": "Diallo",
+            "citizen_first_name": "Aminata",
+            "citizen_nin": "NIN-CONTRACT-002",
+            "citizen_phone": "+224620000001",
+            "citizen_email": spoofed_email,
+            "citizen_address": "Conakry",
+            "motif": "Demande anti-usurpation",
+            "delivery_mode": "en_ligne",
+        }
+    )
+
+    result = await create_service_request(
+        payload=payload,
+        db=db,
+        current_user=current_user,
+    )
+
+    assert result == {
+        "citizenId": str(authenticated_id),
+        "citizenEmail": authenticated_email,
+    }
+    created_request = next(
+        call.args[0]
+        for call in db.add.call_args_list
+        if isinstance(call.args[0], ServiceRequest)
+    )
+    assert created_request.citizen_id == authenticated_id
+    assert created_request.citizen_email == authenticated_email
+    assert created_request.citizen_email != spoofed_email
+    assert db.sync_session.info["trusted_target_institution_id"] == "institution-a"
+    append_note.assert_awaited_once()
+    db.flush.assert_awaited_once()
 
 
 @pytest.mark.asyncio

@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
@@ -60,6 +60,11 @@ ALLOWED_TRANSITIONS: dict[ServiceRequestStatusEnum, set[ServiceRequestStatusEnum
 
 
 class ServiceRequestCreate(BaseModel):
+    # Old clients may still send deprecated compatibility fields such as
+    # citizen_email. Ignore extras instead of breaking them, but never expose
+    # those values to creation logic: citizen identity comes from current_user.
+    model_config = ConfigDict(extra="ignore")
+
     service_id: str = Field(min_length=1, max_length=100)
     # Compatibility-only hints from older clients. The server deliberately
     # ignores them and resolves authoritative metadata from service_id.
@@ -71,7 +76,6 @@ class ServiceRequestCreate(BaseModel):
     citizen_first_name: str = Field(min_length=1, max_length=150)
     citizen_nin: str = Field(min_length=3, max_length=120)
     citizen_phone: str = Field(min_length=3, max_length=50)
-    citizen_email: EmailStr
     citizen_address: str = Field(min_length=3, max_length=500)
     motif: str = Field(min_length=3, max_length=5000)
     required_documents: list[str] = Field(default_factory=list)
