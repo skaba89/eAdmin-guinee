@@ -108,13 +108,6 @@ jobs:
           "${compose[@]}" exec -T postgres \
             psql -U eadmin -d eadmin -v ON_ERROR_STOP=1 \
             -v runtime_password="${EADMIN_HIERARCHY_RLS_PASSWORD}" <<'SQL'
-          DO $$
-          BEGIN
-            IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'eadmin_hierarchy_rls') THEN
-              DROP ROLE eadmin_hierarchy_rls;
-            END IF;
-          END
-          $$;
           CREATE ROLE eadmin_hierarchy_rls
             LOGIN
             NOSUPERUSER
@@ -136,20 +129,21 @@ jobs:
       - name: Prove DIRECTEUR institution plus descendants only
         run: |
           set -euo pipefail
+          compose=(docker compose --env-file .env.local.ci -f docker-compose.local.yml)
           psql_runtime() {
-            PGPASSWORD="${EADMIN_HIERARCHY_RLS_PASSWORD}" psql \
-              -h 127.0.0.1 -p 5433 -U eadmin_hierarchy_rls -d eadmin \
-              -v ON_ERROR_STOP=1 -Atc "$1"
+            "${compose[@]}" exec -T -e PGPASSWORD="${EADMIN_HIERARCHY_RLS_PASSWORD}" postgres \
+              psql -X -q -A -t -h 127.0.0.1 -U eadmin_hierarchy_rls -d eadmin \
+              -v ON_ERROR_STOP=1 -c "$1"
           }
           scoped_sql="BEGIN;
-            SELECT set_config('app.current_user_id', '00000000-0000-0000-0000-000000000001', true);
-            SELECT set_config('app.current_tenant_id', 'republique-de-guinee', true);
-            SELECT set_config('app.current_institution_id', 'dir-justice-recette', true);
-            SELECT set_config('app.current_role', 'DIRECTEUR', true);"
+            SET LOCAL app.current_user_id = '00000000-0000-0000-0000-000000000001';
+            SET LOCAL app.current_tenant_id = 'republique-de-guinee';
+            SET LOCAL app.current_institution_id = 'dir-justice-recette';
+            SET LOCAL app.current_role = 'DIRECTEUR';"
 
-          child_count="$(psql_runtime "${scoped_sql} SELECT count(*) FROM service_requests WHERE reference='REC-GN-2026-006'; COMMIT;" | tail -n 1)"
-          unrelated_count="$(psql_runtime "${scoped_sql} SELECT count(*) FROM service_requests WHERE reference='REC-GN-2026-002'; COMMIT;" | tail -n 1)"
-          cross_tenant_count="$(psql_runtime "${scoped_sql} SELECT count(*) FROM service_requests WHERE reference='REC-ISO-2026-001'; COMMIT;" | tail -n 1)"
+          child_count="$(psql_runtime "${scoped_sql} SELECT count(*) FROM service_requests WHERE reference='REC-GN-2026-006'; COMMIT;")"
+          unrelated_count="$(psql_runtime "${scoped_sql} SELECT count(*) FROM service_requests WHERE reference='REC-GN-2026-002'; COMMIT;")"
+          cross_tenant_count="$(psql_runtime "${scoped_sql} SELECT count(*) FROM service_requests WHERE reference='REC-ISO-2026-001'; COMMIT;")"
 
           test "${child_count}" = '1'
           test "${unrelated_count}" = '0'
@@ -158,18 +152,19 @@ jobs:
       - name: Prove operational roles remain exact institution
         run: |
           set -euo pipefail
+          compose=(docker compose --env-file .env.local.ci -f docker-compose.local.yml)
           query_as_role() {
             local role="$1" institution="$2" reference="$3"
-            PGPASSWORD="${EADMIN_HIERARCHY_RLS_PASSWORD}" psql \
-              -h 127.0.0.1 -p 5433 -U eadmin_hierarchy_rls -d eadmin \
-              -v ON_ERROR_STOP=1 -Atc "
+            "${compose[@]}" exec -T -e PGPASSWORD="${EADMIN_HIERARCHY_RLS_PASSWORD}" postgres \
+              psql -X -q -A -t -h 127.0.0.1 -U eadmin_hierarchy_rls -d eadmin \
+              -v ON_ERROR_STOP=1 -c "
                 BEGIN;
-                SELECT set_config('app.current_user_id', '00000000-0000-0000-0000-000000000002', true);
-                SELECT set_config('app.current_tenant_id', 'republique-de-guinee', true);
-                SELECT set_config('app.current_institution_id', '${institution}', true);
-                SELECT set_config('app.current_role', '${role}', true);
+                SET LOCAL app.current_user_id = '00000000-0000-0000-0000-000000000002';
+                SET LOCAL app.current_tenant_id = 'republique-de-guinee';
+                SET LOCAL app.current_institution_id = '${institution}';
+                SET LOCAL app.current_role = '${role}';
                 SELECT count(*) FROM service_requests WHERE reference='${reference}';
-                COMMIT;" | tail -n 1
+                COMMIT;"
           }
 
           test "$(query_as_role ADMIN mairie-ratoma-recette REC-GN-2026-002)" = '1'
@@ -180,18 +175,19 @@ jobs:
       - name: Prove MINISTRE tenant scope and unknown role fail closed
         run: |
           set -euo pipefail
+          compose=(docker compose --env-file .env.local.ci -f docker-compose.local.yml)
           count_for() {
             local role="$1" institution="$2" reference="$3"
-            PGPASSWORD="${EADMIN_HIERARCHY_RLS_PASSWORD}" psql \
-              -h 127.0.0.1 -p 5433 -U eadmin_hierarchy_rls -d eadmin \
-              -v ON_ERROR_STOP=1 -Atc "
+            "${compose[@]}" exec -T -e PGPASSWORD="${EADMIN_HIERARCHY_RLS_PASSWORD}" postgres \
+              psql -X -q -A -t -h 127.0.0.1 -U eadmin_hierarchy_rls -d eadmin \
+              -v ON_ERROR_STOP=1 -c "
                 BEGIN;
-                SELECT set_config('app.current_user_id', '00000000-0000-0000-0000-000000000003', true);
-                SELECT set_config('app.current_tenant_id', 'republique-de-guinee', true);
-                SELECT set_config('app.current_institution_id', '${institution}', true);
-                SELECT set_config('app.current_role', '${role}', true);
+                SET LOCAL app.current_user_id = '00000000-0000-0000-0000-000000000003';
+                SET LOCAL app.current_tenant_id = 'republique-de-guinee';
+                SET LOCAL app.current_institution_id = '${institution}';
+                SET LOCAL app.current_role = '${role}';
                 SELECT count(*) FROM service_requests WHERE reference='${reference}';
-                COMMIT;" | tail -n 1
+                COMMIT;"
           }
 
           test "$(count_for MINISTRE min-justice-recette REC-GN-2026-002)" = '1'
@@ -201,18 +197,19 @@ jobs:
       - name: Prove DIRECTEUR can update descendant but not unrelated request
         run: |
           set -euo pipefail
+          compose=(docker compose --env-file .env.local.ci -f docker-compose.local.yml)
           update_ref() {
             local reference="$1"
-            PGPASSWORD="${EADMIN_HIERARCHY_RLS_PASSWORD}" psql \
-              -h 127.0.0.1 -p 5433 -U eadmin_hierarchy_rls -d eadmin \
-              -v ON_ERROR_STOP=1 -Atc "
+            "${compose[@]}" exec -T -e PGPASSWORD="${EADMIN_HIERARCHY_RLS_PASSWORD}" postgres \
+              psql -X -q -A -t -h 127.0.0.1 -U eadmin_hierarchy_rls -d eadmin \
+              -v ON_ERROR_STOP=1 -c "
                 BEGIN;
-                SELECT set_config('app.current_user_id', '00000000-0000-0000-0000-000000000004', true);
-                SELECT set_config('app.current_tenant_id', 'republique-de-guinee', true);
-                SELECT set_config('app.current_institution_id', 'dir-justice-recette', true);
-                SELECT set_config('app.current_role', 'DIRECTEUR', true);
+                SET LOCAL app.current_user_id = '00000000-0000-0000-0000-000000000004';
+                SET LOCAL app.current_tenant_id = 'republique-de-guinee';
+                SET LOCAL app.current_institution_id = 'dir-justice-recette';
+                SET LOCAL app.current_role = 'DIRECTEUR';
                 UPDATE service_requests SET updated_at = updated_at WHERE reference='${reference}' RETURNING reference;
-                ROLLBACK;" | grep -E '^REC-' || true
+                ROLLBACK;"
           }
 
           test "$(update_ref REC-GN-2026-006)" = 'REC-GN-2026-006'
