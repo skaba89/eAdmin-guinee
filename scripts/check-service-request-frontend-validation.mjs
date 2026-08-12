@@ -13,7 +13,6 @@ const requiredSnippets = [
   "citizen_phone: normalizeRequired(input.citizenPhone, 'Le téléphone', 3)",
   "citizen_address: normalizeRequired(input.citizenAddress, 'L’adresse', 3)",
   "motif: normalizeRequired(input.motif, 'Le motif', 3)",
-  "citizen_email: AUTHENTICATED_EMAIL_COMPATIBILITY_PLACEHOLDER",
   "const validationMessage = formatValidationDetail(detail)",
   "Données de la demande invalides — ${messages.join(' ; ')}",
   "const field = typeof rawField === 'string' ? rawField : 'champ'",
@@ -33,7 +32,6 @@ const fieldLabels = [
   'citizen_first_name',
   'citizen_nin',
   'citizen_phone',
-  'citizen_email',
   'citizen_address',
   'motif',
   'delivery_mode',
@@ -45,9 +43,14 @@ for (const field of fieldLabels) {
   }
 }
 
-if (source.includes('citizen_email: input.citizenEmail')) {
-  console.error('Régression: le navigateur ne doit pas réenvoyer un e-mail citoyen éditable comme identité autoritaire.')
+if (source.includes('citizen_email:')) {
+  console.error('Régression: citizen_email ne doit plus être envoyé par le navigateur dans la création d’une demande.')
   process.exit(1)
 }
 
-console.log('PASS: contrat frontend service-request validation + erreurs 422 lisibles')
+if (source.includes('AUTHENTICATED_EMAIL_COMPATIBILITY_PLACEHOLDER')) {
+  console.error('Régression: le placeholder d’identité e-mail ne doit pas revenir dans le client.')
+  process.exit(1)
+}
+
+console.log('PASS: contrat frontend service-request validation + identité serveur + erreurs 422 lisibles')
