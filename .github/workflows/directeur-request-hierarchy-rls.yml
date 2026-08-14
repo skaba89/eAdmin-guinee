@@ -126,6 +126,73 @@ jobs:
             "SELECT rolsuper::text || ':' || rolbypassrls::text FROM pg_roles WHERE rolname='eadmin_hierarchy_rls';")"
           test "${flags}" = 'false:false'
 
+      - name: Prove hierarchy fixture before RLS
+        run: |
+          set -euo pipefail
+          compose=(docker compose --env-file .env.local.ci -f docker-compose.local.yml)
+
+          graph="$("${compose[@]}" exec -T postgres psql -U eadmin -d eadmin -X -q -A -t -v ON_ERROR_STOP=1 -c "
+            WITH RECURSIVE institution_tree AS (
+              SELECT id, parent_id
+              FROM institutions
+              WHERE id='dir-justice-recette'
+                AND tenant_id='republique-de-guinee'
+                AND is_active=TRUE
+              UNION
+              SELECT child.id, child.parent_id
+              FROM institutions child
+              JOIN institution_tree parent ON child.parent_id = parent.id
+              WHERE child.tenant_id='republique-de-guinee'
+                AND child.is_active=TRUE
+            )
+            SELECT string_agg(id, ',' ORDER BY id) FROM institution_tree;")"
+          test "${graph}" = 'dir-justice-recette,service-casier-recette'
+
+          route="$("${compose[@]}" exec -T postgres psql -U eadmin -d eadmin -X -q -A -t -v ON_ERROR_STOP=1 -c "
+            SELECT tenant_id || ':' || institution_id
+            FROM service_requests
+            WHERE reference='REC-GN-2026-006';")"
+          test "${route}" = 'republique-de-guinee:service-casier-recette'
+
+      - name: Prove runtime CTE and signed RLS context
+        run: |
+          set -euo pipefail
+          compose=(docker compose --env-file .env.local.ci -f docker-compose.local.yml)
+          psql_runtime() {
+            "${compose[@]}" exec -T -e PGPASSWORD="${EADMIN_HIERARCHY_RLS_PASSWORD}" postgres \
+              psql -X -q -A -t -h 127.0.0.1 -U eadmin_hierarchy_rls -d eadmin \
+              -v ON_ERROR_STOP=1 -c "$1"
+          }
+
+          runtime_graph="$(psql_runtime "
+            WITH RECURSIVE institution_tree AS (
+              SELECT id, parent_id
+              FROM institutions
+              WHERE id='dir-justice-recette'
+                AND tenant_id='republique-de-guinee'
+                AND is_active=TRUE
+              UNION
+              SELECT child.id, child.parent_id
+              FROM institutions child
+              JOIN institution_tree parent ON child.parent_id = parent.id
+              WHERE child.tenant_id='republique-de-guinee'
+                AND child.is_active=TRUE
+            )
+            SELECT string_agg(id, ',' ORDER BY id) FROM institution_tree;")"
+          test "${runtime_graph}" = 'dir-justice-recette,service-casier-recette'
+
+          context="$(psql_runtime "
+            BEGIN;
+            SET LOCAL app.current_user_id = '00000000-0000-0000-0000-000000000001';
+            SET LOCAL app.current_tenant_id = 'republique-de-guinee';
+            SET LOCAL app.current_institution_id = 'dir-justice-recette';
+            SET LOCAL app.current_role = 'DIRECTEUR';
+            SELECT current_setting('app.current_role', true)
+              || '|' || current_setting('app.current_tenant_id', true)
+              || '|' || current_setting('app.current_institution_id', true);
+            COMMIT;")"
+          test "${context}" = 'DIRECTEUR|republique-de-guinee|dir-justice-recette'
+
       - name: Prove DIRECTEUR institution plus descendants only
         run: |
           set -euo pipefail

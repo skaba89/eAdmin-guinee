@@ -67,12 +67,12 @@ CASES = (
         RoleEnum.CHEF_SERVICE,
         frozenset({"REC-GN-2026-006"}),
     ),
-    # Current authorization policy binds DIRECTEUR to its exact institution.
-    # The seeded dossier is attached to the child service, not the direction.
+    # DIRECTEUR is scoped to its signed institution plus active descendants.
+    # The seeded Justice dossier is attached to the child Casier service.
     ScopeCase(
         f"directeur.justice@{RECETTE_DOMAIN}",
         RoleEnum.DIRECTEUR,
-        frozenset(),
+        frozenset({"REC-GN-2026-006"}),
     ),
     ScopeCase(
         f"ministre.justice@{RECETTE_DOMAIN}",
@@ -189,10 +189,9 @@ async def _assert_decision_probe(
     """Probe approve/reject authorization without changing seeded business state.
 
     A 403 proves the role is blocked by RBAC before any workflow mutation.
-    A 404 for DIRECTEUR proves the permission check passed but the exact current
-    institution scope still hides a child-service dossier. A 409 on a terminal
-    dossier proves approve/reject permission passed and execution reached the
-    workflow state machine, which then safely rejected the impossible transition.
+    A 409 on a terminal dossier proves approve/reject permission and request
+    scope both passed, then the workflow state machine safely rejected the
+    impossible transition without mutating the seeded state.
     """
     response = await client.post(
         f"/service-requests/{target.id}/status",
@@ -266,10 +265,12 @@ async def _assert_decision_permissions(
                 label=f"{role_label} sans {action_label}",
             )
 
-    # CHEF_SERVICE, MINISTRE and SUPER_ADMIN own approve/reject permission.
-    # The terminal Justice dossier guarantees a non-destructive 409 after RBAC.
+    # CHEF_SERVICE, DIRECTEUR, MINISTRE and SUPER_ADMIN own approve/reject permission.
+    # The terminal Justice dossier guarantees a non-destructive 409 after RBAC
+    # and scope evaluation.
     for email, role_label in (
         (f"chef.casier@{RECETTE_DOMAIN}", "CHEF_SERVICE"),
+        (f"directeur.justice@{RECETTE_DOMAIN}", "DIRECTEUR"),
         (f"ministre.justice@{RECETTE_DOMAIN}", "MINISTRE"),
         (f"superadmin.recette@{RECETTE_DOMAIN}", "SUPER_ADMIN"),
     ):
@@ -287,23 +288,6 @@ async def _assert_decision_permissions(
                 expected_detail_fragment="Transition interdite",
                 label=f"{role_label} possède {action_label}",
             )
-
-    # DIRECTEUR has approve/reject permission, but the current policy scopes it
-    # to dir-justice-recette exactly; the child service dossier must stay hidden.
-    directeur = user_map[f"directeur.justice@{RECETTE_DOMAIN}"]
-    for target_status, action_label in (
-        (ServiceRequestStatusEnum.VALIDEE, "approve"),
-        (ServiceRequestStatusEnum.REJETEE, "reject"),
-    ):
-        await _assert_decision_probe(
-            client,
-            user=directeur,
-            target=justice_livree,
-            target_status=target_status,
-            expected_http_status=404,
-            expected_detail_fragment="hors de votre périmètre",
-            label=f"DIRECTEUR {action_label} bloqué par scope exact",
-        )
 
     # Forbidden probes must not have altered the seeded in-progress request.
     await _assert_request_status_unchanged(
