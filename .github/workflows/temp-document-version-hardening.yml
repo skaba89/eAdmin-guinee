@@ -78,6 +78,9 @@ jobs:
       - name: Apply deterministic scratch patch
         run: python .scratch/document_version_hardening_patch.py
 
+      - name: Normalize PostgreSQL probe
+        run: python .scratch/fix_document_probe.py
+
       - name: Verify migration chain after patch
         working-directory: backend
         run: |
@@ -121,6 +124,7 @@ jobs:
         run: |
           rm .github/workflows/temp-document-version-hardening.yml
           rm .scratch/document_version_hardening_patch.py
+          rm .scratch/fix_document_probe.py
           rmdir .scratch 2>/dev/null || true
           git diff --check
           git status --short
