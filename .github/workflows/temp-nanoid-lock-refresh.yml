@@ -29,10 +29,10 @@ jobs:
           bun install
           grep -Fq '"nanoid": ["nanoid@3.3.18"' bun.lock
           bun install --frozen-lockfile
-          git diff --exit-code -- bun.lock && {
+          if git diff --quiet -- bun.lock; then
             echo 'Expected bun.lock to change for nanoid 3.3.18' >&2
             exit 1
-          }
+          fi
 
       - name: Commit generated lock on technical branch
         run: |
