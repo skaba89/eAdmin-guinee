@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'backend/alembic/versions/directeur_request_hierarchy_scope.py'
+      - 'backend/alembic/versions/directeur_runtime_hierarchy_scope.py'
       - 'backend/app/api/service_requests.py'
       - 'backend/app/services/institution_scope.py'
       - 'backend/tests/test_institution_scope.py'
@@ -118,7 +119,6 @@ jobs:
             PASSWORD :'runtime_password';
           GRANT CONNECT ON DATABASE eadmin TO eadmin_hierarchy_rls;
           GRANT USAGE ON SCHEMA public TO eadmin_hierarchy_rls;
-          GRANT SELECT ON institutions TO eadmin_hierarchy_rls;
           GRANT SELECT, UPDATE ON service_requests TO eadmin_hierarchy_rls;
           SQL
 
@@ -154,7 +154,7 @@ jobs:
             WHERE reference='REC-GN-2026-006';")"
           test "${route}" = 'republique-de-guinee:service-casier-recette'
 
-      - name: Prove runtime CTE and signed RLS context
+      - name: Prove signed DIRECTEUR helper contract
         run: |
           set -euo pipefail
           compose=(docker compose --env-file .env.local.ci -f docker-compose.local.yml)
@@ -163,35 +163,24 @@ jobs:
               psql -X -q -A -t -h 127.0.0.1 -U eadmin_hierarchy_rls -d eadmin \
               -v ON_ERROR_STOP=1 -c "$1"
           }
+          scope_for() {
+            local role="$1" tenant="$2" institution="$3"
+            psql_runtime "
+              BEGIN;
+              SET LOCAL app.current_user_id = '00000000-0000-0000-0000-000000000001';
+              SET LOCAL app.current_tenant_id = '${tenant}';
+              SET LOCAL app.current_institution_id = '${institution}';
+              SET LOCAL app.current_role = '${role}';
+              SELECT COALESCE(string_agg(scope_id, ',' ORDER BY scope_id), '')
+              FROM eadmin_current_directeur_institution_scope();
+              COMMIT;"
+          }
 
-          runtime_graph="$(psql_runtime "
-            WITH RECURSIVE institution_tree AS (
-              SELECT id, parent_id
-              FROM institutions
-              WHERE id='dir-justice-recette'
-                AND tenant_id='republique-de-guinee'
-                AND is_active=TRUE
-              UNION
-              SELECT child.id, child.parent_id
-              FROM institutions child
-              JOIN institution_tree parent ON child.parent_id = parent.id
-              WHERE child.tenant_id='republique-de-guinee'
-                AND child.is_active=TRUE
-            )
-            SELECT string_agg(id, ',' ORDER BY id) FROM institution_tree;")"
-          test "${runtime_graph}" = 'dir-justice-recette,service-casier-recette'
-
-          context="$(psql_runtime "
-            BEGIN;
-            SET LOCAL app.current_user_id = '00000000-0000-0000-0000-000000000001';
-            SET LOCAL app.current_tenant_id = 'republique-de-guinee';
-            SET LOCAL app.current_institution_id = 'dir-justice-recette';
-            SET LOCAL app.current_role = 'DIRECTEUR';
-            SELECT current_setting('app.current_role', true)
-              || '|' || current_setting('app.current_tenant_id', true)
-              || '|' || current_setting('app.current_institution_id', true);
-            COMMIT;")"
-          test "${context}" = 'DIRECTEUR|republique-de-guinee|dir-justice-recette'
+          test "$(scope_for DIRECTEUR republique-de-guinee dir-justice-recette)" = 'dir-justice-recette,service-casier-recette'
+          test -z "$(scope_for DIRECTEUR tenant-isolation-recette dir-justice-recette)"
+          test -z "$(scope_for DIRECTEUR republique-de-guinee '')"
+          test -z "$(scope_for UNKNOWN republique-de-guinee dir-justice-recette)"
+          test -z "$(scope_for MINISTRE republique-de-guinee dir-justice-recette)"
 
       - name: Prove DIRECTEUR institution plus descendants only
         run: |
