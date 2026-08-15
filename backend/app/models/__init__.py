@@ -23,6 +23,7 @@ from app.models.identity_lifecycle import (
     IdentityLifecycleEvent,
 )
 from app.models.institution import Institution
+from app.models.institution_service_assignment import InstitutionServiceAssignment
 from app.models.notification_outbox import NotificationOutbox
 from app.models.phone_verification import PhoneVerificationChallenge
 from app.models.qualified_signature_evidence import QualifiedSignatureEvidence
@@ -58,6 +59,7 @@ __all__ = [
     "RoleEnum",
     "Tenant",
     "Institution",
+    "InstitutionServiceAssignment",
     "Document",
     "DocumentStatusEnum",
     "DocumentVersion",

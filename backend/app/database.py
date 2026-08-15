@@ -96,6 +96,8 @@ def _enforce_trusted_scope(session: Session, flush_context, instances) -> None:
     is_super_admin = bool(scope.get("is_super_admin"))
     trusted_target = session.info.get("trusted_target_institution_id")
     trusted_target = str(trusted_target).strip() if trusted_target else None
+    trusted_user_target = session.info.get("trusted_user_institution_id")
+    trusted_user_target = str(trusted_user_target).strip() if trusted_user_target else None
 
     for obj in session.new:
         if hasattr(obj, "tenant_id"):
@@ -114,8 +116,15 @@ def _enforce_trusted_scope(session: Session, flush_context, instances) -> None:
                 and obj.__class__.__name__ == "ServiceRequest"
                 and trusted_target is not None
             )
+            is_governed_user_assignment = (
+                obj.__class__.__name__ == "User"
+                and role in {"MAIRIE", "ADMIN"}
+                and trusted_user_target is not None
+            )
             if is_citizen_request:
                 setattr(obj, "institution_id", trusted_target)
+            elif is_governed_user_assignment:
+                setattr(obj, "institution_id", trusted_user_target)
             elif is_super_admin:
                 if getattr(obj, "institution_id", None) in (None, ""):
                     setattr(obj, "institution_id", institution_id)
@@ -136,4 +145,5 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         finally:
             session.sync_session.info.pop("rls_scope", None)
             session.sync_session.info.pop("trusted_target_institution_id", None)
+            session.sync_session.info.pop("trusted_user_institution_id", None)
             await session.close()
