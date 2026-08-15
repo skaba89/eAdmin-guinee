@@ -133,6 +133,46 @@ async def test_admin_can_create_only_lower_role_inside_own_scope(
 
 
 @pytest.mark.asyncio
+async def test_central_user_admin_guard_preserves_descendant_scope_boundaries(db_session):
+    actor = await _user(
+        db_session,
+        email="admin.descendant.guard@eadmin.gn",
+        role=RoleEnum.ADMIN,
+        tenant_id=settings.TENANT_DEFAULT_ID,
+        institution_id="mairie-root",
+    )
+    target = await _user(
+        db_session,
+        email="agent.descendant.guard@eadmin.gn",
+        role=RoleEnum.AGENT,
+        tenant_id=settings.TENANT_DEFAULT_ID,
+        institution_id="mairie-root-service",
+    )
+
+    assert authorization_service.can_administer_user(actor, target) is False
+    assert authorization_service.can_administer_user(
+        actor,
+        target,
+        institution_scope_verified=True,
+    ) is True
+
+    target.tenant_id = "other-tenant"
+    assert authorization_service.can_administer_user(
+        actor,
+        target,
+        institution_scope_verified=True,
+    ) is False
+
+    target.tenant_id = settings.TENANT_DEFAULT_ID
+    target.role = RoleEnum.DIRECTEUR
+    assert authorization_service.can_administer_user(
+        actor,
+        target,
+        institution_scope_verified=True,
+    ) is False
+
+
+@pytest.mark.asyncio
 async def test_temporary_grant_requires_mfa_and_cannot_escape_tenant(db_session):
     requester = await _user(
         db_session,

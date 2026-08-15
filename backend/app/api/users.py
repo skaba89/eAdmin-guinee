@@ -429,6 +429,18 @@ async def create_user(
         tenant_id=tenant_id,
         institution_id=institution_id,
     )
+    institution_scope_verified = await _institution_in_actor_scope(
+        db, current_user, user.institution_id
+    )
+    if not authorization_service.can_administer_user(
+        current_user,
+        user,
+        institution_scope_verified=institution_scope_verified,
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Création du compte hors de votre périmètre administratif.",
+        )
     db.add(user)
     await db.flush()
     await identity_lifecycle_service.record_joiner(
@@ -492,6 +504,18 @@ async def update_user(
         raise HTTPException(
             status_code=403,
             detail="Compte hors de votre niveau ou périmètre administratif.",
+        )
+    institution_scope_verified = await _institution_in_actor_scope(
+        db, current_user, user.institution_id
+    )
+    if not authorization_service.can_administer_user(
+        current_user,
+        user,
+        institution_scope_verified=institution_scope_verified,
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="Mutation utilisateur hors de votre périmètre administratif.",
         )
 
     update_data = user_data.model_dump(exclude_unset=True)
@@ -612,6 +636,15 @@ async def deactivate_user(
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
     if not await _can_view_user_governed(db, current_user, user):
+        raise HTTPException(status_code=403, detail="Désactivation hors périmètre interdite.")
+    institution_scope_verified = await _institution_in_actor_scope(
+        db, current_user, user.institution_id
+    )
+    if not authorization_service.can_administer_user(
+        current_user,
+        user,
+        institution_scope_verified=institution_scope_verified,
+    ):
         raise HTTPException(status_code=403, detail="Désactivation hors périmètre interdite.")
 
     await identity_lifecycle_service.offboard_user(

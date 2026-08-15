@@ -253,8 +253,18 @@ class AuthorizationService:
         return AuthorizationDecision(False, reason, "deny")
 
     @staticmethod
-    def can_administer_user(actor: User, target: User) -> bool:
-        """Permanent user administration never inherits through a temporary grant."""
+    def can_administer_user(
+        actor: User,
+        target: User,
+        *,
+        institution_scope_verified: bool = False,
+    ) -> bool:
+        """Authorize permanent user administration from trusted server scope only.
+
+        ``institution_scope_verified`` may only represent a server-side hierarchy proof
+        (for example a mairie root administering an active descendant service). It never
+        bypasses self-administration, role hierarchy, activity, or tenant isolation.
+        """
         if actor.role == RoleEnum.SUPER_ADMIN:
             return actor.id != target.id
         if not actor.is_active or actor.id == target.id:
@@ -265,6 +275,8 @@ class AuthorizationService:
             return False
         if actor.role == RoleEnum.MINISTRE:
             return True
+        if institution_scope_verified:
+            return bool(actor.institution_id) and bool(target.institution_id)
         return bool(actor.institution_id) and actor.institution_id == target.institution_id
 
     @staticmethod
