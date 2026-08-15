@@ -53,6 +53,7 @@ jobs:
           path.write_text('\n'.join(output) + '\n', encoding='utf-8')
           PY
           python scripts/apply_municipality_routing_patch.py
+          python scripts/harden_municipality_routing_patch.py
 
       - name: Verify Alembic has one head
         working-directory: backend
@@ -63,7 +64,7 @@ jobs:
 
       - name: Lint changed backend surface
         working-directory: backend
-        run: ruff check app/models/institution_service_assignment.py app/models/service_request.py app/services/service_catalog.py app/api/service_requests.py app/api/service_catalog.py app/api/users.py tests/test_municipality_service_request_routing.py
+        run: ruff check app/database.py app/models/institution_service_assignment.py app/models/service_request.py app/services/service_catalog.py app/api/service_requests.py app/api/service_catalog.py app/api/users.py tests/test_municipality_service_request_routing.py
 
       - name: Run focused municipal routing tests
         working-directory: backend
@@ -80,6 +81,7 @@ jobs:
       - name: Remove temporary build helpers
         run: |
           rm -f scripts/apply_municipality_routing_patch.py
+          rm -f scripts/harden_municipality_routing_patch.py
           rm -f .github/workflows/temp-municipality-routing-build.yml
 
       - name: Commit tested implementation
