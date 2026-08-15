@@ -81,6 +81,9 @@ jobs:
       - name: Normalize PostgreSQL probe
         run: python .scratch/fix_document_probe.py
 
+      - name: Seed PostgreSQL probe fixtures
+        run: python .scratch/fix_document_probe_seed.py
+
       - name: Normalize document scope tests
         run: python .scratch/fix_document_scope_tests.py
 
@@ -128,6 +131,7 @@ jobs:
           rm .github/workflows/temp-document-version-hardening.yml
           rm .scratch/document_version_hardening_patch.py
           rm .scratch/fix_document_probe.py
+          rm .scratch/fix_document_probe_seed.py
           rm .scratch/fix_document_scope_tests.py
           rmdir .scratch 2>/dev/null || true
           git diff --check
