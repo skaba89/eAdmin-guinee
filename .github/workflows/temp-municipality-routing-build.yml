@@ -69,6 +69,8 @@ jobs:
         working-directory: backend
         env:
           ENVIRONMENT: test
+          DATABASE_URL: sqlite+aiosqlite:///./test_eadmin.db
+          REDIS_URL: redis://localhost:6379/0
           SECRET_KEY: ci-only-secret-key-not-for-production-0123456789
           ENCRYPTION_KEY: ci-only-encryption-key-0123456789abcdef
           MINIO_ACCESS_KEY: ci-minio
