@@ -71,14 +71,13 @@ async def get_active_service_assignment(
     institution_id: str,
     service_id: str,
 ) -> InstitutionServiceAssignment | None:
-    """Resolve active routing only when both municipality and child service are active."""
+    """Resolve the active configured route; callers validate endpoint health/hierarchy."""
     query = select(InstitutionServiceAssignment).where(
         InstitutionServiceAssignment.tenant_id == tenant_id,
         InstitutionServiceAssignment.institution_id == institution_id,
         InstitutionServiceAssignment.service_id == service_id,
         InstitutionServiceAssignment.is_active.is_(True),
     )
-    query = _join_active_assignment_endpoints(query)
     return (await db.execute(query)).scalar_one_or_none()
 
 
