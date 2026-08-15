@@ -11,7 +11,9 @@ on:
       - 'backend/app/models/institution_service_assignment.py'
       - 'backend/app/services/service_catalog.py'
       - 'backend/alembic/versions/municipality_service_request_routing.py'
+      - 'backend/alembic/versions/municipal_route_history_lock.py'
       - 'backend/tests/test_municipality_service_request_routing.py'
+      - 'backend/tests/test_municipality_routing_matrix.py'
       - '.github/workflows/municipality-service-request-rls.yml'
   workflow_dispatch:
 
@@ -21,7 +23,7 @@ permissions:
 jobs:
   municipality-service-request-rls:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:16
@@ -46,6 +48,7 @@ jobs:
       ENCRYPTION_KEY: ci-only-encryption-key-0123456789abcdef
       MINIO_ACCESS_KEY: ci-minio
       MINIO_SECRET_KEY: ci-minio-secret
+      PYTHONPATH: ${{ github.workspace }}/backend
 
     steps:
       - name: Checkout
@@ -56,13 +59,15 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-          cache-dependency-path: backend/requirements.txt
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
 
-      - name: Install backend dependencies
+      - name: Install backend test dependencies
         working-directory: backend
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
 
       - name: Apply schema and seed governed baseline
         working-directory: backend
@@ -70,30 +75,70 @@ jobs:
           alembic upgrade head
           python scripts/seed_recette_data.py
 
+      - name: Verify one Alembic head
+        working-directory: backend
+        run: |
+          alembic heads
+          test "$(alembic heads | grep -c '(head)')" = '1'
+
+      - name: Run municipality application matrix
+        working-directory: backend
+        run: |
+          pytest \
+            tests/test_municipality_service_request_routing.py \
+            tests/test_municipality_routing_matrix.py \
+            tests/test_service_request_hierarchy_scope.py \
+            tests/test_public_service_catalog.py \
+            tests/test_mairie_tenant_isolation.py \
+            -q
+
       - name: Prepare two-mairie RLS fixtures
         shell: bash
         run: |
           set -euo pipefail
           TENANT_ID="$(psql -h localhost -U eadmin -d eadmin_test -Atc "SELECT id FROM tenants ORDER BY id LIMIT 1")"
-          CITIZEN_ID="$(psql -h localhost -U eadmin -d eadmin_test -Atc "SELECT id FROM users ORDER BY created_at LIMIT 1")"
+          CITIZEN_A_ID="$(psql -h localhost -U eadmin -d eadmin_test -Atc "SELECT id FROM users ORDER BY created_at, id LIMIT 1")"
+          CITIZEN_B_ID="$(psql -h localhost -U eadmin -d eadmin_test -Atc "SELECT id FROM users ORDER BY created_at, id OFFSET 1 LIMIT 1")"
           test -n "$TENANT_ID"
-          test -n "$CITIZEN_ID"
+          test -n "$CITIZEN_A_ID"
+          test -n "$CITIZEN_B_ID"
+          test "$CITIZEN_A_ID" != "$CITIZEN_B_ID"
 
           psql -h localhost -U eadmin -d eadmin_test -v ON_ERROR_STOP=1 \
-            -v tenant_id="$TENANT_ID" -v citizen_id="$CITIZEN_ID" <<'SQL'
+            -v tenant_id="$TENANT_ID" \
+            -v citizen_a_id="$CITIZEN_A_ID" \
+            -v citizen_b_id="$CITIZEN_B_ID" <<'SQL'
           INSERT INTO institutions (id, tenant_id, name, type, parent_id, is_active)
           VALUES
             ('ci-mairie-a', :'tenant_id', 'CI Mairie A', 'mairie', NULL, TRUE),
-            ('ci-service-a', :'tenant_id', 'CI Etat civil A', 'service', 'ci-mairie-a', TRUE),
+            ('ci-service-a1', :'tenant_id', 'CI Etat civil A1', 'service', 'ci-mairie-a', TRUE),
+            ('ci-service-a2', :'tenant_id', 'CI Urbanisme A2', 'service', 'ci-mairie-a', TRUE),
             ('ci-mairie-b', :'tenant_id', 'CI Mairie B', 'mairie', NULL, TRUE),
-            ('ci-service-b', :'tenant_id', 'CI Etat civil B', 'service', 'ci-mairie-b', TRUE)
+            ('ci-service-b1', :'tenant_id', 'CI Etat civil B1', 'service', 'ci-mairie-b', TRUE)
           ON CONFLICT (id) DO NOTHING;
+
+          -- Insert the first historical row before any assignment exists. The
+          -- AFTER INSERT trigger on the assignment must freeze it to A1.
+          INSERT INTO service_requests (
+            id, reference, service_id, service_name, category, category_id,
+            citizen_id, citizen_name, citizen_first_name, citizen_nin,
+            citizen_phone, citizen_email, citizen_address, motif,
+            required_documents, status, assigned_service, timeline,
+            deadline_days, deadline_date, delivery_mode,
+            tenant_id, institution_id, service_institution_id
+          ) VALUES (
+            'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', 'CI-MAIRIE-A-LEGACY-1', 'ci-acte-a', 'Acte A',
+            'Etat civil', 'etat-civil', :'citizen_a_id', 'Diallo', 'Aminata', 'CI-NIN-A1',
+            '+224600000001', 'a1@ci.test', 'Commune A', 'Isolation A historique 1', '[]'::json,
+            'soumise', 'CI Etat civil A1', '[]'::json, 5, now() + interval '5 days', 'guichet',
+            :'tenant_id', 'ci-mairie-a', NULL
+          ) ON CONFLICT (reference) DO NOTHING;
 
           INSERT INTO institution_service_assignments
             (id, tenant_id, institution_id, service_id, service_institution_id, is_active)
           VALUES
-            ('11111111-1111-4111-8111-111111111111', :'tenant_id', 'ci-mairie-a', 'ci-acte-a', 'ci-service-a', TRUE),
-            ('22222222-2222-4222-8222-222222222222', :'tenant_id', 'ci-mairie-b', 'ci-acte-b', 'ci-service-b', TRUE)
+            ('11111111-1111-4111-8111-111111111111', :'tenant_id', 'ci-mairie-a', 'ci-acte-a', 'ci-service-a1', TRUE),
+            ('22222222-2222-4222-8222-222222222222', :'tenant_id', 'ci-mairie-b', 'ci-acte-b', 'ci-service-b1', TRUE)
           ON CONFLICT (tenant_id, institution_id, service_id) DO UPDATE
             SET service_institution_id = EXCLUDED.service_institution_id, is_active = TRUE;
 
@@ -106,27 +151,37 @@ jobs:
             tenant_id, institution_id, service_institution_id
           ) VALUES
             (
-              'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', 'CI-MAIRIE-A-NEW', 'ci-acte-a', 'Acte A',
-              'Etat civil', 'etat-civil', :'citizen_id', 'Diallo', 'Aminata', 'CI-NIN-A1',
-              '+224600000001', 'a1@ci.test', 'Commune A', 'Isolation A nouvelle', '[]'::json,
-              'soumise', 'CI Etat civil A', '[]'::json, 5, now() + interval '5 days', 'guichet',
-              :'tenant_id', 'ci-mairie-a', 'ci-service-a'
+              'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2', 'CI-MAIRIE-A-NEW-A1', 'ci-acte-a', 'Acte A',
+              'Etat civil', 'etat-civil', :'citizen_a_id', 'Bah', 'Mamadou', 'CI-NIN-A2',
+              '+224600000002', 'a2@ci.test', 'Commune A', 'Isolation A nouvelle A1', '[]'::json,
+              'soumise', 'CI Etat civil A1', '[]'::json, 5, now() + interval '5 days', 'guichet',
+              :'tenant_id', 'ci-mairie-a', 'ci-service-a1'
             ),
             (
-              'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2', 'CI-MAIRIE-A-LEGACY', 'ci-acte-a', 'Acte A',
-              'Etat civil', 'etat-civil', :'citizen_id', 'Bah', 'Mamadou', 'CI-NIN-A2',
-              '+224600000002', 'a2@ci.test', 'Commune A', 'Isolation A historique', '[]'::json,
-              'soumise', 'CI Etat civil A', '[]'::json, 5, now() + interval '5 days', 'guichet',
-              :'tenant_id', 'ci-mairie-a', NULL
-            ),
-            (
-              'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1', 'CI-MAIRIE-B-NEW', 'ci-acte-b', 'Acte B',
-              'Etat civil', 'etat-civil', :'citizen_id', 'Camara', 'Fatoumata', 'CI-NIN-B1',
-              '+224600000003', 'b1@ci.test', 'Commune B', 'Isolation B nouvelle', '[]'::json,
-              'soumise', 'CI Etat civil B', '[]'::json, 5, now() + interval '5 days', 'guichet',
-              :'tenant_id', 'ci-mairie-b', 'ci-service-b'
+              'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1', 'CI-MAIRIE-B-NEW-B1', 'ci-acte-b', 'Acte B',
+              'Etat civil', 'etat-civil', :'citizen_b_id', 'Camara', 'Fatoumata', 'CI-NIN-B1',
+              '+224600000003', 'b1@ci.test', 'Commune B', 'Isolation B nouvelle B1', '[]'::json,
+              'soumise', 'CI Etat civil B1', '[]'::json, 5, now() + interval '5 days', 'guichet',
+              :'tenant_id', 'ci-mairie-b', 'ci-service-b1'
             )
           ON CONFLICT (reference) DO NOTHING;
+
+          -- Create a second null legacy row while the A1 route is active. It
+          -- must be frozen to A1 BEFORE the mairie moves future requests to A2.
+          INSERT INTO service_requests (
+            id, reference, service_id, service_name, category, category_id,
+            citizen_id, citizen_name, citizen_first_name, citizen_nin,
+            citizen_phone, citizen_email, citizen_address, motif,
+            required_documents, status, assigned_service, timeline,
+            deadline_days, deadline_date, delivery_mode,
+            tenant_id, institution_id, service_institution_id
+          ) VALUES (
+            'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3', 'CI-MAIRIE-A-LEGACY-2', 'ci-acte-a', 'Acte A',
+            'Etat civil', 'etat-civil', :'citizen_a_id', 'Sylla', 'Mariama', 'CI-NIN-A3',
+            '+224600000004', 'a3@ci.test', 'Commune A', 'Isolation A historique 2', '[]'::json,
+            'soumise', 'CI Etat civil A1', '[]'::json, 5, now() + interval '5 days', 'guichet',
+            :'tenant_id', 'ci-mairie-a', NULL
+          ) ON CONFLICT (reference) DO NOTHING;
 
           DO $$
           BEGIN
@@ -135,60 +190,184 @@ jobs:
             END IF;
           END $$;
           GRANT USAGE ON SCHEMA public TO eadmin_runtime_ci;
-          GRANT SELECT ON service_requests, institution_service_assignments TO eadmin_runtime_ci;
+          GRANT SELECT, UPDATE ON service_requests TO eadmin_runtime_ci;
+          GRANT SELECT, INSERT, UPDATE, DELETE ON institution_service_assignments TO eadmin_runtime_ci;
           SQL
+
+          frozen="$(psql -h localhost -U eadmin -d eadmin_test -Atc "SELECT service_institution_id FROM service_requests WHERE reference='CI-MAIRIE-A-LEGACY-1'")"
+          test "$frozen" = 'ci-service-a1'
 
           echo "TENANT_ID=$TENANT_ID" >> "$GITHUB_ENV"
+          echo "CITIZEN_A_ID=$CITIZEN_A_ID" >> "$GITHUB_ENV"
+          echo "CITIZEN_B_ID=$CITIZEN_B_ID" >> "$GITHUB_ENV"
 
-      - name: Prove Agent A sees only service A including historical request
+      - name: Prove Agent and Chef A1 see only service A1
         run: |
-          result="$(psql -h localhost -U eadmin -d eadmin_test -At -v ON_ERROR_STOP=1 <<SQL
-          SET ROLE eadmin_runtime_ci;
-          SELECT set_config('app.current_tenant_id', '$TENANT_ID', false);
-          SELECT set_config('app.current_institution_id', 'ci-service-a', false);
-          SELECT set_config('app.current_role', 'AGENT', false);
-          SELECT string_agg(reference, ',' ORDER BY reference)
-          FROM service_requests
-          WHERE reference LIKE 'CI-MAIRIE-%';
-          SQL
-          )"
-          test "$(printf '%s\n' "$result" | tail -n1)" = 'CI-MAIRIE-A-LEGACY,CI-MAIRIE-A-NEW'
-
-      - name: Prove Agent B sees only service B
-        run: |
-          result="$(psql -h localhost -U eadmin -d eadmin_test -At -v ON_ERROR_STOP=1 <<SQL
-          SET ROLE eadmin_runtime_ci;
-          SELECT set_config('app.current_tenant_id', '$TENANT_ID', false);
-          SELECT set_config('app.current_institution_id', 'ci-service-b', false);
-          SELECT set_config('app.current_role', 'AGENT', false);
-          SELECT string_agg(reference, ',' ORDER BY reference)
-          FROM service_requests
-          WHERE reference LIKE 'CI-MAIRIE-%';
-          SQL
-          )"
-          test "$(printf '%s\n' "$result" | tail -n1)" = 'CI-MAIRIE-B-NEW'
-
-      - name: Prove each mairie sees only requests addressed to it
-        run: |
-          for pair in 'ci-mairie-a:CI-MAIRIE-A-LEGACY,CI-MAIRIE-A-NEW' 'ci-mairie-b:CI-MAIRIE-B-NEW'; do
-            institution="${pair%%:*}"
-            expected="${pair#*:}"
+          for role in AGENT CHEF_SERVICE; do
             result="$(psql -h localhost -U eadmin -d eadmin_test -At -v ON_ERROR_STOP=1 <<SQL
           SET ROLE eadmin_runtime_ci;
           SELECT set_config('app.current_tenant_id', '$TENANT_ID', false);
-          SELECT set_config('app.current_institution_id', '$institution', false);
-          SELECT set_config('app.current_role', 'MAIRIE', false);
-          SELECT string_agg(reference, ',' ORDER BY reference)
+          SELECT set_config('app.current_institution_id', 'ci-service-a1', false);
+          SELECT set_config('app.current_role', '$role', false);
+          SELECT COALESCE(string_agg(reference, ',' ORDER BY reference), 'NONE')
           FROM service_requests
           WHERE reference LIKE 'CI-MAIRIE-%';
           SQL
           )"
-            test "$(printf '%s\n' "$result" | tail -n1)" = "$expected"
+            test "$(printf '%s\n' "$result" | tail -n1)" = 'CI-MAIRIE-A-LEGACY-1,CI-MAIRIE-A-NEW-A1'
           done
 
-      - name: Prove service teams cannot read another mairie assignment
+      - name: Prove Agent B1 sees only service B1
         run: |
-          for pair in 'ci-service-a:ci-mairie-a' 'ci-service-b:ci-mairie-b'; do
+          result="$(psql -h localhost -U eadmin -d eadmin_test -At -v ON_ERROR_STOP=1 <<SQL
+          SET ROLE eadmin_runtime_ci;
+          SELECT set_config('app.current_tenant_id', '$TENANT_ID', false);
+          SELECT set_config('app.current_institution_id', 'ci-service-b1', false);
+          SELECT set_config('app.current_role', 'AGENT', false);
+          SELECT COALESCE(string_agg(reference, ',' ORDER BY reference), 'NONE')
+          FROM service_requests
+          WHERE reference LIKE 'CI-MAIRIE-%';
+          SQL
+          )"
+          test "$(printf '%s\n' "$result" | tail -n1)" = 'CI-MAIRIE-B-NEW-B1'
+
+      - name: Prove mairie and admin see only their commune
+        run: |
+          for role in MAIRIE ADMIN; do
+            result="$(psql -h localhost -U eadmin -d eadmin_test -At -v ON_ERROR_STOP=1 <<SQL
+          SET ROLE eadmin_runtime_ci;
+          SELECT set_config('app.current_tenant_id', '$TENANT_ID', false);
+          SELECT set_config('app.current_institution_id', 'ci-mairie-a', false);
+          SELECT set_config('app.current_role', '$role', false);
+          SELECT COALESCE(string_agg(reference, ',' ORDER BY reference), 'NONE')
+          FROM service_requests
+          WHERE reference LIKE 'CI-MAIRIE-%';
+          SQL
+          )"
+            test "$(printf '%s\n' "$result" | tail -n1)" = 'CI-MAIRIE-A-LEGACY-1,CI-MAIRIE-A-LEGACY-2,CI-MAIRIE-A-NEW-A1'
+          done
+
+          result="$(psql -h localhost -U eadmin -d eadmin_test -At -v ON_ERROR_STOP=1 <<SQL
+          SET ROLE eadmin_runtime_ci;
+          SELECT set_config('app.current_tenant_id', '$TENANT_ID', false);
+          SELECT set_config('app.current_institution_id', 'ci-mairie-b', false);
+          SELECT set_config('app.current_role', 'MAIRIE', false);
+          SELECT COALESCE(string_agg(reference, ',' ORDER BY reference), 'NONE')
+          FROM service_requests
+          WHERE reference LIKE 'CI-MAIRIE-%';
+          SQL
+          )"
+          test "$(printf '%s\n' "$result" | tail -n1)" = 'CI-MAIRIE-B-NEW-B1'
+
+      - name: Prove citizens see only their own dossiers
+        run: |
+          result_a="$(psql -h localhost -U eadmin -d eadmin_test -At -v ON_ERROR_STOP=1 <<SQL
+          SET ROLE eadmin_runtime_ci;
+          SELECT set_config('app.current_user_id', '$CITIZEN_A_ID', false);
+          SELECT set_config('app.current_tenant_id', '$TENANT_ID', false);
+          SELECT set_config('app.current_institution_id', '', false);
+          SELECT set_config('app.current_role', 'CITOYEN', false);
+          SELECT COALESCE(string_agg(reference, ',' ORDER BY reference), 'NONE')
+          FROM service_requests
+          WHERE reference LIKE 'CI-MAIRIE-%';
+          SQL
+          )"
+          test "$(printf '%s\n' "$result_a" | tail -n1)" = 'CI-MAIRIE-A-LEGACY-1,CI-MAIRIE-A-LEGACY-2,CI-MAIRIE-A-NEW-A1'
+
+          result_b="$(psql -h localhost -U eadmin -d eadmin_test -At -v ON_ERROR_STOP=1 <<SQL
+          SET ROLE eadmin_runtime_ci;
+          SELECT set_config('app.current_user_id', '$CITIZEN_B_ID', false);
+          SELECT set_config('app.current_tenant_id', '$TENANT_ID', false);
+          SELECT set_config('app.current_institution_id', '', false);
+          SELECT set_config('app.current_role', 'CITOYEN', false);
+          SELECT COALESCE(string_agg(reference, ',' ORDER BY reference), 'NONE')
+          FROM service_requests
+          WHERE reference LIKE 'CI-MAIRIE-%';
+          SQL
+          )"
+          test "$(printf '%s\n' "$result_b" | tail -n1)" = 'CI-MAIRIE-B-NEW-B1'
+
+      - name: Prove missing scope and wrong tenant fail closed
+        run: |
+          no_service="$(psql -h localhost -U eadmin -d eadmin_test -At -v ON_ERROR_STOP=1 <<SQL
+          SET ROLE eadmin_runtime_ci;
+          SELECT set_config('app.current_tenant_id', '$TENANT_ID', false);
+          SELECT set_config('app.current_institution_id', '', false);
+          SELECT set_config('app.current_role', 'AGENT', false);
+          SELECT COALESCE(string_agg(reference, ',' ORDER BY reference), 'NONE')
+          FROM service_requests
+          WHERE reference LIKE 'CI-MAIRIE-%';
+          SQL
+          )"
+          test "$(printf '%s\n' "$no_service" | tail -n1)" = 'NONE'
+
+          wrong_tenant="$(psql -h localhost -U eadmin -d eadmin_test -At -v ON_ERROR_STOP=1 <<SQL
+          SET ROLE eadmin_runtime_ci;
+          SELECT set_config('app.current_tenant_id', 'ci-wrong-tenant', false);
+          SELECT set_config('app.current_institution_id', 'ci-service-a1', false);
+          SELECT set_config('app.current_role', 'AGENT', false);
+          SELECT COALESCE(string_agg(reference, ',' ORDER BY reference), 'NONE')
+          FROM service_requests
+          WHERE reference LIKE 'CI-MAIRIE-%';
+          SQL
+          )"
+          test "$(printf '%s\n' "$wrong_tenant" | tail -n1)" = 'NONE'
+
+      - name: Prove cross-mairie updates are blocked by RLS
+        run: |
+          agent_cross="$(psql -h localhost -U eadmin -d eadmin_test -At -v ON_ERROR_STOP=1 <<SQL
+          SET ROLE eadmin_runtime_ci;
+          SELECT set_config('app.current_tenant_id', '$TENANT_ID', false);
+          SELECT set_config('app.current_institution_id', 'ci-service-a1', false);
+          SELECT set_config('app.current_role', 'AGENT', false);
+          WITH changed AS (
+            UPDATE service_requests
+            SET motif = 'ILLEGAL-AGENT-CROSS'
+            WHERE reference = 'CI-MAIRIE-B-NEW-B1'
+            RETURNING reference
+          )
+          SELECT COALESCE(string_agg(reference, ',' ORDER BY reference), 'NONE') FROM changed;
+          SQL
+          )"
+          test "$(printf '%s\n' "$agent_cross" | tail -n1)" = 'NONE'
+
+          mairie_cross="$(psql -h localhost -U eadmin -d eadmin_test -At -v ON_ERROR_STOP=1 <<SQL
+          SET ROLE eadmin_runtime_ci;
+          SELECT set_config('app.current_tenant_id', '$TENANT_ID', false);
+          SELECT set_config('app.current_institution_id', 'ci-mairie-a', false);
+          SELECT set_config('app.current_role', 'MAIRIE', false);
+          WITH changed AS (
+            UPDATE service_requests
+            SET motif = 'ILLEGAL-MAIRIE-CROSS'
+            WHERE reference = 'CI-MAIRIE-B-NEW-B1'
+            RETURNING reference
+          )
+          SELECT COALESCE(string_agg(reference, ',' ORDER BY reference), 'NONE') FROM changed;
+          SQL
+          )"
+          test "$(printf '%s\n' "$mairie_cross" | tail -n1)" = 'NONE'
+
+          own_update="$(psql -h localhost -U eadmin -d eadmin_test -At -v ON_ERROR_STOP=1 <<SQL
+          SET ROLE eadmin_runtime_ci;
+          SELECT set_config('app.current_tenant_id', '$TENANT_ID', false);
+          SELECT set_config('app.current_institution_id', 'ci-service-a1', false);
+          SELECT set_config('app.current_role', 'AGENT', false);
+          WITH changed AS (
+            UPDATE service_requests
+            SET motif = 'LEGAL-A1-UPDATE'
+            WHERE reference = 'CI-MAIRIE-A-NEW-A1'
+            RETURNING reference
+          )
+          SELECT COALESCE(string_agg(reference, ',' ORDER BY reference), 'NONE') FROM changed;
+          SQL
+          )"
+          test "$(printf '%s\n' "$own_update" | tail -n1)" = 'CI-MAIRIE-A-NEW-A1'
+
+          test "$(psql -h localhost -U eadmin -d eadmin_test -Atc "SELECT motif FROM service_requests WHERE reference='CI-MAIRIE-B-NEW-B1'")" = 'Isolation B nouvelle B1'
+
+      - name: Prove assignment RLS blocks another mairie and agents
+        run: |
+          for pair in 'ci-service-a1:ci-mairie-a' 'ci-service-b1:ci-mairie-b'; do
             service="${pair%%:*}"
             expected="${pair#*:}"
             result="$(psql -h localhost -U eadmin -d eadmin_test -At -v ON_ERROR_STOP=1 <<SQL
@@ -196,10 +375,114 @@ jobs:
           SELECT set_config('app.current_tenant_id', '$TENANT_ID', false);
           SELECT set_config('app.current_institution_id', '$service', false);
           SELECT set_config('app.current_role', 'AGENT', false);
-          SELECT string_agg(institution_id, ',' ORDER BY institution_id)
+          SELECT COALESCE(string_agg(institution_id, ',' ORDER BY institution_id), 'NONE')
           FROM institution_service_assignments
           WHERE institution_id LIKE 'ci-mairie-%';
           SQL
           )"
             test "$(printf '%s\n' "$result" | tail -n1)" = "$expected"
           done
+
+          agent_write="$(psql -h localhost -U eadmin -d eadmin_test -At -v ON_ERROR_STOP=1 <<SQL
+          SET ROLE eadmin_runtime_ci;
+          SELECT set_config('app.current_tenant_id', '$TENANT_ID', false);
+          SELECT set_config('app.current_institution_id', 'ci-service-a1', false);
+          SELECT set_config('app.current_role', 'AGENT', false);
+          WITH changed AS (
+            UPDATE institution_service_assignments
+            SET is_active = FALSE
+            WHERE institution_id = 'ci-mairie-a' AND service_id = 'ci-acte-a'
+            RETURNING institution_id
+          )
+          SELECT COALESCE(string_agg(institution_id, ',' ORDER BY institution_id), 'NONE') FROM changed;
+          SQL
+          )"
+          test "$(printf '%s\n' "$agent_write" | tail -n1)" = 'NONE'
+
+          mairie_cross="$(psql -h localhost -U eadmin -d eadmin_test -At -v ON_ERROR_STOP=1 <<SQL
+          SET ROLE eadmin_runtime_ci;
+          SELECT set_config('app.current_tenant_id', '$TENANT_ID', false);
+          SELECT set_config('app.current_institution_id', 'ci-mairie-a', false);
+          SELECT set_config('app.current_role', 'MAIRIE', false);
+          WITH changed AS (
+            UPDATE institution_service_assignments
+            SET is_active = FALSE
+            WHERE institution_id = 'ci-mairie-b' AND service_id = 'ci-acte-b'
+            RETURNING institution_id
+          )
+          SELECT COALESCE(string_agg(institution_id, ',' ORDER BY institution_id), 'NONE') FROM changed;
+          SQL
+          )"
+          test "$(printf '%s\n' "$mairie_cross" | tail -n1)" = 'NONE'
+
+      - name: Prove historical routes stay frozen after reassignment
+        run: |
+          moved="$(psql -h localhost -U eadmin -d eadmin_test -At -v ON_ERROR_STOP=1 <<SQL
+          SET ROLE eadmin_runtime_ci;
+          SELECT set_config('app.current_tenant_id', '$TENANT_ID', false);
+          SELECT set_config('app.current_institution_id', 'ci-mairie-a', false);
+          SELECT set_config('app.current_role', 'MAIRIE', false);
+          WITH changed AS (
+            UPDATE institution_service_assignments
+            SET service_institution_id = 'ci-service-a2'
+            WHERE institution_id = 'ci-mairie-a' AND service_id = 'ci-acte-a'
+            RETURNING institution_id
+          )
+          SELECT COALESCE(string_agg(institution_id, ',' ORDER BY institution_id), 'NONE') FROM changed;
+          SQL
+          )"
+          test "$(printf '%s\n' "$moved" | tail -n1)" = 'ci-mairie-a'
+
+          frozen="$(psql -h localhost -U eadmin -d eadmin_test -Atc "SELECT string_agg(reference || ':' || service_institution_id, ',' ORDER BY reference) FROM service_requests WHERE reference IN ('CI-MAIRIE-A-LEGACY-1','CI-MAIRIE-A-LEGACY-2')")"
+          test "$frozen" = 'CI-MAIRIE-A-LEGACY-1:ci-service-a1,CI-MAIRIE-A-LEGACY-2:ci-service-a1'
+
+          psql -h localhost -U eadmin -d eadmin_test -v ON_ERROR_STOP=1 \
+            -v tenant_id="$TENANT_ID" -v citizen_a_id="$CITIZEN_A_ID" <<'SQL'
+          INSERT INTO service_requests (
+            id, reference, service_id, service_name, category, category_id,
+            citizen_id, citizen_name, citizen_first_name, citizen_nin,
+            citizen_phone, citizen_email, citizen_address, motif,
+            required_documents, status, assigned_service, timeline,
+            deadline_days, deadline_date, delivery_mode,
+            tenant_id, institution_id, service_institution_id
+          ) VALUES (
+            'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa4', 'CI-MAIRIE-A-NEW-A2', 'ci-acte-a', 'Acte A',
+            'Etat civil', 'etat-civil', :'citizen_a_id', 'Keita', 'Ibrahima', 'CI-NIN-A4',
+            '+224600000005', 'a4@ci.test', 'Commune A', 'Isolation A nouvelle A2', '[]'::json,
+            'soumise', 'CI Urbanisme A2', '[]'::json, 5, now() + interval '5 days', 'guichet',
+            :'tenant_id', 'ci-mairie-a', 'ci-service-a2'
+          ) ON CONFLICT (reference) DO NOTHING;
+          SQL
+
+          visible_a1="$(psql -h localhost -U eadmin -d eadmin_test -At -v ON_ERROR_STOP=1 <<SQL
+          SET ROLE eadmin_runtime_ci;
+          SELECT set_config('app.current_tenant_id', '$TENANT_ID', false);
+          SELECT set_config('app.current_institution_id', 'ci-service-a1', false);
+          SELECT set_config('app.current_role', 'AGENT', false);
+          SELECT COALESCE(string_agg(reference, ',' ORDER BY reference), 'NONE')
+          FROM service_requests WHERE reference LIKE 'CI-MAIRIE-A-%';
+          SQL
+          )"
+          test "$(printf '%s\n' "$visible_a1" | tail -n1)" = 'CI-MAIRIE-A-LEGACY-1,CI-MAIRIE-A-LEGACY-2,CI-MAIRIE-A-NEW-A1'
+
+          visible_a2="$(psql -h localhost -U eadmin -d eadmin_test -At -v ON_ERROR_STOP=1 <<SQL
+          SET ROLE eadmin_runtime_ci;
+          SELECT set_config('app.current_tenant_id', '$TENANT_ID', false);
+          SELECT set_config('app.current_institution_id', 'ci-service-a2', false);
+          SELECT set_config('app.current_role', 'AGENT', false);
+          SELECT COALESCE(string_agg(reference, ',' ORDER BY reference), 'NONE')
+          FROM service_requests WHERE reference LIKE 'CI-MAIRIE-A-%';
+          SQL
+          )"
+          test "$(printf '%s\n' "$visible_a2" | tail -n1)" = 'CI-MAIRIE-A-NEW-A2'
+
+          mairie_all="$(psql -h localhost -U eadmin -d eadmin_test -At -v ON_ERROR_STOP=1 <<SQL
+          SET ROLE eadmin_runtime_ci;
+          SELECT set_config('app.current_tenant_id', '$TENANT_ID', false);
+          SELECT set_config('app.current_institution_id', 'ci-mairie-a', false);
+          SELECT set_config('app.current_role', 'MAIRIE', false);
+          SELECT COALESCE(string_agg(reference, ',' ORDER BY reference), 'NONE')
+          FROM service_requests WHERE reference LIKE 'CI-MAIRIE-A-%';
+          SQL
+          )"
+          test "$(printf '%s\n' "$mairie_all" | tail -n1)" = 'CI-MAIRIE-A-LEGACY-1,CI-MAIRIE-A-LEGACY-2,CI-MAIRIE-A-NEW-A1,CI-MAIRIE-A-NEW-A2'
