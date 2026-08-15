@@ -9,6 +9,8 @@ from sqlalchemy import select
 from app.api.service_catalog import ServiceVersionCreate, publish_service_version
 from app.api.service_requests import ServiceRequestCreate, create_service_request
 from app.models.administrative_service import AdministrativeService
+from app.models.institution import Institution
+from app.models.institution_service_assignment import InstitutionServiceAssignment
 from app.models.service_request import ServiceRequest
 from app.services.service_catalog import get_active_service
 
@@ -133,6 +135,18 @@ async def test_request_creation_ignores_tampered_client_service_metadata(
     citoyen_user,
 ):
     citoyen_user.tenant_id = test_tenant.id
+    test_institution.type = "mairie"
+    test_institution.name = "Mairie Test"
+    processing_service = Institution(
+        id="test-institution-service",
+        tenant_id=test_tenant.id,
+        name="Service interne Test",
+        type="service",
+        parent_id=test_institution.id,
+        code="TEST-SVC-001",
+        is_active=True,
+    )
+    db_session.add(processing_service)
     authoritative = catalog_row(
         test_tenant.id,
         service_id="svc-authoritative",
@@ -148,6 +162,16 @@ async def test_request_creation_ignores_tampered_client_service_metadata(
     authoritative.policy_status = "approved"
     authoritative.source_reference = "Référence officielle TEST-7"
     db_session.add(authoritative)
+    await db_session.flush()
+    db_session.add(
+        InstitutionServiceAssignment(
+            tenant_id=test_tenant.id,
+            institution_id=test_institution.id,
+            service_id=authoritative.service_id,
+            service_institution_id=processing_service.id,
+            is_active=True,
+        )
+    )
     await db_session.flush()
 
     payload = ServiceRequestCreate(
