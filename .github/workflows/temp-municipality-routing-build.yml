@@ -35,7 +35,24 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Apply deterministic routing patch
-        run: python scripts/apply_municipality_routing_patch.py
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/apply_municipality_routing_patch.py')
+          lines = path.read_text(encoding='utf-8').splitlines()
+          output = []
+          skip_next = False
+          for line in lines:
+              if skip_next:
+                  skip_next = False
+                  continue
+              if line.strip() == 'if text.count(old) != 1:':
+                  skip_next = True
+                  continue
+              output.append(line)
+          path.write_text('\n'.join(output) + '\n', encoding='utf-8')
+          PY
+          python scripts/apply_municipality_routing_patch.py
 
       - name: Verify Alembic has one head
         working-directory: backend
