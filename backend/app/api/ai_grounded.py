@@ -24,12 +24,14 @@ router = APIRouter()
 class ClassifyRequest(BaseModel):
     text: str = Field(min_length=1, max_length=20000)
     title: str | None = Field(default=None, max_length=500)
+    institution_id: str | None = Field(default=None, max_length=100)
 
 
 class AssistantRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
     context: dict | None = None
     language: str = Field(default="fr", max_length=10)
+    institution_id: str | None = Field(default=None, max_length=100)
 
 
 class SummarizeRequest(BaseModel):
@@ -65,15 +67,18 @@ class RequestClassifyRequest(BaseModel):
     motif: str | None = Field(default=None, max_length=5000)
     description: str | None = Field(default=None, max_length=5000)
     citizen_info: str | None = Field(default=None, max_length=2000)
+    institution_id: str | None = Field(default=None, max_length=100)
 
 
 class AssistantAskRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
     context: dict | None = None
+    institution_id: str | None = Field(default=None, max_length=100)
 
 
 class ProcedureSuggestRequest(BaseModel):
     citizen_need: str = Field(min_length=1, max_length=2000)
+    institution_id: str | None = Field(default=None, max_length=100)
 
 
 class ExtractDataRequest(BaseModel):
@@ -88,6 +93,18 @@ class GenerateReportRequest(BaseModel):
 
 def _tenant_id(user: User) -> str | None:
     return user.tenant_id
+
+
+def _catalog_scope(
+    user: User,
+    requested_institution_id: str | None,
+) -> tuple[str | None, str | None]:
+    """Return only server-trusted catalog scope for grounded AI retrieval."""
+    if user.role in {RoleEnum.AGENT, RoleEnum.CHEF_SERVICE}:
+        return None, user.institution_id
+    if user.role in {RoleEnum.MAIRIE, RoleEnum.ADMIN, RoleEnum.AGENCE}:
+        return user.institution_id, None
+    return requested_institution_id, None
 
 
 def _as_http_error(exc: ValueError) -> HTTPException:
@@ -106,11 +123,16 @@ async def classify_text(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
+    institution_id, service_institution_id = _catalog_scope(
+        current_user, request.institution_id
+    )
     return await grounded_government_ai.classify_text(
         db,
         request.text,
         _tenant_id(current_user),
         title=request.title,
+        institution_id=institution_id,
+        service_institution_id=service_institution_id,
     )
 
 
@@ -120,11 +142,16 @@ async def administrative_assistant(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
+    institution_id, service_institution_id = _catalog_scope(
+        current_user, request.institution_id
+    )
     return await grounded_government_ai.answer_question(
         db,
         request.question,
         _tenant_id(current_user),
         language=request.language,
+        institution_id=institution_id,
+        service_institution_id=service_institution_id,
     )
 
 
@@ -230,10 +257,15 @@ async def classify_citizen_request(
     )
     if not combined:
         raise HTTPException(status_code=422, detail="Un contenu est requis pour la suggestion.")
+    institution_id, service_institution_id = _catalog_scope(
+        current_user, request.institution_id
+    )
     return await grounded_government_ai.classify_text(
         db,
         combined,
         _tenant_id(current_user),
+        institution_id=institution_id,
+        service_institution_id=service_institution_id,
     )
 
 
@@ -272,10 +304,15 @@ async def ask_assistant(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
+    institution_id, service_institution_id = _catalog_scope(
+        current_user, request.institution_id
+    )
     return await grounded_government_ai.answer_question(
         db,
         request.question,
         _tenant_id(current_user),
+        institution_id=institution_id,
+        service_institution_id=service_institution_id,
     )
 
 
@@ -285,10 +322,15 @@ async def suggest_procedure(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
+    institution_id, service_institution_id = _catalog_scope(
+        current_user, request.institution_id
+    )
     return await grounded_government_ai.suggest_procedures(
         db,
         request.citizen_need,
         _tenant_id(current_user),
+        institution_id=institution_id,
+        service_institution_id=service_institution_id,
     )
 
 
