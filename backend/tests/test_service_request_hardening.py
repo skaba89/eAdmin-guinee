@@ -159,11 +159,14 @@ async def test_create_request_uses_authenticated_citizen_identity_not_spoofed_em
         required_documents=["Pièce d'identité"],
         sla_business_days=5,
     )
-    institution = SimpleNamespace(id="institution-a", name="Mairie A")
+    institution = SimpleNamespace(id="institution-a", name="Mairie A", type="mairie")
+    assignment = SimpleNamespace(service_institution_id="service-a")
+    processing_service = SimpleNamespace(id="service-a", name="Service A", type="service")
     db_result = MagicMock()
     db_result.scalar_one_or_none.return_value = institution
     db = MagicMock()
     db.execute = AsyncMock(return_value=db_result)
+    db.scalar = AsyncMock(return_value=processing_service)
     db.add = MagicMock()
     db.flush = AsyncMock()
     db.refresh = AsyncMock()
@@ -175,6 +178,10 @@ async def test_create_request_uses_authenticated_citizen_identity_not_spoofed_em
     monkeypatch.setattr(
         "app.api.service_requests.get_active_service",
         AsyncMock(return_value=catalog_service),
+    )
+    monkeypatch.setattr(
+        "app.api.service_requests.get_active_service_assignment",
+        AsyncMock(return_value=assignment),
     )
     append_note = AsyncMock()
     monkeypatch.setattr("app.api.service_requests._append_note", append_note)
