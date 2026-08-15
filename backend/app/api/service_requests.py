@@ -10,7 +10,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import func, select, text
+from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import Select
 
@@ -19,6 +19,7 @@ from app.config import settings
 from app.database import get_db
 from app.middleware.rbac import require_permission
 from app.models.institution import Institution
+from app.models.institution_service_assignment import InstitutionServiceAssignment
 from app.models.service_request import (
     DeliveryModeEnum,
     GeneratedServiceDocument,
@@ -30,7 +31,11 @@ from app.models.service_request import (
 from app.models.user import RoleEnum, User
 from app.services.institution_scope import institution_descendant_ids_query
 from app.services.object_storage import object_storage
-from app.services.service_catalog import get_active_service, get_service_version
+from app.services.service_catalog import (
+    get_active_service,
+    get_active_service_assignment,
+    get_service_version,
+)
 from app.services.service_document_templates import render_approved_document
 from app.services.upload_security import upload_security
 
@@ -183,7 +188,8 @@ def _apply_request_scope(query: Select, current_user: User) -> Select:
     - SUPER_ADMIN: global visibility;
     - MINISTRE: tenant-wide visibility;
     - DIRECTEUR: their active institution and active descendants in the tenant;
-    - operational staff (including mairie admins): their institution only;
+    - MAIRIE/ADMIN/AGENCE: requests addressed to their institution only;
+    - AGENT/CHEF_SERVICE: requests routed to their internal service only;
     - CITOYEN: only requests they personally own.
 
     An institution therefore cannot read or mutate a dossier outside its signed
@@ -216,6 +222,31 @@ def _apply_request_scope(query: Select, current_user: User) -> Select:
                     root_institution_id=institution_id,
                     name="director_request_scope",
                 )
+            )
+        )
+
+    if current_user.role in (RoleEnum.AGENT, RoleEnum.CHEF_SERVICE):
+        legacy_assignment = (
+            select(InstitutionServiceAssignment.id)
+            .where(
+                InstitutionServiceAssignment.tenant_id == ServiceRequest.tenant_id,
+                InstitutionServiceAssignment.institution_id == ServiceRequest.institution_id,
+                InstitutionServiceAssignment.service_id == ServiceRequest.service_id,
+                InstitutionServiceAssignment.service_institution_id == institution_id,
+                InstitutionServiceAssignment.is_active.is_(True),
+            )
+            .exists()
+        )
+        return scoped.where(
+            or_(
+                ServiceRequest.service_institution_id == institution_id,
+                and_(
+                    ServiceRequest.service_institution_id.is_(None),
+                    or_(
+                        ServiceRequest.institution_id == institution_id,
+                        legacy_assignment,
+                    ),
+                ),
             )
         )
 
@@ -327,6 +358,7 @@ def _serialize_request(item: ServiceRequest) -> dict[str, Any]:
         "aiProcessingDetails": item.ai_processing_details,
         "tenantId": item.tenant_id,
         "institutionId": item.institution_id,
+        "serviceInstitutionId": item.service_institution_id,
     }
 
 
@@ -428,6 +460,41 @@ async def create_service_request(
     ).scalar_one_or_none()
     if not institution:
         raise HTTPException(status_code=400, detail="Institution cible invalide ou inactive.")
+    if institution.type.lower() != "mairie":
+        raise HTTPException(
+            status_code=400,
+            detail="Une demande citoyenne municipale doit cibler une mairie active.",
+        )
+
+    assignment = await get_active_service_assignment(
+        db, tenant_id, institution.id, catalog_service.service_id
+    )
+    if not assignment:
+        raise HTTPException(
+            status_code=400,
+            detail="Cette démarche n'est pas proposée par la mairie sélectionnée.",
+        )
+
+    processing_service = await db.scalar(
+        select(Institution).where(
+            Institution.id == assignment.service_institution_id,
+            Institution.tenant_id == tenant_id,
+            Institution.is_active.is_(True),
+            Institution.type == "service",
+            Institution.id.in_(
+                institution_descendant_ids_query(
+                    tenant_id=tenant_id,
+                    root_institution_id=institution.id,
+                    name="request_processing_service_scope",
+                )
+            ),
+        )
+    )
+    if not processing_service:
+        raise HTTPException(
+            status_code=409,
+            detail="Le routage interne de cette démarche est invalide ou inactif.",
+        )
 
     if current_user.role not in (RoleEnum.CITOYEN, RoleEnum.SUPER_ADMIN):
         if current_user.institution_id != institution.id:
@@ -472,7 +539,7 @@ async def create_service_request(
         citizen_address=payload.citizen_address,
         motif=payload.motif,
         required_documents=list(catalog_service.required_documents or []),
-        assigned_service=institution.name,
+        assigned_service=processing_service.name,
         timeline=_default_timeline(),
         deadline_days=deadline_days,
         deadline_date=_add_business_days(now, deadline_days),
@@ -480,6 +547,7 @@ async def create_service_request(
         delivery_mode=payload.delivery_mode,
         tenant_id=tenant_id,
         institution_id=institution.id,
+        service_institution_id=processing_service.id,
     )
     db.add(item)
     await db.flush()
@@ -488,7 +556,10 @@ async def create_service_request(
         db,
         item,
         current_user,
-        f"Demande soumise. Référence officielle : {item.reference}. Institution : {institution.name}.",
+        (
+            f"Demande soumise. Référence officielle : {item.reference}. "
+            f"Mairie : {institution.name}. Service compétent : {processing_service.name}."
+        ),
         "notification",
     )
     await db.refresh(item)

@@ -109,7 +109,14 @@ class ServiceRequest(Base):
     ai_processing_details: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
     tenant_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    # Citizen-facing destination (typically the mairie root).
     institution_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    # Internal processing unit. New municipal requests always populate this
+    # from a server-governed InstitutionServiceAssignment. Historical rows may
+    # remain NULL and keep their previous exact-institution behavior.
+    service_institution_id: Mapped[str | None] = mapped_column(
+        String(100), ForeignKey("institutions.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
