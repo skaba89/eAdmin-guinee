@@ -69,7 +69,7 @@ jobs:
         working-directory: backend
         env:
           ENVIRONMENT: test
-          DATABASE_URL: sqlite+aiosqlite:///./test_eadmin.db
+          DATABASE_URL: postgresql+asyncpg://eadmin:ci-test-password@localhost:5432/eadmin_test
           REDIS_URL: redis://localhost:6379/0
           SECRET_KEY: ci-only-secret-key-not-for-production-0123456789
           ENCRYPTION_KEY: ci-only-encryption-key-0123456789abcdef
