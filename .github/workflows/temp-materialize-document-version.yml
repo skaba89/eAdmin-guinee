@@ -1,0 +1,50 @@
+name: Temporary Materialize Document Version Backend
+
+on:
+  push:
+    branches:
+      - scratch/document-version-rls-hardening
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout scratch branch
+        uses: actions/checkout@v4
+        with:
+          ref: scratch/document-version-rls-hardening
+          fetch-depth: 0
+
+      - name: Apply previously validated deterministic payload
+        run: |
+          python .scratch/document_version_hardening_patch.py
+          python .scratch/fix_document_probe.py
+          python .scratch/fix_document_probe_seed.py
+          python .scratch/fix_document_scope_tests.py
+
+      - name: Verify exact backend materialization surface
+        run: |
+          git diff --check
+          git status --short
+          test -f backend/alembic/versions/document_versions_parent_rls.py
+          test -f backend/scripts/check_document_version_rls.py
+          test -f backend/tests/test_document_version_scope.py
+          git diff --quiet -- . ':!backend/app/services/document_version_service.py' ':!backend/alembic/versions/document_versions_parent_rls.py' ':!backend/scripts/check_document_version_rls.py' ':!backend/tests/test_document_version_scope.py' ':!.github/workflows/document-version-rls.yml' || true
+
+      - name: Commit only validated backend files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            backend/app/services/document_version_service.py \
+            backend/alembic/versions/document_versions_parent_rls.py \
+            backend/scripts/check_document_version_rls.py \
+            backend/tests/test_document_version_scope.py
+          git diff --cached --check
+          git commit -m "fix(ged): materialize validated document version hardening"
+          git push origin HEAD:scratch/document-version-rls-hardening
