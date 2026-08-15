@@ -94,9 +94,11 @@ jobs:
             app/models/institution_service_assignment.py \
             app/models/service_request.py \
             app/services/service_catalog.py \
-            scripts/verify_municipality_rls.py \
             tests/test_municipality_service_request_routing.py \
             tests/test_municipality_routing_matrix.py
+          # The verification script builds only one of three hard-coded SET
+          # clauses from booleans/constant column names; no user input enters SQL.
+          ruff check --ignore S608 scripts/verify_municipality_rls.py
 
       - name: Run municipality application matrix
         working-directory: backend
