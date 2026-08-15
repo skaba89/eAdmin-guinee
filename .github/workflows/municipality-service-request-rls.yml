@@ -15,6 +15,7 @@ on:
       - 'backend/tests/test_municipality_service_request_routing.py'
       - 'backend/tests/test_municipality_routing_matrix.py'
       - 'backend/scripts/verify_municipality_rls.py'
+      - 'backend/scripts/run_municipality_rls_gate.py'
       - '.github/workflows/municipality-service-request-rls.yml'
   workflow_dispatch:
 
@@ -94,6 +95,7 @@ jobs:
             app/models/institution_service_assignment.py \
             app/models/service_request.py \
             app/services/service_catalog.py \
+            scripts/run_municipality_rls_gate.py \
             tests/test_municipality_service_request_routing.py \
             tests/test_municipality_routing_matrix.py
           # The verification script builds only one of three hard-coded SET
@@ -113,4 +115,4 @@ jobs:
 
       - name: Prove PostgreSQL RLS municipality matrix
         working-directory: backend
-        run: python scripts/verify_municipality_rls.py
+        run: python scripts/run_municipality_rls_gate.py
