@@ -98,7 +98,9 @@ async def test_scoped_catalog_hides_assignment_when_municipality_is_inactive(
     )
 
     assert rows == []
-    assert assignment is None
+    # The configured route remains resolvable so request creation can distinguish
+    # an inactive/malformed route (409) from a service not offered at all (400).
+    assert assignment is not None
 
 
 @pytest.mark.asyncio
@@ -131,7 +133,7 @@ async def test_scoped_catalog_hides_assignment_when_processing_service_is_inacti
 
     assert municipality_rows == []
     assert service_rows == []
-    assert assignment is None
+    assert assignment is not None
 
 
 @pytest.mark.asyncio
