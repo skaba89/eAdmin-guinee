@@ -4,8 +4,10 @@ from datetime import datetime, timezone
 
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.models.administrative_service import AdministrativeService
+from app.models.institution import Institution
 from app.models.institution_service_assignment import InstitutionServiceAssignment
 
 
@@ -19,6 +21,30 @@ def _effective_catalog_query(tenant_id: str, at: datetime):
             AdministrativeService.effective_to > at,
         ),
     )
+
+
+def _join_active_assignment_endpoints(query):
+    municipality = aliased(Institution, name="catalog_municipality")
+    processing_service = aliased(Institution, name="catalog_processing_service")
+    query = query.join(
+        municipality,
+        and_(
+            municipality.id == InstitutionServiceAssignment.institution_id,
+            municipality.tenant_id == InstitutionServiceAssignment.tenant_id,
+            municipality.is_active.is_(True),
+            municipality.type == "mairie",
+        ),
+    ).join(
+        processing_service,
+        and_(
+            processing_service.id == InstitutionServiceAssignment.service_institution_id,
+            processing_service.tenant_id == InstitutionServiceAssignment.tenant_id,
+            processing_service.parent_id == municipality.id,
+            processing_service.is_active.is_(True),
+            processing_service.type == "service",
+        ),
+    )
+    return query
 
 
 async def get_active_service(
@@ -45,7 +71,7 @@ async def get_active_service_assignment(
     institution_id: str,
     service_id: str,
 ) -> InstitutionServiceAssignment | None:
-    """Resolve the active server-governed municipal routing for a service."""
+    """Resolve the active configured route; callers validate endpoint health/hierarchy."""
     query = select(InstitutionServiceAssignment).where(
         InstitutionServiceAssignment.tenant_id == tenant_id,
         InstitutionServiceAssignment.institution_id == institution_id,
@@ -93,6 +119,7 @@ async def list_active_services(
                 InstitutionServiceAssignment.is_active.is_(True),
             ),
         )
+        query = _join_active_assignment_endpoints(query)
         if institution_id:
             query = query.where(InstitutionServiceAssignment.institution_id == institution_id)
         if service_institution_id:
