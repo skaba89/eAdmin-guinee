@@ -18,6 +18,7 @@ from app.models.user import RoleEnum, User
 from app.services.audit_service import AuditService
 from app.services.authorization_service import authorization_service
 from app.services.identity_lifecycle_service import identity_lifecycle_service
+from app.services.institution_scope import institution_descendant_ids_query
 
 router = APIRouter()
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -215,6 +216,45 @@ async def _validate_target_assignment(
     return institution.name, institution
 
 
+async def _institution_in_actor_scope(
+    db: AsyncSession, actor: User, target_institution_id: str | None
+) -> bool:
+    if actor.role in (RoleEnum.SUPER_ADMIN, RoleEnum.MINISTRE):
+        return True
+    if not actor.institution_id or not target_institution_id:
+        return False
+    if actor.institution_id == target_institution_id:
+        return True
+    if actor.role not in (RoleEnum.MAIRIE, RoleEnum.ADMIN):
+        return False
+    tenant_id = actor.tenant_id or settings.TENANT_DEFAULT_ID
+    candidate = await db.scalar(
+        select(Institution.id).where(
+            Institution.id == target_institution_id,
+            Institution.id.in_(
+                institution_descendant_ids_query(
+                    tenant_id=tenant_id,
+                    root_institution_id=actor.institution_id,
+                    name="mairie_team_scope",
+                )
+            ),
+        )
+    )
+    return candidate is not None
+
+
+async def _can_view_user_governed(db: AsyncSession, actor: User, target: User) -> bool:
+    if actor.role == RoleEnum.SUPER_ADMIN or actor.id == target.id:
+        return True
+    if (actor.tenant_id or settings.TENANT_DEFAULT_ID) != (
+        target.tenant_id or settings.TENANT_DEFAULT_ID
+    ):
+        return False
+    if actor.role.hierarchy_level() <= target.role.hierarchy_level():
+        return False
+    return await _institution_in_actor_scope(db, actor, target.institution_id)
+
+
 def _can_view_user(actor: User, target: User) -> bool:
     if actor.role == RoleEnum.SUPER_ADMIN or actor.id == target.id:
         return True
@@ -278,7 +318,18 @@ async def list_users(
         if current_user.role != RoleEnum.MINISTRE:
             if not current_user.institution_id:
                 raise HTTPException(status_code=403, detail="Périmètre institutionnel absent.")
-            query = query.where(User.institution_id == current_user.institution_id)
+            if current_user.role in (RoleEnum.MAIRIE, RoleEnum.ADMIN):
+                query = query.where(
+                    User.institution_id.in_(
+                        institution_descendant_ids_query(
+                            tenant_id=tenant,
+                            root_institution_id=current_user.institution_id,
+                            name="mairie_user_list_scope",
+                        )
+                    )
+                )
+            else:
+                query = query.where(User.institution_id == current_user.institution_id)
 
         manageable_roles = [
             role for role in RoleEnum
@@ -339,13 +390,33 @@ async def create_user(
     if existing:
         raise HTTPException(status_code=409, detail="Un compte avec cet email existe déjà")
 
-    tenant_id, institution_id = _target_scope_for_create(current_user, user_data)
+    requested_institution = (user_data.institution_id or "").strip()
+    governed_child_assignment = (
+        current_user.role in (RoleEnum.MAIRIE, RoleEnum.ADMIN)
+        and user_data.role in (RoleEnum.AGENT, RoleEnum.CHEF_SERVICE)
+        and bool(requested_institution)
+        and requested_institution != (current_user.institution_id or "").strip()
+    )
+    if governed_child_assignment:
+        tenant_id = (current_user.tenant_id or settings.TENANT_DEFAULT_ID).strip()
+        institution_id = requested_institution
+    else:
+        tenant_id, institution_id = _target_scope_for_create(current_user, user_data)
+
     canonical_institution, _ = await _validate_target_assignment(
         db,
         tenant_id=tenant_id,
         institution_id=institution_id,
         role=user_data.role,
     )
+    if current_user.role not in (RoleEnum.SUPER_ADMIN, RoleEnum.MINISTRE) and not await _institution_in_actor_scope(
+        db, current_user, institution_id
+    ):
+        raise HTTPException(status_code=403, detail="Service cible hors de votre mairie.")
+    if governed_child_assignment:
+        # Server-only slot consumed by the trusted before_flush guard. A browser
+        # cannot populate this value and cross-mairie descendants are rejected above.
+        db.sync_session.info["trusted_user_institution_id"] = institution_id
 
     user = User(
         email=email,
@@ -396,7 +467,7 @@ async def get_user(
     user = await db.scalar(select(User).where(User.id == user_id))
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
-    if not _can_view_user(current_user, user):
+    if not await _can_view_user_governed(db, current_user, user):
         raise HTTPException(status_code=403, detail="Utilisateur hors de votre périmètre administratif.")
     return user
 
@@ -417,7 +488,7 @@ async def update_user(
     user = await db.scalar(select(User).where(User.id == user_id).with_for_update())
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
-    if not authorization_service.can_administer_user(current_user, user):
+    if not await _can_view_user_governed(db, current_user, user):
         raise HTTPException(
             status_code=403,
             detail="Compte hors de votre niveau ou périmètre administratif.",
@@ -438,10 +509,16 @@ async def update_user(
             raise HTTPException(status_code=403, detail="Changement de tenant réservé au SUPER_ADMIN.")
         requested_institution = update_data.get("institution_id", user.institution_id)
         if current_user.role != RoleEnum.MINISTRE and requested_institution != user.institution_id:
-            raise HTTPException(
-                status_code=403,
-                detail="Changement d'institution hors périmètre interdit.",
-            )
+            requested_role = update_data.get("role") or user.role
+            if (
+                current_user.role not in (RoleEnum.MAIRIE, RoleEnum.ADMIN)
+                or requested_role not in (RoleEnum.AGENT, RoleEnum.CHEF_SERVICE)
+                or not await _institution_in_actor_scope(db, current_user, requested_institution)
+            ):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Changement d'institution hors périmètre interdit.",
+                )
         if current_user.role == RoleEnum.MINISTRE and requested_institution is not None:
             if (current_user.tenant_id or settings.TENANT_DEFAULT_ID) != (
                 user.tenant_id or settings.TENANT_DEFAULT_ID
@@ -534,7 +611,7 @@ async def deactivate_user(
     user = await db.scalar(select(User).where(User.id == user_id).with_for_update())
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
-    if not authorization_service.can_administer_user(current_user, user):
+    if not await _can_view_user_governed(db, current_user, user):
         raise HTTPException(status_code=403, detail="Désactivation hors périmètre interdite.")
 
     await identity_lifecycle_service.offboard_user(

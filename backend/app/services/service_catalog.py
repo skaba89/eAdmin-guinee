@@ -2,10 +2,11 @@
 
 from datetime import datetime, timezone
 
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.administrative_service import AdministrativeService
+from app.models.institution_service_assignment import InstitutionServiceAssignment
 
 
 def _effective_catalog_query(tenant_id: str, at: datetime):
@@ -38,6 +39,22 @@ async def get_active_service(
     return (await db.execute(query)).scalar_one_or_none()
 
 
+async def get_active_service_assignment(
+    db: AsyncSession,
+    tenant_id: str,
+    institution_id: str,
+    service_id: str,
+) -> InstitutionServiceAssignment | None:
+    """Resolve the active server-governed municipal routing for a service."""
+    query = select(InstitutionServiceAssignment).where(
+        InstitutionServiceAssignment.tenant_id == tenant_id,
+        InstitutionServiceAssignment.institution_id == institution_id,
+        InstitutionServiceAssignment.service_id == service_id,
+        InstitutionServiceAssignment.is_active.is_(True),
+    )
+    return (await db.execute(query)).scalar_one_or_none()
+
+
 async def get_service_version(
     db: AsyncSession,
     tenant_id: str,
@@ -59,11 +76,29 @@ async def list_active_services(
     *,
     category_id: str | None = None,
     search: str | None = None,
+    institution_id: str | None = None,
+    service_institution_id: str | None = None,
     at: datetime | None = None,
 ) -> list[AdministrativeService]:
-    """Return active catalog rows for one trusted tenant scope."""
+    """Return active catalog rows for one trusted tenant/institution scope."""
     effective_at = at or datetime.now(timezone.utc)
     query = _effective_catalog_query(tenant_id, effective_at)
+
+    if institution_id or service_institution_id:
+        query = query.join(
+            InstitutionServiceAssignment,
+            and_(
+                InstitutionServiceAssignment.tenant_id == AdministrativeService.tenant_id,
+                InstitutionServiceAssignment.service_id == AdministrativeService.service_id,
+                InstitutionServiceAssignment.is_active.is_(True),
+            ),
+        )
+        if institution_id:
+            query = query.where(InstitutionServiceAssignment.institution_id == institution_id)
+        if service_institution_id:
+            query = query.where(
+                InstitutionServiceAssignment.service_institution_id == service_institution_id
+            )
 
     if category_id:
         query = query.where(AdministrativeService.category_id == category_id)

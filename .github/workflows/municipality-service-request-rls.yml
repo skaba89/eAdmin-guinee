@@ -1,0 +1,121 @@
+name: Municipality Service Request RLS Gate
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/api/service_requests.py'
+      - 'backend/app/api/service_catalog.py'
+      - 'backend/app/api/users.py'
+      - 'backend/app/database.py'
+      - 'backend/app/models/service_request.py'
+      - 'backend/app/models/institution_service_assignment.py'
+      - 'backend/app/services/service_catalog.py'
+      - 'backend/alembic/versions/municipality_service_request_routing.py'
+      - 'backend/alembic/versions/municipal_route_history_lock.py'
+      - 'backend/tests/test_municipality_service_request_routing.py'
+      - 'backend/tests/test_municipality_routing_matrix.py'
+      - 'backend/tests/test_public_municipality_catalog_scope.py'
+      - 'backend/scripts/verify_municipality_rls.py'
+      - 'backend/scripts/run_municipality_rls_gate.py'
+      - '.github/workflows/municipality-service-request-rls.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  municipality-service-request-rls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: eadmin
+          POSTGRES_PASSWORD: ci-test-password
+          POSTGRES_DB: eadmin_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U eadmin -d eadmin_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      ENVIRONMENT: test
+      DATABASE_URL: postgresql+asyncpg://eadmin:ci-test-password@localhost:5432/eadmin_test
+      PGPASSWORD: ci-test-password
+      REDIS_URL: redis://localhost:6379/0
+      SECRET_KEY: ci-only-secret-key-not-for-production-0123456789
+      ENCRYPTION_KEY: ci-only-encryption-key-0123456789abcdef
+      MINIO_ACCESS_KEY: ci-minio
+      MINIO_SECRET_KEY: ci-minio-secret
+      EADMIN_BOOTSTRAP_TEST_PASSWORD: Ci-Test-Only-2026!Strong
+      PYTHONPATH: ${{ github.workspace }}/backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Install backend test dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Apply schema and seed governed baseline
+        working-directory: backend
+        run: |
+          alembic upgrade head
+          python scripts/seed_recette_data.py
+
+      - name: Verify one Alembic head
+        working-directory: backend
+        run: |
+          alembic heads
+          test "$(alembic heads | grep -c '(head)')" = '1'
+
+      - name: Lint municipality routing surface
+        working-directory: backend
+        run: |
+          ruff check \
+            app/api/service_requests.py \
+            app/api/service_catalog.py \
+            app/api/users.py \
+            app/database.py \
+            app/models/institution_service_assignment.py \
+            app/models/service_request.py \
+            app/services/service_catalog.py \
+            scripts/run_municipality_rls_gate.py \
+            tests/test_municipality_service_request_routing.py \
+            tests/test_municipality_routing_matrix.py \
+            tests/test_public_municipality_catalog_scope.py
+          # The verification script builds only one of three hard-coded SET
+          # clauses from booleans/constant column names; no user input enters SQL.
+          ruff check --ignore S608 scripts/verify_municipality_rls.py
+
+      - name: Run municipality application matrix
+        working-directory: backend
+        run: |
+          pytest \
+            tests/test_municipality_service_request_routing.py \
+            tests/test_municipality_routing_matrix.py \
+            tests/test_public_municipality_catalog_scope.py \
+            tests/test_service_request_hierarchy_scope.py \
+            tests/test_public_service_catalog.py \
+            tests/test_mairie_tenant_isolation.py \
+            -q
+
+      - name: Prove PostgreSQL RLS municipality matrix
+        working-directory: backend
+        run: python scripts/run_municipality_rls_gate.py
