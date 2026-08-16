@@ -1,3 +1,4 @@
+# Audit-only trigger: full E2E use-case matrix 2026-08-16. No product behavior change.
 """Regression tests for Redis-bound JWT session families."""
 
 import uuid
