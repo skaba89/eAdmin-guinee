@@ -1,0 +1,167 @@
+name: Security Session Redis Gate
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/api/auth_hardening.py"
+      - "backend/app/api/auth_session_hardening.py"
+      - "backend/app/api/security_hardening.py"
+      - "backend/app/middleware/session_validity.py"
+      - "backend/app/services/session_binding.py"
+      - "backend/app/services/session_service.py"
+      - "backend/tests/test_security_hardening_service.py"
+      - "backend/tests/test_security_session_redis.py"
+      - "backend/tests/test_session_bound_jwt.py"
+      - ".github/workflows/security-session-redis.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/app/api/auth_hardening.py"
+      - "backend/app/api/auth_session_hardening.py"
+      - "backend/app/api/security_hardening.py"
+      - "backend/app/middleware/session_validity.py"
+      - "backend/app/services/session_binding.py"
+      - "backend/app/services/session_service.py"
+      - "backend/tests/test_security_hardening_service.py"
+      - "backend/tests/test_security_session_redis.py"
+      - "backend/tests/test_session_bound_jwt.py"
+      - ".github/workflows/security-session-redis.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  redis-session-contract:
+    runs-on: ubuntu-24.04
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      ENVIRONMENT: test
+      REDIS_URL: redis://localhost:6379
+      DATABASE_URL: postgresql+asyncpg://eadmin:eadmin@localhost:5432/eadmin_test
+      SECRET_KEY: ci-only-secret-key-not-for-production-0123456789
+      ENCRYPTION_KEY: ci-only-encryption-key-0123456789abcdef
+      MINIO_ACCESS_KEY: ci-minio
+      MINIO_SECRET_KEY: ci-minio-secret
+      MINIO_ENDPOINT: localhost:9000
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Lint session security surface
+        working-directory: backend
+        run: |
+          ruff check \
+            app/api/auth_hardening.py \
+            app/api/auth_session_hardening.py \
+            app/api/security_hardening.py \
+            app/middleware/session_validity.py \
+            app/services/session_binding.py \
+            app/services/session_service.py \
+            tests/test_security_hardening_service.py \
+            tests/test_security_session_redis.py \
+            tests/test_session_bound_jwt.py
+
+      - name: Run focused security session tests
+        working-directory: backend
+        run: |
+          pytest -q \
+            tests/test_security_hardening_service.py \
+            tests/test_security_session_redis.py \
+            tests/test_session_bound_jwt.py \
+            tests/test_session_service.py
+
+      - name: Probe real Redis session lifecycle
+        working-directory: backend
+        env:
+          ENVIRONMENT: development
+        run: |
+          python - <<'PY'
+          import asyncio
+
+          from app.services.session_service import SessionService
+
+
+          async def main() -> None:
+              service = SessionService()
+              redis = await service._get_redis()
+              await redis.flushdb()
+
+              sid_a = await service.create_session(
+                  user_id="tenant-user-a",
+                  ip_address="10.10.0.1",
+                  user_agent="redis-contract-a",
+                  device_fingerprint="fingerprint-a",
+              )
+              sid_b = await service.create_session(
+                  user_id="tenant-user-b",
+                  ip_address="10.20.0.1",
+                  user_agent="redis-contract-b",
+                  device_fingerprint="fingerprint-b",
+              )
+
+              session_a = await service.validate_session(sid_a)
+              assert session_a is not None
+              assert session_a["user_id"] == "tenant-user-a"
+
+              list_a = await service.get_user_sessions("tenant-user-a")
+              list_b = await service.get_user_sessions("tenant-user-b")
+              assert {row["session_id"] for row in list_a} == {sid_a}
+              assert {row["session_id"] for row in list_b} == {sid_b}
+
+              previous_activity = session_a["last_activity"]
+              await asyncio.sleep(0.01)
+              await service.update_session_activity(sid_a)
+              touched = await service.validate_session(sid_a)
+              assert touched is not None
+              assert touched["last_activity"] >= previous_activity
+
+              await service.add_trusted_device(
+                  "tenant-user-a",
+                  "fingerprint-a",
+                  device_name="CI browser",
+                  user_agent="redis-contract-a",
+              )
+              devices = await service.get_trusted_devices("tenant-user-a")
+              assert len(devices) == 1
+              assert devices[0]["device_id"] == "fingerprint-a"
+
+              events = await service.get_security_events("tenant-user-a", limit=20)
+              assert any(event["event_type"] == "session_created" for event in events)
+
+              await service.destroy_session(sid_a)
+              assert await service.validate_session(sid_a) is None
+              assert await service.get_user_sessions("tenant-user-a") == []
+              assert await service.validate_session(sid_b) is not None
+
+              await redis.flushdb()
+              await service.close()
+              print("SECURITY_SESSION_REDIS=PASS")
+
+
+          asyncio.run(main())
+          PY
