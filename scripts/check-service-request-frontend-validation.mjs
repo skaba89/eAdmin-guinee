@@ -1,4 +1,3 @@
-// Audit-only trigger: full E2E use-case matrix 2026-08-16. No product behavior change.
 import fs from 'node:fs'
 import path from 'node:path'
 
