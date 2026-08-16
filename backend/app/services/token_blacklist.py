@@ -112,6 +112,13 @@ class TokenBlacklistService:
         key = f"{REFRESH_TOKEN_PREFIX}{user_id}"
         return await redis.sismember(key, refresh_jti) > 0
 
+    async def consume_refresh_token(self, user_id: str, refresh_jti: str) -> bool:
+        """Consomme atomiquement un refresh token une seule fois via Redis SREM."""
+        redis = await self._get_redis()
+        key = f"{REFRESH_TOKEN_PREFIX}{user_id}"
+        removed = await redis.srem(key, refresh_jti)
+        return int(removed or 0) == 1
+
     async def revoke_all_user_tokens(self, user_id: str) -> int:
         """
         Révoque tous les refresh tokens d'un utilisateur.

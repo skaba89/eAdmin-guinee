@@ -91,6 +91,18 @@ async def test_store_and_validate_refresh_token(service):
 
 
 @pytest.mark.asyncio
+async def test_consume_refresh_token_is_single_use(service):
+    redis = fake_redis()
+    redis.srem.side_effect = [1, 0]
+    service._redis = redis
+
+    assert await service.consume_refresh_token("user-1", "refresh-1") is True
+    assert await service.consume_refresh_token("user-1", "refresh-1") is False
+    assert redis.srem.await_count == 2
+    redis.srem.assert_awaited_with(f"{REFRESH_TOKEN_PREFIX}user-1", "refresh-1")
+
+
+@pytest.mark.asyncio
 async def test_revoke_all_user_tokens_returns_count(service):
     redis = fake_redis()
     redis.scard.return_value = 3
