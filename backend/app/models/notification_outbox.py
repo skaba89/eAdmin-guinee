@@ -52,6 +52,9 @@ class NotificationOutbox(Base):
     max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
     next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    processing_token: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True, index=True
+    )
 
     provider_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     provider_message_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
