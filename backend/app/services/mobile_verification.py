@@ -29,7 +29,7 @@ OTP_TTL_SECONDS = 600
 OTP_MAX_ATTEMPTS = 5
 OTP_RESEND_COOLDOWN_SECONDS = 60
 OTP_MAX_REQUESTS_PER_HOUR = 5
-OTP_REDIS_PREFIX = "eadmin:phone_verification:"
+OTP_REDIS_PREFIX = "eadmin:phone_verification:v2:"
 
 
 class MobileVerificationError(ValueError):
@@ -117,16 +117,35 @@ class MobileVerificationService:
             self._redis = None
 
     @staticmethod
-    def redis_key(challenge_id: uuid.UUID | str) -> str:
-        return f"{OTP_REDIS_PREFIX}{challenge_id}"
+    def redis_key(tenant_id: str, challenge_id: uuid.UUID | str) -> str:
+        """Return the tenant-bound Redis key for one ephemeral OTP.
 
-    async def get_delivery_code(self, challenge_id: uuid.UUID | str) -> str | None:
-        redis = await self._get_redis()
-        return await redis.get(self.redis_key(challenge_id))
+        Challenge UUIDs are already unguessable, but tenant binding keeps the
+        raw delivery secret inside the same boundary as the FORCE-RLS outbox row
+        that is allowed to materialize it.
+        """
+        normalized_tenant = (tenant_id or "").strip()
+        if not normalized_tenant:
+            raise MobileVerificationError("Tenant absent du challenge de vérification.")
+        return f"{OTP_REDIS_PREFIX}{normalized_tenant}:{challenge_id}"
 
-    async def _delete_delivery_code(self, challenge_id: uuid.UUID | str) -> None:
+    async def get_delivery_code(
+        self,
+        challenge_id: uuid.UUID | str,
+        *,
+        tenant_id: str,
+    ) -> str | None:
         redis = await self._get_redis()
-        await redis.delete(self.redis_key(challenge_id))
+        return await redis.get(self.redis_key(tenant_id, challenge_id))
+
+    async def _delete_delivery_code(
+        self,
+        challenge_id: uuid.UUID | str,
+        *,
+        tenant_id: str,
+    ) -> None:
+        redis = await self._get_redis()
+        await redis.delete(self.redis_key(tenant_id, challenge_id))
 
     async def start_challenge(
         self,
@@ -194,7 +213,11 @@ class MobileVerificationService:
         await db.flush()
 
         redis = await self._get_redis()
-        await redis.setex(self.redis_key(challenge.id), OTP_TTL_SECONDS, code)
+        await redis.setex(
+            self.redis_key(tenant_id, challenge.id),
+            OTP_TTL_SECONDS,
+            code,
+        )
 
         await enqueue_notification(
             db,
@@ -266,7 +289,10 @@ class MobileVerificationService:
         user.notification_consent_updated_at = now
         await db.flush()
         try:
-            await self._delete_delivery_code(challenge.id)
+            await self._delete_delivery_code(
+                challenge.id,
+                tenant_id=challenge.tenant_id,
+            )
         except Exception:
             pass
         return ConfirmationResult(success=True, challenge=challenge)
