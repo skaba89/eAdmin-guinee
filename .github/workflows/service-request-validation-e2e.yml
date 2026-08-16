@@ -84,7 +84,7 @@ jobs:
           "${compose[@]}" logs --tail 250 backend
           exit 1
 
-      - name: Seed one valid mairie and one active service
+      - name: Seed valid mairie, processing service and governed catalog assignment
         run: |
           docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T backend python - <<'PY'
           import asyncio
@@ -93,28 +93,54 @@ jobs:
           from app.database import async_session_factory
           from app.models.administrative_service import AdministrativeService
           from app.models.institution import Institution
+          from app.models.institution_service_assignment import InstitutionServiceAssignment
+
+          TENANT = 'republique-de-guinee'
+          MAIRIE = 'mairie-validation-e2e'
+          PROCESSING_SERVICE = 'service-validation-e2e'
+          CATALOG_SERVICE = 'validation-e2e-service'
 
           async def main():
               async with async_session_factory() as session:
-                  inst = await session.get(Institution, 'mairie-validation-e2e')
-                  if inst is None:
-                      inst = Institution(
-                          id='mairie-validation-e2e',
-                          tenant_id='republique-de-guinee',
+                  mairie = await session.get(Institution, MAIRIE)
+                  if mairie is None:
+                      mairie = Institution(
+                          id=MAIRIE,
+                          tenant_id=TENANT,
                           name='Mairie Validation E2E',
                           type='mairie',
                           is_active=True,
                       )
-                      session.add(inst)
+                      session.add(mairie)
+                  else:
+                      mairie.type = 'mairie'
+                      mairie.is_active = True
+
+                  processing = await session.get(Institution, PROCESSING_SERVICE)
+                  if processing is None:
+                      processing = Institution(
+                          id=PROCESSING_SERVICE,
+                          tenant_id=TENANT,
+                          name='Service interne Validation E2E',
+                          type='service',
+                          parent_id=MAIRIE,
+                          is_active=True,
+                      )
+                      session.add(processing)
+                  else:
+                      processing.type = 'service'
+                      processing.parent_id = MAIRIE
+                      processing.is_active = True
+
                   svc = await session.scalar(select(AdministrativeService).where(
-                      AdministrativeService.tenant_id == 'republique-de-guinee',
-                      AdministrativeService.service_id == 'validation-e2e-service',
+                      AdministrativeService.tenant_id == TENANT,
+                      AdministrativeService.service_id == CATALOG_SERVICE,
                       AdministrativeService.version == 1,
                   ))
                   if svc is None:
                       svc = AdministrativeService(
-                          tenant_id='republique-de-guinee',
-                          service_id='validation-e2e-service',
+                          tenant_id=TENANT,
+                          service_id=CATALOG_SERVICE,
                           version=1,
                           category_id='etat-civil',
                           category_name='État civil',
@@ -128,6 +154,24 @@ jobs:
                   else:
                       svc.is_active = True
                       svc.effective_from = datetime.now(timezone.utc)
+
+                  assignment = await session.scalar(select(InstitutionServiceAssignment).where(
+                      InstitutionServiceAssignment.tenant_id == TENANT,
+                      InstitutionServiceAssignment.institution_id == MAIRIE,
+                      InstitutionServiceAssignment.service_id == CATALOG_SERVICE,
+                  ))
+                  if assignment is None:
+                      session.add(InstitutionServiceAssignment(
+                          tenant_id=TENANT,
+                          institution_id=MAIRIE,
+                          service_id=CATALOG_SERVICE,
+                          service_institution_id=PROCESSING_SERVICE,
+                          is_active=True,
+                      ))
+                  else:
+                      assignment.service_institution_id = PROCESSING_SERVICE
+                      assignment.is_active = True
+
                   await session.commit()
           asyncio.run(main())
           PY
@@ -175,10 +219,12 @@ jobs:
           request_id="$(python -c "import json; print(json.load(open('/tmp/valid-request.json'))['id'])")"
           response_email="$(python -c "import json; print(json.load(open('/tmp/valid-request.json'))['citizenEmail'])")"
           stored_email="$(docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T postgres psql -U eadmin -d eadmin -Atc "SELECT citizen_email FROM service_requests WHERE id='${request_id}';")"
+          stored_processing="$(docker compose --env-file .env.local.ci -f docker-compose.local.yml exec -T postgres psql -U eadmin -d eadmin -Atc "SELECT service_institution_id FROM service_requests WHERE id='${request_id}';")"
           test "${response_email}" = 'citoyen@eadmin.test'
           test "${stored_email}" = 'citoyen@eadmin.test'
           test "${stored_email}" != 'victim@example.com'
-          echo 'PASS: spoofed legacy email ignored; authenticated account email is authoritative'
+          test "${stored_processing}" = 'service-validation-e2e'
+          echo 'PASS: authoritative citizen identity and governed mairie -> processing-service routing persisted'
 
       - name: Backend logs on failure
         if: failure()
