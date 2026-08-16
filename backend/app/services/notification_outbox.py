@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import smtplib
+import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
@@ -21,11 +22,13 @@ from urllib.parse import urlparse
 
 import httpx
 from sqlalchemy import or_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.notification_outbox import NotificationOutbox
 
 SUPPORTED_CHANNELS = frozenset({"email", "sms", "whatsapp"})
+WORKER_ROLE = "SYSTEM_WORKER"
 
 
 @dataclass(frozen=True)
@@ -86,6 +89,33 @@ def build_idempotency_key(
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def _is_postgresql(db: AsyncSession) -> bool:
+    bind = db.get_bind()
+    dialect = getattr(bind, "dialect", None)
+    return getattr(dialect, "name", None) == "postgresql"
+
+
+def configure_worker_tenant_scope(db: AsyncSession, tenant_id: str) -> str:
+    """Install a trusted tenant scope that is re-applied after every commit.
+
+    The database session hook propagates ``session.info['rls_scope']`` to each
+    new PostgreSQL transaction. This lets the standalone worker use the same
+    NOBYPASSRLS principal as the API without leaking tenant context through the
+    connection pool.
+    """
+    normalized = tenant_id.strip()
+    if not normalized:
+        raise ValueError("tenant_id est obligatoire pour le worker de notifications.")
+    db.sync_session.info["rls_scope"] = {
+        "user_id": "",
+        "tenant_id": normalized,
+        "institution_id": "",
+        "role": WORKER_ROLE,
+        "is_super_admin": False,
+    }
+    return normalized
+
+
 async def enqueue_notification(
     db: AsyncSession,
     *,
@@ -138,9 +168,25 @@ async def enqueue_notification(
         status="pending",
         max_attempts=max_attempts,
     )
-    db.add(item)
-    await db.flush()
-    return item
+
+    # The preliminary SELECT is only an optimization. The unique key is the
+    # source of truth under concurrency. A savepoint prevents a simultaneous
+    # duplicate enqueue from rolling back the surrounding administrative
+    # transaction.
+    try:
+        async with db.begin_nested():
+            db.add(item)
+            await db.flush()
+        return item
+    except IntegrityError:
+        existing = (
+            await db.execute(
+                select(NotificationOutbox).where(NotificationOutbox.idempotency_key == key)
+            )
+        ).scalar_one_or_none()
+        if existing is None:
+            raise
+        return existing
 
 
 def retry_delay(attempt_count: int) -> timedelta:
@@ -165,6 +211,7 @@ async def recover_stale_processing(
         .values(
             status="retry",
             locked_at=None,
+            processing_token=None,
             next_attempt_at=datetime.now(timezone.utc),
             last_error="Reprise automatique après verrou de traitement expiré.",
         )
@@ -196,22 +243,79 @@ async def claim_due_notifications(
     for item in items:
         item.status = "processing"
         item.locked_at = now
+        item.processing_token = uuid.uuid4()
     await db.flush()
     return items
+
+
+async def _claim_update(
+    db: AsyncSession,
+    item: NotificationOutbox,
+    **values,
+) -> bool:
+    token = getattr(item, "processing_token", None)
+    if token is None:
+        # SQLite and provider-boundary unit tests do not exercise PostgreSQL RLS
+        # or leases. Production PostgreSQL always requires a real claim token.
+        if _is_postgresql(db):
+            return False
+        for key, value in values.items():
+            setattr(item, key, value)
+        await db.commit()
+        return True
+
+    result = await db.execute(
+        update(NotificationOutbox)
+        .where(
+            NotificationOutbox.id == item.id,
+            NotificationOutbox.status == "processing",
+            NotificationOutbox.processing_token == token,
+        )
+        .values(**values)
+    )
+    await db.commit()
+    return int(result.rowcount or 0) == 1
+
+
+async def _begin_delivery_attempt(
+    db: AsyncSession,
+    item: NotificationOutbox,
+    provider_name: str,
+) -> bool:
+    attempt_count = int(item.attempt_count or 0) + 1
+    claimed = await _claim_update(
+        db,
+        item,
+        attempt_count=attempt_count,
+        provider_name=provider_name,
+        locked_at=datetime.now(timezone.utc),
+    )
+    if claimed:
+        item.attempt_count = attempt_count
+        item.provider_name = provider_name
+    return claimed
 
 
 async def process_outbox_batch(
     db: AsyncSession,
     registry: ProviderRegistry,
     *,
+    tenant_id: str | None = None,
     batch_size: int = 50,
 ) -> dict[str, int]:
-    """Process one outbox batch.
+    """Process one tenant-scoped outbox batch.
 
     Claims are committed before external network I/O, so workers never hold row
-    locks while waiting on providers. A crashed worker is recovered by the stale
-    processing guard on the next run.
+    locks while waiting on providers. The processing token prevents an old
+    worker from sending after another worker has recovered and reclaimed its
+    stale lease. Provider calls remain at-least-once across a process crash; the
+    stable idempotency key is forwarded to provider adapters for deduplication.
     """
+    if tenant_id is not None:
+        configure_worker_tenant_scope(db, tenant_id)
+    elif _is_postgresql(db):
+        raise ValueError("tenant_id est obligatoire pour traiter l'outbox PostgreSQL.")
+
     recovered = await recover_stale_processing(db)
     items = await claim_due_notifications(db, batch_size=batch_size)
     await db.commit()
@@ -223,22 +327,36 @@ async def process_outbox_batch(
         "dead_letter": 0,
         "blocked": 0,
         "recovered": recovered,
+        "lost_claim": 0,
     }
 
     for item in items:
         provider = registry.get(item.channel)
         if provider is None:
-            item.status = "blocked"
-            item.provider_name = None
-            item.last_error = f"Aucun fournisseur configuré pour le canal {item.channel}."
-            item.locked_at = None
-            counters["blocked"] += 1
-            await db.commit()
+            error = f"Aucun fournisseur configuré pour le canal {item.channel}."
+            changed = await _claim_update(
+                db,
+                item,
+                status="blocked",
+                provider_name=None,
+                last_error=error,
+                locked_at=None,
+                processing_token=None,
+            )
+            if changed:
+                item.status = "blocked"
+                item.provider_name = None
+                item.last_error = error
+                item.locked_at = None
+                item.processing_token = None
+                counters["blocked"] += 1
+            else:
+                counters["lost_claim"] += 1
             continue
 
-        item.attempt_count += 1
-        item.provider_name = provider.name
-        await db.commit()
+        if not await _begin_delivery_attempt(db, item, provider.name):
+            counters["lost_claim"] += 1
+            continue
 
         try:
             # Imported lazily to avoid a module cycle: mobile verification uses
@@ -250,28 +368,59 @@ async def process_outbox_batch(
             result = await provider.send(delivery_notification)
         except Exception as exc:  # provider boundary: always turn failure into durable state
             message = str(exc).strip() or exc.__class__.__name__
-            item.last_error = message[:4000]
-            item.locked_at = None
             if item.attempt_count >= item.max_attempts:
-                item.status = "dead_letter"
-                item.next_attempt_at = None
-                counters["dead_letter"] += 1
+                next_status = "dead_letter"
+                next_attempt_at = None
+                counter_key = "dead_letter"
             else:
-                item.status = "retry"
-                item.next_attempt_at = datetime.now(timezone.utc) + retry_delay(item.attempt_count)
-                counters["retry"] += 1
-            await db.commit()
+                next_status = "retry"
+                next_attempt_at = datetime.now(timezone.utc) + retry_delay(item.attempt_count)
+                counter_key = "retry"
+            changed = await _claim_update(
+                db,
+                item,
+                status=next_status,
+                last_error=message[:4000],
+                locked_at=None,
+                processing_token=None,
+                next_attempt_at=next_attempt_at,
+            )
+            if changed:
+                item.status = next_status
+                item.last_error = message[:4000]
+                item.locked_at = None
+                item.processing_token = None
+                item.next_attempt_at = next_attempt_at
+                counters[counter_key] += 1
+            else:
+                counters["lost_claim"] += 1
             continue
 
-        item.status = "sent"
-        item.provider_name = result.provider_name
-        item.provider_message_id = result.message_id
-        item.last_error = None
-        item.next_attempt_at = None
-        item.locked_at = None
-        item.sent_at = datetime.now(timezone.utc)
-        counters["sent"] += 1
-        await db.commit()
+        sent_at = datetime.now(timezone.utc)
+        changed = await _claim_update(
+            db,
+            item,
+            status="sent",
+            provider_name=result.provider_name,
+            provider_message_id=result.message_id,
+            last_error=None,
+            next_attempt_at=None,
+            locked_at=None,
+            processing_token=None,
+            sent_at=sent_at,
+        )
+        if changed:
+            item.status = "sent"
+            item.provider_name = result.provider_name
+            item.provider_message_id = result.message_id
+            item.last_error = None
+            item.next_attempt_at = None
+            item.locked_at = None
+            item.processing_token = None
+            item.sent_at = sent_at
+            counters["sent"] += 1
+        else:
+            counters["lost_claim"] += 1
 
     return counters
 

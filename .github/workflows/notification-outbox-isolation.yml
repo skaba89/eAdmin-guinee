@@ -1,35 +1,35 @@
-name: Service Request Child RLS Gate
+name: Notification Outbox Isolation Gate
 
 on:
   pull_request:
     paths:
       - "backend/alembic/versions/**"
-      - "backend/app/api/service_request_files.py"
-      - "backend/app/api/service_requests.py"
-      - "backend/scripts/check_service_request_child_rls.py"
-      - "backend/tests/test_service_request_child_authority.py"
-      - "backend/tests/test_service_request_hardening.py"
-      - "backend/tests/test_municipality_routing_matrix.py"
-      - ".github/workflows/service-request-child-rls.yml"
+      - "backend/app/models/notification_outbox.py"
+      - "backend/app/services/notification_outbox.py"
+      - "backend/app/workers/notification_outbox.py"
+      - "backend/scripts/check_notification_outbox_rls.py"
+      - "backend/tests/test_notification_outbox.py"
+      - "backend/tests/test_notification_outbox_worker_hardening.py"
+      - ".github/workflows/notification-outbox-isolation.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  child-rls:
+  notification-outbox-isolation:
     runs-on: ubuntu-latest
     services:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_DB: eadmin_request_child_rls
+          POSTGRES_DB: eadmin_notification_rls
           POSTGRES_USER: eadmin
           POSTGRES_PASSWORD: ci-test-password
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U eadmin -d eadmin_request_child_rls"
+          --health-cmd "pg_isready -U eadmin -d eadmin_notification_rls"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -45,7 +45,7 @@ jobs:
 
     env:
       ENVIRONMENT: test
-      DATABASE_URL: postgresql://eadmin:ci-test-password@localhost:5432/eadmin_request_child_rls
+      DATABASE_URL: postgresql://eadmin:ci-test-password@localhost:5432/eadmin_notification_rls
       REDIS_URL: redis://localhost:6379
       SECRET_KEY: ci-only-secret-key-not-for-production-0123456789
       ENCRYPTION_KEY: ci-only-encryption-key-0123456789abcdef
@@ -81,23 +81,25 @@ jobs:
       - name: Upgrade PostgreSQL schema
         run: alembic upgrade head
 
-      - name: Ruff changed security surface
+      - name: Ruff notification security surface
         run: >-
           ruff check
-          alembic/versions/service_request_children_parent_rls.py
-          app/api/service_request_files.py
-          scripts/check_service_request_child_rls.py
-          tests/test_service_request_child_authority.py
+          alembic/versions/notification_outbox_tenant_rls.py
+          app/models/notification_outbox.py
+          app/services/notification_outbox.py
+          app/workers/notification_outbox.py
+          scripts/check_notification_outbox_rls.py
+          tests/test_notification_outbox_worker_hardening.py
 
-      - name: Targeted child authority regressions
+      - name: Targeted notification regressions
         run: >-
           pytest -q
-          tests/test_service_request_child_authority.py
-          tests/test_service_request_hardening.py
-          tests/test_municipality_routing_matrix.py
+          tests/test_notification_outbox.py
+          tests/test_notification_outbox_worker_hardening.py
+          tests/test_mobile_notification_consent.py
 
       - name: Full backend regression suite
         run: pytest tests -q
 
-      - name: PostgreSQL NOBYPASSRLS parent-child proof
-        run: python scripts/check_service_request_child_rls.py
+      - name: PostgreSQL NOBYPASSRLS and concurrent-claim proof
+        run: python scripts/check_notification_outbox_rls.py
