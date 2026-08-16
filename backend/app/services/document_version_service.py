@@ -33,6 +33,19 @@ class DocumentVersionService:
     - Audit trail de chaque changement
     """
 
+    async def _load_scoped_document(
+        self,
+        session: AsyncSession,
+        document_id: str,
+    ) -> Document | None:
+        """Resolve a document through the parent FORCE-RLS boundary."""
+        try:
+            parsed_id = uuid.UUID(document_id)
+        except (TypeError, ValueError, AttributeError):
+            return None
+        result = await session.execute(select(Document).where(Document.id == parsed_id))
+        return result.scalar_one_or_none()
+
     async def create_version(
         self,
         document_id: str,
@@ -62,11 +75,7 @@ class DocumentVersionService:
         """
         try:
             async with async_session_factory() as session:
-                # Récupérer le document
-                result = await session.execute(
-                    select(Document).where(Document.id == uuid.UUID(document_id))
-                )
-                document = result.scalar_one_or_none()
+                document = await self._load_scoped_document(session, document_id)
                 if not document:
                     return {"error": "Document non trouvé"}
 
@@ -76,14 +85,14 @@ class DocumentVersionService:
                 # Déterminer le numéro de version
                 version_result = await session.execute(
                     select(func := __import__('sqlalchemy').func.max(DocumentVersion.version_number))
-                    .where(DocumentVersion.document_id == uuid.UUID(document_id))
+                    .where(DocumentVersion.document_id == document.id)
                 )
                 max_version = version_result.scalar() or 0
                 new_version_number = max_version + 1
 
                 # Créer la version
                 version = DocumentVersion(
-                    document_id=uuid.UUID(document_id),
+                    document_id=document.id,
                     version_number=new_version_number,
                     file_path=file_path,
                     file_size=file_size,
@@ -137,9 +146,12 @@ class DocumentVersionService:
         """
         try:
             async with async_session_factory() as session:
+                document = await self._load_scoped_document(session, document_id)
+                if not document:
+                    return []
                 result = await session.execute(
                     select(DocumentVersion)
-                    .where(DocumentVersion.document_id == uuid.UUID(document_id))
+                    .where(DocumentVersion.document_id == document.id)
                     .order_by(desc(DocumentVersion.version_number))
                 )
                 versions = result.scalars().all()
@@ -193,11 +205,14 @@ class DocumentVersionService:
         """
         try:
             async with async_session_factory() as session:
+                document = await self._load_scoped_document(session, document_id)
+                if not document:
+                    return {"error": "Document non trouvé"}
                 # Récupérer la version à restaurer
                 version_result = await session.execute(
                     select(DocumentVersion).where(
                         and_(
-                            DocumentVersion.document_id == uuid.UUID(document_id),
+                            DocumentVersion.document_id == document.id,
                             DocumentVersion.version_number == version_number,
                         )
                     )
@@ -259,11 +274,14 @@ class DocumentVersionService:
         """
         try:
             async with async_session_factory() as session:
+                document = await self._load_scoped_document(session, document_id)
+                if not document:
+                    return {"error": "Document non trouvé"}
                 # Récupérer les deux versions
                 v1_result = await session.execute(
                     select(DocumentVersion).where(
                         and_(
-                            DocumentVersion.document_id == uuid.UUID(document_id),
+                            DocumentVersion.document_id == document.id,
                             DocumentVersion.version_number == v1,
                         )
                     )
@@ -273,7 +291,7 @@ class DocumentVersionService:
                 v2_result = await session.execute(
                     select(DocumentVersion).where(
                         and_(
-                            DocumentVersion.document_id == uuid.UUID(document_id),
+                            DocumentVersion.document_id == document.id,
                             DocumentVersion.version_number == v2,
                         )
                     )
@@ -359,10 +377,13 @@ class DocumentVersionService:
         """Récupère les détails d'une version spécifique."""
         try:
             async with async_session_factory() as session:
+                document = await self._load_scoped_document(session, document_id)
+                if not document:
+                    return None
                 result = await session.execute(
                     select(DocumentVersion).where(
                         and_(
-                            DocumentVersion.document_id == uuid.UUID(document_id),
+                            DocumentVersion.document_id == document.id,
                             DocumentVersion.version_number == version_number,
                         )
                     )
