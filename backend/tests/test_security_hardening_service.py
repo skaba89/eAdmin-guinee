@@ -61,13 +61,17 @@ async def test_security_setup_mfa_delegates_to_canonical_auth_flow(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_security_verify_mfa_delegates_to_canonical_auth_flow(monkeypatch):
+async def test_security_verify_mfa_delegates_to_session_bound_flow(monkeypatch):
     current_user = user()
     request = request_with_ip()
     db = MagicMock()
     body = auth_api.MFAVerifyRequest(code="123456", session_id="legacy-session")
-    canonical = AsyncMock(return_value={"access_token": "a", "refresh_token": "r"})
-    monkeypatch.setattr(hardening.auth_api, "verify_mfa", canonical)
+    bound = AsyncMock(return_value={"access_token": "a", "refresh_token": "r"})
+    monkeypatch.setattr(
+        hardening.auth_session_hardening,
+        "secure_session_verify_mfa",
+        bound,
+    )
 
     result = await hardening.secure_security_verify_mfa(
         request,
@@ -77,7 +81,7 @@ async def test_security_verify_mfa_delegates_to_canonical_auth_flow(monkeypatch)
     )
 
     assert result["refresh_token"] == "r"
-    canonical.assert_awaited_once_with(request, body, current_user, db)
+    bound.assert_awaited_once_with(request, body, current_user, db)
 
 
 @pytest.mark.asyncio
