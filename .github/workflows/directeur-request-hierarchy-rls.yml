@@ -5,8 +5,10 @@ on:
     paths:
       - 'backend/alembic/versions/directeur_request_hierarchy_scope.py'
       - 'backend/alembic/versions/directeur_runtime_hierarchy_scope.py'
+      - 'backend/alembic/versions/municipality_service_request_routing.py'
       - 'backend/app/api/service_requests.py'
       - 'backend/app/services/institution_scope.py'
+      - 'backend/scripts/verify_directeur_request_rls.py'
       - 'backend/tests/test_institution_scope.py'
       - 'backend/tests/test_service_request_hierarchy_scope.py'
       - 'src/lib/service-request-scope.ts'
@@ -102,39 +104,6 @@ jobs:
           "${compose[@]}" run --rm --no-deps backend alembic upgrade head
           "${compose[@]}" run --rm --no-deps backend python -m scripts.seed_recette_data
 
-      - name: Create non-bypass RLS runtime role
-        run: |
-          set -euo pipefail
-          compose=(docker compose --env-file .env.local.ci -f docker-compose.local.yml)
-          "${compose[@]}" exec -T postgres \
-            psql -U eadmin -d eadmin -v ON_ERROR_STOP=1 \
-            -v runtime_password="${EADMIN_HIERARCHY_RLS_PASSWORD}" <<'SQL'
-          CREATE ROLE eadmin_hierarchy_rls
-            LOGIN
-            NOSUPERUSER
-            NOCREATEDB
-            NOCREATEROLE
-            NOINHERIT
-            NOBYPASSRLS
-            PASSWORD :'runtime_password';
-          GRANT CONNECT ON DATABASE eadmin TO eadmin_hierarchy_rls;
-          GRANT USAGE ON SCHEMA public TO eadmin_hierarchy_rls;
-          GRANT SELECT, UPDATE ON service_requests TO eadmin_hierarchy_rls;
-          -- The current service_requests RLS policy resolves legacy municipal
-          -- AGENT/CHEF_SERVICE routes through this table. PostgreSQL evaluates
-          -- policy dependencies with the querying role's privileges, so every
-          -- realistic non-bypass service_requests reader needs SELECT here.
-          GRANT SELECT ON institution_service_assignments TO eadmin_hierarchy_rls;
-          SQL
-
-          flags="$("${compose[@]}" exec -T postgres psql -U eadmin -d eadmin -Atc \
-            "SELECT rolsuper::text || ':' || rolbypassrls::text FROM pg_roles WHERE rolname='eadmin_hierarchy_rls';")"
-          test "${flags}" = 'false:false'
-
-          assignment_read="$("${compose[@]}" exec -T postgres psql -U eadmin -d eadmin -Atc \
-            "SELECT has_table_privilege('eadmin_hierarchy_rls', 'institution_service_assignments', 'SELECT')::text;")"
-          test "${assignment_read}" = 'true'
-
       - name: Prove hierarchy fixture before RLS
         run: |
           set -euo pipefail
@@ -163,141 +132,42 @@ jobs:
             WHERE reference='REC-GN-2026-006';")"
           test "${route}" = 'republique-de-guinee:service-casier-recette'
 
-      - name: Prepare signed DIRECTEUR helper probe
+      - name: Create non-bypass RLS runtime role
         run: |
-          cat > /tmp/directeur-scope-probe.sh <<'SH'
-          #!/usr/bin/env bash
           set -euo pipefail
-          role="$1"
-          tenant="$2"
-          institution="$3"
-          expected="$4"
           compose=(docker compose --env-file .env.local.ci -f docker-compose.local.yml)
-          actual="$("${compose[@]}" exec -T -e PGPASSWORD="${EADMIN_HIERARCHY_RLS_PASSWORD}" postgres \
-            psql -X -q -A -t -h 127.0.0.1 -U eadmin_hierarchy_rls -d eadmin \
-            -v ON_ERROR_STOP=1 -v role="${role}" -v tenant="${tenant}" -v institution="${institution}" <<'SQL'
-          WITH signed_context AS MATERIALIZED (
-            SELECT
-              set_config('app.current_user_id', '00000000-0000-0000-0000-000000000001', true),
-              set_config('app.current_tenant_id', :'tenant', true),
-              set_config('app.current_institution_id', :'institution', true),
-              set_config('app.current_role', :'role', true)
-          ), scoped AS (
-            SELECT s.scope_id
-            FROM signed_context
-            CROSS JOIN LATERAL eadmin_current_directeur_institution_scope() AS s
-          )
-          SELECT COALESCE(string_agg(scope_id, ',' ORDER BY scope_id), '') FROM scoped;
+          "${compose[@]}" exec -T postgres \
+            psql -U eadmin -d eadmin -v ON_ERROR_STOP=1 \
+            -v runtime_password="${EADMIN_HIERARCHY_RLS_PASSWORD}" <<'SQL'
+          CREATE ROLE eadmin_hierarchy_rls
+            LOGIN
+            NOSUPERUSER
+            NOCREATEDB
+            NOCREATEROLE
+            NOINHERIT
+            NOBYPASSRLS
+            PASSWORD :'runtime_password';
+          GRANT CONNECT ON DATABASE eadmin TO eadmin_hierarchy_rls;
+          GRANT USAGE ON SCHEMA public TO eadmin_hierarchy_rls;
+          GRANT SELECT, UPDATE ON service_requests TO eadmin_hierarchy_rls;
+          GRANT SELECT ON institution_service_assignments TO eadmin_hierarchy_rls;
           SQL
-          )"
-          printf 'role=%s tenant=%s institution=%s scope=%q\n' "${role}" "${tenant}" "${institution}" "${actual}"
-          test "${actual}" = "${expected}"
-          SH
-          chmod +x /tmp/directeur-scope-probe.sh
 
-      - name: Prove signed DIRECTEUR helper nominal scope
-        run: /tmp/directeur-scope-probe.sh DIRECTEUR republique-de-guinee dir-justice-recette 'dir-justice-recette,service-casier-recette'
+          flags="$("${compose[@]}" exec -T postgres psql -U eadmin -d eadmin -Atc \
+            "SELECT rolsuper::text || ':' || rolbypassrls::text FROM pg_roles WHERE rolname='eadmin_hierarchy_rls';")"
+          test "${flags}" = 'false:false'
 
-      - name: Prove DIRECTEUR helper rejects wrong tenant
-        run: /tmp/directeur-scope-probe.sh DIRECTEUR tenant-isolation-recette dir-justice-recette ''
+          assignment_read="$("${compose[@]}" exec -T postgres psql -U eadmin -d eadmin -Atc \
+            "SELECT has_table_privilege('eadmin_hierarchy_rls', 'institution_service_assignments', 'SELECT')::text;")"
+          test "${assignment_read}" = 'true'
 
-      - name: Prove DIRECTEUR helper rejects missing institution
-        run: /tmp/directeur-scope-probe.sh DIRECTEUR republique-de-guinee '' ''
-
-      - name: Prove DIRECTEUR helper rejects unknown role
-        run: /tmp/directeur-scope-probe.sh UNKNOWN republique-de-guinee dir-justice-recette ''
-
-      - name: Prove DIRECTEUR helper is DIRECTEUR-only
-        run: /tmp/directeur-scope-probe.sh MINISTRE republique-de-guinee dir-justice-recette ''
-
-      - name: Prove DIRECTEUR institution plus descendants only
+      - name: Prove DIRECTEUR and operational RLS matrix
         run: |
           set -euo pipefail
           compose=(docker compose --env-file .env.local.ci -f docker-compose.local.yml)
-          psql_runtime() {
-            "${compose[@]}" exec -T -e PGPASSWORD="${EADMIN_HIERARCHY_RLS_PASSWORD}" postgres \
-              psql -X -q -A -t -h 127.0.0.1 -U eadmin_hierarchy_rls -d eadmin \
-              -v ON_ERROR_STOP=1 -c "$1"
-          }
-          scoped_sql="BEGIN;
-            SET LOCAL app.current_user_id = '00000000-0000-0000-0000-000000000001';
-            SET LOCAL app.current_tenant_id = 'republique-de-guinee';
-            SET LOCAL app.current_institution_id = 'dir-justice-recette';
-            SET LOCAL app.current_role = 'DIRECTEUR';"
-
-          child_count="$(psql_runtime "${scoped_sql} SELECT count(*) FROM service_requests WHERE reference='REC-GN-2026-006'; COMMIT;")"
-          unrelated_count="$(psql_runtime "${scoped_sql} SELECT count(*) FROM service_requests WHERE reference='REC-GN-2026-002'; COMMIT;")"
-          cross_tenant_count="$(psql_runtime "${scoped_sql} SELECT count(*) FROM service_requests WHERE reference='REC-ISO-2026-001'; COMMIT;")"
-
-          test "${child_count}" = '1'
-          test "${unrelated_count}" = '0'
-          test "${cross_tenant_count}" = '0'
-
-      - name: Prove operational roles remain exact institution
-        run: |
-          set -euo pipefail
-          compose=(docker compose --env-file .env.local.ci -f docker-compose.local.yml)
-          query_as_role() {
-            local role="$1" institution="$2" reference="$3"
-            "${compose[@]}" exec -T -e PGPASSWORD="${EADMIN_HIERARCHY_RLS_PASSWORD}" postgres \
-              psql -X -q -A -t -h 127.0.0.1 -U eadmin_hierarchy_rls -d eadmin \
-              -v ON_ERROR_STOP=1 -c "
-                BEGIN;
-                SET LOCAL app.current_user_id = '00000000-0000-0000-0000-000000000002';
-                SET LOCAL app.current_tenant_id = 'republique-de-guinee';
-                SET LOCAL app.current_institution_id = '${institution}';
-                SET LOCAL app.current_role = '${role}';
-                SELECT count(*) FROM service_requests WHERE reference='${reference}';
-                COMMIT;"
-          }
-
-          test "$(query_as_role ADMIN mairie-ratoma-recette REC-GN-2026-002)" = '1'
-          test "$(query_as_role ADMIN mairie-ratoma-recette REC-GN-2026-003)" = '0'
-          test "$(query_as_role CHEF_SERVICE service-casier-recette REC-GN-2026-006)" = '1'
-          test "$(query_as_role CHEF_SERVICE service-casier-recette REC-GN-2026-002)" = '0'
-
-      - name: Prove MINISTRE tenant scope and unknown role fail closed
-        run: |
-          set -euo pipefail
-          compose=(docker compose --env-file .env.local.ci -f docker-compose.local.yml)
-          count_for() {
-            local role="$1" institution="$2" reference="$3"
-            "${compose[@]}" exec -T -e PGPASSWORD="${EADMIN_HIERARCHY_RLS_PASSWORD}" postgres \
-              psql -X -q -A -t -h 127.0.0.1 -U eadmin_hierarchy_rls -d eadmin \
-              -v ON_ERROR_STOP=1 -c "
-                BEGIN;
-                SET LOCAL app.current_user_id = '00000000-0000-0000-0000-000000000003';
-                SET LOCAL app.current_tenant_id = 'republique-de-guinee';
-                SET LOCAL app.current_institution_id = '${institution}';
-                SET LOCAL app.current_role = '${role}';
-                SELECT count(*) FROM service_requests WHERE reference='${reference}';
-                COMMIT;"
-          }
-
-          test "$(count_for MINISTRE min-justice-recette REC-GN-2026-002)" = '1'
-          test "$(count_for MINISTRE min-justice-recette REC-ISO-2026-001)" = '0'
-          test "$(count_for UNKNOWN dir-justice-recette REC-GN-2026-006)" = '0'
-
-      - name: Prove DIRECTEUR can update descendant but not unrelated request
-        run: |
-          set -euo pipefail
-          compose=(docker compose --env-file .env.local.ci -f docker-compose.local.yml)
-          update_ref() {
-            local reference="$1"
-            "${compose[@]}" exec -T -e PGPASSWORD="${EADMIN_HIERARCHY_RLS_PASSWORD}" postgres \
-              psql -X -q -A -t -h 127.0.0.1 -U eadmin_hierarchy_rls -d eadmin \
-              -v ON_ERROR_STOP=1 -c "
-                BEGIN;
-                SET LOCAL app.current_user_id = '00000000-0000-0000-0000-000000000004';
-                SET LOCAL app.current_tenant_id = 'republique-de-guinee';
-                SET LOCAL app.current_institution_id = 'dir-justice-recette';
-                SET LOCAL app.current_role = 'DIRECTEUR';
-                UPDATE service_requests SET updated_at = updated_at WHERE reference='${reference}' RETURNING reference;
-                ROLLBACK;"
-          }
-
-          test "$(update_ref REC-GN-2026-006)" = 'REC-GN-2026-006'
-          test -z "$(update_ref REC-GN-2026-002)"
+          "${compose[@]}" run --rm --no-deps \
+            -e EADMIN_HIERARCHY_RLS_PASSWORD="${EADMIN_HIERARCHY_RLS_PASSWORD}" \
+            backend python -m scripts.verify_directeur_request_rls
 
       - name: Cleanup
         if: always()
