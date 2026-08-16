@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api import auth as auth_api
-from app.api import auth_hardening
+from app.api import auth_hardening, auth_session_hardening
 from app.api.auth import get_current_user, verify_password
 from app.api.security import _verify_totp_code
 from app.database import get_db
@@ -48,8 +48,13 @@ async def secure_security_verify_mfa(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """Use the canonical MFA verifier and central refresh-token store."""
-    return await auth_api.verify_mfa(request, body, current_user, db)
+    """Use canonical TOTP verification plus Redis session-bound token issuance."""
+    return await auth_session_hardening.secure_session_verify_mfa(
+        request,
+        body,
+        current_user,
+        db,
+    )
 
 
 @router.post("/change-password", summary="Changer le mot de passe")
