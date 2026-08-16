@@ -8,6 +8,8 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api import auth as auth_api
+from app.api import auth_hardening
 from app.api.auth import get_current_user, verify_password
 from app.api.security import _verify_totp_code
 from app.database import get_db
@@ -24,6 +26,22 @@ logger = logging.getLogger("eadmin.security_hardening")
 class SecureMFADisableRequest(BaseModel):
     password: str
     code: str
+
+
+@router.post("/change-password", summary="Changer le mot de passe")
+async def secure_security_change_password(
+    request: Request,
+    body: auth_api.ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    """Shadow the legacy security route with the durable auth revocation flow."""
+    return await auth_hardening.secure_change_password(
+        request,
+        body,
+        current_user,
+        db,
+    )
 
 
 @router.post("/disable-mfa", summary="Désactiver MFA")
