@@ -5,9 +5,12 @@ on:
     paths:
       - "backend/alembic/versions/**"
       - "backend/app/models/notification_outbox.py"
+      - "backend/app/services/mobile_verification.py"
       - "backend/app/services/notification_outbox.py"
+      - "backend/app/services/notification_payload_resolver.py"
       - "backend/app/workers/notification_outbox.py"
       - "backend/scripts/check_notification_outbox_rls.py"
+      - "backend/tests/test_mobile_notification_consent.py"
       - "backend/tests/test_notification_outbox.py"
       - "backend/tests/test_notification_outbox_worker_hardening.py"
       - ".github/workflows/notification-outbox-isolation.yml"
@@ -86,9 +89,12 @@ jobs:
           ruff check
           alembic/versions/notification_outbox_tenant_rls.py
           app/models/notification_outbox.py
+          app/services/mobile_verification.py
           app/services/notification_outbox.py
+          app/services/notification_payload_resolver.py
           app/workers/notification_outbox.py
           scripts/check_notification_outbox_rls.py
+          tests/test_mobile_notification_consent.py
           tests/test_notification_outbox_worker_hardening.py
 
       - name: Targeted notification regressions

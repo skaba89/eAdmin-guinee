@@ -25,7 +25,14 @@ async def materialize_notification(notification: NotificationOutbox):
     if not challenge_id:
         raise RuntimeError("Challenge OTP absent du payload de vérification.")
 
-    code = await mobile_verification_service.get_delivery_code(challenge_id)
+    tenant_id = str(getattr(notification, "tenant_id", "") or "").strip()
+    if not tenant_id:
+        raise RuntimeError("Tenant OTP absent de la notification de vérification.")
+
+    code = await mobile_verification_service.get_delivery_code(
+        challenge_id,
+        tenant_id=tenant_id,
+    )
     if not code:
         raise RuntimeError("Code OTP expiré ou indisponible pour livraison.")
 
