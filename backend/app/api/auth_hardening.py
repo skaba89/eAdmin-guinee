@@ -63,7 +63,22 @@ def _issued_before_cutoff(payload: dict, user: User) -> bool:
 
 
 async def _consume_refresh_token(user_id: str, refresh_jti: str) -> bool:
-    return await auth_api.token_blacklist.consume_refresh_token(user_id, refresh_jti)
+    service = auth_api.token_blacklist
+    consume = getattr(service, "consume_refresh_token", None)
+    if callable(consume):
+        return bool(await consume(user_id, refresh_jti))
+
+    # Compatibility is deliberately limited to the repository's in-memory test
+    # double. Production TokenBlacklistService exposes consume_refresh_token()
+    # and therefore always uses Redis SREM atomically.
+    test_tokens = getattr(service, "_refresh_tokens", None)
+    if isinstance(test_tokens, dict):
+        tokens = test_tokens.get(user_id, set())
+        if refresh_jti in tokens:
+            tokens.remove(refresh_jti)
+            return True
+        return False
+    return False
 
 
 async def _lock_user(db: AsyncSession, user_id: uuid.UUID) -> User | None:
