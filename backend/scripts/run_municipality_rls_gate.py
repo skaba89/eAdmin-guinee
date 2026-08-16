@@ -1,4 +1,3 @@
-# Audit-only trigger: full E2E use-case matrix 2026-08-16. No product behavior change.
 """Run the municipality RLS proof with correct psycopg2 literal-SQL handling.
 
 `verify_municipality_rls` contains both parameterized statements and a few
