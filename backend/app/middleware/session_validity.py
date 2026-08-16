@@ -1,7 +1,8 @@
 """Global access-token lifecycle guard.
 
 Rejects access JWTs whose embedded authorization scope no longer matches the
-current account or whose `iat` predates a server-side invalidation cutoff.
+current account, whose `iat` predates a server-side invalidation cutoff, or
+whose signed `sid` no longer resolves to the same Redis-backed user session.
 """
 
 from datetime import datetime, timezone
@@ -17,6 +18,10 @@ from starlette.responses import JSONResponse
 from app.config import settings
 from app.database import async_session_factory, get_db
 from app.models.user import User
+from app.services.session_binding import (
+    SessionRegistryUnavailable,
+    validate_bound_session,
+)
 
 logger = logging.getLogger("eadmin.session_validity")
 
@@ -134,6 +139,32 @@ class SessionValidityMiddleware(BaseHTTPMiddleware):
         if user.sessions_invalid_before is not None:
             if token_iat <= _utc(user.sessions_invalid_before):
                 logger.warning("Rejected JWT before session cutoff user=%s", user.id)
+                return JSONResponse(
+                    status_code=401,
+                    content={
+                        "detail": "Cette session a été révoquée. Reconnectez-vous.",
+                        "code": "SESSION_REVOKED",
+                    },
+                )
+
+        # Rollout compatibility: pre-sid JWTs remain governed by the durable DB
+        # checks above until their normal expiration. Once sid is present, Redis
+        # becomes mandatory and ownership must match the signed JWT subject.
+        sid = str(payload.get("sid") or "")
+        if sid:
+            try:
+                valid = await validate_bound_session(sid, user_id, touch=True)
+            except SessionRegistryUnavailable as exc:
+                logger.error("Bound session lookup failed sid=%s user=%s: %s", sid, user_id, exc)
+                return JSONResponse(
+                    status_code=503,
+                    content={
+                        "detail": "La session ne peut pas être vérifiée actuellement.",
+                        "code": "SESSION_REGISTRY_UNAVAILABLE",
+                    },
+                )
+            if not valid:
+                logger.warning("Rejected missing/mismatched bound session sid=%s user=%s", sid, user_id)
                 return JSONResponse(
                     status_code=401,
                     content={

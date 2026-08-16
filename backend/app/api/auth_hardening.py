@@ -21,6 +21,11 @@ from app.database import get_db
 from app.models.user import RoleEnum, User
 from app.services.audit_service import AuditService
 from app.services.authorization_service import authorization_service
+from app.services.session_binding import (
+    SessionRegistryUnavailable,
+    destroy_bound_session_best_effort,
+    validate_bound_session,
+)
 
 router = APIRouter()
 logger = logging.getLogger("eadmin.auth_hardening")
@@ -197,7 +202,7 @@ async def secure_refresh_token(
     request: SecureRefreshRequest,
     db: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
-    """Atomically rotate a refresh token and reject globally revoked sessions."""
+    """Atomically rotate a refresh token and enforce its bound Redis session."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Token de rafraîchissement invalide",
@@ -226,6 +231,18 @@ async def secure_refresh_token(
     user = await _lock_user(db, user_uuid)
     if not user or not user.is_active or _issued_before_cutoff(payload, user):
         raise credentials_exception
+
+    sid = str(payload.get("sid") or "")
+    if sid:
+        try:
+            bound = await validate_bound_session(sid, user_id, touch=True)
+        except SessionRegistryUnavailable as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Le registre de sessions est temporairement indisponible.",
+            ) from exc
+        if not bound:
+            raise credentials_exception
 
     if user.mfa_enabled and payload.get("mfa_verified") is not True:
         logger.warning("Blocked refresh before MFA verification for user=%s", user_id)
@@ -257,6 +274,8 @@ async def secure_refresh_token(
         "tenant_id": user.tenant_id or settings.TENANT_DEFAULT_ID,
         "institution_id": user.institution_id or "",
     }
+    if sid:
+        token_data["sid"] = sid
     if user.mfa_enabled:
         token_data.update({"mfa_required": True, "mfa_verified": True})
 
@@ -287,6 +306,7 @@ async def secure_logout(
         raise HTTPException(status_code=401, detail="Session invalide.")
 
     cutoff = await _set_session_cutoff(db, user)
+    current_sid = ""
 
     # Keep the current-JTI blacklist for immediate multi-instance visibility;
     # sessions_invalid_before remains the durable fail-closed authority.
@@ -298,6 +318,7 @@ async def secure_logout(
                 settings.SECRET_KEY,
                 algorithms=[settings.ALGORITHM],
             )
+            current_sid = str(payload.get("sid") or "")
             jti = str(payload.get("jti") or "")
             exp = float(payload.get("exp") or 0)
             ttl = max(0, int(exp - datetime.now(timezone.utc).timestamp()))
@@ -310,6 +331,7 @@ async def secure_logout(
             pass
 
     await _revoke_refresh_tokens_best_effort(str(user.id))
+    await destroy_bound_session_best_effort(current_sid)
     logger.info("Global logout cutoff=%s user=%s", cutoff.isoformat(), user.id)
     return {"message": "Déconnexion réussie. Toutes vos sessions ont été révoquées."}
 
@@ -362,3 +384,10 @@ async def secure_change_password(
         pass
 
     return {"message": "Mot de passe modifié avec succès. Veuillez vous reconnecter."}
+
+
+# Session-bound login and MFA verification are included in the same override
+# router so they remain ahead of the legacy auth routes in FastAPI order.
+from app.api.auth_session_hardening import router as session_auth_router  # noqa: E402
+
+router.include_router(session_auth_router)
