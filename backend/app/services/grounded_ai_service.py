@@ -19,6 +19,7 @@ from app.models.administrative_service import AdministrativeService
 from app.models.courrier import Courrier
 from app.models.document import Document
 from app.models.document_ocr import DocumentOCRResult
+from app.services.service_catalog import list_active_services
 
 
 _STOPWORDS = {
@@ -58,15 +59,31 @@ class GroundedGovernmentAssistant:
         self,
         db: AsyncSession,
         tenant_id: str | None,
+        *,
+        institution_id: str | None = None,
+        service_institution_id: str | None = None,
     ) -> list[AdministrativeService]:
-        statement = select(AdministrativeService).where(AdministrativeService.is_active.is_(True))
-        if tenant_id:
-            statement = statement.where(AdministrativeService.tenant_id == tenant_id)
-        statement = statement.order_by(
-            AdministrativeService.service_id,
-            desc(AdministrativeService.version),
-        )
-        rows = (await db.execute(statement)).scalars().all()
+        scoped = bool(institution_id or service_institution_id)
+        if scoped:
+            if not tenant_id:
+                return []
+            rows = await list_active_services(
+                db,
+                tenant_id,
+                institution_id=institution_id,
+                service_institution_id=service_institution_id,
+            )
+        else:
+            statement = select(AdministrativeService).where(
+                AdministrativeService.is_active.is_(True)
+            )
+            if tenant_id:
+                statement = statement.where(AdministrativeService.tenant_id == tenant_id)
+            statement = statement.order_by(
+                AdministrativeService.service_id,
+                desc(AdministrativeService.version),
+            )
+            rows = list((await db.execute(statement)).scalars().all())
 
         latest: dict[str, AdministrativeService] = {}
         for service in rows:
@@ -114,8 +131,16 @@ class GroundedGovernmentAssistant:
         query: str,
         tenant_id: str | None,
         limit: int = 5,
+        *,
+        institution_id: str | None = None,
+        service_institution_id: str | None = None,
     ) -> list[ServiceMatch]:
-        services = await self._latest_active_services(db, tenant_id)
+        services = await self._latest_active_services(
+            db,
+            tenant_id,
+            institution_id=institution_id,
+            service_institution_id=service_institution_id,
+        )
         matches = [self._score_service(query, service) for service in services]
         matches = [match for match in matches if match.score > 0]
         matches.sort(key=lambda match: (match.score, match.service.version), reverse=True)
@@ -183,9 +208,19 @@ class GroundedGovernmentAssistant:
         question: str,
         tenant_id: str | None,
         language: str = "fr",
+        *,
+        institution_id: str | None = None,
+        service_institution_id: str | None = None,
     ) -> dict[str, Any]:
         question = " ".join((question or "").split())
-        matches = await self.find_services(db, question, tenant_id, limit=5)
+        matches = await self.find_services(
+            db,
+            question,
+            tenant_id,
+            limit=5,
+            institution_id=institution_id,
+            service_institution_id=service_institution_id,
+        )
         if not matches or matches[0].score < 0.18:
             message = (
                 "Je ne dispose pas d'une source suffisamment précise dans le catalogue administratif "
@@ -240,8 +275,18 @@ class GroundedGovernmentAssistant:
         db: AsyncSession,
         citizen_need: str,
         tenant_id: str | None,
+        *,
+        institution_id: str | None = None,
+        service_institution_id: str | None = None,
     ) -> dict[str, Any]:
-        matches = await self.find_services(db, citizen_need, tenant_id, limit=5)
+        matches = await self.find_services(
+            db,
+            citizen_need,
+            tenant_id,
+            limit=5,
+            institution_id=institution_id,
+            service_institution_id=service_institution_id,
+        )
         suggestions = []
         for match in matches:
             service = match.service
@@ -276,9 +321,19 @@ class GroundedGovernmentAssistant:
         text_value: str,
         tenant_id: str | None,
         title: str | None = None,
+        *,
+        institution_id: str | None = None,
+        service_institution_id: str | None = None,
     ) -> dict[str, Any]:
         combined = " ".join(part for part in [title or "", text_value or ""] if part).strip()
-        matches = await self.find_services(db, combined, tenant_id, limit=3)
+        matches = await self.find_services(
+            db,
+            combined,
+            tenant_id,
+            limit=3,
+            institution_id=institution_id,
+            service_institution_id=service_institution_id,
+        )
         if not matches:
             return {
                 "category": "autre",
