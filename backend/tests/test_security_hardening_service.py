@@ -1,4 +1,4 @@
-"""Tests for MFA-disable hardening and forced session revocation."""
+"""Tests for security-route hardening and forced session revocation."""
 
 import uuid
 from types import SimpleNamespace
@@ -8,6 +8,8 @@ import pytest
 from fastapi import HTTPException
 
 import app.api.security_hardening as hardening
+from app.api import auth as auth_api
+from app.main import app
 
 
 def user(*, enabled=True, secret="JBSWY3DPEHPK3PXP"):
@@ -21,6 +23,40 @@ def user(*, enabled=True, secret="JBSWY3DPEHPK3PXP"):
 
 def request_with_ip(ip="127.0.0.1"):
     return SimpleNamespace(client=SimpleNamespace(host=ip))
+
+
+def test_security_password_route_is_shadowed_by_hardened_handler():
+    matching = [
+        route
+        for route in app.routes
+        if getattr(route, "path", None) == "/api/v1/security/change-password"
+        and "POST" in (getattr(route, "methods", set()) or set())
+    ]
+    assert len(matching) >= 2
+    assert matching[0].endpoint is hardening.secure_security_change_password
+
+
+@pytest.mark.asyncio
+async def test_security_password_route_delegates_to_durable_auth_flow(monkeypatch):
+    current_user = user()
+    request = request_with_ip()
+    db = MagicMock()
+    body = auth_api.ChangePasswordRequest(
+        current_password="AncienSecret2026!Z",
+        new_password="NouveauSecret2026!Z",
+    )
+    durable = AsyncMock(return_value={"message": "ok"})
+    monkeypatch.setattr(hardening.auth_hardening, "secure_change_password", durable)
+
+    result = await hardening.secure_security_change_password(
+        request,
+        body,
+        current_user,
+        db,
+    )
+
+    assert result == {"message": "ok"}
+    durable.assert_awaited_once_with(request, body, current_user, db)
 
 
 @pytest.mark.asyncio
