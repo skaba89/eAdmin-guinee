@@ -59,10 +59,11 @@ async def _bind_token_pair(
     refresh_token: str,
     request: Request,
 ) -> tuple[str, str]:
-    """Reissue a successful token pair with a Redis-backed session id."""
+    """Reissue a coherent successful token pair with a Redis-backed session id."""
 
     try:
         claims = _reissuable_claims(access_token)
+        refresh_payload = _decode(refresh_token)
     except JWTError as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -70,7 +71,12 @@ async def _bind_token_pair(
         ) from exc
 
     user_id = str(claims.get("sub") or "")
-    if not user_id:
+    refresh_user_id = str(refresh_payload.get("sub") or "")
+    if (
+        not user_id
+        or refresh_user_id != user_id
+        or refresh_payload.get("type") != "refresh"
+    ):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Impossible de finaliser la session authentifiée.",
