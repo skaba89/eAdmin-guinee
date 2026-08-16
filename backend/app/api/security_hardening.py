@@ -16,7 +16,6 @@ from app.database import get_db
 from app.middleware.rls import set_rls_context
 from app.models.qualified_signature_evidence import QualifiedSignatureEvidence
 from app.models.user import RoleEnum, User
-from app.services.token_blacklist import token_blacklist
 from app.services.trust_service import trust_service
 
 router = APIRouter()
@@ -26,6 +25,31 @@ logger = logging.getLogger("eadmin.security_hardening")
 class SecureMFADisableRequest(BaseModel):
     password: str
     code: str
+
+
+@router.post(
+    "/setup-mfa",
+    response_model=auth_api.MFASetupResponse,
+    summary="Configurer MFA",
+)
+async def secure_security_setup_mfa(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> auth_api.MFASetupResponse:
+    """Shadow the legacy setup route with the canonical audited MFA flow."""
+    return await auth_api.setup_mfa(request, current_user, db)
+
+
+@router.post("/verify-mfa", summary="Vérifier le code MFA")
+async def secure_security_verify_mfa(
+    request: Request,
+    body: auth_api.MFAVerifyRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Use the canonical MFA verifier and central refresh-token store."""
+    return await auth_api.verify_mfa(request, body, current_user, db)
 
 
 @router.post("/change-password", summary="Changer le mot de passe")
@@ -51,7 +75,7 @@ async def secure_disable_mfa(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, str]:
-    """Disable MFA only after re-authentication with password and current TOTP."""
+    """Disable MFA after re-authentication and durably revoke old sessions."""
 
     if not current_user.mfa_enabled or not current_user.mfa_secret:
         raise HTTPException(
@@ -79,11 +103,11 @@ async def secure_disable_mfa(
 
     current_user.mfa_enabled = False
     current_user.mfa_secret = None
-    await db.flush()
 
-    # Existing sessions were authenticated under a stronger policy. Revoke them
-    # so the account must sign in again under the new MFA state.
-    await token_blacklist.revoke_all_user_tokens(str(current_user.id))
+    # MFA is an authorization-strength attribute. Every access token issued
+    # before this transition must become stale, even when Redis cleanup fails.
+    await auth_hardening._set_session_cutoff(db, current_user)
+    await auth_hardening._revoke_refresh_tokens_best_effort(str(current_user.id))
 
     logger.warning(
         "MFA disabled after password+TOTP re-authentication: user=%s ip=%s",
