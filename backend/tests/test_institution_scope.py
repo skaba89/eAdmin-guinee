@@ -1,3 +1,4 @@
+# Audit-only trigger: full E2E use-case matrix 2026-08-16. No product behavior change.
 """Tests for hierarchical institution scope construction."""
 
 import pytest
