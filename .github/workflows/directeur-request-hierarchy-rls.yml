@@ -120,11 +120,20 @@ jobs:
           GRANT CONNECT ON DATABASE eadmin TO eadmin_hierarchy_rls;
           GRANT USAGE ON SCHEMA public TO eadmin_hierarchy_rls;
           GRANT SELECT, UPDATE ON service_requests TO eadmin_hierarchy_rls;
+          -- The current service_requests RLS policy resolves legacy municipal
+          -- AGENT/CHEF_SERVICE routes through this table. PostgreSQL evaluates
+          -- policy dependencies with the querying role's privileges, so every
+          -- realistic non-bypass service_requests reader needs SELECT here.
+          GRANT SELECT ON institution_service_assignments TO eadmin_hierarchy_rls;
           SQL
 
           flags="$("${compose[@]}" exec -T postgres psql -U eadmin -d eadmin -Atc \
             "SELECT rolsuper::text || ':' || rolbypassrls::text FROM pg_roles WHERE rolname='eadmin_hierarchy_rls';")"
           test "${flags}" = 'false:false'
+
+          assignment_read="$("${compose[@]}" exec -T postgres psql -U eadmin -d eadmin -Atc \
+            "SELECT has_table_privilege('eadmin_hierarchy_rls', 'institution_service_assignments', 'SELECT')::text;")"
+          test "${assignment_read}" = 'true'
 
       - name: Prove hierarchy fixture before RLS
         run: |
