@@ -217,7 +217,7 @@ async def test_password_change_sets_cutoff_even_if_redis_cleanup_fails(monkeypat
         request,
         ChangePasswordRequest(
             current_password="OldPassword2026!",
-            new_password="NewSecurePassword2026!",
+            new_password="NouveauSecret2026!Z",
         ),
         user,
         db,
