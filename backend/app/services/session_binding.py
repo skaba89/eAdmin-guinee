@@ -31,10 +31,14 @@ def _request_context(request: Request) -> tuple[str, str, str]:
 async def create_bound_session(user_id: str, request: Request) -> str | None:
     """Create the Redis session that will back a newly issued JWT family.
 
-    Test/development keep a compatibility path when Redis is intentionally not
-    running. Staging and production fail closed so a newly issued token can
-    never pretend to be session-bound without an authoritative Redis record.
+    The normal test suite intentionally does not depend on a real Redis daemon;
+    focused session-binding tests switch the environment and inject a fake
+    registry. Development keeps compatibility when local Redis is absent.
+    Staging and production fail closed.
     """
+
+    if settings.is_test:
+        return None
 
     client_ip, user_agent, fingerprint = _request_context(request)
     try:
@@ -45,10 +49,9 @@ async def create_bound_session(user_id: str, request: Request) -> str | None:
             device_fingerprint=fingerprint,
         )
     except Exception as exc:
-        if settings.is_test or settings.is_development:
+        if settings.is_development:
             logger.warning(
-                "Session registry unavailable in %s; issuing legacy unbound token user=%s: %s",
-                settings.ENVIRONMENT,
+                "Session registry unavailable in development; issuing legacy unbound token user=%s: %s",
                 user_id,
                 exc,
             )
