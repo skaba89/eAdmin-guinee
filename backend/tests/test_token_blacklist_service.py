@@ -49,9 +49,7 @@ async def test_lazy_redis_initialization(monkeypatch, service):
 async def test_revoke_token_ignores_expired_token(service):
     redis = fake_redis()
     service._redis = redis
-
     await service.revoke_token("expired-jti", 0)
-
     redis.setex.assert_not_awaited()
 
 
@@ -63,11 +61,8 @@ async def test_revoke_and_check_token(service):
 
     await service.revoke_token("jti-123456789", 120)
     assert await service.is_token_revoked("jti-123456789") is True
-
     redis.setex.assert_awaited_once_with(
-        f"{BLACKLIST_PREFIX}jti-123456789",
-        120,
-        "revoked",
+        f"{BLACKLIST_PREFIX}jti-123456789", 120, "revoked"
     )
     redis.exists.assert_awaited_once_with(f"{BLACKLIST_PREFIX}jti-123456789")
 
@@ -79,15 +74,21 @@ async def test_store_and_validate_refresh_token(service):
     service._redis = redis
 
     await service.store_refresh_token("user-1", "refresh-1", 600)
-    valid = await service.is_refresh_token_valid("user-1", "refresh-1")
-
-    assert valid is True
+    assert await service.is_refresh_token_valid("user-1", "refresh-1") is True
     redis.sadd.assert_awaited_once_with(f"{REFRESH_TOKEN_PREFIX}user-1", "refresh-1")
     redis.expire.assert_awaited_once_with(f"{REFRESH_TOKEN_PREFIX}user-1", 600)
-    redis.sismember.assert_awaited_once_with(
-        f"{REFRESH_TOKEN_PREFIX}user-1",
-        "refresh-1",
-    )
+
+
+@pytest.mark.asyncio
+async def test_consume_refresh_token_is_single_use(service):
+    redis = fake_redis()
+    redis.srem.side_effect = [1, 0]
+    service._redis = redis
+
+    assert await service.consume_refresh_token("user-1", "refresh-1") is True
+    assert await service.consume_refresh_token("user-1", "refresh-1") is False
+    assert redis.srem.await_count == 2
+    redis.srem.assert_awaited_with(f"{REFRESH_TOKEN_PREFIX}user-1", "refresh-1")
 
 
 @pytest.mark.asyncio
@@ -110,9 +111,7 @@ async def test_account_lockout_keeps_only_recent_attempts(monkeypatch, service):
     monkeypatch.setattr(module.time, "time", lambda: 1000.0)
 
     locked = await service.is_account_locked(
-        "citizen@example.gn",
-        max_attempts=2,
-        lockout_seconds=10,
+        "citizen@example.gn", max_attempts=2, lockout_seconds=10
     )
 
     assert locked is True
@@ -130,9 +129,7 @@ async def test_account_not_locked_without_enough_recent_attempts(monkeypatch, se
     monkeypatch.setattr(module.time, "time", lambda: 1000.0)
 
     assert await service.is_account_locked(
-        "agent@example.gn",
-        max_attempts=5,
-        lockout_seconds=10,
+        "agent@example.gn", max_attempts=5, lockout_seconds=10
     ) is False
 
 
@@ -148,12 +145,9 @@ async def test_record_reset_and_remaining_attempts(monkeypatch, service):
     redis.expire.assert_awaited_once_with(key, 300)
 
     redis.lrange.return_value = ["990.0", "995.0"]
-    remaining = await service.get_remaining_attempts(
-        "agent@example.gn",
-        max_attempts=5,
-        lockout_seconds=30,
-    )
-    assert remaining == 3
+    assert await service.get_remaining_attempts(
+        "agent@example.gn", max_attempts=5, lockout_seconds=30
+    ) == 3
 
     await service.reset_login_attempts("agent@example.gn")
     redis.delete.assert_awaited_with(key)
@@ -167,9 +161,7 @@ async def test_remaining_attempts_never_negative(monkeypatch, service):
     monkeypatch.setattr(module.time, "time", lambda: 1000.0)
 
     assert await service.get_remaining_attempts(
-        "locked@example.gn",
-        max_attempts=5,
-        lockout_seconds=30,
+        "locked@example.gn", max_attempts=5, lockout_seconds=30
     ) == 0
 
 
@@ -177,8 +169,6 @@ async def test_remaining_attempts_never_negative(monkeypatch, service):
 async def test_close_resets_connection(service):
     redis = fake_redis()
     service._redis = redis
-
     await service.close()
-
     redis.close.assert_awaited_once()
     assert service._redis is None
