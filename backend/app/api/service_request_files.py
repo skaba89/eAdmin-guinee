@@ -2,14 +2,16 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user
+from app.api.service_requests import _load_request
 from app.database import get_db
-from app.models.service_request import ServiceRequest, ServiceRequestAttachment
-from app.models.user import User
+from app.middleware.rbac import require_permission
+from app.models.service_request import ServiceRequestAttachment
+from app.models.user import RoleEnum, User
 from app.services.object_storage import object_storage
 
 router = APIRouter()
@@ -23,14 +25,13 @@ router = APIRouter()
 async def delete_service_request_attachment(
     request_id: uuid.UUID,
     attachment_id: uuid.UUID,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> None:
-    request_item = (
-        await db.execute(select(ServiceRequest).where(ServiceRequest.id == request_id))
-    ).scalar_one_or_none()
-    if not request_item:
-        raise HTTPException(status_code=404, detail="Demande introuvable ou hors périmètre.")
+    # Apply the same server-authoritative dossier scope used by every other
+    # request operation before resolving the child row.
+    await _load_request(db, request_id, current_user)
 
     attachment = (
         await db.execute(
@@ -43,16 +44,31 @@ async def delete_service_request_attachment(
     if not attachment:
         raise HTTPException(status_code=404, detail="Pièce jointe introuvable.")
 
+    if current_user.role == RoleEnum.CITOYEN:
+        if attachment.uploaded_by != current_user.id:
+            raise HTTPException(
+                status_code=403,
+                detail="Seul l'auteur de cette pièce jointe peut la supprimer.",
+            )
+    else:
+        permission_checker = require_permission("requests", "process")
+        await permission_checker(
+            request=request,
+            current_user=current_user,
+            db=db,
+        )
+
     object_key = attachment.object_key
     await db.delete(attachment)
     await db.flush()
 
-    # Storage deletion happens only after the database authorization checks have
-    # succeeded. Failure is surfaced so an operator can reconcile the object.
+    # Object deletion runs after both application authorization and database
+    # RLS checks. Raising keeps the surrounding request transaction rollbackable
+    # when object storage is unavailable.
     try:
         await object_storage.delete(object_key)
     except Exception as exc:
         raise HTTPException(
             status_code=503,
-            detail="La métadonnée a été supprimée mais le stockage objet doit être réconcilié.",
+            detail="Suppression annulée : le stockage objet est indisponible.",
         ) from exc
