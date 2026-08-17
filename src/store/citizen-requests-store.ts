@@ -291,6 +291,7 @@ interface CitizenRequestsState {
   addProcessingNote: (id: string, note: Omit<ProcessingNote, 'id' | 'date'>) => void
   advanceTimeline: (id: string) => void
   assignRequest: (id: string, agent: string) => void
+  takeChargeRequest: (id: string, agent: string) => Promise<CitizenRequest>
   completeRequest: (id: string, deliveryMode: CitizenRequest['deliveryMode'], deliveryLocation?: string) => void
   getRequestById: (id: string) => CitizenRequest | undefined
   getRequestByReference: (ref: string) => CitizenRequest | undefined
@@ -419,6 +420,22 @@ export const useCitizenRequestsStore = create<CitizenRequestsState>((set, get) =
     void serviceRequestsApi.assignRequest(id, agent)
       .then((updated) => set((state) => ({ requests: replaceRequest(state.requests, updated) })))
       .catch((error) => set({ syncError: error instanceof Error ? error.message : 'Affectation impossible.' }))
+  },
+
+  takeChargeRequest: async (id, agent) => {
+    set({ syncError: null })
+    try {
+      await serviceRequestsApi.updateStatus(id, 'en_cours', 'Demande prise en charge par le service')
+      const assigned = await serviceRequestsApi.assignRequest(id, agent)
+      const requests = await serviceRequestsApi.listRequests()
+      const refreshed = requests.find((item) => item.id === id) || assigned
+      set({ requests, syncError: null })
+      return refreshed
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Prise en charge impossible.'
+      set({ syncError: message })
+      throw error instanceof Error ? error : new Error(message)
+    }
   },
 
   completeRequest: (id, deliveryMode, deliveryLocation) => {

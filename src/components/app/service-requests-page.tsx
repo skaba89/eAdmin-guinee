@@ -47,7 +47,7 @@ const STATUS_CONFIG: Record<RequestStatus, { label: string; color: string; icon:
 export function ServiceRequestsPage() {
   const {
     requests, updateRequestStatus, addProcessingNote, advanceTimeline,
-    assignRequest, completeRequest, verifyDocument, setGeneratedDocument, addUploadedDocument,
+    takeChargeRequest, completeRequest, verifyDocument, setGeneratedDocument, addUploadedDocument,
     checkAndRejectExpiredRequests,
   } = useCitizenRequestsStore()
 
@@ -70,6 +70,7 @@ export function ServiceRequestsPage() {
   const [rejectReason, setRejectReason] = useState('')
   const [generateDialogOpen, setGenerateDialogOpen] = useState(false)
   const [successToast, setSuccessToast] = useState('')
+  const [errorToast, setErrorToast] = useState('')
 
   useEffect(() => {
     if (successToast) {
@@ -77,6 +78,13 @@ export function ServiceRequestsPage() {
       return () => clearTimeout(timer)
     }
   }, [successToast])
+
+  useEffect(() => {
+    if (errorToast) {
+      const timer = setTimeout(() => setErrorToast(''), 5000)
+      return () => clearTimeout(timer)
+    }
+  }, [errorToast])
 
   // Refresh missed-SLA indicators periodically. The backend never rejects a
   // request automatically merely because its target date has passed.
@@ -118,12 +126,15 @@ export function ServiceRequestsPage() {
     { label: 'Livrées ce mois', value: rlsFilteredRequests.filter(r => r.status === 'livree').length, icon: Download, color: 'text-[#0B2E58] dark:text-[#3B7DD8]', bg: 'bg-[#0B2E58]/5 dark:bg-[#3B7DD8]/10' },
   ]
 
-  const handleTakeCharge = (req: CitizenRequest) => {
-    updateRequestStatus(req.id, 'en_cours', 'Demande prise en charge par le service')
-    advanceTimeline(req.id)
-    assignRequest(req.id, 'Agent en charge')
-    setSuccessToast(`Demande ${req.reference} prise en charge`)
-    refreshSelected(req.id)
+  const handleTakeCharge = async (req: CitizenRequest) => {
+    setErrorToast('')
+    try {
+      const updated = await takeChargeRequest(req.id, 'Agent en charge')
+      if (selectedRequest?.id === req.id) setSelectedRequest(updated)
+      setSuccessToast(`Demande ${req.reference} prise en charge`)
+    } catch (error) {
+      setErrorToast(error instanceof Error ? error.message : 'Prise en charge impossible.')
+    }
   }
 
   const handleRequestMoreInfo = () => {
@@ -421,7 +432,7 @@ export function ServiceRequestsPage() {
                         </div>
                         {req.status === 'soumise' && canProcess && (
                           <div className="mt-3 flex gap-2">
-                            <Button size="sm" className="btn-premium gap-1 h-7 text-xs" onClick={(e) => { e.stopPropagation(); handleTakeCharge(req) }}>
+                            <Button size="sm" className="btn-premium gap-1 h-7 text-xs" onClick={(e) => { e.stopPropagation(); void handleTakeCharge(req) }}>
                               <Play className="size-3" />
                               Prendre en charge
                             </Button>
@@ -712,7 +723,7 @@ export function ServiceRequestsPage() {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {selectedRequest.status === 'soumise' && canProcess && (
-                      <Button size="sm" className="btn-premium flex-1 gap-1" onClick={() => handleTakeCharge(selectedRequest)}>
+                      <Button size="sm" className="btn-premium flex-1 gap-1" onClick={() => { void handleTakeCharge(selectedRequest) }}>
                         <Play className="size-3.5" />
                         Prendre en charge
                       </Button>
@@ -936,6 +947,20 @@ export function ServiceRequestsPage() {
           >
             <CheckCircle2 className="size-4" />
             {successToast}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {errorToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-4 right-4 z-[61] flex items-center gap-2 rounded-lg bg-red-600 px-4 py-3 text-white text-sm font-medium shadow-lg"
+          >
+            <AlertCircle className="size-4" />
+            {errorToast}
           </motion.div>
         )}
       </AnimatePresence>
