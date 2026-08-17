@@ -157,7 +157,12 @@ test.describe('Service request lifecycle — real stack', () => {
     await expect(requestReference).toBeVisible()
     await requestReference.click()
 
-    const takeChargeButton = page.getByRole('button', { name: 'Prendre en charge', exact: true })
+    const detailsPanel = page
+      .getByText('Informations du citoyen', { exact: true })
+      .locator('xpath=ancestor::*[@data-slot="card"][1]')
+    await expect(detailsPanel).toBeVisible()
+
+    const takeChargeButton = detailsPanel.getByRole('button', { name: 'Prendre en charge', exact: true })
     await expect(takeChargeButton).toBeVisible()
 
     const statusResponsePromise = page.waitForResponse(
