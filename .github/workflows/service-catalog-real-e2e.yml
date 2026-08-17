@@ -1,0 +1,207 @@
+name: Service Catalog Real Stack E2E
+
+on:
+  pull_request:
+    paths:
+      - 'Dockerfile.local'
+      - 'docker-compose.local.yml'
+      - 'package.json'
+      - 'bun.lock'
+      - 'backend/app/api/auth.py'
+      - 'backend/app/api/auth_hardening.py'
+      - 'backend/app/api/auth_session_hardening.py'
+      - 'backend/app/api/service_catalog.py'
+      - 'backend/app/models/administrative_service.py'
+      - 'backend/app/services/service_catalog.py'
+      - 'backend/scripts/seed_recette_data.py'
+      - 'src/components/app/citizen-portal-page.tsx'
+      - 'src/components/auth/login-page.tsx'
+      - 'src/components/layout/app-sidebar.tsx'
+      - 'src/lib/auth-client.ts'
+      - 'src/lib/public-service-catalog.ts'
+      - 'src/store/app-store.ts'
+      - 'e2e/service-catalog.real.spec.ts'
+      - '.github/workflows/service-catalog-real-e2e.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  service-catalog-real-stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.4
+
+      - name: Install frontend dependencies and Chromium
+        run: |
+          set -euo pipefail
+          bun install --frozen-lockfile
+          bunx playwright install --with-deps chromium
+
+      - name: Create isolated real-stack environment
+        run: |
+          set -euo pipefail
+
+          postgres_password="$(openssl rand -hex 24)"
+          redis_password="$(openssl rand -hex 24)"
+          minio_password="$(openssl rand -hex 24)"
+          secret_key="$(openssl rand -hex 48)"
+          encryption_key="$(openssl rand -hex 32)"
+          frontend_encryption_key="$(openssl rand -hex 32)"
+          grafana_password="$(openssl rand -hex 24)"
+          test_password="CiCatalog!$(openssl rand -hex 20)Aa1"
+
+          for secret in \
+            "${postgres_password}" \
+            "${redis_password}" \
+            "${minio_password}" \
+            "${secret_key}" \
+            "${encryption_key}" \
+            "${frontend_encryption_key}" \
+            "${grafana_password}" \
+            "${test_password}"
+          do
+            echo "::add-mask::${secret}"
+          done
+
+          echo "EADMIN_UI_E2E_PASSWORD=${test_password}" >> "${GITHUB_ENV}"
+          echo "EADMIN_UI_E2E_API_URL=http://localhost:8000" >> "${GITHUB_ENV}"
+
+          cat > .env.local.ci <<EOF
+          POSTGRES_PASSWORD=${postgres_password}
+          REDIS_PASSWORD=${redis_password}
+          MINIO_ROOT_USER=eadmin
+          MINIO_ROOT_PASSWORD=${minio_password}
+          SECRET_KEY=${secret_key}
+          ENCRYPTION_KEY=${encryption_key}
+          NEXT_PUBLIC_ENCRYPTION_KEY=${frontend_encryption_key}
+          GRAFANA_ADMIN_USER=admin
+          GRAFANA_ADMIN_PASSWORD=${grafana_password}
+          LOCAL_TEST_PASSWORD=${test_password}
+          LOCAL_TEST_DOMAIN=eadmin.test
+          LOCAL_SUPERADMIN_EMAIL=superadmin@eadmin.test
+          LOCAL_FRONTEND_PORT=3000
+          LOCAL_BACKEND_PORT=8000
+          LOCAL_POSTGRES_PORT=5433
+          LOCAL_REDIS_PORT=6380
+          LOCAL_MINIO_CONSOLE_PORT=9101
+          LOCAL_MAILPIT_SMTP_PORT=1025
+          LOCAL_MAILPIT_UI_PORT=8025
+          LOCAL_PROMETHEUS_PORT=9090
+          LOCAL_GRAFANA_PORT=3001
+          EOF
+
+      - name: Build application images
+        run: |
+          set -euo pipefail
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml build backend frontend
+
+      - name: Start infrastructure and backend
+        run: |
+          set -euo pipefail
+          compose=(docker compose --env-file .env.local.ci -f docker-compose.local.yml)
+
+          "${compose[@]}" up -d postgres redis minio minio-init mailpit
+
+          postgres_ready=false
+          for attempt in $(seq 1 60); do
+            if "${compose[@]}" exec -T postgres pg_isready -U eadmin -d eadmin >/dev/null 2>&1; then
+              postgres_ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "${postgres_ready}" != 'true' ]; then
+            echo 'PostgreSQL did not become ready before migrations.' >&2
+            "${compose[@]}" logs --tail 250 postgres
+            exit 1
+          fi
+
+          "${compose[@]}" run --rm --no-deps backend alembic upgrade head
+          "${compose[@]}" run --rm --no-deps backend python -m app.bootstrap_runtime
+          "${compose[@]}" up -d backend
+
+          for attempt in $(seq 1 90); do
+            if curl -fsS http://localhost:8000/health >/dev/null; then
+              echo 'Backend healthy'
+              exit 0
+            fi
+            sleep 2
+          done
+
+          "${compose[@]}" logs --tail 300 backend
+          exit 1
+
+      - name: Seed governed catalog twice and prove isolation fixtures
+        run: |
+          set -euo pipefail
+          compose=(docker compose --env-file .env.local.ci -f docker-compose.local.yml)
+
+          "${compose[@]}" exec -T backend python -m scripts.seed_recette_data
+          "${compose[@]}" exec -T backend python -m scripts.seed_recette_data
+
+          citizen_count="$("${compose[@]}" exec -T postgres \
+            psql -U eadmin -d eadmin -Atc \
+            "SELECT count(*) FROM users WHERE email='citoyen.awa@recette.eadmin.gn' AND is_active=TRUE;")"
+          test "${citizen_count}" = '1'
+
+          primary_catalog_count="$("${compose[@]}" exec -T postgres \
+            psql -U eadmin -d eadmin -Atc \
+            "SELECT count(*) FROM administrative_services WHERE service_id IN ('recette-acte-naissance','recette-certificat-residence','recette-carte-identite','recette-casier-judiciaire','recette-creation-entreprise') AND is_active=TRUE;")"
+          test "${primary_catalog_count}" = '5'
+
+          isolation_catalog_count="$("${compose[@]}" exec -T postgres \
+            psql -U eadmin -d eadmin -Atc \
+            "SELECT count(*) FROM administrative_services WHERE service_id='recette-isolation-service' AND is_active=TRUE;")"
+          test "${isolation_catalog_count}" = '1'
+
+      - name: Start real frontend
+        run: |
+          set -euo pipefail
+          compose=(docker compose --env-file .env.local.ci -f docker-compose.local.yml)
+          "${compose[@]}" up -d frontend
+
+          for attempt in $(seq 1 90); do
+            if curl -fsS http://localhost:3000 >/dev/null; then
+              echo 'Frontend healthy'
+              exit 0
+            fi
+            sleep 2
+          done
+
+          "${compose[@]}" logs --tail 300 frontend
+          exit 1
+
+      - name: Run strict service catalog Playwright gate
+        run: |
+          set -euo pipefail
+          test -n "${EADMIN_UI_E2E_PASSWORD}"
+          CI=1 bunx playwright test e2e/service-catalog.real.spec.ts \
+            --project=chromium \
+            --workers=1 \
+            --retries=0 \
+            --reporter=github,list | tee /tmp/service-catalog-real-e2e.log
+          grep -Eq '4 passed' /tmp/service-catalog-real-e2e.log
+          if grep -Eq '[1-9][0-9]* skipped' /tmp/service-catalog-real-e2e.log; then
+            echo 'A strict service catalog browser assertion was skipped.' >&2
+            exit 1
+          fi
+
+      - name: Show stack logs on failure
+        if: failure()
+        run: |
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml ps -a || true
+          docker compose --env-file .env.local.ci -f docker-compose.local.yml logs --tail 350 backend frontend postgres redis || true
+
+      - name: Cleanup
+        if: always()
+        run: docker compose --env-file .env.local.ci -f docker-compose.local.yml down -v --remove-orphans || true
